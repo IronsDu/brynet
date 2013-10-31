@@ -10,20 +10,19 @@ extern "C" {
 
 struct server_s
 {
-    void    (*start_pt)(struct server_s* self,  logic_on_enter_pt enter_pt, logic_on_close_pt close_pt, logic_on_recved_pt  recved_pt, logic_on_cansend_pt cansend_pt, logic_on_sendfinish_pt  sendfinish_pt);
-    void    (*poll_pt)(struct server_s* self, int64_t timeout);
-    void    (*stop_pt)(struct server_s* self);
-    void    (*closesession_pt)(struct server_s* self, int index);
-    bool    (*register_pt)(struct server_s* self, int fd);
-    int    (*send_pt)(struct server_s* self, int index, const char* data, int len);
-    int     (*sendv_pt)(struct server_s* self, int index, const char* datas[], const int* lens, int num);
-    int     (*copy_pt)(struct server_s* self, int index, const char* data, int len);
+    void    (*start_callback)(struct server_s* self,  logic_on_enter_handle enter_pt, logic_on_close_handle close_pt, logic_on_recved_handle  recved_pt, logic_on_cansend_handle cansend_pt, logic_on_sendfinish_handle  sendfinish_pt);
+    void    (*poll_callback)(struct server_s* self, int64_t timeout);
+    void    (*stop_callback)(struct server_s* self);
+    void    (*closesession_callback)(struct server_s* self, void* handle);
+    bool    (*register_callback)(struct server_s* self, void* ud, int fd);
+    int     (*send_callback)(struct server_s* self, void* handle, const char* data, int len);
+    int     (*sendv_callback)(struct server_s* self, void* handle, const char* datas[], const int* lens, int num);
 
-    logic_on_enter_pt   logic_on_enter;
-    logic_on_close_pt   logic_on_close;
-    logic_on_recved_pt  logic_on_recved;
-    logic_on_cansend_pt logic_on_cansend;
-    logic_on_sendfinish_pt  logic_on_sendfinish;
+    logic_on_enter_handle   logic_on_enter;
+    logic_on_close_handle   logic_on_close;
+    logic_on_recved_handle  logic_on_recved;
+    logic_on_cansend_handle logic_on_cansend;
+    logic_on_sendfinish_handle  logic_on_sendfinish;
     
     void*   ext;
 };

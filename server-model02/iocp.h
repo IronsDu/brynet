@@ -11,7 +11,6 @@ struct server_s;
 //  session_sendbuffer_size : 内置发送缓冲区大小(存放投递未成功的数据)
 
 struct server_s* iocp_create(
-    int max_num,
     int session_recvbuffer_size,
     int session_sendbuffer_size,
     void*   ext

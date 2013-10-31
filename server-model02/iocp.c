@@ -35,20 +35,20 @@ struct ovl_ext_s
 
 struct session_s
 {
-    int index;
-    sock fd;
+    sock                fd;
     struct buffer_s*    send_buffer;
     struct buffer_s*    recv_buffer;
-    bool    send_ispending;
-    char    ip[IP_SIZE];
-    int port;
-    bool active;            /*  是否连接    */
+    bool                send_ispending;
+    char                ip[IP_SIZE];
+    int                 port;
+    bool                active;            /*  是否连接    */
 
-    WSABUF wsendbuf[MAX_SENDBUF_NUM];
+    WSABUF              wsendbuf[MAX_SENDBUF_NUM];
 
-    bool    is_use;
-    bool    haveleftdata;   /*  逻辑层没有发送完数据标志    */
-    void*   ext_data;
+    bool                is_use;
+    bool                haveleftdata;   /*  逻辑层没有发送完数据标志    */
+    void*               ud;
+    void*               ext_data;
 };
 
 #define permormance 0
@@ -59,15 +59,10 @@ struct iocp_s
 
     bool run_flag;
     HANDLE  iocp_handle;
-    int max_num;
-    struct session_s*   sessions;
     struct session_ext_s* exts;
 
     int session_recvbuffer_size;
     int session_sendbuffer_size;
-
-    struct stack_s* freelist;
-    int freelist_num;
 
 #if permormance
     int send_count; /*  wsasend次数   */
@@ -94,7 +89,6 @@ static void iocp_session_reset(struct session_s* client)
 {
     if(client->fd != SOCKET_ERROR)
     {
-        struct session_ext_s*  ext_p = (struct session_ext_s*)client->ext_data;
         client->active = false;
         ox_socket_close(client->fd);
         client->fd = SOCKET_ERROR;
@@ -102,41 +96,53 @@ static void iocp_session_reset(struct session_s* client)
     }
 }
 
+static void iocp_session_free(struct session_s* client)
+{
+    iocp_session_reset(client);
+    ox_buffer_delete(client->recv_buffer);
+    ox_buffer_delete(client->send_buffer);
+    if(client->ext_data != NULL)
+    {
+        free(client->ext_data);
+    }
+    free(client);
+}
+
 static void iocp_session_onclose(struct iocp_s* iocp, struct session_s* client)
 {
     if(client->active)
     {
         client->active = false;
-        (iocp->base.logic_on_close)(&iocp->base, client->index);
+        (iocp->base.logic_on_close)(&iocp->base, client->ud);
+    }
+    else
+    {
+        iocp_session_free(client);
     }
 }
 
-static void iocp_session_init(struct iocp_s* iocp, struct session_s* client)
+static struct session_s* iocp_session_malloc(struct iocp_s* iocp)
 {
-    struct session_ext_s* ext_p = NULL;
+    struct session_s* session = (struct session_s*)malloc(sizeof *session);
+    struct session_ext_s* ext_data = NULL;
+    session->ext_data = (struct session_ext_s*)malloc(sizeof(struct session_ext_s));
+    ext_data = session->ext_data;
 
-    if(client->ext_data == NULL)
-    {
-        client->ext_data = (struct session_ext_s*)malloc(sizeof(struct session_ext_s));
-    }
+    ZeroMemory(&ext_data->ovl_recv, sizeof(struct ovl_ext_s));
+    ZeroMemory(&ext_data->ovl_send, sizeof(struct ovl_ext_s));
 
-    ext_p = (struct session_ext_s*)client->ext_data;
+    ext_data->ovl_recv.base.Offset = OVL_RECV;
+    ext_data->ovl_send.base.Offset = OVL_SEND;
 
-    ZeroMemory(&ext_p->ovl_recv, sizeof(struct ovl_ext_s));
-    ZeroMemory(&ext_p->ovl_send, sizeof(struct ovl_ext_s));
-
-    ext_p->ovl_recv.base.Offset = OVL_RECV;
-    ext_p->ovl_send.base.Offset = OVL_SEND;
-
-    ext_p->ck.ptr = client;
+    ext_data->ck.ptr = session;
     
-    client->recv_buffer = ox_buffer_new(iocp->session_recvbuffer_size);
-    client->send_buffer = ox_buffer_new(iocp->session_sendbuffer_size);
+    session->recv_buffer = ox_buffer_new(iocp->session_recvbuffer_size);
+    session->send_buffer = ox_buffer_new(iocp->session_sendbuffer_size);
+    session->ud = NULL;
+    session->haveleftdata = false;
+    session->fd = SOCKET_ERROR;
 
-    client->haveleftdata = false;
-    client->fd = SOCKET_ERROR;
-
-    return;
+    return session;
 }
 
 static bool iocp_wait_recv(struct session_s* session, struct session_ext_s*  ext_p, sock fd)
@@ -170,7 +176,7 @@ static bool iocp_recv_complete(struct iocp_s* iocp, struct session_s* session, s
     ox_buffer_addwritepos(temp_buffer, bytes);
 
     {
-        int process_len = (iocp->base.logic_on_recved)(&iocp->base, session->index, ox_buffer_getreadptr(temp_buffer), ox_buffer_getreadvalidcount(temp_buffer));
+        int process_len = (iocp->base.logic_on_recved)(&iocp->base, session->ud, ox_buffer_getreadptr(temp_buffer), ox_buffer_getreadvalidcount(temp_buffer));
         ox_buffer_addreadpos(temp_buffer, process_len);
     }
 
@@ -251,7 +257,7 @@ static bool iocp_send_complete(struct iocp_s* iocp, struct session_s* session, s
     {
         /*  调用上层发送完成通知  */
         /*  用于上层采用sendv接口时,调用此函数直接路由给上层进行下一步处理,此处不做任何其他操作   */
-        (iocp->base.logic_on_sendfinish)(&iocp->base, session->index, bytes);
+        (iocp->base.logic_on_sendfinish)(&iocp->base, session->ud, bytes);
     }   /*  TODO::考证    */
     else
     {
@@ -261,7 +267,7 @@ static bool iocp_send_complete(struct iocp_s* iocp, struct session_s* session, s
         {
             /*  如果socket仍然可写且逻辑层有未发送的数据则通知逻辑层    */
             struct server_s* server = &iocp->base;
-            (server->logic_on_cansend)(server, session->index);
+            (server->logic_on_cansend)(server, session->ud);
         }
     }
 
@@ -309,7 +315,7 @@ static bool iocp_accept_complete(struct iocp_s* iocp, struct session_s* session)
     getpeername(session->fd, (struct sockaddr*)&addr, &addr_len);
     ip = inet_ntoa(addr.sin_addr);
     session->port = htons(addr.sin_port);
-    CopyMemory(session->ip, ip, strlen(ip));
+    strcpy(session->ip, ip);
 
     ox_buffer_init(session->recv_buffer);
     ox_buffer_init(session->send_buffer);
@@ -324,11 +330,8 @@ static bool iocp_accept_complete(struct iocp_s* iocp, struct session_s* session)
     if(!iocp_wait_recv(session, ext, session->fd))
     {
         iocp_session_reset(session);
-        printf("accept %d recv error, %d\n", session->fd, sErrno);
         return false;
     }
-
-    (iocp->base.logic_on_enter)(&iocp->base, session->index);
 
     return true;
 }
@@ -369,6 +372,7 @@ iocp_poll_callback(struct server_s* self, int64_t timeout)
 
         current_time = ox_getnowtime();
         ms = end_time - current_time;
+        ovl_p = NULL;
     }while(ms > 0);
 
 #if permormance
@@ -394,11 +398,11 @@ iocp_poll_callback(struct server_s* self, int64_t timeout)
 
 static void iocp_start_callback(
     struct server_s* self,
-    logic_on_enter_pt enter_pt,
-    logic_on_close_pt close_pt,
-    logic_on_recved_pt   recved_pt,
-    logic_on_cansend_pt cansend_pt,
-    logic_on_sendfinish_pt  sendfinish_pt
+    logic_on_enter_handle enter_pt,
+    logic_on_close_handle close_pt,
+    logic_on_recved_handle   recved_pt,
+    logic_on_cansend_handle cansend_pt,
+    logic_on_sendfinish_handle  sendfinish_pt
     )
 {
     struct iocp_s* iocp = (struct iocp_s*)self;
@@ -417,25 +421,6 @@ static void iocp_start_callback(
         iocp->base.logic_on_cansend = cansend_pt;
         iocp->base.logic_on_sendfinish = sendfinish_pt;
 
-        iocp->exts = (struct session_ext_s*)malloc(sizeof(struct session_ext_s) * iocp->max_num);
-        iocp->sessions = (struct session_s*)malloc(sizeof(struct session_s) * iocp->max_num);
-
-        memset(iocp->sessions, 0, sizeof(struct session_s) * iocp->max_num);
-
-        iocp->freelist = ox_stack_new(iocp->max_num, sizeof(struct session_s*));
-
-        for (; i < iocp->max_num; ++i)
-        {
-            struct session_s* session = iocp->sessions+i;
-            session->ext_data = iocp->exts+i;
-            session->index = i;
-            iocp_session_init(iocp, session);
-            session->active = false;
-
-            ox_stack_push(iocp->freelist, &session);
-            iocp->freelist_num++;
-        }
-
         iocp->run_flag = true;
     }
 }
@@ -447,29 +432,6 @@ static void iocp_stop_callback(struct server_s* self)
     {
         int i = 0;
 
-        for(; i < iocp->max_num; ++i)
-        {
-            ox_socket_close(iocp->sessions[i].fd);
-        }
-
-        i = 0;
-        for(; i < iocp->max_num; ++i)
-        {
-            struct session_s* session = iocp->sessions+i;
-            ox_buffer_delete(session->recv_buffer);
-            ox_buffer_delete(session->send_buffer);
-
-            session->recv_buffer = NULL;
-            session->send_buffer = NULL;
-        }
-
-        ox_stack_delete(iocp->freelist);
-        free(iocp->sessions);
-        iocp->sessions = NULL;
-
-        free(iocp->exts);
-        iocp->exts = NULL;
-
         CloseHandle(iocp->iocp_handle);
         iocp->iocp_handle = NULL;
         iocp->run_flag = false;
@@ -478,38 +440,35 @@ static void iocp_stop_callback(struct server_s* self)
     }
 }
 
-static int iocp_send_callback(struct server_s* self, int index, const char* data, int len)
+static int iocp_send_callback(struct server_s* self, void* handle, const char* data, int len)
 {
     int send_len = 0;
     struct iocp_s* iocp = (struct iocp_s*)self;
-    if(index >= 0 && index < iocp->max_num)
+    struct session_s* session = (struct session_s*)handle;
+
+    if(session->active)
     {
-        struct session_s* session = iocp->sessions+index;
+        send_len = iocp_wrap_session_senddata(session, data, len);
+    }
 
-        if(session->active)
-        {
-            send_len = iocp_wrap_session_senddata(session, data, len);
-        }
-
-        /*  如果没有完全发送完数据则设置标志    */
-        if(!session->haveleftdata)
-        {
-            session->haveleftdata = (send_len >= 0 && send_len < len);
-        }
+    /*  如果没有完全发送完数据则设置标志    */
+    if(!session->haveleftdata)
+    {
+        session->haveleftdata = (send_len >= 0 && send_len < len);
     }
 
     return send_len;
 }
 
 /*  返回-1表示socket断开,否则返回0  */
-static int iocp_sendv_callback(struct server_s* self, int index, const char* datas[], const int* lens, int num)
+static int iocp_sendv_callback(struct server_s* self, void* handle, const char* datas[], const int* lens, int num)
 {
     /*  同一时刻只能存在一次wsasend   */
     int send_len = 0;
     struct iocp_s* iocp = (struct iocp_s*)self;
-    if(index >= 0 && index < iocp->max_num && num > 0 && num <= MAX_SENDBUF_NUM)
+    if(num > 0 && num <= MAX_SENDBUF_NUM)
     {
-        struct session_s* session = iocp->sessions+index;
+        struct session_s* session = (struct session_s*)handle;
 
         if(session->active && !session->is_use)
         {
@@ -539,7 +498,6 @@ static int iocp_sendv_callback(struct server_s* self, int index, const char* dat
                 else
                 {
                     send_len = -1;
-                    printf("%d WSASend send failed, error id: %d\n", index, sErrno);
                     perror("The following error occurred");
                 }
             }
@@ -558,75 +516,47 @@ static int iocp_sendv_callback(struct server_s* self, int index, const char* dat
     return send_len;
 }
 
-static int iocp_copy_callback(struct server_s* self, int index, const char* data, int len)
-{
-    if(data != NULL && len > 0)
-    {
-        struct iocp_s* iocp = (struct iocp_s*)self;
-        if(index >= 0 && index < iocp->max_num)
-        {
-            struct session_s* session = iocp->sessions+index;
-            if(session->active && !session->send_ispending)
-            {
-                if(ox_buffer_write(session->send_buffer, data, len))
-                {
-                    return len;
-                }
-            }
-        }
-    }
-
-    return 0;
-}
-
-static void iocp_closesession_callback(struct server_s* self, int index)
+static void iocp_closesession_callback(struct server_s* self, void* handle)
 {
     struct iocp_s* iocp = (struct iocp_s*)self;
-    struct session_s* session = iocp->sessions+index;
-    
-    if(session->fd != SOCKET_ERROR)
+    struct session_s* session = handle;
+
+    if(session->active)
     {
         iocp_session_reset(session);
-        ox_stack_push(iocp->freelist, &session);
-        iocp->freelist_num++;
-    }
-}
-
-static bool iocp_register_callback(struct server_s* self, int fd)
-{
-    struct iocp_s* iocp = (struct iocp_s*)self;
-    if(iocp->freelist_num > 0)
-    {
-        struct session_s** ppsession = (struct session_s**)ox_stack_popback(iocp->freelist);
-        if(ppsession != NULL)
-        {
-            struct session_s* session = *ppsession;
-            iocp->freelist_num--;
-
-            session->fd = fd;
-            
-            if(!iocp_accept_complete(iocp, session))
-            {
-                ox_stack_push(iocp->freelist, ppsession);
-                iocp->freelist_num++;
-                return false;
-            }
-            else
-            {
-                return true;
-            }
-        }
     }
     else
     {
-        printf("register fd error, because res no enough");
+        iocp_session_free(session);
+    }
+}
+
+static bool iocp_register_callback(struct server_s* self, void* ud, int fd)
+{
+    bool ret = false;
+    struct iocp_s* iocp = (struct iocp_s*)self;
+    struct session_s* session = iocp_session_malloc(iocp);
+    session->fd = fd;
+    session->ud = ud;
+
+    if(iocp_accept_complete(iocp, session))
+    {
+        (iocp->base.logic_on_enter)(&iocp->base, session->ud, session);
+
+        ret = true;
+    }
+    else
+    {
+        free(session->ext_data);
+        free(session);
+
+        ret = false;
     }
 
-    return false;
+    return ret;
 }
 
 struct server_s* iocp_create(
-    int max_num,
     int session_recvbuffer_size,
     int session_sendbuffer_size,
     void*   ext)
@@ -634,18 +564,16 @@ struct server_s* iocp_create(
     struct iocp_s* iocp = (struct iocp_s*)malloc(sizeof(struct iocp_s));
     memset(iocp, 0, sizeof(*iocp));
 
-    iocp->base.start_pt = iocp_start_callback;
-    iocp->base.poll_pt = iocp_poll_callback;
-    iocp->base.stop_pt = iocp_stop_callback;
-    iocp->base.closesession_pt = iocp_closesession_callback;
-    iocp->base.register_pt = iocp_register_callback;
-    iocp->base.send_pt = iocp_send_callback;
-    iocp->base.sendv_pt = iocp_sendv_callback;
-    iocp->base.copy_pt = iocp_copy_callback;
+    iocp->base.start_callback = iocp_start_callback;
+    iocp->base.poll_callback = iocp_poll_callback;
+    iocp->base.stop_callback = iocp_stop_callback;
+    iocp->base.closesession_callback = iocp_closesession_callback;
+    iocp->base.register_callback = iocp_register_callback;
+    iocp->base.send_callback = iocp_send_callback;
+    iocp->base.sendv_callback = iocp_sendv_callback;
 
     iocp->base.ext = ext;
     iocp->run_flag = false;
-    iocp->max_num = max_num;
 
     iocp->session_recvbuffer_size = session_recvbuffer_size;
     iocp->session_sendbuffer_size = session_sendbuffer_size;

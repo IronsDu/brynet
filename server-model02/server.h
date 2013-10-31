@@ -12,26 +12,25 @@ extern "C" {
 
 struct server_s;
 
-typedef void (*logic_on_enter_pt)(struct server_s* self, int index);
-typedef void (*logic_on_close_pt)(struct server_s* self, int index);
-typedef int (*logic_on_recved_pt)(struct server_s* self, int index, const char* buffer, int len);
-typedef void (*logic_on_cansend_pt)(struct server_s* self, int index);
-typedef void (*logic_on_sendfinish_pt)(struct server_s* self, int index, int len);
+typedef void (*logic_on_enter_handle)(struct server_s* self, void* ud, void* handle);
+typedef void (*logic_on_close_handle)(struct server_s* self, void* ud);
+typedef int (*logic_on_recved_handle)(struct server_s* self, void* ud, const char* buffer, int len);
+typedef void (*logic_on_cansend_handle)(struct server_s* self, void* ud);
+typedef void (*logic_on_sendfinish_handle)(struct server_s* self, void* ud, int len);
 
 void server_start(struct server_s* self,
-                  logic_on_enter_pt enter_pt,
-                  logic_on_close_pt close_pt,
-                  logic_on_recved_pt    recved_pt,
-                  logic_on_cansend_pt canrecv_pt,
-                  logic_on_sendfinish_pt  sendfinish_pt);
+                  logic_on_enter_handle enter_callback,
+                  logic_on_close_handle close_callback,
+                  logic_on_recved_handle    recved_callback,
+                  logic_on_cansend_handle canrecv_callback,
+                  logic_on_sendfinish_handle  sendfinish_callback);
 
 void server_pool(struct server_s* self, int timeout);
 void server_stop(struct server_s* self);
-void server_close(struct server_s* self, int index);
-bool server_register(struct server_s* self, int fd);
-int server_send(struct server_s* self, int index, const char* data, int len);
-int server_sendv(struct server_s* self, int index, const char* datas[], const int* lens, int num);
-int server_copy(struct server_s* self, int index, const char* data, int len);
+void server_close(struct server_s* self, void* handle);
+bool server_register(struct server_s* self, void* ud, int fd);
+int server_send(struct server_s* self, void* handle, const char* data, int len);
+int server_sendv(struct server_s* self, void* handle, const char* datas[], const int* lens, int num);
 
 void* server_getext(struct server_s* self);
 
