@@ -28,37 +28,19 @@ struct msg_data_s
     char data[1];                       /*  消息包内容,库使用者序列化数据到此缓冲区    */
 };
 
-/*  网络库缓冲池配置参数  */
-struct connection_msgpool_config
-{
-    const int*    sendmsg_pool_num;     /*  各种类的消息包默认个数  */
-    const int*    sendmsg_pool_len;     /*  各种类的长度  */
-    char    sendmsg_pool_typemax;       /*  长度配置个数  */
-
-    const int*    netmsg_pool_num;      /*  各种类的消息包默认个数 */
-    const int*    netmsg_pool_len;      /*  各种类的长度  */
-    char    netmsg_pool_typemax;        /*  长度配置个数  */
-};
-
 /*  检查数据是否包含完整包 */
 typedef int (*pfn_check_packet)(const char* buffer, int len);
 /*  包处理函数类型 */
 typedef void (*pfn_packet_handle)(struct connection_s* self, struct msg_data_s*, void* ext);
 
 /*  创建客户端网络    */
-DLL_CONF    struct connection_s* ox_connection_new(int rdsize, int sdsize, pfn_check_packet, pfn_packet_handle, const struct connection_msgpool_config config, void* ext);
+DLL_CONF    struct connection_s* ox_connection_new(int rdsize, int sdsize, pfn_check_packet, pfn_packet_handle, void* ext);
 
 /*  释放客户端网络实例:非线程安全 */
 DLL_CONF    void ox_connection_delete(struct connection_s* self);
 
 /*  申请消息包   */
-DLL_CONF    struct msg_data_s* ox_connection_sendmsg_claim(struct connection_s* self, int pool_index);
-
-/*  根据长度申请合适的消息包   */
-DLL_CONF    struct msg_data_s* ox_connection_sendmsg_lenclaim(struct connection_s* self, int data_len);
-
-/*  返回消息类型最大容量  */
-DLL_CONF    int ox_connection_config_datalen(struct connection_s* self, struct msg_data_s* msg);
+DLL_CONF    struct msg_data_s* ox_connection_sendmsg_claim(struct connection_s* self, int len);
 
 /*  发送消息包   */
 DLL_CONF    void ox_connection_send(struct connection_s* self, struct msg_data_s* msg);

@@ -39,12 +39,10 @@ struct connection_s
     struct fdset_s*         fdset;
 
     struct buffer_s*        send_buffer;
-    struct multi_pool_s*    sendmsg_pools;
     struct rwlist_s*        sendmsg_list;       /*  逻辑层投递给网络层的消息队列   */
     struct rwlist_s*        free_sendmsg_list;  /*  网络层已经处理的消息队列(需要逻辑层回收)   */
 
     struct buffer_s*        recv_buffer;
-    struct multi_pool_s*    netmsg_pools;
     struct rwlist_s*        netmsg_list;        /*  网络层投递给逻辑层的消息队列  */
     struct rwlist_s*        free_netmsg_list;   /*  逻辑层已经处理的消息队列(需要网络层回收)   */
 
@@ -66,7 +64,7 @@ struct connection_s
 #define DF_RWLIST_PENDING_NUM (5)
 
 struct connection_s*
-ox_connection_new(int rdsize, int sdsize, pfn_check_packet check, pfn_packet_handle handle, const struct connection_msgpool_config config, void* ext)
+ox_connection_new(int rdsize, int sdsize, pfn_check_packet check, pfn_packet_handle handle, void* ext)
 {
     struct connection_s* ret = (struct connection_s*)malloc(sizeof(*ret));
 
@@ -75,15 +73,11 @@ ox_connection_new(int rdsize, int sdsize, pfn_check_packet check, pfn_packet_han
     ret->fdset = ox_fdset_new();
 
     ret->send_buffer = ox_buffer_new(sdsize);
-    
-    ret->sendmsg_pools = ox_multi_pool_new(config.sendmsg_pool_num, config.sendmsg_pool_len, config.sendmsg_pool_typemax, sizeof(struct msg_data_s));
 
     ret->sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
     ret->free_sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
 
     ret->recv_buffer = ox_buffer_new(rdsize);
-
-    ret->netmsg_pools = ox_multi_pool_new(config.netmsg_pool_num, config.netmsg_pool_len, config.netmsg_pool_typemax, sizeof(struct msg_data_s));
 
     ret->netmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
     ret->free_netmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
@@ -114,9 +108,6 @@ ox_connection_delete(struct connection_s* self)
     ox_rwlist_delete(self->free_netmsg_list);
     ox_rwlist_delete(self->proc_list);
 
-    ox_multi_pool_delete(self->sendmsg_pools);
-    ox_multi_pool_delete(self->netmsg_pools);
-
     if(self->fd != SOCKET_ERROR)
     {
         ox_socket_close(self->fd);
@@ -127,29 +118,15 @@ ox_connection_delete(struct connection_s* self)
 }
 
 struct msg_data_s*
-ox_connection_sendmsg_claim(struct connection_s* self, int pool_index)
+ox_connection_sendmsg_claim(struct connection_s* self, int len)
 {
-    return (struct msg_data_s*)ox_multi_pool_claim(self->sendmsg_pools, pool_index);
-}
-
-struct msg_data_s*
-ox_connection_sendmsg_lenclaim(struct connection_s* self, int len)
-{
-    return (struct msg_data_s*)ox_multi_pool_lenclaim(self->sendmsg_pools, len+sizeof(struct msg_data_s));
-}
-
-int
-ox_connection_config_datalen(struct connection_s* self, struct msg_data_s* msg)
-{
-    return (ox_multi_pool_config_len(self->sendmsg_pools, (char*)msg) - sizeof(struct msg_data_s));
+    return (struct msg_data_s*)malloc(sizeof(struct msg_data_s)+len);
 }
 
 void
 ox_connection_send(struct connection_s* self, struct msg_data_s* msg)
 {
     /*  逻辑层请求网络层发送数据(投递消息给网络层)  */
-    int temp = ox_multi_pool_config_len(self->sendmsg_pools, (char*)msg);
-    assert((msg->len+sizeof(struct msg_data_s)) <= temp);
     msg->type = send_msg_data;
 
     self->current_msg_id++;
@@ -220,7 +197,7 @@ connection_close(struct connection_s* self)
 static void
 connection_send_logicmsg(struct connection_s* self, enum net_msg_type type, const char* data, int data_len)
 {
-    struct msg_data_s* msg = (struct msg_data_s*)ox_multi_pool_lenclaim(self->netmsg_pools, data_len+sizeof(struct msg_data_s));
+    struct msg_data_s* msg = (struct msg_data_s*)malloc(data_len+sizeof(struct msg_data_s));
     assert(msg != NULL);
 
     if(msg != NULL)
@@ -340,14 +317,13 @@ connection_connect_help(struct connection_s* self, struct connect_msg* connect_d
 static void
 connection_free_sendmsglist(struct connection_s* self)
 {
-    struct multi_pool_s* sendmsg_pools = self->sendmsg_pools;
     struct rwlist_s*    free_sendmsg_list = self->free_sendmsg_list;
     struct msg_data_s** msg_p = NULL;
 
     while((msg_p = (struct msg_data_s**)ox_rwlist_pop(free_sendmsg_list, 0)) != NULL)
     {
         struct msg_data_s* msg = *msg_p;
-        ox_multi_pool_reclaim(sendmsg_pools, (char*)msg);
+        free(msg);
     }
 }
 
@@ -355,13 +331,12 @@ static void
 connection_free_netmsglist(struct connection_s* self)
 {
     struct rwlist_s* freenetmsg_list = self->free_netmsg_list;
-    struct multi_pool_s* netmsg_pool = self->netmsg_pools;
     struct msg_data_s** msg_p = NULL;
 
     while((msg_p = (struct msg_data_s**)ox_rwlist_pop(freenetmsg_list, 0)) != NULL)
     {
         struct msg_data_s* msg = *msg_p;
-        ox_multi_pool_reclaim(netmsg_pool, (char*)msg);
+        free(msg);
     }
 }
 
