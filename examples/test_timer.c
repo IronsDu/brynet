@@ -1,14 +1,17 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include "../../common/timeaction.h"
-#include "../../common/systemlib.h"
-#include "../../common/heap.h"
-#include "../../common/typepool.h"
 
+#include "typepool.h"
+#include "systemlib.h"
+#include "timeaction.h"
+#include "heap.h"
+
+static int count = 0;
 static void my_handler(void* arg)
 {
-    //printf("handler\n");
+    printf("handler\n");
+	count++;
 }
 
 static void my_handler1(void* arg)
@@ -18,14 +21,14 @@ static void my_handler1(void* arg)
 
 void typepool_cpu()
 {
-    struct type_pool_s* tp = type_pool_new(40000, sizeof(int));
+    struct type_pool_s* tp = ox_type_pool_new(40000, sizeof(int));
     int i = 0;
-    unsigned int old =  getnowtime();
+	unsigned int old =  ox_getnowtime();
     printf("开始分配：%d\n", old);
     while( i < 80001)
     {
-        char* p = type_pool_claim(tp);
-        type_pool_reclaim(tp, p);
+		char* p = ox_type_pool_claim(tp);
+		ox_type_pool_reclaim(tp, p);
         i++;
         ;
     }
@@ -33,7 +36,7 @@ void typepool_cpu()
     i = 0;
     while( i < 80000)
     {
-        char* p = type_pool_claim(tp);
+        char* p = ox_type_pool_claim(tp);
 
         i++;
         ;
@@ -44,30 +47,34 @@ void typepool_cpu()
 
 void test_timer_cpu()
 {
-    unsigned int old =  getnowtime();
+    unsigned int old =  ox_getnowtime();
     int id = -1;
     int i = 0;
-    struct timeaction_mgr_s* time_mgr = 0;
+    struct timer_mgr_s* time_mgr = 0;
     printf("开始构造:%d\n", old);
-    time_mgr = timeaction_mgr_new(10000000);
-    id = timeaction_mgr_add(time_mgr, my_handler1, 3000, NULL);
+	time_mgr = ox_timer_mgr_new(10000000);
+	id = ox_timer_mgr_add(time_mgr, my_handler1, 3000, NULL);
 
-    old =  getnowtime();
+    old =  ox_getnowtime();
     printf("开始添加:%d\n", old);
     for(; i < 1000000; ++i)
     {
-        id = timeaction_mgr_add(time_mgr, my_handler, rand() % 2000, NULL);
+        id = ox_timer_mgr_add(time_mgr, my_handler, rand() % 2000, NULL);
     }
-    old =  getnowtime();
+    old =  ox_getnowtime();
     //timeaction_mgr_del(time_mgr, id);
     printf("开始调度:%d\n", old);
     
-    while(timeaction_mgr_schedule(time_mgr))
-    {
-        ;
-    }
+	while(1)
+	{
+		ox_timer_mgr_schedule(time_mgr);
+		if(count >= 1000000)
+		{
+			break;
+		}
+	}
     
-    old =  getnowtime();
+    old =  ox_getnowtime();
     //timeaction_mgr_del(time_mgr, id);
     printf("调度结束:%d\n", old);   
 }
@@ -95,20 +102,20 @@ void heap_cpu()
     void* p = 0;
     int i = 0;
     int to = 0;
-    unsigned int old =  getnowtime();
-    struct heap_s* heap = heap_new(100000, sizeof(int), compare_int, swap_int, NULL);
+	unsigned int old =  ox_getnowtime();
+	struct heap_s* heap = ox_heap_new(100000, sizeof(int), compare_int, swap_int, NULL);
     
-    old =  getnowtime();
+	old =  ox_getnowtime();
     printf("开始添加堆元素:%d\n", old);   
     for(; i < 1000000; ++i)
     {
         a = rand() % 10000;
-        heap_insert(heap, &a);
+		ox_heap_insert(heap, &a);
     }
 
-    old =  getnowtime();
+    old =  ox_getnowtime();
     printf("添加完毕，开始pop:%d\n", old);  
-    while( p =heap_pop(heap))
+	while( p =ox_heap_pop(heap))
     {
         to++;
             //int temp = *(int*)p;
@@ -116,7 +123,7 @@ void heap_cpu()
         ;
     }
     
-    old =  getnowtime();
+    old =  ox_getnowtime();
     printf("pop完毕:%d, to:%d\n", old, to);  
 }
 

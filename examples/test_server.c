@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "thread.h"
 #include "socketlibfunction.h"
 #include "thread_reactor.h"
@@ -58,12 +61,11 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
     {
         /*  申请发送消息  */
         struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, 1024);
-        printf("request close session \n");
-        strcpy(sd_msg->data, "<head>hello</head>");
-        sd_msg->data_len = strlen("<head>hello</head>")+1;
+		printf("recv %s \n", msg->data);
+		memcpy(sd_msg->data, msg->data, msg->data_len);
+        sd_msg->data_len = msg->data_len;
         /*  发送消息    */
         ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
-        ox_nrmgr_request_closesession(mgr, msg->session);
     }
 }
 

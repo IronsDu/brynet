@@ -25,11 +25,11 @@ printf("############### ThreadID : %d\n", (int)pthread_self());
 
     
     printf("wait counter lock\n");
-    mutex_lock(count_mutex);
+	ox_mutex_lock(count_mutex);
     counter++;
 
     printf("current count : %d\n", counter);
-    mutex_unlock(count_mutex);
+	ox_mutex_unlock(count_mutex);
 
     printf("un counter lock\n");
 }
@@ -57,10 +57,10 @@ int main()
     int i= 0;
     struct thread_s* pthrea = NULL;
     p = thread_pool_new(my_msg_fun, 4, 4000);
-    count_mutex = mutex_new();
+	count_mutex = ox_mutex_new();
     thread_pool_start(p);
     
-    thread_sleep(1000);
+	ox_thread_sleep(1000);
     thread_pool_pushmsg(p, (void*)3);
     thread_pool_pushmsg(p, (void*)3);
     thread_pool_pushmsg(p, (void*)3);
@@ -74,7 +74,7 @@ int main()
     thread_pool_pushmsg(p, (void*)3);
     thread_pool_pushmsg(p, (void*)3);
     
-    pthrea = thread_new(haha, NULL);
+    pthrea = ox_thread_new(haha, NULL);
     
     thread_pool_wait(p);
 
@@ -96,7 +96,7 @@ int main()
         i++;
     }
     
-    thread_wait(pthrea);
+    ox_thread_wait(pthrea);
     thread_pool_delete(p);
     return 0;
 }
