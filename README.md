@@ -3,7 +3,7 @@
 
 * C语言数据结构
 * 网络
-    * 原始ocket api封装
+    * 原始socket api封装
     * 网络库(管理多个socket,以及基于消息和回调的高级封装)
 * 线程
     * 原始thread api封装
