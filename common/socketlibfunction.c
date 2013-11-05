@@ -1,3 +1,4 @@
+#include "fdset.h"
 #include "socketlibfunction.h"
 
 #if defined PLATFORM_WINDOWS
@@ -81,6 +82,85 @@ ox_socket_connect(const char* server_ip, int port)
                 continue;
             }
         }
+    }
+
+    return clientfd;
+}
+
+sock
+ox_socket_nonblock_connect(const char* server_ip, int port, int second)
+{
+	struct sockaddr_in server_addr;
+    sock clientfd = SOCKET_ERROR;
+    bool connect_ret = true;
+
+    ox_socket_init();
+
+    clientfd = socket(AF_INET, SOCK_STREAM, 0);
+    ox_socket_nonblock(clientfd);
+
+    if(clientfd != SOCKET_ERROR)
+    {
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = inet_addr(server_ip);
+        server_addr.sin_port = htons(port);
+
+        if(connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) < 0)
+        {
+            int check_error = 0;
+            
+            #if defined PLATFORM_WINDOWS
+            check_error = WSAEWOULDBLOCK;
+            #else
+            check_error = EINPROGRESS;
+            #endif
+
+            if(check_error != sErrno)
+            {
+                connect_ret = false;
+            }
+            else
+            {
+                struct fdset_s* fdset = ox_fdset_new();
+                bool canwrite = false;
+                bool canread = false;
+                /*  重设默认链接状态为失败   */
+                connect_ret = false;
+
+                ox_fdset_add(fdset, clientfd, ReadCheck | WriteCheck);
+                ox_fdset_poll(fdset, second);
+
+                canwrite = ox_fdset_check(fdset, clientfd, WriteCheck);
+                canread = ox_fdset_check(fdset, clientfd, ReadCheck);
+
+                if(canwrite)
+                {
+                    if(canread)
+                    {
+                        int error;
+                        int len = sizeof(error);
+                        if(getsockopt(clientfd, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len) >= 0)
+                        {
+                            /*  返回值不为-1(linux下失败也返回0,后续会检测出来)即为成功 */
+                            connect_ret = true;
+                        }
+                    }
+                    else
+                    {
+                        /*  可读且不可写即为链接成功    */
+                        connect_ret = true;
+                    }
+                }
+
+                ox_fdset_delete(fdset);
+            }
+        }
+    }
+
+    if(!connect_ret)
+    {
+        ox_socket_close(clientfd);
+        clientfd = SOCKET_ERROR;
     }
 
     return clientfd;

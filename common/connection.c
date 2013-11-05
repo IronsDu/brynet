@@ -215,85 +215,6 @@ connection_send_logicmsg(struct connection_s* self, enum net_msg_type type, cons
     }
 }
 
-static sock
-socket_non_connect(const char* server_ip, int port, int overtime)
-{
-    struct sockaddr_in server_addr;
-    sock clientfd = SOCKET_ERROR;
-    bool connect_ret = true;
-
-    ox_socket_init();
-
-    clientfd = socket(AF_INET, SOCK_STREAM, 0);
-    ox_socket_nonblock(clientfd);
-
-    if(clientfd != SOCKET_ERROR)
-    {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_addr.s_addr = inet_addr(server_ip);
-        server_addr.sin_port = htons(port);
-
-        if(connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) < 0)
-        {
-            int check_error = 0;
-            
-            #if defined PLATFORM_WINDOWS
-            check_error = WSAEWOULDBLOCK;
-            #else
-            check_error = EINPROGRESS;
-            #endif
-
-            if(check_error != sErrno)
-            {
-                connect_ret = false;
-            }
-            else
-            {
-                struct fdset_s* fdset = ox_fdset_new();
-                bool canwrite = false;
-                bool canread = false;
-                /*  重设默认链接状态为失败   */
-                connect_ret = false;
-
-                ox_fdset_add(fdset, clientfd, ReadCheck | WriteCheck);
-                ox_fdset_poll(fdset, overtime);
-
-                canwrite = ox_fdset_check(fdset, clientfd, WriteCheck);
-                canread = ox_fdset_check(fdset, clientfd, ReadCheck);
-
-                if(canwrite)
-                {
-                    if(canread)
-                    {
-                        int error;
-                        int len = sizeof(error);
-                        if(getsockopt(clientfd, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len) >= 0)
-                        {
-                            /*  返回值不为-1(linux下失败也返回0,后续会检测出来)即为成功 */
-                            connect_ret = true;
-                        }
-                    }
-                    else
-                    {
-                        /*  可读且不可写即为链接成功    */
-                        connect_ret = true;
-                    }
-                }
-
-                ox_fdset_delete(fdset);
-            }
-        }
-    }
-
-    if(!connect_ret)
-    {
-        ox_socket_close(clientfd);
-        clientfd = SOCKET_ERROR;
-    }
-
-    return clientfd;
-}
-
 void
 connection_connect_help(struct connection_s* self, struct connect_msg* connect_data)
 {
@@ -302,7 +223,7 @@ connection_connect_help(struct connection_s* self, struct connect_msg* connect_d
         return;
     }
 
-    self->fd = socket_non_connect(connect_data->ip, connect_data->port, connect_data->timeout);
+    self->fd = ox_socket_nonblock_connect(connect_data->ip, connect_data->port, connect_data->timeout);
     if(self->fd != SOCKET_ERROR)
     {
         ox_socket_nodelay(self->fd);
