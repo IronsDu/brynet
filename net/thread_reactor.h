@@ -41,7 +41,6 @@ typedef int (*pfn_nrmgr_check_packet)(void* ud, const char* buffer, int len);
 DLL_CONF struct nr_mgr* ox_create_nrmgr(
     int thread_num,                 /*  网络层开启的reactor线程数量   */
     int rbsize,                     /*  单个会话的内置接收缓冲区大小  */
-    int sbsize,                     /*  单个会话的内置发送缓冲区大小  */
     pfn_nrmgr_check_packet check    /*  网络层接收到数据时判断包完整性的回调函数    */
     );
 

@@ -10,6 +10,7 @@
 #include "thread.h"
 #include "mutex.h"
 #include "timeaction.h"
+#include "list.h"
 
 #ifdef PLATFORM_LINUX
 #include "epollserver.h"
@@ -66,7 +67,6 @@ struct net_session_s
     bool                    active;                 /*  是否处于链接状态    */
     bool                    wait_flush;             /*  是否处于等待flush中    */
     int                     flush_id;               /*  刷新定时器的ID    */
-
     void*                   handle;                 /*  下层网络对象  */
     void*                   ud;                     /*  上层用户数据  */
 };
@@ -90,6 +90,8 @@ struct net_reactor
     struct thread_s*        thread;
 
     struct timer_mgr_s*     flush_timer;
+
+    struct list_s*          waitsend_list;
 };
 
 /*  session待发的消息    */
@@ -161,7 +163,6 @@ struct nr_mgr*
 ox_create_nrmgr(
     int thread_num,
     int rbsize,
-    int sbsize,
     pfn_nrmgr_check_packet check)
 {
     struct nr_mgr* mgr = (struct nr_mgr*)malloc(sizeof(*mgr));
@@ -179,7 +180,7 @@ ox_create_nrmgr(
         #ifdef PLATFORM_LINUX
         reactor->server = epollserver_create(rbsize, sbsize, &mgr->reactors[i]);
         #else
-        reactor->server = iocp_create(rbsize, sbsize, &mgr->reactors[i]);
+        reactor->server = iocp_create(rbsize, 0, &mgr->reactors[i]);
         #endif
         
         reactor->rwlist = ox_rwlist_new(1024, sizeof(struct rwlist_msg_data) , DF_RWLIST_PENDING_NUM);
@@ -192,7 +193,7 @@ ox_create_nrmgr(
 
         server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_close_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback);
         reactor->flush_timer = ox_timer_mgr_new(1024);
-
+        reactor->waitsend_list = ox_list_new(1024, sizeof(struct net_session_s*));
         reactor->thread = NULL;
         reactor->thread = ox_thread_new(reactor_thread, reactor);
     }
@@ -423,6 +424,7 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
 
     server_close(reactor->server, session->handle);
     session->active = false;
+    session->wait_flush = false;
     if(session->flush_id != -1 && session->wait_flush)
     {
         ox_timer_mgr_del(reactor->flush_timer, session->flush_id);
@@ -473,6 +475,16 @@ insert_flush(struct net_reactor* reactor, struct net_session_s* session)
 }
 
 static void
+add_session_to_waitsendlist(struct net_reactor* reactor, struct net_session_s* session)
+{
+    if(!session->wait_flush)
+    {
+        session->wait_flush = true;
+        ox_list_push_back(reactor->waitsend_list, &session);
+    }
+}
+
+static void
 reactor_proc_sendmsg(struct net_reactor* reactor, struct net_session_s* session, struct nrmgr_send_msg_data* data)
 {
     if(session->active)
@@ -493,7 +505,15 @@ reactor_proc_sendmsg(struct net_reactor* reactor, struct net_session_s* session,
                 session->lens[session->bufnum] = pending->left_len;
                 ++(session->bufnum);
 
-                insert_flush(reactor, session);
+                if(false)
+                {
+                    insert_flush(reactor, session);
+                }
+                else
+                {
+                    /*	添加到活动send列表	*/
+                    add_session_to_waitsendlist(reactor, session);
+                }
             }
         }
         else
@@ -580,7 +600,23 @@ reactor_thread(void* arg)
         /*  由用户给定网络库每次循环的超时时间   */
         server_pool(reactor->server, SOCKET_POLL_TIME);
 
-        ox_timer_mgr_schedule(reactor->flush_timer);
+        if(false)
+        {
+            ox_timer_mgr_schedule(reactor->flush_timer);
+        }
+        else
+        {
+            struct list_node_s* begin = ox_list_begin(reactor->waitsend_list);
+            const struct list_node_s* end = ox_list_end(reactor->waitsend_list);
+
+            while(begin != end)
+            {
+                struct net_session_s* session = *(struct net_session_s**)begin->data;
+                session->wait_flush = false;
+                begin = ox_list_erase(reactor->waitsend_list, begin);
+                session_packet_flush(reactor, session);
+            }
+        }
     }
 }
 
