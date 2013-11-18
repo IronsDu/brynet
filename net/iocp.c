@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "socketlibfunction.h"
 #include "server.h"
@@ -38,15 +39,15 @@ struct session_s
     sock                fd;
     struct buffer_s*    send_buffer;
     struct buffer_s*    recv_buffer;
-    bool                send_ispending;
     char                ip[IP_SIZE];
     int                 port;
-    bool                active;            /*  是否连接    */
 
     WSABUF              wsendbuf[MAX_SENDBUF_NUM];
 
-    bool                is_use;
-    bool                haveleftdata;   /*  逻辑层没有发送完数据标志    */
+    bool                send_ispending;     /*  发送是否挂起  */
+    bool                active;             /*  连接是否正常    */
+    bool                send_isuse;         /*  是否已经投递了send */
+
     void*               ud;
     void*               ext_data;
 };
@@ -89,10 +90,10 @@ static void iocp_session_reset(struct session_s* client)
 {
     if(client->fd != SOCKET_ERROR)
     {
-        client->active = false;
         ox_socket_close(client->fd);
         client->fd = SOCKET_ERROR;
-        client->is_use = false;
+        client->active = false;
+        client->send_isuse = false;
     }
 }
 
@@ -117,6 +118,7 @@ static void iocp_session_onclose(struct iocp_s* iocp, struct session_s* client)
     }
     else
     {
+        /*  逻辑层通知关闭session后，iocp可能也会得到socket关闭通知，所以这时active为false   */
         iocp_session_free(client);
     }
 }
@@ -138,8 +140,12 @@ static struct session_s* iocp_session_malloc(struct iocp_s* iocp)
     
     session->recv_buffer = ox_buffer_new(iocp->session_recvbuffer_size);
     session->send_buffer = ox_buffer_new(iocp->session_sendbuffer_size);
+
+    session->send_ispending = false;
+    session->send_isuse = false;
+    session->active = true;
+
     session->ud = NULL;
-    session->haveleftdata = false;
     session->fd = SOCKET_ERROR;
 
     return session;
@@ -165,6 +171,10 @@ static bool iocp_wait_recv(struct session_s* session, struct session_ext_s*  ext
                 ret = false;
             }
         }
+        else
+        {
+            assert(false);
+        }
     }
 
     return ret;
@@ -189,89 +199,17 @@ static bool iocp_recv_complete(struct iocp_s* iocp, struct session_s* session, s
     return iocp_wait_recv(session, ext_p, session->fd);
 }
 
-static int iocp_session_senddata(struct session_s* session, const char* data, int len)
+static void iocp_send_complete(struct iocp_s* iocp, struct session_s* session, struct session_ext_s* ext_p, int bytes)
 {
-    int send_len = 0;
-
-    if(len > 0 && !session->send_ispending)
-    {
-        WSABUF  out_buf = {len, (char*)data};
-        OVERLAPPED* ovl_p = &(((struct session_ext_s*)session->ext_data)->ovl_send.base);
-        ovl_p->OffsetHigh   = len;
-        send_len = len;
-
-        if(SOCKET_ERROR == (WSASend(session->fd, &out_buf, 1, (LPDWORD)&send_len, 0, ovl_p, 0)))
-        {
-            if(sErrno == WSA_IO_PENDING)
-            {
-                /*  设置pending标志位为true   */
-                session->send_ispending = true;
-            }
-            else
-            {
-                send_len = -1;
-            }
-        }
-    }
-
-    return send_len;
-}
-
-/*  TODO::不管是epoll和iocp是否该提供预先序列化数据,然后再直接发送缓冲区    */
-static int iocp_wrap_session_senddata(struct session_s* session, const char* data, int len)
-{
-    struct buffer_s* temp_buffer = session->send_buffer;
-    int send_len = 0;
-    int temp_size = 0;
-
-    /*  如果session处于pending或者copy到内置缓冲区失败则返回0   */
-    if(session->send_ispending || (data != NULL && !ox_buffer_write(temp_buffer, data, len)))
-    {
-        return 0;
-    }
-
-    /*  获取可读(待发送)数据  */
-    temp_size = ox_buffer_getreadvalidcount(temp_buffer);
-    if(temp_size > 0)
-    {
-        /*  投递待发送数据 */
-        send_len = iocp_session_senddata(session, ox_buffer_getreadptr(temp_buffer), temp_size);
-        if(send_len > 0)
-        {
-            /*  投递(无论pending与否)成功清除数据    */
-            ox_buffer_addreadpos(temp_buffer, temp_size);
-        }
-    }
-
-    return send_len;
-}
-
-static bool iocp_send_complete(struct iocp_s* iocp, struct session_s* session, struct session_ext_s* ext_p, int bytes)
-{
-    int ret = 0;
-
     session->send_ispending = false;
-    session->is_use = false;
+    session->send_isuse = false;
 
     if(iocp->base.logic_on_sendfinish)
     {
         /*  调用上层发送完成通知  */
         /*  用于上层采用sendv接口时,调用此函数直接路由给上层进行下一步处理,此处不做任何其他操作   */
         (iocp->base.logic_on_sendfinish)(&iocp->base, session->ud, bytes);
-    }   /*  TODO::考证    */
-    else
-    {
-        ret = iocp_wrap_session_senddata(session, NULL, 0);
-
-        if(ret >= 0 && !session->send_ispending && session->haveleftdata)
-        {
-            /*  如果socket仍然可写且逻辑层有未发送的数据则通知逻辑层    */
-            struct server_s* server = &iocp->base;
-            (server->logic_on_cansend)(server, session->ud);
-        }
     }
-
-    return  ret >= 0;
 }
 
 static void iocp_iocomplete(struct iocp_s* iocp, struct session_s* session, struct session_ext_s* ext_p, int offset, int bytes)
@@ -296,7 +234,7 @@ static void iocp_iocomplete(struct iocp_s* iocp, struct session_s* session, stru
             iocp->total_send_len += bytes;
         }
 #endif
-        must_close = !iocp_send_complete(iocp, session, ext_p, bytes);
+        iocp_send_complete(iocp, session, ext_p, bytes);
     }
 
     if(must_close)
@@ -316,12 +254,6 @@ static bool iocp_accept_complete(struct iocp_s* iocp, struct session_s* session)
     ip = inet_ntoa(addr.sin_addr);
     session->port = htons(addr.sin_port);
     strcpy(session->ip, ip);
-
-    ox_buffer_init(session->recv_buffer);
-    ox_buffer_init(session->send_buffer);
-
-    session->active = true;
-    session->is_use = false;
 
     ox_socket_nonblock(session->fd);
 
@@ -430,34 +362,12 @@ static void iocp_stop_callback(struct server_s* self)
     struct iocp_s* iocp = (struct iocp_s*)self;
     if(iocp->run_flag)
     {
-        int i = 0;
-
         CloseHandle(iocp->iocp_handle);
         iocp->iocp_handle = NULL;
         iocp->run_flag = false;
 
         free(iocp);
     }
-}
-
-static int iocp_send_callback(struct server_s* self, void* handle, const char* data, int len)
-{
-    int send_len = 0;
-    struct iocp_s* iocp = (struct iocp_s*)self;
-    struct session_s* session = (struct session_s*)handle;
-
-    if(session->active)
-    {
-        send_len = iocp_wrap_session_senddata(session, data, len);
-    }
-
-    /*  如果没有完全发送完数据则设置标志    */
-    if(!session->haveleftdata)
-    {
-        session->haveleftdata = (send_len >= 0 && send_len < len);
-    }
-
-    return send_len;
 }
 
 /*  返回-1表示socket断开,否则返回0  */
@@ -470,7 +380,7 @@ static int iocp_sendv_callback(struct server_s* self, void* handle, const char* 
     {
         struct session_s* session = (struct session_s*)handle;
 
-        if(session->active && !session->is_use)
+        if(session->active && !session->send_isuse && !session->send_ispending)
         {
             int     i = 0;
             int     totalsendlen = 0;
@@ -509,7 +419,7 @@ static int iocp_sendv_callback(struct server_s* self, void* handle, const char* 
 #if permormance
             iocp->send_count ++;
 #endif
-            session->is_use = true;
+            session->send_isuse = true;
         }
     }
 
@@ -519,7 +429,7 @@ static int iocp_sendv_callback(struct server_s* self, void* handle, const char* 
 static void iocp_closesession_callback(struct server_s* self, void* handle)
 {
     struct iocp_s* iocp = (struct iocp_s*)self;
-    struct session_s* session = handle;
+    struct session_s* session = (struct session_s*)handle;
 
     if(session->active)
     {
@@ -569,7 +479,6 @@ struct server_s* iocp_create(
     iocp->base.stop_callback = iocp_stop_callback;
     iocp->base.closesession_callback = iocp_closesession_callback;
     iocp->base.register_callback = iocp_register_callback;
-    iocp->base.send_callback = iocp_send_callback;
     iocp->base.sendv_callback = iocp_sendv_callback;
 
     iocp->base.ext = ext;

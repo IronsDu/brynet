@@ -15,7 +15,6 @@ struct server_s
     void    (*stop_callback)(struct server_s* self);
     void    (*closesession_callback)(struct server_s* self, void* handle);
     bool    (*register_callback)(struct server_s* self, void* ud, int fd);
-    int     (*send_callback)(struct server_s* self, void* handle, const char* data, int len);
     int     (*sendv_callback)(struct server_s* self, void* handle, const char* datas[], const int* lens, int num);
 
     logic_on_enter_handle   logic_on_enter;

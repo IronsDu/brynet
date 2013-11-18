@@ -36,8 +36,6 @@
 
 #define SOCKET_POLL_TIME (1)
 
-/*  最大累计数量  */
-#define MAX_PENDING_NUM (20)
 #define PENDING_POOL_SIZE (10024)
 
 #define FLUSHTIMER_DELAY 50
@@ -504,16 +502,16 @@ reactor_proc_sendmsg(struct net_reactor* reactor, struct net_session_s* session,
                 session->bufs[session->bufnum] = pending->msg->data;
                 session->lens[session->bufnum] = pending->left_len;
                 ++(session->bufnum);
+            }
 
-                if(false)
-                {
-                    insert_flush(reactor, session);
-                }
-                else
-                {
-                    /*	添加到活动send列表	*/
-                    add_session_to_waitsendlist(reactor, session);
-                }
+            if(true)
+            {
+                insert_flush(reactor, session);
+            }
+            else
+            {
+                /*	添加到活动send列表	*/
+                add_session_to_waitsendlist(reactor, session);
             }
         }
         else
@@ -593,14 +591,14 @@ reactor_thread(void* arg)
 
     while(reactor->thread == NULL || ox_thread_isrun(reactor->thread))
     {
+        /*  由用户给定网络库每次循环的超时时间   */
+        server_pool(reactor->server, SOCKET_POLL_TIME);
+        ox_rwlist_flush(reactor->logic_msglist);
+
         reactor_proc_rwlist(reactor);
         reactor_proc_freelogiclist(reactor);
 
-        ox_rwlist_flush(reactor->logic_msglist);
-        /*  由用户给定网络库每次循环的超时时间   */
-        server_pool(reactor->server, SOCKET_POLL_TIME);
-
-        if(false)
+        if(true)
         {
             ox_timer_mgr_schedule(reactor->flush_timer);
         }
@@ -745,9 +743,16 @@ session_sendfinish_callback(struct server_s* self, void* ud, int bytes)
             }
 
             /*  没有完全发送完毕继续发送    */
-            if(session->bufnum >= MAX_PENDING_NUM)
+            if(session->bufnum > 0)
             {
-                session_packet_flush(reactor, session);
+                if(true)
+                {
+                    insert_flush(reactor, session);
+                }
+                else
+                {
+                    session_packet_flush(reactor, session);     
+                }
             }
         }
     }

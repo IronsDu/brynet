@@ -31,11 +31,6 @@ bool server_register(struct server_s* self, void* ud, int fd)
     return (self->register_callback)(self, ud, fd);
 }
 
-int server_send(struct server_s* self, void* handle, const char* data, int len)
-{
-    return (self->send_callback)(self, handle, data, len);
-}
-
 int server_sendv(struct server_s* self, void* handle, const char* datas[], const int* lens, int num)
 {
     return (self->sendv_callback)(self, handle, datas, lens, num);

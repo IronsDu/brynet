@@ -29,7 +29,6 @@ void server_pool(struct server_s* self, int timeout);
 void server_stop(struct server_s* self);
 void server_close(struct server_s* self, void* handle);
 bool server_register(struct server_s* self, void* ud, int fd);
-int server_send(struct server_s* self, void* handle, const char* data, int len);
 int server_sendv(struct server_s* self, void* handle, const char* datas[], const int* lens, int num);
 
 void* server_getext(struct server_s* self);
