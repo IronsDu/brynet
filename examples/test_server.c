@@ -4,10 +4,24 @@
 #include "thread.h"
 #include "socketlibfunction.h"
 #include "thread_reactor.h"
+#include "systemlib.h"
+
+#define SERVER_PORT 4100
+#define CLIENT_NUM 5000
+#define PACKET_LEN (16*1024)
+
+static int totaol_recv = 0;
 
 static int s_check(void* ud, const char* buffer, int len)
 {
-    return len;
+	if(len == PACKET_LEN)
+	{
+		return len;
+	}
+	else 
+	{
+		return 0;
+	}
 }
 
 static void    listen_thread(void* arg)
@@ -17,7 +31,7 @@ static void    listen_thread(void* arg)
     socklen_t size = sizeof(struct sockaddr);
     struct nr_mgr* mgr = (struct nr_mgr*)arg;
 
-    sock listen_fd = ox_socket_listen(4100, 25);
+    sock listen_fd = ox_socket_listen(SERVER_PORT, 25);
 
     if(SOCKET_ERROR != listen_fd)
     {
@@ -60,8 +74,8 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
     else if(msg->type == nrmgr_net_msg_data)
     {
         /*  申请发送消息  */
-        struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, 1024);
-		printf("recv %s \n", msg->data);
+		struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, msg->data_len);
+		totaol_recv += msg->data_len;
 		memcpy(sd_msg->data, msg->data, msg->data_len);
         sd_msg->data_len = msg->data_len;
         /*  发送消息    */
@@ -71,12 +85,22 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
 
 int main()
 {
-    struct nr_mgr* mgr = ox_create_nrmgr(1, 1024, 1024, s_check);
+    struct nr_mgr* mgr = ox_create_nrmgr(1, PACKET_LEN*2, s_check);
+	int old = ox_getnowtime();
     ox_thread_new(listen_thread, mgr);
 
     while(true)
     {
         ox_nrmgr_logic_poll(mgr, msg_handle, 5);
+		{
+			int now = ox_getnowtime();
+			if((now - old) >= 1000)
+			{
+				printf("recv %d k/s \n", totaol_recv/1024);
+				old = now;
+				totaol_recv = 0;
+			}
+		}
     }
 
     return 0;
