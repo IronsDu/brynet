@@ -50,6 +50,7 @@ struct session_s
 
     void*               ud;
     void*               ext_data;
+    bool                post_close;
 };
 
 #define permormance 0
@@ -60,7 +61,6 @@ struct iocp_s
 
     bool run_flag;
     HANDLE  iocp_handle;
-    struct session_ext_s* exts;
 
     int session_recvbuffer_size;
     int session_sendbuffer_size;
@@ -74,8 +74,6 @@ struct iocp_s
 #endif
 };
 
-#define ACCEPT_ADDRESS_LENGTH   (sizeof(SOCKADDR_IN) + 16)
-
 //  struct session_s的扩展属性ext_data结构
 struct session_ext_s
 {
@@ -83,7 +81,6 @@ struct session_ext_s
 
     struct ovl_ext_s ovl_recv;
     struct ovl_ext_s ovl_send;
-    char    addrblock[ACCEPT_ADDRESS_LENGTH*2];
 };
 
 static void iocp_session_reset(struct session_s* client)
@@ -109,17 +106,24 @@ static void iocp_session_free(struct session_s* client)
     free(client);
 }
 
-static void iocp_session_onclose(struct iocp_s* iocp, struct session_s* client)
+static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* client)
 {
     if(client->active)
     {
+        /*  如果当前会话处于活动，则需要通知上层  */
         client->active = false;
         (iocp->base.logic_on_close)(&iocp->base, client->ud);
     }
     else
     {
         /*  逻辑层通知关闭session后，iocp可能也会得到socket关闭通知，所以这时active为false   */
-        iocp_session_free(client);
+        struct session_ext_s* ext_data = (struct session_ext_s*)client->ext_data;
+
+        if(!client->post_close)
+        {
+            client->post_close = true;
+            PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xdeaddead);
+        }
     }
 }
 
@@ -147,7 +151,7 @@ static struct session_s* iocp_session_malloc(struct iocp_s* iocp)
 
     session->ud = NULL;
     session->fd = SOCKET_ERROR;
-
+    session->post_close = false;
     return session;
 }
 
@@ -239,7 +243,7 @@ static void iocp_iocomplete(struct iocp_s* iocp, struct session_s* session, stru
 
     if(must_close)
     {
-        iocp_session_onclose(iocp, session);
+        iocp_session_on_disconnect(iocp, session);
     }
 }
 
@@ -291,9 +295,15 @@ iocp_poll_callback(struct server_s* self, int64_t timeout)
 
         if(Bytes == 0)
         {
-            if(true)
+            if(ovl_p == (struct ovl_ext_s*)0xdeaddead)
             {
-                iocp_session_onclose(iocp, session_p);
+                /*  真正释放资源  */
+                iocp_session_free(session_p);
+            }
+            else
+            {
+                /*  处理被动关闭socket    */
+                iocp_session_on_disconnect(iocp, session_p);
             }
         }
         else
@@ -430,14 +440,14 @@ static void iocp_closesession_callback(struct server_s* self, void* handle)
 {
     struct iocp_s* iocp = (struct iocp_s*)self;
     struct session_s* session = (struct session_s*)handle;
+    struct session_ext_s* ext_data = (struct session_ext_s*)session->ext_data;
 
-    if(session->active)
+    iocp_session_reset(session);
+
+    if(!session->post_close)
     {
-        iocp_session_reset(session);
-    }
-    else
-    {
-        iocp_session_free(session);
+        session->post_close = true;
+        PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xdeaddead);
     }
 }
 

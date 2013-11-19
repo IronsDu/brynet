@@ -44,7 +44,6 @@ struct nr_mgr
 {
     struct net_reactor*     reactors;
     int                     reactor_num;
-    int                     one_reactor_sessionnum; /*  单个reactor能够容纳多少个会话个数   */
 
     void*                   ud;
 };
@@ -67,6 +66,8 @@ struct net_session_s
     int                     flush_id;               /*  刷新定时器的ID    */
     void*                   handle;                 /*  下层网络对象  */
     void*                   ud;                     /*  上层用户数据  */
+
+    bool                    is_destroy;
 };
 
 struct net_reactor
@@ -394,10 +395,11 @@ net_session_malloc()
 {
     struct net_session_s* session = (struct net_session_s*)malloc(sizeof(*session));
     session->bufnum = 0;
-    session->active = false;
+    session->active = true;
     double_link_init(&session->packet_list);
     session->wait_flush = false;
     session->flush_id = -1;
+    session->is_destroy = false;
 
     return session;
 }
@@ -408,6 +410,11 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
     struct double_link_node_s* current = double_link_begin(&session->packet_list);
     struct double_link_node_s* end = double_link_end(&session->packet_list);
 
+    if(session->is_destroy)
+    {
+        printf("%p \n", session);
+    }
+    assert(!session->is_destroy);
     while(current != end)
     {
         struct pending_send_msg_s* node = (struct pending_send_msg_s*)current;
@@ -429,6 +436,7 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
         session->flush_id = -1;
     }
 
+    session->is_destroy = true;
     free(session);
     reactor->active_num--;
 }
@@ -626,8 +634,6 @@ reactor_logic_on_enter_callback(struct server_s* self, void* ud, void* handle)
     struct nrmgr_net_msg* msg = make_logicmsg(reactor, nrmgr_net_msg_connect, session, NULL, 0);
     session->handle = handle;
 
-    assert(msg != NULL);
-
     if(msg != NULL)
     {
         session->active = true;
@@ -644,12 +650,11 @@ reactor_logic_on_close_callback(struct server_s* self, void* ud)
     if(session->active)
     {
         struct nrmgr_net_msg* msg = make_logicmsg(reactor, nrmgr_net_msg_close, session, NULL, 0);
-        assert(msg != NULL);
+        /*  设置网络已断开 */
+        session->active = false;
 
         if(msg != NULL)
         {
-            /*  设置网络已断开 */
-            session->active = false;
             ox_rwlist_push(reactor->logic_msglist, &msg);
         }
     }
@@ -672,7 +677,6 @@ reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* bu
         if(check_len > 0)
         {
             struct nrmgr_net_msg* msg = make_logicmsg(reactor, nrmgr_net_msg_data, session, check_buffer, check_len);
-            assert(msg != NULL);
             if(msg != NULL)
             {
                 ox_rwlist_push(logic_msglist, &msg);

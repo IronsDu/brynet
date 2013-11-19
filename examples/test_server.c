@@ -14,9 +14,9 @@ static int totaol_recv = 0;
 
 static int s_check(void* ud, const char* buffer, int len)
 {
-	if(len == PACKET_LEN)
+	if(len >= PACKET_LEN)
 	{
-		return len;
+		return PACKET_LEN;
 	}
 	else 
 	{
@@ -65,18 +65,19 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
     if(msg->type == nrmgr_net_msg_connect)
     {
         printf("connection enter  \n");
+        ox_nrmgr_request_closesession(mgr, msg->session);
     }
     else if(msg->type == nrmgr_net_msg_close)
     {
         printf("connection close , close session \n");
-        ox_nrmgr_closesession(mgr, msg->session);
+        //ox_nrmgr_closesession(mgr, msg->session);
     }
     else if(msg->type == nrmgr_net_msg_data)
     {
         /*  申请发送消息  */
 		struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, msg->data_len);
 		totaol_recv += msg->data_len;
-		memcpy(sd_msg->data, msg->data, msg->data_len);
+		//memcpy(sd_msg->data, msg->data, msg->data_len);
         sd_msg->data_len = msg->data_len;
         /*  发送消息    */
         ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
@@ -96,7 +97,7 @@ int main()
 			int now = ox_getnowtime();
 			if((now - old) >= 1000)
 			{
-				printf("recv %d k/s \n", totaol_recv/1024);
+				printf("recv %d M/s \n", totaol_recv/1024/1024);
 				old = now;
 				totaol_recv = 0;
 			}

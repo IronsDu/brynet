@@ -10,9 +10,9 @@
 
 static int s_check(void* ud, const char* buffer, int len)
 {
-    if(len == PACKET_LEN)
+    if(len >= PACKET_LEN)
 	{
-		return len;
+		return PACKET_LEN;
 	}
 	else 
 	{
@@ -24,10 +24,18 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
 {
     if(msg->type == nrmgr_net_msg_connect)
     {
-		struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, PACKET_LEN);
-        sd_msg->data_len = PACKET_LEN;
-        /*  发送消息    */
-        ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
+        {
+            struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, PACKET_LEN);
+            sd_msg->data_len = PACKET_LEN;
+            /*  发送消息    */
+            ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
+        }
+        {
+            struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, PACKET_LEN);
+            sd_msg->data_len = PACKET_LEN;
+            /*  发送消息    */
+            ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
+        }
 		printf("connection enter  \n");
     }
     else if(msg->type == nrmgr_net_msg_close)
