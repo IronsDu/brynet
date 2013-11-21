@@ -107,33 +107,36 @@ enum RWLIST_MSG_TYPE
     RMT_ENTER,
     RMT_CLOSE,
     RMT_REQUEST_CLOSE,
-};
-
-struct send_msg
-{
-    struct nrmgr_send_msg_data* data;
-    struct net_session_s*       session;
-};
-
-struct enter_data_s
-{
-    void*   ud;
-    sock    fd;
-};
-
-struct close_data_s
-{
-    struct net_session_s* session;
+    RMT_REQUEST_FREE,
 };
 
 struct rwlist_msg_data
 {
     enum RWLIST_MSG_TYPE msg_type;
+
     union
     {
-        struct send_msg send;
-        struct enter_data_s enter;
-        struct close_data_s close;
+        struct
+        {
+            struct nrmgr_send_msg_data* data;
+            struct net_session_s*       session;
+        }send;
+
+        struct
+        {
+            void*   ud;
+            sock    fd;
+        }enter;
+
+        struct
+        {
+            struct net_session_s* session;
+        }close;
+
+        struct
+        {
+            struct nrmgr_net_msg*   msg;
+        }free;
     }data;
 };
 
@@ -186,7 +189,7 @@ ox_create_nrmgr(
 
         reactor->free_sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_send_msg_data*), DF_RWLIST_PENDING_NUM*10);
         reactor->logic_msglist = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_net_msg*), DF_RWLIST_PENDING_NUM);
-        reactor->free_logicmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_net_msg**), DF_RWLIST_PENDING_NUM*10);
+        reactor->free_logicmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_net_msg*), DF_RWLIST_PENDING_NUM*10);
             
         reactor->check_packet = check;
 
@@ -321,6 +324,10 @@ reactor_logicmsg_handle(struct net_reactor* reactor, pfn_nrmgr_logicmsg callback
     struct rwlist_s*    logic_msglist = reactor->logic_msglist;
     int64_t current_time = ox_getnowtime();
     const int64_t end_time = current_time+timeout;
+    struct rwlist_msg_data msg;
+    struct rwlist_s*    rwlist = reactor->rwlist;
+    msg.msg_type = RMT_REQUEST_FREE;
+    
 
     do
     {
@@ -328,7 +335,16 @@ reactor_logicmsg_handle(struct net_reactor* reactor, pfn_nrmgr_logicmsg callback
         if(msg_pp != NULL)
         {
             (callback)(mgr, *msg_pp);
-            ox_rwlist_push(free_logicmsg_list, msg_pp);
+
+            if(false)
+            {
+                ox_rwlist_push(free_logicmsg_list, msg_pp);
+            }
+            else
+            {
+                msg.data.free.msg = *msg_pp;
+                ox_rwlist_push(rwlist, &msg);
+            }
         }
 
         current_time = ox_getnowtime();
@@ -574,6 +590,11 @@ reactor_proc_rwlist(struct net_reactor* reactor)
             {
                 session_destroy(reactor, rwlist_msg->data.close.session);
             }
+        }
+        else if(rwlist_msg->msg_type == RMT_REQUEST_FREE)
+        {
+            free(rwlist_msg->data.free.msg);
+            rwlist_msg->data.free.msg = NULL;
         }
     }
 }
