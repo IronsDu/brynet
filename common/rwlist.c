@@ -122,16 +122,15 @@ void
 ox_rwlist_push(struct rwlist_s* self, const void* data)
 {
     bool push_ret = false;
-    ox_mutex_lock(self->fuck);
+    //ox_mutex_lock(self->fuck);
     push_ret = ox_stack_push(self->local_write, data);
+    //ox_mutex_unlock(self->fuck);
     assert(push_ret);
     /*  如果写队列数据大于最大值,且共享队列和读队列都没有数据则立即同步到共享队列  */
     if(ox_stack_num(self->local_write) > self->max_pengding_num && (ox_stack_num(self->shared) <= 0 && ox_stack_num(self->local_read) <= 0))
     {
         rwlist_sync_write(self);
     }
-
-    ox_mutex_unlock(self->fuck);
 }
 
 static
@@ -182,7 +181,6 @@ char *
 ox_rwlist_pop(struct rwlist_s* self, int timeout)
 {
     char * ret = NULL;
-    //ox_mutex_lock(self->fuck);
     if(ox_stack_num(self->local_read) <= 0)
     {
         /*  从共享队列同步到读队列    */
@@ -190,59 +188,53 @@ ox_rwlist_pop(struct rwlist_s* self, int timeout)
     }
 
     ret = ox_stack_popfront(self->local_read);
-    //ox_mutex_unlock(self->fuck);
     return ret;
 }
 
 void
 ox_rwlist_flush(struct rwlist_s* self)
 {
-    //ox_mutex_lock(self->fuck);
     if(ox_stack_num(self->local_write) > 0)
     {
         rwlist_sync_write(self);
     }
-    //ox_mutex_unlock(self->fuck);
 }
 
 void
 ox_rwlist_force_flush(struct rwlist_s* self)
 {
-    ox_mutex_lock(self->fuck);
+    //ox_mutex_lock(self->fuck);
     if(ox_stack_num(self->local_write) > 0)
     {
+        ox_mutex_lock(self->mutex);
+
         if(ox_stack_num(self->shared) <= 0)
         {
             /*  如果共享队列没有数据则交换   */
             struct stack_s* temp;
-            ox_mutex_lock(self->mutex);
+            
             temp = self->shared;
             self->shared = self->local_write;
             self->local_write = temp;
 
             /*  thread_cond_signal(self->cond); */
-
-            ox_mutex_unlock(self->mutex);
         }
         else
         {
             /*  否则将本地写队列里的数据放入到共享队列 */
-            struct stack_s* temp;
+            struct stack_s* temp = self->local_write;
             char* data = NULL;
 
-            ox_mutex_lock(self->mutex);
-
-            temp = self->local_write;
             while((data = ox_stack_popfront(temp)) != NULL)
             {
                 ox_stack_push(self->shared, data);
             }
-
-            ox_mutex_unlock(self->mutex);
         }
+
+        ox_mutex_unlock(self->mutex);
     }
 
-    ox_mutex_unlock(self->fuck);
+    //ox_mutex_unlock(self->fuck);
 }
 
 bool

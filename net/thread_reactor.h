@@ -19,6 +19,7 @@ enum nrmgr_net_msg_type
     nrmgr_net_msg_data,
 };
 
+/*  网络层投递给逻辑层的消息结构类型    */
 struct nrmgr_net_msg
 {
     struct net_session_s* session;
