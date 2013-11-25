@@ -70,12 +70,12 @@ epoll_add_event(int epoll_fd, sock fd, struct session_s* client, uint32_t events
 }
 #endif
 
-static struct session_s* epoll_session_malloc(sock fd)
+static struct session_s* epoll_session_malloc(struct epollserver_s* epollserver, sock fd)
 {
     struct session_s* session = (struct session_s*)malloc(sizeof *session);
+    session->recv_buffer = ox_buffer_new(epollserver->session_recvbuffer_size);
+    session->send_buffer = ox_buffer_new(epollserver->session_sendbuffer_size);
 
-    ox_buffer_init(session->recv_buffer);
-    ox_buffer_init(session->send_buffer);
     ox_socket_nonblock(fd);
     session->writeable = true;
     session->haveleftdata = false;
@@ -90,7 +90,7 @@ epoll_handle_newclient(struct epollserver_s* epollserver, void* ud, sock client_
 {
     bool result = false;
     
-    struct session_s*   session = epoll_session_malloc(client_fd);
+    struct session_s*   session = epoll_session_malloc(epollserver, client_fd);
 
     if(session != NULL)
     {
@@ -133,6 +133,19 @@ epollserver_handle_sessionclose(struct epollserver_s* epollserver, struct sessio
         
         session->status = session_status_none;
     }
+
+    if(session->recv_buffer != NULL)
+    {
+        ox_buffer_delete(session->recv_buffer);
+        session->recv_buffer = NULL;
+    }
+    if(session->send_buffer != NULL)
+    {
+        ox_buffer_delete(session->send_buffer);
+        session->send_buffer = NULL;
+    }
+
+    free(session);
 }
 
 /*  发送内置缓冲区未发送的数据 */
@@ -316,24 +329,7 @@ epollserver_start_callback(
     self->logic_on_recved = recved_pt;
     self->logic_on_cansend = cansend_pt;
     self->logic_on_sendfinish = sendfinish_pt;
-    
-    {
-        /*int i = 0;
-        for(; i < epollserver->max_num; ++i)
-        {
-            struct session_s* session = epollserver->sessions+i;
-            session->server = epollserver;
-            session->index = i;
-            session->fd = SOCKET_ERROR;
-            session->haveleftdata = false;
-            
-            session->send_buffer = ox_buffer_new(epollserver->session_sendbuffer_size);
-            session->recv_buffer = ox_buffer_new(epollserver->session_recvbuffer_size);
-            session->status = session_status_none;
-            ox_stack_push(epollserver->freelist, &session);
-        }*/
-    }
-    
+
     epollserver->epoll_fd = epoll_create(1);
 }
 
@@ -426,18 +422,6 @@ epollserver_register(struct server_s* self, void* ud, int fd)
 }
 
 static int
-epollserver_send_callback(struct server_s* self, void* handle, const char* data, int len)
-{
-    struct epollserver_s* epollserver = (struct epollserver_s*)self;
-    int send_len = -1;
-
-    struct session_s* session = (struct session_s*)handle;
-    send_len = epollserver_senddata(session, data, len);
-    
-    return send_len;
-}
-
-static int
 epollserver_sendv_callback(struct server_s* self, void* handle, const char* datas[], const int* lens, int num)
 {
     int send_len = 0;
@@ -489,9 +473,7 @@ epollserver_create(
     epollserver->base.stop_callback = epollserver_stop_callback;
     epollserver->base.closesession_callback = epollserver_closesession_callback;
     epollserver->base.register_callback = epollserver_register;
-    epollserver->base.send_callback = epollserver_send_callback;
     epollserver->base.sendv_callback = epollserver_sendv_callback;
-    /*  epollserver->base.copy_pt = epollserver_copy_callback; */
     epollserver->base.ext = ext;
 
     epollserver->session_recvbuffer_size = session_recvbuffer_size;

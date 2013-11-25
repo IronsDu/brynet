@@ -10,10 +10,11 @@
 #include "stack.h"
 #include "fdset.h"
 #include "systemlib.h"
-#include "multipool.h"
 #include "thread.h"
 
 #include "connection.h"
+
+#define CONNECTION_SEND_CHECK   /*  是否运行时检测消息包序号是否正确    */
 
 #define DF_LIST_SIZE (1024)
 #define PROC_LIST_SIZE (10)
@@ -55,10 +56,10 @@ struct connection_s
 
     void*   ext;
 
+    #ifdef CONNECTION_SEND_CHECK
     int     current_msg_id;
     int     last_send_msg_id;
-
-    int     total_recv_len;
+    #endif
 };
 
 #define DF_RWLIST_PENDING_NUM (5)
@@ -67,30 +68,35 @@ struct connection_s*
 ox_connection_new(int rdsize, int sdsize, pfn_check_packet check, pfn_packet_handle handle, void* ext)
 {
     struct connection_s* ret = (struct connection_s*)malloc(sizeof(*ret));
+    if(ret != NULL)
+    {
+        ret->fd = SOCKET_ERROR;
+        ret->status = connection_none;
+        ret->fdset = ox_fdset_new();
 
-    ret->fd = SOCKET_ERROR;
-    ret->status = connection_none;
-    ret->fdset = ox_fdset_new();
+        ret->send_buffer = ox_buffer_new(sdsize);
 
-    ret->send_buffer = ox_buffer_new(sdsize);
+        ret->sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
+        ret->free_sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
 
-    ret->sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
-    ret->free_sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
+        ret->recv_buffer = ox_buffer_new(rdsize);
 
-    ret->recv_buffer = ox_buffer_new(rdsize);
+        ret->netmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
+        ret->free_netmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
 
-    ret->netmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
-    ret->free_netmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
+        ret->proc_list = ox_rwlist_new(PROC_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
 
-    ret->proc_list = ox_rwlist_new(PROC_LIST_SIZE, sizeof(struct msg_data_s*), DF_RWLIST_PENDING_NUM);
+        ret->check = check;
+        ret->handle = handle;
 
-    ret->check = check;
-    ret->handle = handle;
+        ret->ext = ext;
+        ret->writable = true;
 
-    ret->ext = ext;
-    ret->writable = true;
-    ret->current_msg_id = 0;
-    ret->last_send_msg_id = 0;
+        #ifdef CONNECTION_SEND_CHECK
+        ret->current_msg_id = 0;
+        ret->last_send_msg_id = 0;
+        #endif
+    }
 
     return ret;
 }
@@ -129,9 +135,11 @@ ox_connection_send(struct connection_s* self, struct msg_data_s* msg)
     /*  逻辑层请求网络层发送数据(投递消息给网络层)  */
     msg->type = send_msg_data;
 
+    #ifdef CONNECTION_SEND_CHECK
     self->current_msg_id++;
     msg->msg_id = self->current_msg_id;
-    
+    #endif
+
     ox_rwlist_push(self->sendmsg_list, &msg);
 }
 
@@ -189,8 +197,11 @@ connection_close(struct connection_s* self)
         self->writable = false;
         ox_buffer_init(self->recv_buffer);
         ox_buffer_init(self->send_buffer);
+
+        #ifdef CONNECTION_SEND_CHECK
         self->current_msg_id = 0;
         self->last_send_msg_id = 0;
+        #endif
     }
 }
 

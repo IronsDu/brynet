@@ -66,8 +66,6 @@ struct net_session_s
     int                     flush_id;               /*  刷新定时器的ID    */
     void*                   handle;                 /*  下层网络对象  */
     void*                   ud;                     /*  上层用户数据  */
-
-    bool                    is_destroy;
 };
 
 struct net_reactor
@@ -172,36 +170,39 @@ ox_create_nrmgr(
     pfn_nrmgr_check_packet check)
 {
     struct nr_mgr* mgr = (struct nr_mgr*)malloc(sizeof(*mgr));
-    int i = 0;
-
-    mgr->reactors = (struct net_reactor*)malloc(sizeof(struct net_reactor) * thread_num);
-    mgr->reactor_num = thread_num;
-
-    for(; i < thread_num; ++i)
+    if(mgr != NULL)
     {
-        struct net_reactor* reactor = mgr->reactors+i;
-        int j = 0;
-        reactor->mgr = mgr;
-        reactor->active_num = 0;
-        #ifdef PLATFORM_LINUX
-        reactor->server = epollserver_create(rbsize, sbsize, &mgr->reactors[i]);
-        #else
-        reactor->server = iocp_create(rbsize, 0, &mgr->reactors[i]);
-        #endif
+        int i = 0;
 
-        reactor->free_sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_send_msg_data*), DF_RWLIST_PENDING_NUM*10);
-        reactor->logic_msglist = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_net_msg*), DF_RWLIST_PENDING_NUM);
+        mgr->reactors = (struct net_reactor*)malloc(sizeof(struct net_reactor) * thread_num);
+        mgr->reactor_num = thread_num;
 
-        reactor->enter_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct rwlist_entermsg_data), DF_RWLIST_PENDING_NUM*10);
-        reactor->fromlogic_rwlist = ox_rwlist_new(1024, sizeof(struct rwlist_msg_data) , DF_RWLIST_PENDING_NUM);
+        for(; i < thread_num; ++i)
+        {
+            struct net_reactor* reactor = mgr->reactors+i;
+            int j = 0;
+            reactor->mgr = mgr;
+            reactor->active_num = 0;
+#ifdef PLATFORM_LINUX
+            reactor->server = epollserver_create(rbsize, sbsize, &mgr->reactors[i]);
+#else
+            reactor->server = iocp_create(rbsize, 0, &mgr->reactors[i]);
+#endif
 
-        reactor->check_packet = check;
+            reactor->free_sendmsg_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_send_msg_data*), DF_RWLIST_PENDING_NUM*10);
+            reactor->logic_msglist = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct nrmgr_net_msg*), DF_RWLIST_PENDING_NUM);
 
-        server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_close_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback);
-        reactor->flush_timer = ox_timer_mgr_new(1024);
-        reactor->waitsend_list = ox_list_new(1024, sizeof(struct net_session_s*));
-        reactor->thread = NULL;
-        reactor->thread = ox_thread_new(reactor_thread, reactor);
+            reactor->enter_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct rwlist_entermsg_data), DF_RWLIST_PENDING_NUM*10);
+            reactor->fromlogic_rwlist = ox_rwlist_new(1024, sizeof(struct rwlist_msg_data) , DF_RWLIST_PENDING_NUM);
+
+            reactor->check_packet = check;
+
+            server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_close_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback);
+            reactor->flush_timer = ox_timer_mgr_new(1024);
+            reactor->waitsend_list = ox_list_new(1024, sizeof(struct net_session_s*));
+            reactor->thread = NULL;
+            reactor->thread = ox_thread_new(reactor_thread, reactor);
+        }
     }
 
     return mgr;
@@ -406,12 +407,14 @@ static struct net_session_s*
 net_session_malloc()
 {
     struct net_session_s* session = (struct net_session_s*)malloc(sizeof(*session));
-    session->bufnum = 0;
-    session->active = true;
-    double_link_init(&session->packet_list);
-    session->wait_flush = false;
-    session->flush_id = -1;
-    session->is_destroy = false;
+    if(session != NULL)
+    {
+        session->bufnum = 0;
+        session->active = true;
+        double_link_init(&session->packet_list);
+        session->wait_flush = false;
+        session->flush_id = -1;
+    }
 
     return session;
 }
@@ -422,11 +425,6 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
     struct double_link_node_s* current = double_link_begin(&session->packet_list);
     struct double_link_node_s* end = double_link_end(&session->packet_list);
 
-    if(session->is_destroy)
-    {
-        printf("%p \n", session);
-    }
-    assert(!session->is_destroy);
     while(current != end)
     {
         struct pending_send_msg_s* node = (struct pending_send_msg_s*)current;
@@ -448,7 +446,6 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
         session->flush_id = -1;
     }
 
-    session->is_destroy = true;
     free(session);
     reactor->active_num--;
 }

@@ -21,15 +21,17 @@ struct multi_pool_s*
 ox_multi_pool_new(const int* nums, const int* lens, int max, int add)
 {
     struct multi_pool_s* ret = (struct multi_pool_s*)malloc(sizeof(*ret));
-    int i = 0;
 
     ret->max = max;
     ret->lens = (int*)malloc(sizeof(int)*max);
     memcpy(ret->lens, lens, sizeof(int)*max);
 
-    for(; i < max; ++i)
     {
-        ret->lens[i] += add;
+        int i = 0;
+        for(; i < max; ++i)
+        {
+            ret->lens[i] += add;
+        }
     }
 
     ret->msg_pools = (struct type_pool_s**)malloc(sizeof(struct type_pool_s*)*max);

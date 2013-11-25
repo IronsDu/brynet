@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-DLL_CONF    void ox_socket_init();
+DLL_CONF    bool ox_socket_init();
 DLL_CONF    void ox_socket_destroy();
 DLL_CONF    int  ox_socket_nodelay(sock fd);
 DLL_CONF    bool ox_socket_nonblock(sock fd);

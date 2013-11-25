@@ -34,6 +34,8 @@ struct ovl_ext_s
     void*   ptr;
 };
 
+struct session_ext_s;
+
 struct session_s
 {
     sock                fd;
@@ -48,9 +50,9 @@ struct session_s
     bool                active;             /*  连接是否正常    */
     bool                send_isuse;         /*  是否已经投递了send */
 
-    void*               ud;
-    void*               ext_data;
-    bool                post_close;
+    void*                   ud;
+    struct session_ext_s*   ext_data;
+    bool                    post_close;
 };
 
 #define permormance 0
@@ -122,7 +124,7 @@ static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* cl
         if(!client->post_close)
         {
             client->post_close = true;
-            PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xdeaddead);
+            PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xcdcdcdcd);
         }
     }
 }
@@ -130,28 +132,46 @@ static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* cl
 static struct session_s* iocp_session_malloc(struct iocp_s* iocp)
 {
     struct session_s* session = (struct session_s*)malloc(sizeof *session);
-    struct session_ext_s* ext_data = NULL;
-    session->ext_data = (struct session_ext_s*)malloc(sizeof(struct session_ext_s));
-    ext_data = session->ext_data;
+    struct session_ext_s* ext_data = (struct session_ext_s*)malloc(sizeof(struct session_ext_s));
 
-    ZeroMemory(&ext_data->ovl_recv, sizeof(struct ovl_ext_s));
-    ZeroMemory(&ext_data->ovl_send, sizeof(struct ovl_ext_s));
+    if(session != NULL && ext_data != NULL)
+    {
+        session->ext_data = ext_data;
 
-    ext_data->ovl_recv.base.Offset = OVL_RECV;
-    ext_data->ovl_send.base.Offset = OVL_SEND;
+        ZeroMemory(&ext_data->ovl_recv, sizeof(struct ovl_ext_s));
+        ZeroMemory(&ext_data->ovl_send, sizeof(struct ovl_ext_s));
 
-    ext_data->ck.ptr = session;
+        ext_data->ovl_recv.base.Offset = OVL_RECV;
+        ext_data->ovl_send.base.Offset = OVL_SEND;
+
+        ext_data->ck.ptr = session;
+
+        session->recv_buffer = ox_buffer_new(iocp->session_recvbuffer_size);
+        session->send_buffer = ox_buffer_new(iocp->session_sendbuffer_size);
+
+        session->send_ispending = false;
+        session->send_isuse = false;
+        session->active = true;
+
+        session->ud = NULL;
+        session->fd = SOCKET_ERROR;
+        session->post_close = false;
+    }
+    else
+    {
+        if(session != NULL)
+        {
+            free(session);
+            session = NULL;
+        }
+
+        if(ext_data != NULL)
+        {
+            free(ext_data);
+            ext_data = NULL;
+        }
+    }
     
-    session->recv_buffer = ox_buffer_new(iocp->session_recvbuffer_size);
-    session->send_buffer = ox_buffer_new(iocp->session_sendbuffer_size);
-
-    session->send_ispending = false;
-    session->send_isuse = false;
-    session->active = true;
-
-    session->ud = NULL;
-    session->fd = SOCKET_ERROR;
-    session->post_close = false;
     return session;
 }
 
@@ -257,7 +277,7 @@ static bool iocp_accept_complete(struct iocp_s* iocp, struct session_s* session)
     getpeername(session->fd, (struct sockaddr*)&addr, &addr_len);
     ip = inet_ntoa(addr.sin_addr);
     session->port = htons(addr.sin_port);
-    strcpy(session->ip, ip);
+    strcpy_s(session->ip, sizeof(session->ip), ip);
 
     ox_socket_nonblock(session->fd);
 
@@ -295,7 +315,7 @@ iocp_poll_callback(struct server_s* self, int64_t timeout)
 
         if(Bytes == 0)
         {
-            if(ovl_p == (struct ovl_ext_s*)0xdeaddead)
+            if(ovl_p == (struct ovl_ext_s*)0xcdcdcdcd)
             {
                 /*  真正释放资源  */
                 iocp_session_free(session_p);
@@ -447,7 +467,7 @@ static void iocp_closesession_callback(struct server_s* self, void* handle)
     if(!session->post_close)
     {
         session->post_close = true;
-        PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xdeaddead);
+        PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xcdcdcdcd);
     }
 }
 
@@ -481,29 +501,35 @@ struct server_s* iocp_create(
     int session_sendbuffer_size,
     void*   ext)
 {
+    struct server_s* ret = NULL;
     struct iocp_s* iocp = (struct iocp_s*)malloc(sizeof(struct iocp_s));
-    memset(iocp, 0, sizeof(*iocp));
+    if(iocp != NULL)
+    {
+        memset(iocp, 0, sizeof(*iocp));
 
-    iocp->base.start_callback = iocp_start_callback;
-    iocp->base.poll_callback = iocp_poll_callback;
-    iocp->base.stop_callback = iocp_stop_callback;
-    iocp->base.closesession_callback = iocp_closesession_callback;
-    iocp->base.register_callback = iocp_register_callback;
-    iocp->base.sendv_callback = iocp_sendv_callback;
+        iocp->base.start_callback = iocp_start_callback;
+        iocp->base.poll_callback = iocp_poll_callback;
+        iocp->base.stop_callback = iocp_stop_callback;
+        iocp->base.closesession_callback = iocp_closesession_callback;
+        iocp->base.register_callback = iocp_register_callback;
+        iocp->base.sendv_callback = iocp_sendv_callback;
 
-    iocp->base.ext = ext;
-    iocp->run_flag = false;
+        iocp->base.ext = ext;
+        iocp->run_flag = false;
 
-    iocp->session_recvbuffer_size = session_recvbuffer_size;
-    iocp->session_sendbuffer_size = session_sendbuffer_size;
+        iocp->session_recvbuffer_size = session_recvbuffer_size;
+        iocp->session_sendbuffer_size = session_sendbuffer_size;
 
 #if permormance
-    iocp->send_count = 0;
-    iocp->total_recv_len = 0;
-    iocp->total_send_len = 0;
-    iocp->old_time = 0;
+        iocp->send_count = 0;
+        iocp->total_recv_len = 0;
+        iocp->total_send_len = 0;
+        iocp->old_time = 0;
 #endif
-    return &iocp->base;
+        ret = &iocp->base;
+    }
+
+    return ret;
 }
 
 void iocp_delete(struct server_s* self)

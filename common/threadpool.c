@@ -33,23 +33,26 @@ struct thread_pool_s*
 thread_pool_new(thread_msg_fun_pt callback, int thread_num, int msg_num)
 {
     struct thread_pool_s* ret = (struct thread_pool_s*)malloc(sizeof(*ret));
-    ret->msg_list = ox_stack_new(msg_num,sizeof(void*));
-    ret->msg_lock = ox_mutex_new();
-    
-    ret->cv = ox_thread_cond_new();
+    if(ret != NULL)
+    {
+        ret->msg_list = ox_stack_new(msg_num,sizeof(void*));
+        ret->msg_lock = ox_mutex_new();
 
-    ret->callback = callback;
-    ret->work_thread_num = thread_num;
-    ret->work_threads = (struct thread_s**)malloc(sizeof(struct thread_s*)*ret->work_thread_num);
-    memset(ret->work_threads, 0, sizeof(struct thread_s*)*ret->work_thread_num);
+        ret->cv = ox_thread_cond_new();
 
-    ret->work_thread_state = (bool*)malloc(sizeof(bool)*ret->work_thread_num);
-    memset(ret->work_thread_state, false, sizeof(bool)*ret->work_thread_num);
-    
-    ret->thread_index_lock = ox_mutex_new();
-    ret->thread_index = 0;
+        ret->callback = callback;
+        ret->work_thread_num = thread_num;
+        ret->work_threads = (struct thread_s**)malloc(sizeof(struct thread_s*)*ret->work_thread_num);
+        memset(ret->work_threads, 0, sizeof(struct thread_s*)*ret->work_thread_num);
 
-    ret->is_run = true;
+        ret->work_thread_state = (bool*)malloc(sizeof(bool)*ret->work_thread_num);
+        memset(ret->work_thread_state, false, sizeof(bool)*ret->work_thread_num);
+
+        ret->thread_index_lock = ox_mutex_new();
+        ret->thread_index = 0;
+
+        ret->is_run = true;
+    }
 
     return ret;
 }

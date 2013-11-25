@@ -18,11 +18,14 @@ struct heap_s*
 ox_heap_new(int element_num, int element_size, pfn_compare compare, pfn_swap swap, void* ext)
 {
     struct heap_s* ret = (struct heap_s*)malloc(sizeof(*ret));
-    ret->data =ox_array_new(element_num, element_size);
-    ret->num = 0;
-    ret->compare = compare;
-    ret->swap = swap;
-    ret->ext = ext;
+    if(ret != NULL)
+    {
+        ret->data = ox_array_new(element_num, element_size);
+        ret->num = 0;
+        ret->compare = compare;
+        ret->swap = swap;
+        ret->ext = ext;
+    }
 
     return ret;
 }

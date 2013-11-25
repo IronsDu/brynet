@@ -5,17 +5,26 @@
 static WSADATA g_WSAData;
 #endif
 
-void 
+bool 
 ox_socket_init(void)
 {
+    bool ret = true;
     #if defined PLATFORM_WINDOWS
     static bool WinSockIsInit = false;
     if(!WinSockIsInit)
     {
-        WSAStartup(MAKEWORD(2,2), &g_WSAData);
-        WinSockIsInit = true;
+        if(WSAStartup(MAKEWORD(2,2), &g_WSAData) == 0)
+        {
+            WinSockIsInit = true;
+        }
+        else
+        {
+            ret = false;
+        }
     }
     #endif
+
+    return ret;
 }
 
 void 
