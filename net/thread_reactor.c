@@ -333,9 +333,10 @@ reactor_logicmsg_handle(struct net_reactor* reactor, pfn_nrmgr_logicmsg callback
     struct rwlist_s*    rwlist = reactor->fromlogic_rwlist;
     msg.msg_type = RMT_REQUEST_FREENETMSG;
 
-    do
+    while(true)
     {
         msg_pp = (struct nrmgr_net_msg**)ox_rwlist_pop(logic_msglist, end_time-current_time);
+        current_time = ox_getnowtime();
         if(msg_pp != NULL)
         {
             (callback)(mgr, *msg_pp);
@@ -343,9 +344,14 @@ reactor_logicmsg_handle(struct net_reactor* reactor, pfn_nrmgr_logicmsg callback
             msg.data.free.msg = *msg_pp;
             ox_rwlist_push(rwlist, &msg);
         }
-
-        current_time = ox_getnowtime();
-    }while(end_time > current_time);
+        else
+        {
+            if(current_time >= end_time)
+            {
+                break;
+            }
+        }
+    }
 }
 
 void
