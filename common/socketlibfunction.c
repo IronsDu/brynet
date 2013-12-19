@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "fdset.h"
 #include "socketlibfunction.h"
 
@@ -5,7 +7,7 @@
 static WSADATA g_WSAData;
 #endif
 
-bool 
+bool
 ox_socket_init(void)
 {
     bool ret = true;
@@ -27,7 +29,7 @@ ox_socket_init(void)
     return ret;
 }
 
-void 
+void
 ox_socket_destroy(void)
 {
     #if defined PLATFORM_WINDOWS
@@ -42,7 +44,7 @@ ox_socket_nodelay(sock fd)
     return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
 }
 
-bool 
+bool
 ox_socket_nonblock(sock fd)
 {
     int err;
@@ -68,7 +70,7 @@ ox_socket_setrdsize(sock fd, int rd_size)
     return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
 }
 
-sock 
+sock
 ox_socket_connect(const char* server_ip, int port)
 {
     struct sockaddr_in server_addr;
@@ -117,7 +119,7 @@ ox_socket_nonblock_connect(const char* server_ip, int port, int second)
         if(connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) < 0)
         {
             int check_error = 0;
-            
+
             #if defined PLATFORM_WINDOWS
             check_error = WSAEWOULDBLOCK;
             #else
@@ -175,7 +177,7 @@ ox_socket_nonblock_connect(const char* server_ip, int port, int second)
     return clientfd;
 }
 
-sock 
+sock
 ox_socket_listen(int port, int back_num)
 {
     sock socketfd = SOCKET_ERROR;
@@ -201,12 +203,12 @@ ox_socket_listen(int port, int back_num)
             socketfd = SOCKET_ERROR;
         }
     }
-    
-    
+
+
     return socketfd;
 }
 
-void 
+void
 ox_socket_close(sock fd)
 {
     #if defined PLATFORM_WINDOWS
@@ -216,7 +218,7 @@ ox_socket_close(sock fd)
     #endif
 }
 
-const char* 
+const char*
 ox_socket_getipstr(unsigned int ip)
 {
     struct in_addr addr;
@@ -224,7 +226,7 @@ ox_socket_getipstr(unsigned int ip)
     return inet_ntoa(addr);
 }
 
-int 
+int
 ox_socket_send(sock fd, const char* buffer, int len)
 {
     int transnum = send(fd, buffer, len, 0);

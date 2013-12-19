@@ -145,12 +145,12 @@ struct rwlist_msg_data
 static void
 reactor_thread(void* arg);
 
-static void 
+static void
 reactor_logic_on_enter_callback(struct server_s* self, void* ud, void* handle);
- 
+
 static void
 reactor_logic_on_close_callback(struct server_s* self, void* ud);
- 
+
 static int
 reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* buffer, int len);
 
@@ -170,6 +170,7 @@ ox_create_nrmgr(
     pfn_nrmgr_check_packet check)
 {
     struct nr_mgr* mgr = (struct nr_mgr*)malloc(sizeof(*mgr));
+
     if(mgr != NULL)
     {
         int i = 0;
@@ -180,11 +181,11 @@ ox_create_nrmgr(
         for(; i < thread_num; ++i)
         {
             struct net_reactor* reactor = mgr->reactors+i;
-            int j = 0;
+
             reactor->mgr = mgr;
             reactor->active_num = 0;
 #ifdef PLATFORM_LINUX
-            reactor->server = epollserver_create(rbsize, sbsize, &mgr->reactors[i]);
+            reactor->server = epollserver_create(rbsize, 0, &mgr->reactors[i]);
 #else
             reactor->server = iocp_create(rbsize, 0, &mgr->reactors[i]);
 #endif
@@ -194,7 +195,6 @@ ox_create_nrmgr(
 
             reactor->enter_list = ox_rwlist_new(DF_LIST_SIZE, sizeof(struct rwlist_entermsg_data), DF_RWLIST_PENDING_NUM*10);
             reactor->fromlogic_rwlist = ox_rwlist_new(1024, sizeof(struct rwlist_msg_data) , DF_RWLIST_PENDING_NUM);
-
             reactor->check_packet = check;
 
             server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_close_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback);
@@ -259,7 +259,7 @@ ox_nrmgr_addfd(struct nr_mgr* mgr, void* ud, int fd)
     }
 }
 
-void 
+void
 ox_nrmgr_request_closesession(struct nr_mgr* mgr, struct net_session_s* session)
 {
     struct net_reactor* reactor = session->reactor;
@@ -287,7 +287,7 @@ struct nrmgr_send_msg_data*
 ox_nrmgr_make_sendmsg(struct nr_mgr* mgr, const char* src, int len)
 {
     struct nrmgr_send_msg_data* ret = (struct nrmgr_send_msg_data*)malloc(len+sizeof(struct nrmgr_send_msg_data));
-    
+
     if(ret != NULL)
     {
         ret->ref = 0;
@@ -445,13 +445,14 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
 
     server_close(reactor->server, session->handle);
     session->active = false;
-    session->wait_flush = false;
-    if(session->flush_id != -1 && session->wait_flush)
+
+    if(session->flush_id != -1)
     {
         ox_timer_mgr_del(reactor->flush_timer, session->flush_id);
         session->flush_id = -1;
     }
 
+    session->wait_flush = false;
     free(session);
     reactor->active_num--;
 }
@@ -467,7 +468,7 @@ session_packet_flush(struct net_reactor* reactor, struct net_session_s* session)
 #ifdef PLATFORM_WINDOWS
             assert(false);
 #endif
-            session_sendfinish_callback(reactor->server, session->ud, bytes);
+            session_sendfinish_callback(reactor->server, session, bytes);
         }
         else if(bytes == -1)
         {
@@ -485,7 +486,7 @@ flushpacket_timerover(void* arg)
     session_packet_flush(session->reactor, session);
 }
 
-static void 
+static void
 insert_flush(struct net_reactor* reactor, struct net_session_s* session)
 {
     if(!session->wait_flush)
@@ -553,7 +554,6 @@ reactor_proc_rwlist(struct net_reactor* reactor)
 {
     struct rwlist_msg_data* rwlist_msg = NULL;
     struct rwlist_s*    rwlist = reactor->fromlogic_rwlist;
-    struct server_s* server = reactor->server;
 
     while((rwlist_msg = (struct rwlist_msg_data*)ox_rwlist_pop(rwlist, 0)) != NULL)
     {
@@ -597,6 +597,7 @@ reactor_proc_enterlist(struct net_reactor* reactor)
 
             if(!server_register(server, session, enter_msg->fd))
             {
+                printf("register failed , free session \n");
                 free(session);
             }
         }
@@ -635,6 +636,7 @@ reactor_thread(void* arg)
                 struct net_session_s* session = *(struct net_session_s**)begin->data;
                 session->wait_flush = false;
                 begin = ox_list_erase(reactor->waitsend_list, begin);
+
                 session_packet_flush(reactor, session);
             }
         }
@@ -696,7 +698,7 @@ reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* bu
             {
                 ox_rwlist_push(logic_msglist, &msg);
             }
-            
+
             check_buffer += check_len;
             left_len -= check_len;
             proc_len += check_len;
@@ -706,7 +708,7 @@ reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* bu
             break;
         }
     }
-    
+
     return proc_len;
 }
 
@@ -770,7 +772,7 @@ session_sendfinish_callback(struct server_s* self, void* ud, int bytes)
                 }
                 else
                 {
-                    session_packet_flush(reactor, session);     
+                    session_packet_flush(reactor, session);
                 }
             }
         }
