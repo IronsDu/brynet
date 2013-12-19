@@ -7,7 +7,7 @@
 #include "systemlib.h"
 
 #define SERVER_PORT 4100
-#define CLIENT_NUM 5000
+#define CLIENT_NUM 1000
 #define PACKET_LEN (16*1024)
 
 static int totaol_recv = 0;
@@ -18,7 +18,7 @@ static int s_check(void* ud, const char* buffer, int len)
 	{
 		return PACKET_LEN;
 	}
-	else 
+	else
 	{
 		return 0;
 	}
@@ -47,6 +47,7 @@ static void    listen_thread(void* arg)
 
             if(SOCKET_ERROR != client_fd)
             {
+                //printf("accept client_fd : %d \n", client_fd);
                 ox_nrmgr_addfd(mgr, NULL, client_fd);
             }
         }
@@ -62,15 +63,19 @@ static void    listen_thread(void* arg)
 
 static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
 {
+    static int current_num = 0;
+
     if(msg->type == nrmgr_net_msg_connect)
     {
-        printf("connection enter  \n");
-        ox_nrmgr_request_closesession(mgr, msg->session);
+        current_num++;
+        printf("connection : %p enter , current num : %d \n", msg->session, current_num);
+        //ox_nrmgr_request_closesession(mgr, msg->session);
     }
     else if(msg->type == nrmgr_net_msg_close)
     {
-        printf("connection close , close session \n");
-        //ox_nrmgr_closesession(mgr, msg->session);
+        current_num--;
+        printf("connection :%p close , close session, current num : %d \n", msg->session, current_num);
+        ox_nrmgr_closesession(mgr, msg->session);
     }
     else if(msg->type == nrmgr_net_msg_data)
     {
@@ -97,7 +102,7 @@ int main()
 			int now = ox_getnowtime();
 			if((now - old) >= 1000)
 			{
-				printf("recv %d M/s \n", totaol_recv/1024/1024);
+                printf("recv %d K/s \n", totaol_recv/1024);
 				old = now;
 				totaol_recv = 0;
 			}

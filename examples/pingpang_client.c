@@ -1,11 +1,13 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "thread.h"
 #include "socketlibfunction.h"
 #include "thread_reactor.h"
 
 #define SERVER_PORT 4100
-#define CLIENT_NUM 5000
+#define CLIENT_NUM 1000
 #define PACKET_LEN (16*1024)
 
 static int s_check(void* ud, const char* buffer, int len)
@@ -14,7 +16,7 @@ static int s_check(void* ud, const char* buffer, int len)
 	{
 		return PACKET_LEN;
 	}
-	else 
+	else
 	{
 		return 0;
 	}
@@ -30,12 +32,7 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
             /*  发送消息    */
             ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
         }
-        {
-            struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, PACKET_LEN);
-            sd_msg->data_len = PACKET_LEN;
-            /*  发送消息    */
-            ox_nrmgr_sendmsg(mgr, sd_msg, msg->session);
-        }
+
 		printf("connection enter  \n");
     }
     else if(msg->type == nrmgr_net_msg_close)
@@ -47,6 +44,7 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
     {
         /*  申请发送消息  */
         struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, PACKET_LEN);
+        printf("recv data\n");
 		memcpy(sd_msg->data, msg->data, msg->data_len);
         sd_msg->data_len = msg->data_len;
         /*  发送消息    */
@@ -57,7 +55,7 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
 int main()
 {
 	struct nr_mgr* mgr = ox_create_nrmgr(1, PACKET_LEN*2, s_check);
-	
+
 	{
 		int i = 0;
 		for(; i < CLIENT_NUM; ++i)
