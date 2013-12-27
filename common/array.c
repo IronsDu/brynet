@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "array.h"
 
@@ -66,6 +67,10 @@ ox_array_at(struct array_s* self, int index)
     {
         ret = self->buffer + (index * self->element_size);
     }
+    else
+    {
+        assert(false);
+    }
 
     return ret;
 }
@@ -113,6 +118,7 @@ ox_array_increase(struct array_s* self, int increase_num)
     }
     else
     {
+        assert(false);
         return false;
     }
 }

@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "array.h"
 #include "stack.h"
@@ -72,7 +73,23 @@ ox_stack_push(struct stack_s* self, const void* data)
 
     if(top_index >= self->element_num)
     {
-        ox_stack_increase(self, ox_stack_size(self));
+        int current_num = ox_stack_num(self);
+        if(current_num < self->element_num)
+        {
+            /*  如果数据并没有用完整个缓冲区,则将它们全部移动到起始位置  */
+            int i = 0;
+            for(; i < current_num; ++i)
+            {
+                ox_array_set(self->array, i, ox_array_at(self->array, self->front+i));
+            }
+
+            self->front = 0;
+            self->tail = current_num;
+        }
+        else
+        {
+            ox_stack_increase(self, ox_stack_size(self));
+        }
     }
 
     top_index = self->tail;
@@ -152,7 +169,10 @@ ox_stack_increase(struct stack_s* self, int increase_num)
     {
         self->element_num = ox_array_num(self->array);
     }
-
+    else
+    {
+        assert(false);
+    }
     return ret;
 }
 
