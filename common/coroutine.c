@@ -9,6 +9,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "stack.h"
+
 #define STACK_SIZE (1024*1024)
 #define DEFAULT_COROUTINE 16
 
@@ -20,7 +22,7 @@ struct schedule {
 	int nco;
 	int cap;
 	int running;
-	struct coroutine **co;
+	struct coroutine **cos;
     struct stack_s* active_list;
 };
 
@@ -31,7 +33,7 @@ struct coroutine {
 	struct schedule * sch;
 	ptrdiff_t cap;
 	ptrdiff_t size;
-	int status;
+	int state;
 	char *stack;
 };
 
@@ -43,7 +45,7 @@ _co_new(struct schedule *S , coroutine_func func, void *ud) {
 	co->sch = S;
 	co->cap = 0;
 	co->size = 0;
-	co->status = COROUTINE_READY;
+	co->state = COROUTINE_READY;
 	co->stack = NULL;
 	return co;
 }
@@ -60,9 +62,9 @@ coroutine_open(void) {
 	S->nco = 0;
 	S->cap = DEFAULT_COROUTINE;
 	S->running = -1;
-	S->co = malloc(sizeof(struct coroutine *) * S->cap);
-	memset(S->co, 0, sizeof(struct coroutine *) * S->cap);
-    S->active_list = ox_stack_new(1024, sizeof(int));
+	S->cos = malloc(sizeof(struct coroutine *) * S->cap);
+	memset(S->cos, 0, sizeof(struct coroutine *) * S->cap);
+	S->active_list = ox_stack_new(1024, sizeof(int));
 	return S;
 }
 
@@ -70,13 +72,13 @@ void
 coroutine_close(struct schedule *S) {
 	int i;
 	for (i=0;i<S->cap;i++) {
-		struct coroutine * co = S->co[i];
+		struct coroutine * co = S->cos[i];
 		if (co) {
 			_co_delete(co);
 		}
 	}
-	free(S->co);
-	S->co = NULL;
+	free(S->cos);
+	S->cos = NULL;
 	free(S);
 }
 
@@ -85,19 +87,21 @@ coroutine_new(struct schedule *S, coroutine_func func, void *ud) {
 	struct coroutine *co = _co_new(S, func , ud);
 	if (S->nco >= S->cap) {
 		int id = S->cap;
-		S->co = realloc(S->co, S->cap * 2 * sizeof(struct coroutine *));
-		memset(S->co + S->cap , 0 , sizeof(struct coroutine *) * S->cap);
-		S->co[S->cap] = co;
+		S->cos = realloc(S->cos, S->cap * 2 * sizeof(struct coroutine *));
+		memset(S->cos + S->cap , 0 , sizeof(struct coroutine *) * S->cap);
+		S->cos[S->cap] = co;
 		S->cap *= 2;
 		++S->nco;
+		ox_stack_push(S->active_list, &id);
 		return id;
 	} else {
 		int i;
 		for (i=0;i<S->cap;i++) {
 			int id = (i+S->nco) % S->cap;
-			if (S->co[id] == NULL) {
-				S->co[id] = co;
+			if (S->cos[id] == NULL) {
+				S->cos[id] = co;
 				++S->nco;
+				ox_stack_push(S->active_list, &id);
 				return id;
 			}
 		}
@@ -111,10 +115,10 @@ mainfunc(uint32_t low32, uint32_t hi32) {
 	uintptr_t ptr = (uintptr_t)low32 | ((uintptr_t)hi32 << 32);
 	struct schedule *S = (struct schedule *)ptr;
 	int id = S->running;
-	struct coroutine *C = S->co[id];
+	struct coroutine *C = S->cos[id];
 	C->func(S,C->ud);
 	_co_delete(C);
-	S->co[id] = NULL;
+	S->cos[id] = NULL;
 	--S->nco;
 	S->running = -1;
 }
@@ -123,18 +127,18 @@ static void
 coroutine_goto(struct schedule * S, int id) {
     assert(S->running == -1);
     assert(id >=0 && id < S->cap);
-    struct coroutine *C = S->co[id];
+    struct coroutine *C = S->cos[id];
     if (C == NULL)
         return;
-    int status = C->status;
-    switch(status) {
+    int state = C->state;
+    switch(state) {
     case COROUTINE_READY:
         getcontext(&C->ctx);
         C->ctx.uc_stack.ss_sp = S->stack;
         C->ctx.uc_stack.ss_size = STACK_SIZE;
         C->ctx.uc_link = &S->main;
         S->running = id;
-        C->status = COROUTINE_RUNNING;
+        C->state = COROUTINE_RUNNING;
         uintptr_t ptr = (uintptr_t)S;
         makecontext(&C->ctx, (void (*)(void)) mainfunc, 2, (uint32_t)ptr, (uint32_t)(ptr>>32));
         swapcontext(&S->main, &C->ctx);
@@ -142,7 +146,7 @@ coroutine_goto(struct schedule * S, int id) {
     case COROUTINE_SUSPEND:
         memcpy(S->stack + STACK_SIZE - C->size, C->stack, C->size);
         S->running = id;
-        C->status = COROUTINE_RUNNING;
+        C->state = COROUTINE_RUNNING;
         swapcontext(&S->main, &C->ctx);
         break;
     default:
@@ -167,11 +171,11 @@ void
 coroutine_yield(struct schedule * S) {
 	int id = S->running;
 	assert(id >= 0);
-	struct coroutine * C = S->co[id];
+	struct coroutine * C = S->cos[id];
 	assert((char *)&C > S->stack);
 	_save_stack(C,S->stack + STACK_SIZE);
-	C->status = COROUTINE_SUSPEND;
-    ox_stack_push(s->active_list, &id);
+	C->state = COROUTINE_SUSPEND;
+        ox_stack_push(S->active_list, &id);
 	S->running = -1;
 	swapcontext(&C->ctx , &S->main);
 }
@@ -180,10 +184,10 @@ void
 coroutine_block(struct schedule * S) {
     int id = S->running;
     assert(id >= 0);
-    struct coroutine * C = S->co[id];
+    struct coroutine * C = S->cos[id];
     assert((char *)&C > S->stack);
     _save_stack(C,S->stack + STACK_SIZE);
-    C->status = COROUTINE_BLOCK;
+    C->state = COROUTINE_BLOCK;
     S->running = -1;
     swapcontext(&C->ctx , &S->main);
 }
@@ -191,10 +195,10 @@ coroutine_block(struct schedule * S) {
 int 
 coroutine_status(struct schedule * S, int id) {
 	assert(id>=0 && id < S->cap);
-	if (S->co[id] == NULL) {
+	if (S->cos[id] == NULL) {
 		return COROUTINE_DEAD;
 	}
-	return S->co[id]->status;
+	return S->cos[id]->state;
 }
 
 int 
