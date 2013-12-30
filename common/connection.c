@@ -353,7 +353,7 @@ connection_split_packet(struct connection_s* self)
     while(left_len > 0)
     {
         /*  调用验证包完整回调函数:如果收到完整包则投递到逻辑层  */
-        int packet_len = (self->check)(buffer, left_len);
+        int packet_len = (self->check)(buffer, left_len, self->ext);
         if(packet_len > 0)
         {
             connection_send_logicmsg(self, net_msg_data, buffer, packet_len);

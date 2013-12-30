@@ -22,14 +22,14 @@ enum net_msg_type
 
 struct msg_data_s
 {
-    char type;             /*  消息包类型,库使用者禁止修改此字段       */
+    char type;                          /*  消息包类型,库使用者禁止修改此字段       */
     int msg_id;
     int len;                            /*  消息包长度,库使用者序列化数据时修改此字段   */
-    char data[1];                       /*  消息包内容,库使用者序列化数据到此缓冲区    */
+    char data[0];                       /*  消息包内容,库使用者序列化数据到此缓冲区    */
 };
 
 /*  检查数据是否包含完整包 */
-typedef int (*pfn_check_packet)(const char* buffer, int len);
+typedef int (*pfn_check_packet)(const char* buffer, int len, void* ext);
 /*  包处理函数类型 */
 typedef void (*pfn_packet_handle)(struct connection_s* self, struct msg_data_s*, void* ext);
 
