@@ -235,17 +235,22 @@ struct coroutine {
 };
 
 static void increase_coroutine(struct schedule* s, int num) {
+    int old_num = 0;
+    int new_num = 0;
     if(s->cos == NULL) {
         s->freeids = ox_stack_new(num, sizeof(int));
         s->cos = ox_array_new(num, sizeof(struct coroutine*));
     } else {
+        old_num = ox_array_num(s->cos);
         ox_array_increase(s->cos, num);
     }
 
+    new_num = ox_array_num(s->cos);
+
     {
-        int i = 0;
+        int i = old_num;
         struct coroutine* tmp = NULL;
-        for(; i < num; ++i) {
+        for(; i < new_num; ++i) {
             ox_array_set(s->cos, i, &tmp);
             ox_stack_push(s->freeids, &i);
         }
