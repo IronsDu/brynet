@@ -16,6 +16,10 @@ struct double_link_s
     struct double_link_node_s  tail;
 };
 
+#ifndef inline
+#define inline __inline
+#endif
+
 static inline void double_link_init(struct double_link_s* list)
 {
     list->head.prior = NULL;
