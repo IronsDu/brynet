@@ -8,8 +8,9 @@
 struct stack_s
 {
     struct array_s* array;
-    int element_num;        /*  当前array空间大小 */
+    int element_size;
 
+    int element_num;
     int front;              /*  栈底  */
     int num;                /*  栈有效元素大小 */
 };
@@ -23,6 +24,7 @@ ox_stack_new(int num, int element_size)
     {
         memset(ret, 0, sizeof(*ret));
 
+        ret->element_size = element_size;
         ret->array = ox_array_new(num, element_size);
 
         if(ret->array != NULL)
@@ -136,23 +138,26 @@ bool
 ox_stack_increase(struct stack_s* self, int increase_num)
 {
     bool ret = false;
-    int i = 0;
-    for(; i < ox_stack_num(self); ++i)
-    {
-        ox_array_set(self->array, i, ox_array_at(self->array, self->front+i));
-    }
+    struct array_s* tmp = ox_array_new(self->element_num + increase_num, self->element_size);
 
-    self->front = 0;
-
-    ret = ox_array_increase(self->array, increase_num);
-    if(ret)
+    if(tmp != NULL)
     {
+        int i = 0;
+        int current_num = self->element_num;
+        int current_stack_num = ox_stack_num(self);
+        for(; i < current_stack_num; ++i)
+        {
+            ox_array_set(tmp, i, ox_array_at(self->array, (self->front+i) % current_num));
+        }
+
+        self->front = 0;
+        ox_array_delete(self->array);
+        self->array = tmp;
         self->element_num = ox_array_num(self->array);
+
+        ret = true;
     }
-    else
-    {
-        assert(false);
-    }
+
     return ret;
 }
 
