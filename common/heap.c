@@ -46,19 +46,19 @@ ox_heap_delete(struct heap_s* self)
 static int 
 parent(int index)
 {
-    return index/2;
+    return (index-1)/2;
 }
 
 static int 
 left(int index)
 {
-    return 2*index;
+    return 2*index+1;
 }
 
 static int 
 right(int index)
 {
-    return 2*index+1;
+    return 2*index+2;
 }
 
 static void 
@@ -92,21 +92,27 @@ down(struct heap_s* self, int index)
     int r = right(index);
     int min = index;
 
-    void* l_value = ox_array_at(self->data, l);
-    void* r_value = ox_array_at(self->data, r);
     void* index_value = ox_array_at(self->data, index);
     void* min_value = index_value;
 
-    if(l < self->num && (self->compare)(self, l_value, index_value))
+    if(l < self->num)
     {
-        min = l;
-        min_value = l_value;
+        void* l_value = ox_array_at(self->data, l);
+        if((self->compare)(self, l_value, index_value))
+        {
+            min = l;
+            min_value = l_value;
+        }
     }
 
-    if(r < self->num && (self->compare)(self, r_value, min_value))
+    if(r < self->num)
     {
-        min = r;
-        min_value = r_value;
+        void* r_value = ox_array_at(self->data, r);
+        if((self->compare)(self, r_value, min_value))
+        {
+            min = r;
+            min_value = r_value;
+        }
     }
 
     if(min != index)
