@@ -38,8 +38,6 @@
 
 #define PENDING_POOL_SIZE (10024)
 
-#define FLUSHTIMER_DELAY 50
-
 struct nr_mgr
 {
     struct net_reactor*     reactors;
@@ -63,7 +61,6 @@ struct net_session_s
 
     bool                    active;                 /*  是否处于链接状态    */
     bool                    wait_flush;             /*  是否处于等待flush中    */
-    int                     flush_id;               /*  刷新定时器的ID    */
     void*                   handle;                 /*  下层网络对象  */
     void*                   ud;                     /*  上层用户数据  */
 };
@@ -85,9 +82,8 @@ struct net_reactor
 
     struct thread_s*        thread;
 
-    struct timer_mgr_s*     flush_timer;
-
     struct list_s*          waitsend_list;
+    struct list_s*          waitclose_list;
 };
 
 /*  session待发的消息    */
@@ -198,8 +194,8 @@ ox_create_nrmgr(
             reactor->check_packet = check;
 
             server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_close_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback);
-            reactor->flush_timer = ox_timer_mgr_new(1024);
             reactor->waitsend_list = ox_list_new(1024, sizeof(struct net_session_s*));
+            reactor->waitclose_list = ox_list_new(1024, sizeof(struct net_session_s*));
             reactor->thread = NULL;
             reactor->thread = ox_thread_new(reactor_thread, reactor);
         }
@@ -419,7 +415,6 @@ net_session_malloc()
         session->active = true;
         double_link_init(&session->packet_list);
         session->wait_flush = false;
-        session->flush_id = -1;
     }
 
     return session;
@@ -446,12 +441,6 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
     server_close(reactor->server, session->handle);
     session->active = false;
 
-    if(session->flush_id != -1)
-    {
-        ox_timer_mgr_del(reactor->flush_timer, session->flush_id);
-        session->flush_id = -1;
-    }
-
     session->wait_flush = false;
     free(session);
     reactor->active_num--;
@@ -475,24 +464,6 @@ session_packet_flush(struct net_reactor* reactor, struct net_session_s* session)
             /*  直接处理socket断开    */
             reactor_logic_on_close_callback(reactor->server, session);
         }
-    }
-}
-
-static void
-flushpacket_timerover(void* arg)
-{
-    struct net_session_s* session = (struct net_session_s*)arg;
-    session->wait_flush = false;
-    session_packet_flush(session->reactor, session);
-}
-
-static void
-insert_flush(struct net_reactor* reactor, struct net_session_s* session)
-{
-    if(!session->wait_flush)
-    {
-        session->flush_id = ox_timer_mgr_add(reactor->flush_timer, flushpacket_timerover, FLUSHTIMER_DELAY, session);
-        session->wait_flush = true;
     }
 }
 
@@ -528,15 +499,8 @@ reactor_proc_sendmsg(struct net_reactor* reactor, struct net_session_s* session,
                 ++(session->bufnum);
             }
 
-            if(true)
-            {
-                insert_flush(reactor, session);
-            }
-            else
-            {
-                /*	添加到活动send列表	*/
-                add_session_to_waitsendlist(reactor, session);
-            }
+            /*	添加到活动send列表	*/
+            add_session_to_waitsendlist(reactor, session);
         }
         else
         {
@@ -563,13 +527,13 @@ reactor_proc_rwlist(struct net_reactor* reactor)
         }
         else if(rwlist_msg->msg_type == RMT_CLOSE)
         {
-            session_destroy(reactor, rwlist_msg->data.close.session);
+            ox_list_push_back(reactor->waitclose_list, &rwlist_msg->data.close.session);
         }
         else if(rwlist_msg->msg_type == RMT_REQUEST_CLOSE)
         {
             if(rwlist_msg->data.close.session->active)
             {
-                session_destroy(reactor, rwlist_msg->data.close.session);
+                ox_list_push_back(reactor->waitclose_list, &rwlist_msg->data.close.session);
             }
         }
         else if(rwlist_msg->msg_type == RMT_REQUEST_FREENETMSG)
@@ -622,11 +586,6 @@ reactor_thread(void* arg)
         reactor_proc_rwlist(reactor);
         reactor_proc_enterlist(reactor);
 
-        if(true)
-        {
-            ox_timer_mgr_schedule(reactor->flush_timer);
-        }
-        else
         {
             struct list_node_s* begin = ox_list_begin(reactor->waitsend_list);
             const struct list_node_s* end = ox_list_end(reactor->waitsend_list);
@@ -638,6 +597,20 @@ reactor_thread(void* arg)
                 begin = ox_list_erase(reactor->waitsend_list, begin);
 
                 session_packet_flush(reactor, session);
+            }
+        }
+
+        {
+            /*  在处理了waitsend_list之后，使用专门的list来储存待关闭的session，以防reactor_proc_rwlist将session放入sendlist之后，然后free了session    */
+            struct list_node_s* begin = ox_list_begin(reactor->waitclose_list);
+            const struct list_node_s* end = ox_list_end(reactor->waitclose_list);
+
+            while(begin != end)
+            {
+                struct net_session_s* session = *(struct net_session_s**)begin->data;
+                begin = ox_list_erase(reactor->waitclose_list, begin);
+
+                session_destroy(reactor, session);
             }
         }
     }
@@ -766,14 +739,7 @@ session_sendfinish_callback(struct server_s* self, void* ud, int bytes)
             /*  没有完全发送完毕继续发送    */
             if(session->bufnum > 0)
             {
-                if(true)
-                {
-                    insert_flush(reactor, session);
-                }
-                else
-                {
-                    session_packet_flush(reactor, session);
-                }
+                add_session_to_waitsendlist(reactor, session);
             }
         }
     }
