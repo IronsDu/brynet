@@ -6,9 +6,7 @@
 #include "thread_reactor.h"
 #include "systemlib.h"
 
-#define SERVER_PORT 4100
-#define CLIENT_NUM 1000
-#define PACKET_LEN (16*1024)
+#include "pingpong_def.h"
 
 static int totaol_recv = 0;
 

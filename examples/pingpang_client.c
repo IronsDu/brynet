@@ -6,9 +6,7 @@
 #include "socketlibfunction.h"
 #include "thread_reactor.h"
 
-#define SERVER_PORT 4100
-#define CLIENT_NUM 1000
-#define PACKET_LEN (16*1024)
+#include "pingpong_def.h"
 
 static int s_check(void* ud, const char* buffer, int len)
 {
@@ -44,7 +42,7 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
     {
         /*  申请发送消息  */
         struct nrmgr_send_msg_data* sd_msg = ox_nrmgr_make_sendmsg(mgr, NULL, PACKET_LEN);
-        printf("recv data\n");
+        //printf("recv data\n");
 		memcpy(sd_msg->data, msg->data, msg->data_len);
         sd_msg->data_len = msg->data_len;
         /*  发送消息    */
