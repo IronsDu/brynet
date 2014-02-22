@@ -114,11 +114,11 @@ static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* cl
     {
         /*  如果当前会话处于活动，则需要通知上层  */
         client->active = false;
-        (iocp->base.logic_on_close)(&iocp->base, client->ud);
+        (iocp->base.logic_on_disconnection)(&iocp->base, client->ud);
     }
     else
     {
-        /*  逻辑层通知关闭session后，iocp可能也会得到socket关闭通知，所以这时active为false   */
+        /*  逻辑层通知关闭session后，iocp可能也会得到socket关闭通知，所以这时active为false，需要判断是否已经post释放资源   */
         struct session_ext_s* ext_data = (struct session_ext_s*)client->ext_data;
 
         if(!client->post_close)
@@ -317,8 +317,10 @@ iocp_poll_callback(struct server_s* self, int64_t timeout)
         {
             if(ovl_p == (struct ovl_ext_s*)0xcdcdcdcd)
             {
-                /*  真正释放资源  */
+                /*  完成最后释放资源，并通知上层（才能释放其资源）  */
+                void* ud = session_p->ud;
                 iocp_session_free(session_p);
+                (self->logic_on_closecompleted)(self, ud);
             }
             else
             {
@@ -361,10 +363,11 @@ iocp_poll_callback(struct server_s* self, int64_t timeout)
 static void iocp_start_callback(
     struct server_s* self,
     logic_on_enter_handle enter_pt,
-    logic_on_close_handle close_pt,
+    logic_on_disconnection_handle disconnection_pt,
     logic_on_recved_handle   recved_pt,
     logic_on_cansend_handle cansend_pt,
-    logic_on_sendfinish_handle  sendfinish_pt
+    logic_on_sendfinish_handle  sendfinish_pt,
+    logic_on_close_completed    closecompleted_pt
     )
 {
     struct iocp_s* iocp = (struct iocp_s*)self;
@@ -378,10 +381,11 @@ static void iocp_start_callback(
         iocp->iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
         
         iocp->base.logic_on_enter = enter_pt;
-        iocp->base.logic_on_close = close_pt;
+        iocp->base.logic_on_disconnection = disconnection_pt;
         iocp->base.logic_on_recved = recved_pt;
         iocp->base.logic_on_cansend = cansend_pt;
         iocp->base.logic_on_sendfinish = sendfinish_pt;
+        iocp->base.logic_on_closecompleted = closecompleted_pt;
 
         iocp->run_flag = true;
     }
@@ -458,6 +462,8 @@ static int iocp_sendv_callback(struct server_s* self, void* handle, const char* 
 
 static void iocp_closesession_callback(struct server_s* self, void* handle)
 {
+    /*  仅投递释放资源的请求  */
+
     struct iocp_s* iocp = (struct iocp_s*)self;
     struct session_s* session = (struct session_s*)handle;
     struct session_ext_s* ext_data = (struct session_ext_s*)session->ext_data;

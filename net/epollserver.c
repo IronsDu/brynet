@@ -63,8 +63,6 @@ epoll_add_event(int epoll_fd, sock fd, struct session_s* client, uint32_t events
 {
     struct epoll_event ev = { 0, { 0 }};
     ev.events = events;
-
-    ev.data.fd = fd;
     ev.data.ptr = client;
     epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
 }
@@ -275,19 +273,21 @@ static void
 epollserver_start_callback(
     struct server_s* self,
     logic_on_enter_handle enter_pt,
-    logic_on_close_handle close_pt,
+    logic_on_disconnection_handle on_disconnection_pt,
     logic_on_recved_handle   recved_pt,
     logic_on_cansend_handle    cansend_pt,
-    logic_on_sendfinish_handle sendfinish_pt
+    logic_on_sendfinish_handle sendfinish_pt,
+    logic_on_close_completed  closecompleted_callback
     )
 {
     struct epollserver_s* epollserver = (struct epollserver_s*)self;
 
     self->logic_on_enter = enter_pt;
-    self->logic_on_close = close_pt;
+    self->logic_on_disconnection = on_disconnection_pt;
     self->logic_on_recved = recved_pt;
     self->logic_on_cansend = cansend_pt;
     self->logic_on_sendfinish = sendfinish_pt;
+    self->logic_on_closecompleted = closecompleted_callback;
 
     epollserver->epoll_fd = epoll_create(1);
 }
@@ -371,7 +371,9 @@ epollserver_closesession_callback(struct server_s* self, void* handle)
     struct epollserver_s* epollserver = (struct epollserver_s*)self;
 
     struct session_s* session = (struct session_s*)handle;
+    void* ud = session->ud;
     epollserver_handle_sessionclose(epollserver, session);
+    (self->logic_on_closecompleted)(self, ud);
 }
 
 static bool

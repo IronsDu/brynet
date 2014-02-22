@@ -145,13 +145,17 @@ static void
 reactor_logic_on_enter_callback(struct server_s* self, void* ud, void* handle);
 
 static void
-reactor_logic_on_close_callback(struct server_s* self, void* ud);
+reactor_logic_on_disconnection_callback(struct server_s* self, void* ud);
 
 static int
 reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* buffer, int len);
 
 static void
 session_sendfinish_callback(struct server_s* self, void* ud, int bytes);
+
+static void
+reactor_logic_on_close_completed(struct server_s* self, void* ud);
+
 
 static struct net_session_s*
 net_session_malloc();
@@ -193,7 +197,7 @@ ox_create_nrmgr(
             reactor->fromlogic_rwlist = ox_rwlist_new(1024, sizeof(struct rwlist_msg_data) , DF_RWLIST_PENDING_NUM);
             reactor->check_packet = check;
 
-            server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_close_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback);
+            server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_disconnection_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback, reactor_logic_on_close_completed);
             reactor->waitsend_list = ox_list_new(1024, sizeof(struct net_session_s*));
             reactor->waitclose_list = ox_list_new(1024, sizeof(struct net_session_s*));
             reactor->thread = NULL;
@@ -438,7 +442,6 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
 
     double_link_init(&session->packet_list);
 
-    server_close(reactor->server, session->handle);
     session->active = false;
 
     session->wait_flush = false;
@@ -462,7 +465,7 @@ session_packet_flush(struct net_reactor* reactor, struct net_session_s* session)
         else if(bytes == -1)
         {
             /*  直接处理socket断开    */
-            reactor_logic_on_close_callback(reactor->server, session);
+            reactor_logic_on_disconnection_callback(reactor->server, session);
         }
     }
 }
@@ -609,8 +612,8 @@ reactor_thread(void* arg)
             {
                 struct net_session_s* session = *(struct net_session_s**)begin->data;
                 begin = ox_list_erase(reactor->waitclose_list, begin);
-
-                session_destroy(reactor, session);
+                /*  请求底层释放资源，并会触发释放完成    */
+                server_close(reactor->server, session->handle);
             }
         }
     }
@@ -633,7 +636,7 @@ reactor_logic_on_enter_callback(struct server_s* self, void* ud, void* handle)
 }
 
 static void
-reactor_logic_on_close_callback(struct server_s* self, void* ud)
+reactor_logic_on_disconnection_callback(struct server_s* self, void* ud)
 {
     struct net_session_s* session = (struct net_session_s*)ud;
     struct net_reactor* reactor = (struct net_reactor*)server_getext(self);
@@ -743,6 +746,14 @@ session_sendfinish_callback(struct server_s* self, void* ud, int bytes)
             }
         }
     }
+}
+
+static void
+reactor_logic_on_close_completed(struct server_s* self, void* ud)
+{
+    struct net_reactor* reactor = (struct net_reactor*)server_getext(self);
+    struct net_session_s* session = (struct net_session_s*)ud;
+    session_destroy(reactor, session);
 }
 
 void ox_nrmgr_setuserdata(struct nr_mgr* mgr, void* ud)
