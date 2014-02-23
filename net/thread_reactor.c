@@ -156,6 +156,8 @@ session_sendfinish_callback(struct server_s* self, void* ud, int bytes);
 static void
 reactor_logic_on_close_completed(struct server_s* self, void* ud);
 
+static void
+reactor_freesendmsg_handle(struct net_reactor* reactor);
 
 static struct net_session_s*
 net_session_malloc();
@@ -222,10 +224,41 @@ ox_nrmgr_delete(struct nr_mgr* self)
     {
         struct net_reactor* reactor = self->reactors+i;
 
+        ox_list_delete(reactor->waitclose_list);
+        ox_list_delete(reactor->waitsend_list);
+
+        ox_rwlist_force_flush(reactor->free_sendmsg_list);
+        reactor_freesendmsg_handle(reactor);
         ox_rwlist_delete(reactor->free_sendmsg_list);
         ox_rwlist_delete(reactor->logic_msglist);
         ox_rwlist_delete(reactor->enter_list);
-        ox_rwlist_delete(reactor->fromlogic_rwlist);
+
+        {
+            struct rwlist_s*    rwlist = reactor->fromlogic_rwlist;
+            struct rwlist_msg_data* rwlist_msg = NULL;
+            ox_rwlist_force_flush(reactor->fromlogic_rwlist);
+
+            while((rwlist_msg = (struct rwlist_msg_data*)ox_rwlist_pop(rwlist, 0)) != NULL)
+            {
+                if(rwlist_msg->msg_type == RMT_SENDMSG)
+                {
+                    free(rwlist_msg->data.send.data);
+                }
+                else if(rwlist_msg->msg_type == RMT_CLOSE)
+                {
+                }
+                else if(rwlist_msg->msg_type == RMT_REQUEST_CLOSE)
+                {
+                }
+                else if(rwlist_msg->msg_type == RMT_REQUEST_FREENETMSG)
+                {
+                    free(rwlist_msg->data.free.msg);
+                }
+            }
+
+            ox_rwlist_delete(reactor->fromlogic_rwlist);
+        }
+        
 
         server_stop(reactor->server);
     }
