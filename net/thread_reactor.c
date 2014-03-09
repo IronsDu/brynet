@@ -82,8 +82,8 @@ struct net_reactor
 
     struct thread_s*        thread;
 
-    struct list_s*          waitsend_list;
-    struct list_s*          waitclose_list;
+    struct stack_s*         waitsend_list;
+    struct stack_s*         waitclose_list;
 };
 
 /*  session待发的消息    */
@@ -200,8 +200,8 @@ ox_create_nrmgr(
             reactor->check_packet = check;
 
             server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_disconnection_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback, reactor_logic_on_close_completed);
-            reactor->waitsend_list = ox_list_new(1024, sizeof(struct net_session_s*));
-            reactor->waitclose_list = ox_list_new(1024, sizeof(struct net_session_s*));
+            reactor->waitsend_list = ox_stack_new(1024, sizeof(struct net_session_s*));
+            reactor->waitclose_list = ox_stack_new(1024, sizeof(struct net_session_s*));
             reactor->thread = NULL;
             reactor->thread = ox_thread_new(reactor_thread, reactor);
         }
@@ -224,8 +224,8 @@ ox_nrmgr_delete(struct nr_mgr* self)
     {
         struct net_reactor* reactor = self->reactors+i;
 
-        ox_list_delete(reactor->waitclose_list);
-        ox_list_delete(reactor->waitsend_list);
+        ox_stack_delete(reactor->waitclose_list);
+        ox_stack_delete(reactor->waitsend_list);
 
         ox_rwlist_force_flush(reactor->free_sendmsg_list);
         reactor_freesendmsg_handle(reactor);
@@ -509,7 +509,7 @@ add_session_to_waitsendlist(struct net_reactor* reactor, struct net_session_s* s
     if(!session->wait_flush)
     {
         session->wait_flush = true;
-        ox_list_push_back(reactor->waitsend_list, &session);
+        ox_stack_push(reactor->waitsend_list, &session);
     }
 }
 
@@ -563,13 +563,13 @@ reactor_proc_rwlist(struct net_reactor* reactor)
         }
         else if(rwlist_msg->msg_type == RMT_CLOSE)
         {
-            ox_list_push_back(reactor->waitclose_list, &rwlist_msg->data.close.session);
+            ox_stack_push(reactor->waitclose_list, &rwlist_msg->data.close.session);
         }
         else if(rwlist_msg->msg_type == RMT_REQUEST_CLOSE)
         {
             if(rwlist_msg->data.close.session->active)
             {
-                ox_list_push_back(reactor->waitclose_list, &rwlist_msg->data.close.session);
+                ox_stack_push(reactor->waitclose_list, &rwlist_msg->data.close.session);
             }
         }
         else if(rwlist_msg->msg_type == RMT_REQUEST_FREENETMSG)
@@ -623,31 +623,28 @@ reactor_thread(void* arg)
         reactor_proc_enterlist(reactor);
 
         {
-            struct list_node_s* begin = ox_list_begin(reactor->waitsend_list);
-            const struct list_node_s* end = ox_list_end(reactor->waitsend_list);
-
-            while(begin != end)
+            struct stack_s* waitsend_list = reactor->waitsend_list;
+            char* data = NULL;
+            while((data = ox_stack_popfront(waitsend_list)) != NULL)
             {
-                struct net_session_s* session = *(struct net_session_s**)begin->data;
+                struct net_session_s* session = *(struct net_session_s**)data;
                 session->wait_flush = false;
-                begin = ox_list_erase(reactor->waitsend_list, begin);
 
                 session_packet_flush(reactor, session);
             }
         }
 
         {
-            /*  在处理了waitsend_list之后，使用专门的list来储存待关闭的session，以防reactor_proc_rwlist将session放入sendlist之后，然后free了session    */
-            struct list_node_s* begin = ox_list_begin(reactor->waitclose_list);
-            const struct list_node_s* end = ox_list_end(reactor->waitclose_list);
-
-            while(begin != end)
+            struct stack_s* waitclose_list = reactor->waitclose_list;
+            char* data = NULL;
+            while((data = ox_stack_popfront(waitclose_list)) != NULL)
             {
-                struct net_session_s* session = *(struct net_session_s**)begin->data;
-                begin = ox_list_erase(reactor->waitclose_list, begin);
+                struct net_session_s* session = *(struct net_session_s**)data;
                 /*  请求底层释放资源，并会触发释放完成    */
                 server_close(reactor->server, session->handle);
             }
+
+            /*  在处理了waitsend_list之后，使用专门的list来储存待关闭的session，以防reactor_proc_rwlist将session放入sendlist之后，然后free了session    */
         }
     }
 }
