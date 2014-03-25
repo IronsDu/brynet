@@ -1,179 +1,13 @@
 #define CRTDBG_MAP_ALLOC
 
+#include <windows.h>
 #include "../cpp_common/timer.h"
-#include <functional>
-#include <queue>
-#include <vector>
+#include "../cpp_common/rwlist.h"
+#include <thread>
 #include <iostream>
-#include <memory>
-#include <time.h>
-#include <deque>
-
-#include <Windows.h>
+#include <chrono>
 
 using namespace std;
-
-
-class Mutex
-{
-public:
-	Mutex()
-	{
-		InitializeCriticalSection(&mMutex);
-	}
-
-	~Mutex()
-	{
-		DeleteCriticalSection(&mMutex);
-	}
-
-	void	Lock()
-	{
-		EnterCriticalSection(&mMutex);
-	}
-
-	void	UnLock()
-	{
-		LeaveCriticalSection(&mMutex);
-	}
-
-private:
-	CRITICAL_SECTION    mMutex;
-};
-
-class CondMutex
-{
-public:
-	CondMutex()
-	{
-		mCond = CreateEvent(NULL, FALSE, FALSE, NULL);
-	}
-
-	~CondMutex()
-	{
-		CloseHandle(mCond);
-	}
-
-	void	Wait(Mutex& mutex)
-	{
-		mutex.UnLock();
-		WaitForSingleObject(mCond, INFINITE);
-		mutex.Lock();
-	}
-
-	void	timeWait(Mutex& mutex, int timeover)
-	{
-		mutex.UnLock();
-		WaitForSingleObject(mCond, timeover);
-		mutex.Lock();
-	}
-	
-	void	Singal()
-	{
-		SetEvent(mCond);
-	}
-private:
-	HANDLE  mCond;
-};
-
-template<typename T>
-class Rwlist
-{
-public:
-	typedef std::deque<T>	Container;
-
-	Rwlist()
-	{	
-		mWriteList = new Container();
-		mSharedList = new Container();
-		mReadList = new Container();
-	}
-
-	~Rwlist()
-	{
-		delete mWriteList;
-		delete mSharedList;
-		delete mReadList;
-
-		mWriteList = nullptr;
-		mSharedList = nullptr;
-		mReadList = nullptr;
-	}
-
-	void	push(T t)
-	{
-		mWriteList->push_back(t);
-	}
-
-	T&	front()
-	{
-		if (!mReadList->empty())
-		{
-			return *(mReadList->begin());
-		}
-		else
-		{
-			return *(T*)nullptr;
-		}
-	}
-
-	void	pop_front()
-	{
-		mReadList->pop_front();
-	}
-
-	/*	同步写缓冲到共享队列(共享队列必须为空)	*/
-	void	syncWrite()
-	{
-		if (mSharedList->empty())
-		{
-			mMutex.Lock();
-
-			auto* temp = mSharedList;
-			mSharedList = mWriteList;
-			mWriteList = temp;
-
-			mCond.Singal();
-
-			mMutex.UnLock();
-		}
-	}
-
-	/*	从共享队列同步到读缓冲区(必须读缓冲区为空时)	*/
-	void	syncRead(int timeout)
-	{
-		if (mReadList->empty())
-		{
-			mMutex.Lock();
-
-			if (mSharedList->empty() && timeout > 0)
-			{
-				/*  如果共享队列没有数据且timeout大于0则需要等待通知,否则直接进行同步    */
-				mCond.timeWait(mMutex, timeout);
-			}
-
-			if (!mSharedList->empty())
-			{
-				auto* temp = mSharedList;
-				mSharedList = mReadList;
-				mReadList = temp;
-			}
-
-			mMutex.UnLock();
-		}
-	}
-
-private:
-	Mutex		mMutex;
-	CondMutex	mCond;
-
-	/*	写缓冲	*/
-	Container*	mWriteList;
-	/*	共享队列	*/
-	Container*	mSharedList;
-	/*	读缓冲区	*/
-	Container*	mReadList;
-};
 
 class Test
 {
@@ -207,35 +41,94 @@ static void foo(void)
 	cout << "foo" << endl;
 }
 
+using namespace Concurrency;
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	shared_ptr<Rwlist<int>>	mr = make_shared<Rwlist<int>>();
+	Rwlist<string>	aaaaa;
+    aaaaa.Push("hal");
+
+    {
+        std::chrono::microseconds(1);
+        std::thread t1([]()
+        {
+            while (true)
+            {
+                //cout << "cpp11 thread" << endl;
+                std::this_thread::sleep_for(std::chrono::microseconds(0));
+            }
+        });
+
+        t1.detach();
+    }
 
 	{
-		Rwlist<int>	mr;
-		mr.push(1);
-		mr.push(2);
-		mr.syncWrite();
-		mr.syncRead(1);
+        mr->Push(1);
+        mr->Push(2);
+        mr->SyncWrite();
+        mr->SyncRead(1);
 		while (true)
 		{
-			int& i = mr.front();
+            int& i = mr->PopFront();
 			if (&i == NULL)
 			{
 				break;
 			}
-			mr.pop_front();
 		}
 	}
 	{
 		TimerMgr t;
-		
 
-		Timer::Ptr tmp = t.AddTimer(3000, []{
+        std::thread thread(
+            [](shared_ptr<Rwlist<int>>	mr){
+            DWORD start = GetTickCount();
+            int count = 0;
+            while (true)
+            {
+                while (true)
+                {
+                    int& i = mr->PopFront();
+                    if (&i == nullptr)
+                    {
+                        mr->SyncRead(1);
+                        break;
+                    }
+                    else
+                    {
+                        count++;
+                    }
+                }
+
+                DWORD now = GetTickCount();
+                if ((now - start) >= 1000)
+                {
+                    start = now;
+                    cout << "count : " << count << endl;
+                    count = 0;
+                }
+            }
+        }, mr);
+
+		auto tmp = t.AddTimer(3000, [](){
 			cout << "3000 " <<  endl;
 		});
 
-		tmp->Cancel();
+
+		{
+			auto tmp = [](int a)
+			{
+				cout << a << endl;
+			};
+
+			tmp(1);
+
+			[](int a)
+			{
+				cout << a << endl;
+			}(1);
+		}
+		tmp.lock()->Cancel();
 
 		{
 			auto a = make_shared<Test>();
@@ -244,7 +137,7 @@ int main()
 			a->inc();
 			a->inc();
 
-			t.AddTimer(5000, [a]{
+			t.AddTimer(5000, [a] (){
 				cout << "5000 " <<  endl;
 				a->foo();
 			});
@@ -262,10 +155,24 @@ int main()
 		t.AddTimer(0, foo);
 		t.AddTimer(0, foo);
 
-		while (!t.IsEmpty())
+		while (true)
 		{
+			for (int i = 0; i < 1000; ++i)
+			{
+				mr->Push(1);
+			}
+			mr->SyncWrite();
 			t.Schedule();
-			Sleep(0);
+            std::this_thread::sleep_for(std::chrono::microseconds(0));
+		}
+
+		if (tmp.lock())
+		{
+			cout << "valid" << endl;
+		}
+		else
+		{
+			cout << "is null" << endl;
 		}
 		cin.get();
 	}

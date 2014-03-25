@@ -12,6 +12,7 @@ class Timer
 {
 public:
 	typedef std::shared_ptr<Timer>			Ptr;
+	typedef std::weak_ptr<Timer>			WeakPtr;
 	typedef std::function<void(void)>		Callback;
 
 	time_t									GetEndMs() const;
@@ -42,7 +43,7 @@ private:
 class TimerMgr
 {
 public:
-	Timer::Ptr								AddTimer(time_t delayMs, Timer::Callback callback);
+	Timer::WeakPtr							AddTimer(time_t delayMs, Timer::Callback callback);
 
 	void									Schedule();
 
