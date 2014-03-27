@@ -11,63 +11,63 @@ class TimerMgr;
 class Timer
 {
 public:
-	typedef std::shared_ptr<Timer>			Ptr;
-	typedef std::weak_ptr<Timer>			WeakPtr;
-	typedef std::function<void(void)>		Callback;
+    typedef std::shared_ptr<Timer>          Ptr;
+    typedef std::weak_ptr<Timer>            WeakPtr;
+    typedef std::function<void(void)>       Callback;
 
-	time_t									GetEndMs() const;
-	void									Cancel();
-
-private:
-	Timer(time_t ms, Callback f);
-
-	void operator()							();
+    time_t                                  GetEndMs() const;
+    void                                    Cancel();
 
 private:
-	bool									mActive;
-	Callback								mCallback;
-	time_t									mEndMs;
+    Timer(time_t ms, Callback f);
+
+    void operator()                         ();
+
+private:
+    bool                                    mActive;
+    Callback                                mCallback;
+    time_t                                  mEndMs;
 
 
 private:
-	friend class TimerMgr;
+    friend class TimerMgr;
 
-	template<typename _T, class... _Types>
-	friend std::shared_ptr<_T>				std::make_shared(_Types&&...);
+    template<typename _T, class... _Types>
+    friend std::shared_ptr<_T>              std::make_shared(_Types&&...);
 
-	friend class std::_Ref_count_obj<Timer>;
+    friend class std::_Ref_count_obj<Timer>;
 
-	friend class std::shared_ptr<Timer>;
+    friend class std::shared_ptr<Timer>;
 };
 
 class TimerMgr
 {
 public:
     template<typename F, typename ...TArgs>
-    Timer::WeakPtr							AddTimer(time_t delayMs, F callback, typename TArgs&& ...args)
+    Timer::WeakPtr                          AddTimer(time_t delayMs, F callback, typename TArgs&& ...args)
     {
         auto t = std::make_shared<Timer>(delayMs + static_cast<time_t>(GetTickCount()), 
-                                        std::bind(callback, std::forward<TArgs>(args)...));
+                                            std::bind(callback, std::forward<TArgs>(args)...));
         mTimers.push(t);
 
         return t;
     }
 
-	void									Schedule();
+    void                                    Schedule();
 
-	bool									IsEmpty();
+    bool                                    IsEmpty();
 
 private:
-	class CompareTimer
-	{
-	public:
-		bool operator() (const Timer::Ptr& left, const Timer::Ptr& right) const
-		{
-			return left->GetEndMs() > right->GetEndMs();
-		}
-	};
+    class CompareTimer
+    {
+    public:
+        bool operator() (const Timer::Ptr& left, const Timer::Ptr& right) const
+        {
+            return left->GetEndMs() > right->GetEndMs();
+        }
+    };
 
-	std::priority_queue<Timer::Ptr, std::vector<Timer::Ptr>, CompareTimer>	mTimers;
+    std::priority_queue<Timer::Ptr, std::vector<Timer::Ptr>, CompareTimer>  mTimers;
 };
 
 #endif
