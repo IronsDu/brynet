@@ -25,14 +25,6 @@ void Timer::operator() ()
 	}
 }
 
-Timer::WeakPtr TimerMgr::AddTimer(time_t delayMs, Timer::Callback callback)
-{
-	auto t = std::make_shared<Timer>(delayMs + static_cast<time_t>(GetTickCount()), callback);
-	mTimers.push(t);
-
-	return t;
-}
-
 void TimerMgr::Schedule()
 {
 	while (!mTimers.empty())

@@ -43,7 +43,15 @@ private:
 class TimerMgr
 {
 public:
-	Timer::WeakPtr							AddTimer(time_t delayMs, Timer::Callback callback);
+    template<typename F, typename ...TArgs>
+    Timer::WeakPtr							AddTimer(time_t delayMs, F callback, typename TArgs&& ...args)
+    {
+        auto t = std::make_shared<Timer>(delayMs + static_cast<time_t>(GetTickCount()), 
+                                        std::bind(callback, std::forward<TArgs>(args)...));
+        mTimers.push(t);
+
+        return t;
+    }
 
 	void									Schedule();
 

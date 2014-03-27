@@ -41,54 +41,51 @@ static void foo(void)
 	cout << "foo" << endl;
 }
 
+static void foo1(int a)
+{
+    cout << "fuck  " << a << endl;
+}
+
+static void foo2(int a, int b)
+{}
+
 using namespace Concurrency;
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-	shared_ptr<Rwlist<int>>	mr = make_shared<Rwlist<int>>();
+    auto	mr = make_shared<Rwlist<string*>>();
 	Rwlist<string>	aaaaa;
     aaaaa.Push("hal");
 
-    {
-        std::chrono::microseconds(1);
-        std::thread t1([]()
-        {
-            while (true)
-            {
-                //cout << "cpp11 thread" << endl;
-                std::this_thread::sleep_for(std::chrono::microseconds(0));
-            }
-        });
-
-        t1.detach();
-    }
-
 	{
-        mr->Push(1);
-        mr->Push(2);
+        mr->Push(new string("haha"));
         mr->SyncWrite();
         mr->SyncRead(1);
 		while (true)
 		{
-            int& i = mr->PopFront();
-			if (&i == NULL)
+            auto& i = mr->PopFront();
+			if (&i == nullptr)
 			{
 				break;
 			}
+            else
+            {
+                delete i;
+            }
 		}
 	}
 	{
 		TimerMgr t;
 
         std::thread thread(
-            [](shared_ptr<Rwlist<int>>	mr){
+            [](shared_ptr<Rwlist<string*>>	mr){
             DWORD start = GetTickCount();
             int count = 0;
             while (true)
             {
                 while (true)
                 {
-                    int& i = mr->PopFront();
+                    auto& i = mr->PopFront();
                     if (&i == nullptr)
                     {
                         mr->SyncRead(1);
@@ -96,6 +93,7 @@ int main()
                     }
                     else
                     {
+                        delete i;
                         count++;
                     }
                 }
@@ -143,23 +141,23 @@ int main()
 			});
 		}
 
-		t.AddTimer(1000, []{
+		t.AddTimer(1000, [](int a){
 			cout << "1000 " << endl;
-		});
+		}, 1);
 
 		t.AddTimer(2000, []{
 			cout << "2000 " << endl;
 		});
 
-		t.AddTimer(0, foo);
-		t.AddTimer(0, foo);
+        
+		t.AddTimer(1000, foo1, 1);
 		t.AddTimer(0, foo);
 
 		while (true)
 		{
 			for (int i = 0; i < 1000; ++i)
 			{
-				mr->Push(1);
+                mr->Push(new string("1"));
 			}
 			mr->SyncWrite();
 			t.Schedule();
