@@ -112,20 +112,9 @@ static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* cl
 {
     if(client->active)
     {
-        /*  如果当前会话处于活动，则需要通知上层  */
+        /*  如果当前会话处于活动，则通知上层  */
         client->active = false;
         (iocp->base.logic_on_disconnection)(&iocp->base, client->ud);
-    }
-    else
-    {
-        /*  逻辑层通知关闭session后，iocp可能也会得到socket关闭通知，所以这时active为false，需要判断是否已经post释放资源   */
-        struct session_ext_s* ext_data = (struct session_ext_s*)client->ext_data;
-
-        if(!client->post_close)
-        {
-            client->post_close = true;
-            PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xcdcdcdcd);
-        }
     }
 }
 
@@ -472,6 +461,7 @@ static void iocp_closesession_callback(struct server_s* self, void* handle)
 
     if(!session->post_close)
     {
+        /*  投递特殊通知，以做最后的释放动作    */
         session->post_close = true;
         PostQueuedCompletionStatus(iocp->iocp_handle, 0, (ULONG_PTR)&(ext_data->ck), (LPOVERLAPPED)0xcdcdcdcd);
     }

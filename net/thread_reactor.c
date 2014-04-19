@@ -9,8 +9,6 @@
 #include "platform.h"
 #include "thread.h"
 #include "mutex.h"
-#include "timeaction.h"
-#include "list.h"
 
 #ifdef PLATFORM_LINUX
 #include "epollserver.h"
@@ -36,8 +34,6 @@
 
 #define SOCKET_POLL_TIME (1)
 
-#define PENDING_POOL_SIZE (10024)
-
 struct nr_mgr
 {
     struct net_reactor*     reactors;
@@ -55,14 +51,13 @@ struct net_session_s
 
     struct net_reactor*     reactor;
 
-    const char*             bufs[MAX_SENDBUF_NUM];
-    int                     lens[MAX_SENDBUF_NUM];
-    int                     bufnum;
-
     bool                    active;                 /*  是否处于链接状态    */
     bool                    wait_flush;             /*  是否处于等待flush中    */
     void*                   handle;                 /*  下层网络对象  */
     void*                   ud;                     /*  上层用户数据  */
+    bool                    can_send;               /*  因为移除了buf数组，所以需要此变量，来避免每次都构造临时buf数组以及将session
+                                                    放入带发送列表，如果没有移除buf数组成员，则无需此变量，而直接调用下层sendv，下层会判断
+                                                    是否可写，也没有效率损耗*/
 };
 
 struct net_reactor
@@ -164,6 +159,8 @@ net_session_malloc();
 
 static void
 session_destroy(struct net_reactor* reactor, struct net_session_s* session);
+static void
+session_remove_sended_data(struct net_reactor* reactor, struct net_session_s* session, int sendbytes);
 
 struct nr_mgr*
 ox_create_nrmgr(
@@ -448,10 +445,10 @@ net_session_malloc()
     struct net_session_s* session = (struct net_session_s*)malloc(sizeof(*session));
     if(session != NULL)
     {
-        session->bufnum = 0;
         session->active = true;
         double_link_init(&session->packet_list);
         session->wait_flush = false;
+        session->can_send = true;
     }
 
     return session;
@@ -476,7 +473,6 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
     double_link_init(&session->packet_list);
 
     session->active = false;
-
     session->wait_flush = false;
     free(session);
     reactor->active_num--;
@@ -485,20 +481,52 @@ session_destroy(struct net_reactor* reactor, struct net_session_s* session)
 static void
 session_packet_flush(struct net_reactor* reactor, struct net_session_s* session)
 {
-    if(session->active && session->bufnum > 0)
+    /*  构造writev缓冲区数组 */
+    const char*             bufs[MAX_SENDBUF_NUM];
+    int                     lens[MAX_SENDBUF_NUM];
+    int                     bufnum = 0;
+    int                     total_len = 0;
+
+    struct double_link_node_s* current = double_link_begin((struct double_link_s*)&session->packet_list);
+    struct double_link_node_s* end = double_link_end((struct double_link_s*)&session->packet_list);
+
+    while (current != end && bufnum < MAX_SENDBUF_NUM)
     {
-        int bytes = server_sendv(reactor->server, session->handle, session->bufs, session->lens, session->bufnum);
+        struct pending_send_msg_s* node = (struct pending_send_msg_s*)current;
+        struct double_link_node_s* next = current->next;
+        bufs[bufnum] = node->msg->data + (node->msg->data_len - node->left_len);
+        lens[bufnum] = node->left_len;
+        bufnum++;
+        total_len += node->left_len;
+
+        current = next;
+    }
+
+    if (session->active && bufnum > 0)
+    {
+        int bytes = server_sendv(reactor->server, session->handle, bufs, lens, bufnum);
         if(bytes > 0)
         {
 #ifdef PLATFORM_WINDOWS
             assert(false);
 #endif
-            session_sendfinish_callback(reactor->server, session, bytes);
+
+#ifdef PLATFORM_LINUX
+            /*  linux下是立即完成，所以立即移除以发送数据 */
+            session->can_send = bytes == total_len;
+            session_remove_sended_data(reactor, session, bytes);
+#endif
         }
         else if(bytes == -1)
         {
             /*  直接处理socket断开    */
+            session->can_send = false;
             reactor_logic_on_disconnection_callback(reactor->server, session);
+        }
+        else
+        {
+            /*  win下socket只要没断开，则都返回0， linux下当写入失败时返回0  */
+            session->can_send = false;
         }
     }
 }
@@ -528,15 +556,11 @@ reactor_proc_sendmsg(struct net_reactor* reactor, struct net_session_s* session,
             pending->left_len = data->data_len;
             double_link_push_back(&(session->packet_list), (struct double_link_node_s*)pending);
 
-            if(session->bufnum < MAX_SENDBUF_NUM)
+            /*	添加到待send列表	*/
+            if (session->can_send)
             {
-                session->bufs[session->bufnum] = pending->msg->data;
-                session->lens[session->bufnum] = pending->left_len;
-                ++(session->bufnum);
+                add_session_to_waitsendlist(reactor, session);
             }
-
-            /*	添加到活动send列表	*/
-            add_session_to_waitsendlist(reactor, session);
         }
         else
         {
@@ -563,7 +587,10 @@ reactor_proc_rwlist(struct net_reactor* reactor)
         }
         else if(rwlist_msg->msg_type == RMT_CLOSE)
         {
-            ox_stack_push(reactor->waitclose_list, &rwlist_msg->data.close.session);
+            if (!rwlist_msg->data.close.session->active)
+            {
+                ox_stack_push(reactor->waitclose_list, &rwlist_msg->data.close.session);
+            }
         }
         else if(rwlist_msg->msg_type == RMT_REQUEST_CLOSE)
         {
@@ -673,7 +700,7 @@ reactor_logic_on_disconnection_callback(struct server_s* self, void* ud)
     if(session->active)
     {
         struct nrmgr_net_msg* msg = make_logicmsg(reactor, nrmgr_net_msg_close, session, NULL, 0);
-        /*  设置网络已断开 */
+        /*  设置网络已断开，并告诉上层 */
         session->active = false;
 
         if(msg != NULL)
@@ -718,6 +745,35 @@ reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* bu
     return proc_len;
 }
 
+/*  移除已经发送的数据   */
+static void
+session_remove_sended_data(struct net_reactor* reactor, struct net_session_s* session, int sendbytes)
+{
+    struct double_link_node_s* current = double_link_begin(&session->packet_list);
+    struct double_link_node_s* end = double_link_end(&session->packet_list);
+
+    while (current != end && sendbytes > 0)
+    {
+        struct pending_send_msg_s* node = (struct pending_send_msg_s*)current;
+        struct double_link_node_s* next = current->next;
+        if (node->left_len <= sendbytes)
+        {
+            /*  当前packet已经发送完毕  */
+            double_link_erase(&session->packet_list, current);
+            sendbytes -= node->left_len;
+            ox_rwlist_push(reactor->free_sendmsg_list, &(node->msg));
+            free(node);
+        }
+        else
+        {
+            node->left_len -= sendbytes;
+            break;
+        }
+
+        current = next;
+    }
+}
+
 static void
 session_sendfinish_callback(struct server_s* self, void* ud, int bytes)
 {
@@ -726,55 +782,10 @@ session_sendfinish_callback(struct server_s* self, void* ud, int bytes)
 
     if(session->active)
     {
-        {
-            struct double_link_node_s* current = double_link_begin(&session->packet_list);
-            struct double_link_node_s* end = double_link_end(&session->packet_list);
-
-            while(current != end && bytes > 0)
-            {
-                struct pending_send_msg_s* node = (struct pending_send_msg_s*)current;
-                struct double_link_node_s* next = current->next;
-                if(node->left_len <= bytes)
-                {
-                    /*  当前packet已经发送完毕  */
-                    double_link_erase(&session->packet_list, current);
-                    bytes -= node->left_len;
-                    ox_rwlist_push(reactor->free_sendmsg_list, &(node->msg));
-                    free(node);
-                }
-                else
-                {
-                    node->left_len -= bytes;
-                    break;
-                }
-
-                current = next;
-            }
-        }
-
-        {
-            /*  更新发送缓冲区 */
-            struct double_link_node_s* current = double_link_begin((struct double_link_s*)&session->packet_list);
-            struct double_link_node_s* end = double_link_end((struct double_link_s*)&session->packet_list);
-            session->bufnum = 0;
-
-            while(current != end && session->bufnum < MAX_SENDBUF_NUM)
-            {
-                struct pending_send_msg_s* node = (struct pending_send_msg_s*)current;
-                struct double_link_node_s* next = current->next;
-                session->bufs[session->bufnum] = node->msg->data+(node->msg->data_len-node->left_len);
-                session->lens[session->bufnum] = node->left_len;
-                session->bufnum++;
-
-                current = next;
-            }
-
-            /*  没有完全发送完毕继续发送    */
-            if(session->bufnum > 0)
-            {
-                add_session_to_waitsendlist(reactor, session);
-            }
-        }
+        session->can_send = true;
+        session_remove_sended_data(reactor, session, bytes);
+        /*  不管是linux下收到的可写通知(bytes为0），还是iocp收到的发送完成通知，均将此session放入待发送队列 */
+        add_session_to_waitsendlist(reactor, session);
     }
 }
 

@@ -1,5 +1,11 @@
+
+#define CRTDBG_MAP_ALLOC    
+#include <stdlib.h>    
+#include <crtdbg.h>
+
 #include <stdio.h>
 #include <stdlib.h>
+
 
 #include "thread.h"
 #include "socketlibfunction.h"
@@ -7,6 +13,7 @@
 #include "systemlib.h"
 
 #include "pingpong_def.h"
+
 
 static int totaol_recv = 0;
 
@@ -21,6 +28,8 @@ static int s_check(void* ud, const char* buffer, int len)
 		return 0;
 	}
 }
+
+struct thread_s* lt;
 
 static void    listen_thread(void* arg)
 {
@@ -45,8 +54,20 @@ static void    listen_thread(void* arg)
 
             if(SOCKET_ERROR != client_fd)
             {
-                //printf("accept client_fd : %d \n", client_fd);
-                ox_nrmgr_addfd(mgr, NULL, client_fd);
+                if(ox_thread_isrun(lt))
+                {
+                    //printf("accept client_fd : %d \n", client_fd);
+                    ox_nrmgr_addfd(mgr, NULL, client_fd);
+                }
+                else
+                {
+                    ox_socket_close(client_fd);
+                }
+            }
+
+            if(!ox_thread_isrun(lt))
+            {
+                break;
             }
         }
 
@@ -87,12 +108,44 @@ static void msg_handle(struct nr_mgr* mgr, struct nrmgr_net_msg* msg)
     }
 }
 
+int kbhit(void)
+{
+#if defined(_MSC_VER)
+    return _kbhit();
+#else
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+    ch = getchar();
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+    if(ch != EOF)
+    {
+        ungetc(ch, stdin);
+        return 1;
+    }
+
+    return 0;
+#endif
+}
+
 int main()
 {
     struct nr_mgr* mgr = ox_create_nrmgr(1, PACKET_LEN*2, s_check);
 	int old = ox_getnowtime();
-    ox_thread_new(listen_thread, mgr);
-
+    int64_t now = ox_getnowtime();
+    lt = ox_thread_new(listen_thread, mgr);
+    
     while(true)
     {
         ox_nrmgr_logic_poll(mgr, msg_handle, 5);
@@ -105,7 +158,22 @@ int main()
 				totaol_recv = 0;
 			}
 		}
+
+        if(kbhit())
+        {
+            char c = getchar();
+            if(c == 'q')
+            {
+                break;
+            }
+        }
     }
+
+    ox_socket_connect("127.0.0.1", SERVER_PORT);
+    ox_thread_delete(lt);
+    ox_nrmgr_delete(mgr);
+
+    _CrtDumpMemoryLeaks();
 
     return 0;
 }
