@@ -241,6 +241,7 @@ connection_connect_help(struct connection_s* self, struct connect_msg* connect_d
         ox_fdset_add(self->fdset, self->fd, ReadCheck);
         ox_socket_nonblock(self->fd);
         self->status = connection_establish;
+        self->writable = true;
     }
 
     connection_send_logicmsg(self, (self->status == connection_none ? net_msg_connect_failed : net_msg_establish), NULL, 0);
