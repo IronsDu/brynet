@@ -155,6 +155,16 @@ void rwlist_sync_read(struct rwlist_s* self, int timeout)
     ox_mutex_unlock(self->mutex);
 }
 
+void
+ox_rwlist_sync_read(struct rwlist_s* self, int timeout)
+{
+    if(ox_stack_num(self->local_read) <= 0)
+    {
+        /*  从共享队列同步到读队列    */
+        rwlist_sync_read(self, timeout);
+    }
+}
+
 char *
 ox_rwlist_front(struct rwlist_s* self, int timeout)
 {
@@ -181,6 +191,22 @@ ox_rwlist_pop(struct rwlist_s* self, int timeout)
     }
 
     ret = ox_stack_popfront(self->local_read);
+
+    return ret;
+}
+
+char *
+ox_rwlist_once_front(struct rwlist_s* self)
+{
+    char * ret = ox_stack_front(self->local_read);
+
+    return ret;
+}
+
+char *
+ox_rwlist_once_pop(struct rwlist_s* self)
+{
+    char * ret = ox_stack_popfront(self->local_read);
 
     return ret;
 }
