@@ -52,6 +52,10 @@ function eventobject_removelistener(eventobj, event_id, func)
                     return
                 end
             end
+
+            if #subtable == 0 then
+                listeners[event_id] = nil
+            end
         end
     end
 end
