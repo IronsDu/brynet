@@ -23,11 +23,65 @@ public:
         mWriteList.push_back(t);
     }
 
+    /*  同步写缓冲到共享队列(共享队列必须为空)    */
+    void    TrySyncWrite()
+    {
+        if (!mWriteList.empty() && mSharedList.empty())
+        {
+            mLock.lock();
+
+            mSharedList.swap(mWriteList);
+            mCond.notify_one();
+
+            mLock.unlock();
+        }
+    }
+
+    /*  强制同步    */
+    void    ForceSyncWrite()
+    {
+        if (!mWriteList.empty())
+        {
+            if (mSharedList.empty())
+            {
+                /*  如果共享队列为空，则进行交换  */
+                TrySyncWrite();
+            }
+            else
+            {
+                mLock.lock();
+
+                /*  强制写入    */
+                if (mWriteList.size() > mSharedList.size())
+                {
+                    for (auto x : mSharedList)
+                    {
+                        mWriteList.push_front(x);
+                    }
+
+                    mSharedList.clear();
+                    mSharedList.swap(mWriteList);
+                }
+                else
+                {
+                    for (auto x : mWriteList)
+                    {
+                        mSharedList.push_back(x);
+                    }
+
+                    mWriteList.clear();
+                }
+
+                mLock.unlock();
+            }
+        }
+    }
+
     T&      PopFront()
     {
         if (!mReadList.empty())
         {
-            T& ret = *(mReadList.begin());
+            T& ret = mReadList.front();
             mReadList.pop_front();
             return ret;
         }
@@ -37,17 +91,17 @@ public:
         }
     }
 
-    /*  同步写缓冲到共享队列(共享队列必须为空)    */
-    void    SyncWrite()
+    T&      PopBack()
     {
-        if (mSharedList.empty())
+        if (!mReadList.empty())
         {
-            mLock.lock();
-
-            mSharedList.swap(mWriteList);
-            mCond.notify_one();
-
-            mLock.unlock();
+            T& ret = mReadList.back();
+            mReadList.pop_back();
+            return ret;
+        }
+        else
+        {
+            return *(T*)nullptr;
         }
     }
 
@@ -71,6 +125,11 @@ public:
 
             mLock.unlock();
         }
+    }
+
+    size_t  WriteListSize() const
+    {
+        return mWriteList.size();
     }
 
 private:

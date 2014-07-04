@@ -57,18 +57,24 @@ static void foo1(int& a, const char* hello)
 static void foo2(int a, int b)
 {}
 
+#include <set>
+
 using namespace Concurrency;
 int main()
 {
+    set<int> fuckset;
+    
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    auto    mr = make_shared<Rwlist<string*>>();
+    
+    auto    mr = make_shared<Rwlist<int>>();
     Rwlist<string>  aaaaa;
     aaaaa.Push("hal");
-
+    int ffff = *fuckset.begin();
+    cout << ffff << endl;
     {
-        mr->Push(new string("haha"));
-        mr->SyncWrite();
-        mr->SyncRead(1);
+        mr->Push(1);
+        mr->ForceSyncWrite();
+        mr->SyncRead(0);
         while (true)
         {
             auto& i = mr->PopFront();
@@ -78,7 +84,7 @@ int main()
             }
             else
             {
-                delete i;
+                //delete i;
             }
         }
     }
@@ -86,7 +92,7 @@ int main()
         TimerMgr t;
 
         std::thread thread(
-            [](shared_ptr<Rwlist<string*>>  mr){
+            [](shared_ptr<Rwlist<int>>  mr){
             DWORD start = GetTickCount();
             int count = 0;
             while (true)
@@ -96,12 +102,12 @@ int main()
                     auto& i = mr->PopFront();
                     if (&i == nullptr)
                     {
-                        mr->SyncRead(1);
+                        mr->SyncRead(0);
                         break;
                     }
                     else
                     {
-                        delete i;
+                       // delete i;
                         count++;
                     }
                 }
@@ -166,9 +172,9 @@ int main()
         {
             for (int i = 0; i < 1000; ++i)
             {
-                mr->Push(new string("1"));
+                mr->Push(i);
             }
-            mr->SyncWrite();
+            mr->TrySyncWrite();
             t.Schedule();
             std::this_thread::sleep_for(std::chrono::microseconds(0));
         }
