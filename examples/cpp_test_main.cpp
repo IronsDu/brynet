@@ -1,5 +1,8 @@
 #define CRTDBG_MAP_ALLOC
 
+#include "socketlibtypes.h"
+#include "socketlibfunction.h"
+
 #include <windows.h>
 #include "../cpp_common/timer.h"
 #include "../cpp_common/rwlist.h"
@@ -59,10 +62,108 @@ static void foo2(int a, int b)
 
 #include <set>
 
+#include "cpp_connection.h"
+#include "httprequest.h"
+
+
+string static getipofhost(const char* host)
+{
+    string ret;
+
+    char ip[20];
+    struct hostent *hptr = gethostbyname(host);
+    if (hptr != NULL)
+    {
+        if (hptr->h_addrtype == AF_INET || hptr->h_addrtype == AF_INET6)
+        {
+            char* lll = *(hptr->h_addr_list);
+            sprintf_s(ip, sizeof(ip), "%d.%d.%d.%d", lll[0] & 0x00ff, lll[1] & 0x00ff, lll[2] & 0x00ff, lll[3] & 0x00ff);
+            ret = ip;
+        }
+    }
+
+    return ret;
+}
+
 using namespace Concurrency;
+
+char* pmm = NULL;
+int index = 0;
+
+#include "cpp_server.h"
+
 int main()
 {
+    /*  toto:让用户自定义ud   */
+    CppServer cserver;
+    cserver.create(5999, 1, 1024, [](CppServer&, void* ud, const char* buffer, int len){
+        return len;
+    });
+
+    cserver.setMsgHandle([](CppServer& server, struct nrmgr_net_msg* msg){
+        printf("收到消息:%d\n", msg->type);
+    });
+
+    while (true)
+    {
+        cserver.logicPoll(1);
+    }
+
+    cin.get();
+    pmm = (char*)malloc(110599);
+    memset(pmm, 0, 110599);
+    ox_socket_init();
+    NetConnection ncc;
+    ncc.create(10024, 10024);
+    ncc.setCheckPacketHandle([](const char* buffer, int len)
+        {
+        /*  收到任意数据都认为已收到完整消息包   */
+        return len;
+    });
+
+    ncc.setMsgHandle([&ncc](struct msg_data_s* msg)
+    {
+        if (msg->type == net_msg_establish)
+        {
+            printf("链接服务器成功\n");
+
+            HttpRequest hr;
+            hr.setHost("sx.co3g.com");
+            hr.setRange(100, 200);
+            hr.setRequestUrl("/bag/1.2/1.png");
+            hr.setProtocol(HRP_GET);
+            ncc.sendData(hr.getResult().c_str(), hr.getResult().size() + 1);    /*  发送数据    */
+        }
+        else if (msg->type == net_msg_data)
+        {
+            printf("接收到数据为: %s \n", msg->data);
+            memcpy(pmm+index, msg->data, msg->len);
+            index += msg->len;
+            //ncc.sendDisconnect();   /*  断开连接    */
+        }
+    });
+
+    ncc.sendConnect(getipofhost("sx.co3g.com").c_str(), 80, 1000); /*  请求链接,超时一秒    */
+
+    std::thread net_thread([&ncc](){
+
+        while (true)
+        {
+            ncc.netPoll(1);
+        }
+    });
+
+    std::thread logic_thread([&ncc](){
+
+        while (true)
+        {
+            ncc.logicPoll(1);
+        }
+    });
+
     set<int> fuckset;
+
+    cin.get();
     
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     

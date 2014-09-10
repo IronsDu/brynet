@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <signal.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -723,7 +723,7 @@ reactor_logic_on_recved_callback(struct server_s* self, void* ud, const char* bu
 
     while(left_len > 0)
     {
-        int check_len = (reactor->check_packet)(session->ud, check_buffer, left_len);
+        int check_len = (reactor->check_packet)(reactor->mgr, session->ud, check_buffer, left_len);
         if(check_len > 0)
         {
             struct nrmgr_net_msg* msg = make_logicmsg(reactor, nrmgr_net_msg_data, session, check_buffer, check_len);

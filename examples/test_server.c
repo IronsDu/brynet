@@ -17,7 +17,7 @@
 
 static int totaol_recv = 0;
 
-static int s_check(void* ud, const char* buffer, int len)
+static int s_check(struct nr_mgr* mgr, void* ud, const char* buffer, int len)
 {
 	if(len >= PACKET_LEN)
 	{

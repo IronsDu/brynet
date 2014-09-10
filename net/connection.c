@@ -130,6 +130,12 @@ ox_connection_sendmsg_claim(struct connection_s* self, int len)
 }
 
 void
+ox_connection_msgreclaim(struct connection_s* self, struct msg_data_s* msg)
+{
+    free(msg);
+}
+
+void
 ox_connection_send(struct connection_s* self, struct msg_data_s* msg)
 {
     /*  逻辑层请求网络层发送数据(投递消息给网络层)  */
@@ -226,7 +232,7 @@ connection_send_logicmsg(struct connection_s* self, enum net_msg_type type, cons
     }
 }
 
-void
+static void
 connection_connect_help(struct connection_s* self, struct connect_msg* connect_data)
 {
     if(self->fd != SOCKET_ERROR)

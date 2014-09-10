@@ -37,7 +37,7 @@ struct nrmgr_send_msg_data
 };
 
 typedef void (*pfn_nrmgr_logicmsg)(struct nr_mgr* mgr, struct nrmgr_net_msg*);
-typedef int (*pfn_nrmgr_check_packet)(void* ud, const char* buffer, int len);
+typedef int(*pfn_nrmgr_check_packet)(struct nr_mgr* mgr, void* ud, const char* buffer, int len);
 
 DLL_CONF struct nr_mgr* ox_create_nrmgr(
     int thread_num,                 /*  网络层开启的reactor线程数量   */

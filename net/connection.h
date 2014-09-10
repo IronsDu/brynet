@@ -25,7 +25,7 @@ struct msg_data_s
     char type;                          /*  消息包类型,库使用者禁止修改此字段       */
     int msg_id;
     int len;                            /*  消息包长度,库使用者序列化数据时修改此字段   */
-    char data[0];                       /*  消息包内容,库使用者序列化数据到此缓冲区    */
+    char data[1];                       /*  消息包内容,库使用者序列化数据到此缓冲区    */
 };
 
 /*  检查数据是否包含完整包 */
@@ -42,10 +42,13 @@ DLL_CONF    void ox_connection_delete(struct connection_s* self);
 /*  申请消息包   */
 DLL_CONF    struct msg_data_s* ox_connection_sendmsg_claim(struct connection_s* self, int len);
 
+/*  释放(未发送的)消息包   */
+DLL_CONF    void ox_connection_msgreclaim(struct connection_s* self, struct msg_data_s* msg);
+
 /*  发送消息包   */
 DLL_CONF    void ox_connection_send(struct connection_s* self, struct msg_data_s* msg);
 
-/*  请求链接服务器 */
+/*  请求链接服务器(timeout为超时时间毫秒) */
 DLL_CONF    void ox_connection_send_connect(struct connection_s* self, const char* ip, int port, int timeout);
 /*  请求断开与服务器的链接 */
 DLL_CONF    void ox_connection_send_close(struct connection_s* self);
