@@ -9,13 +9,24 @@ CppServer::CppServer()
     m_server = nullptr;
 }
 
-void CppServer::create(int port, int thread_num, int rbsize, PACKET_CHECK handle)
+void CppServer::addFD(int fd)
+{
+    ox_socket_nodelay(fd);
+    ox_socket_nonblock(fd);
+    ox_nrmgr_addfd(m_server, NULL, fd);
+}
+
+void CppServer::startListen(int port)
 {
     m_port = port;
+    ox_thread_new(s_listen, this);
+}
+
+void CppServer::create(int thread_num, int rbsize, PACKET_CHECK handle)
+{
     m_check = handle;
     m_server = ox_create_nrmgr(thread_num, rbsize, s_check);
     ox_nrmgr_setuserdata(m_server, this);
-    ox_thread_new(s_listen, this);
 }
 
 void CppServer::setMsgHandle(PACKET_HANDLE callback)
@@ -60,9 +71,7 @@ void CppServer::listen()
 
             if (SOCKET_ERROR != client_fd)
             {
-                ox_socket_nodelay(client_fd);
-                ox_socket_nonblock(client_fd);
-                ox_nrmgr_addfd(m_server, NULL, client_fd);
+                addFD(client_fd);
             }
         }
 

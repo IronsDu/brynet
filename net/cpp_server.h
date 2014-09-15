@@ -14,7 +14,9 @@ class CppServer
 public:
     CppServer();
 
-    void            create(int port, int thread_num, int rbsize, PACKET_CHECK handle);
+    void            addFD(int fd);
+    void            startListen(int port);
+    void            create(int thread_num, int rbsize, PACKET_CHECK handle);
 
     void            setMsgHandle(PACKET_HANDLE callback);
 
