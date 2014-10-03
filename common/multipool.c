@@ -143,3 +143,28 @@ ox_multi_pool_config_len(struct multi_pool_s* self, const char* msg)
 
     return len;
 }
+
+int
+ox_multi_pool_typelen(struct multi_pool_s* self, int pool_index)
+{
+    int ret = 0;
+    if(pool_index >= 0 && pool_index < self->max)
+    {
+        ret = self->lens[pool_index];
+    }
+
+    return ret;
+}
+
+int
+ox_multi_pool_nodenum(struct multi_pool_s* self)
+{
+    int ret = 0;
+    int i = 0;
+    for(; i < self->max; ++i)
+    {
+        ret += ox_type_pool_nodenum(self->msg_pools[i]);
+    }
+
+    return ret;
+}
