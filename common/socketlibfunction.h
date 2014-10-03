@@ -19,6 +19,7 @@ DLL_CONF    sock ox_socket_connect(const char* server_ip, int port);
 DLL_CONF    sock ox_socket_nonblock_connect(const char* server_ip, int port, int second);
 DLL_CONF    sock ox_socket_listen(int port, int back_num);
 DLL_CONF    void ox_socket_close(sock fd);
+DLL_CONF    const char* ox_socket_getipoffd(sock fd);
 DLL_CONF    const char* ox_socket_getipstr(unsigned int ip);
 DLL_CONF    int ox_socket_send(sock fd, const char* buffer, int len);
 

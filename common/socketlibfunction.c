@@ -219,6 +219,28 @@ ox_socket_close(sock fd)
 }
 
 const char*
+ox_socket_getipoffd(sock fd)
+{
+#if defined PLATFORM_WINDOWS
+    struct sockaddr_in name;
+    int namelen = sizeof(name);
+    if(getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
+    {
+        return inet_ntoa(name.sin_addr);
+    }
+#else
+    struct sockaddr_in name;
+    socklen_t namelen = sizeof(name);
+    if(getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
+    {
+        return inet_ntoa(name.sin_addr);
+    }
+#endif
+
+    return "";
+}
+
+const char*
 ox_socket_getipstr(unsigned int ip)
 {
     struct in_addr addr;
