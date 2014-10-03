@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "array.h"
 #include "stack.h"
@@ -19,6 +20,8 @@ struct type_pool_s
     struct type_pool_node_s* free_node;
     struct type_pool_node_s* head;
     struct type_pool_node_s* tail;
+
+    int64_t                 nodenum;
 };
 
 static void 
@@ -86,8 +89,9 @@ ox_type_pool_new(int num, int element_size)
     if(ret != NULL)
     {
         memset(ret, 0, sizeof(*ret));
-
+        ret->nodenum = 0;
         ret->head = type_pool_node_new(num, element_size+sizeof(struct type_pool_node_s*));
+        ret->nodenum++;
         if(ret->head != NULL)
         {
             ret->free_node = ret->tail = ret->head;
@@ -161,6 +165,7 @@ ox_type_pool_claim(struct type_pool_s* self)
     if(ret == NULL)
     {
         ox_type_pool_increase(self, self->base_num);
+        self->nodenum++;
         ret = type_pool_claim_help(self);
     }
     
@@ -188,4 +193,10 @@ ox_type_pool_increase(struct type_pool_s* self, int increase_num)
         self->tail = node;
         self->free_node = node;
     }
+}
+
+int
+ox_type_pool_nodenum(struct type_pool_s* self)
+{
+    return self->nodenum;
 }
