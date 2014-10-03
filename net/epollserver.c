@@ -342,8 +342,14 @@ epollserver_poll(struct server_s* self, int64_t timeout)
             {
                 if(event_data & EPOLLRDHUP)
                 {
-                    epollserver_halfclose_session(session->server, session);
-                    (*self->logic_on_close)(self, session->ud);
+                    /*  可能数据和close一起触发,使用recv尝试读取数据且检测断开    */
+                    epoll_recvdata_callback(session);
+                    if(session->status == session_status_connect)
+                    {
+                        /*  再次检测它的状态是否由recv逻辑进行了关闭，避免由于一些情况导致并没有进行关闭处理    */
+                        epollserver_halfclose_session(session->server, session);
+                        (*self->logic_on_close)(self, session->ud);
+                    }
                 }
                 else
                 {
