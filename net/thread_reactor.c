@@ -196,7 +196,7 @@ ox_create_nrmgr(
             reactor->fromlogic_rwlist = ox_rwlist_new(1024, sizeof(struct rwlist_msg_data) , DF_RWLIST_PENDING_NUM);
             reactor->check_packet = check;
 
-            server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_disconnection_callback, reactor_logic_on_recved_callback, NULL, session_sendfinish_callback, reactor_logic_on_close_completed);
+            server_start(reactor->server, reactor_logic_on_enter_callback, reactor_logic_on_disconnection_callback, reactor_logic_on_recved_callback, session_sendfinish_callback, reactor_logic_on_close_completed);
             reactor->waitsend_list = ox_stack_new(1024, sizeof(struct net_session_s*));
             reactor->waitclose_list = ox_stack_new(1024, sizeof(struct net_session_s*));
             reactor->thread = NULL;

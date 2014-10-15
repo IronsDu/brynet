@@ -40,7 +40,6 @@ struct session_s
 
     bool                    haveleftdata;   /*  逻辑层没有发送完数据标志    */
 
-    struct buffer_s*        send_buffer;
     struct buffer_s*        recv_buffer;
 
     enum session_status     status;
@@ -72,7 +71,6 @@ static struct session_s* epoll_session_malloc(struct epollserver_s* epollserver,
 {
     struct session_s* session = (struct session_s*)malloc(sizeof *session);
     session->recv_buffer = ox_buffer_new(epollserver->session_recvbuffer_size);
-    session->send_buffer = ox_buffer_new(epollserver->session_sendbuffer_size);
 
     ox_socket_nonblock(fd);
     session->writeable = true;
@@ -137,36 +135,8 @@ epollserver_handle_sessionclose(struct epollserver_s* epollserver, struct sessio
         ox_buffer_delete(session->recv_buffer);
         session->recv_buffer = NULL;
     }
-    if(session->send_buffer != NULL)
-    {
-        ox_buffer_delete(session->send_buffer);
-        session->send_buffer = NULL;
-    }
 
     free(session);
-}
-
-/*  发送内置缓冲区未发送的数据 */
-static void
-epollserver_send_olddata(struct session_s* session)
-{
-    int send_len = 0;
-    struct buffer_s*    send_buffer = session->send_buffer;
-    int oldlen = ox_buffer_getreadvalidcount(send_buffer);
-
-    if(oldlen > 0)
-    {
-        send_len = ox_socket_send(session->fd, ox_buffer_getreadptr(send_buffer), oldlen);
-
-        if(send_len > 0)
-        {
-            ox_buffer_addwritepos(send_buffer, send_len);
-        }
-
-        session->writeable = (oldlen == oldlen);
-    }
-
-    return;
 }
 
 static void
@@ -177,20 +147,6 @@ epoll_handle_onoutevent(struct session_s* session)
     if(server->logic_on_sendfinish != NULL)
     {
         (server->logic_on_sendfinish)(server, session->ud, 0);
-    }
-    else
-    {
-        if(ox_buffer_getreadvalidcount(session->send_buffer) > 0)
-        {
-            epollserver_send_olddata(session);
-        }
-
-        if(session->writeable && session->haveleftdata)
-        {
-            /*  如果socket仍然可写且逻辑层有未发送的数据则通知逻辑层    */
-            struct server_s* server = &session->server->base;
-            (server->logic_on_cansend)(server, session->ud);
-        }
     }
 }
 
@@ -275,7 +231,6 @@ epollserver_start_callback(
     logic_on_enter_handle enter_pt,
     logic_on_disconnection_handle on_disconnection_pt,
     logic_on_recved_handle   recved_pt,
-    logic_on_cansend_handle    cansend_pt,
     logic_on_sendfinish_handle sendfinish_pt,
     logic_on_close_completed  closecompleted_callback
     )
@@ -285,7 +240,6 @@ epollserver_start_callback(
     self->logic_on_enter = enter_pt;
     self->logic_on_disconnection = on_disconnection_pt;
     self->logic_on_recved = recved_pt;
-    self->logic_on_cansend = cansend_pt;
     self->logic_on_sendfinish = sendfinish_pt;
     self->logic_on_closecompleted = closecompleted_callback;
 

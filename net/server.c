@@ -5,11 +5,10 @@ void server_start(struct server_s* self,
                   logic_on_enter_handle enter_callback,
                   logic_on_disconnection_handle disconnection_callback,
                   logic_on_recved_handle    recved_callback,
-                  logic_on_cansend_handle cansend_callback,
                   logic_on_sendfinish_handle  sendfinish_callback,
                   logic_on_close_completed  closecompleted_callback)
 {
-    (self->start_callback)(self, enter_callback, disconnection_callback, recved_callback, cansend_callback, sendfinish_callback, closecompleted_callback);
+    (self->start_callback)(self, enter_callback, disconnection_callback, recved_callback, sendfinish_callback, closecompleted_callback);
 }
 
 void server_pool(struct server_s* self, int timeout)

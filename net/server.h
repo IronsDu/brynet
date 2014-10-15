@@ -15,7 +15,6 @@ struct server_s;
 typedef void (*logic_on_enter_handle)(struct server_s* self, void* ud, void* handle);
 typedef void (*logic_on_disconnection_handle)(struct server_s* self, void* ud);
 typedef int (*logic_on_recved_handle)(struct server_s* self, void* ud, const char* buffer, int len);
-typedef void (*logic_on_cansend_handle)(struct server_s* self, void* ud);
 typedef void (*logic_on_sendfinish_handle)(struct server_s* self, void* ud, int len);
 typedef void (*logic_on_close_completed)(struct server_s* self, void* ud);
 
@@ -23,7 +22,6 @@ void server_start(struct server_s* self,
                   logic_on_enter_handle enter_callback,
                   logic_on_disconnection_handle close_callback,
                   logic_on_recved_handle    recved_callback,
-                  logic_on_cansend_handle canrecv_callback,
                   logic_on_sendfinish_handle  sendfinish_callback,
                   logic_on_close_completed  closecompleted_callback);
 

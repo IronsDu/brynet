@@ -39,7 +39,6 @@ struct session_ext_s;
 struct session_s
 {
     sock                fd;
-    struct buffer_s*    send_buffer;
     struct buffer_s*    recv_buffer;
     char                ip[IP_SIZE];
     int                 port;
@@ -100,28 +99,18 @@ static void iocp_session_free(struct session_s* client)
 {
     iocp_session_reset(client);
     ox_buffer_delete(client->recv_buffer);
-    ox_buffer_delete(client->send_buffer);
     if(client->ext_data != NULL)
     {
         free(client->ext_data);
+        client->ext_data = NULL;
     }
     free(client);
-}
-
-static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* client)
-{
-    if(client->active)
-    {
-        /*  如果当前会话处于活动，则通知上层  */
-        client->active = false;
-        (iocp->base.logic_on_disconnection)(&iocp->base, client->ud);
-    }
 }
 
 static struct session_s* iocp_session_malloc(struct iocp_s* iocp)
 {
     struct session_s* session = (struct session_s*)malloc(sizeof *session);
-    struct session_ext_s* ext_data = (struct session_ext_s*)malloc(sizeof(struct session_ext_s));
+    struct session_ext_s* ext_data = (struct session_ext_s*)malloc(sizeof *ext_data);
 
     if(session != NULL && ext_data != NULL)
     {
@@ -136,7 +125,6 @@ static struct session_s* iocp_session_malloc(struct iocp_s* iocp)
         ext_data->ck.ptr = session;
 
         session->recv_buffer = ox_buffer_new(iocp->session_recvbuffer_size);
-        session->send_buffer = ox_buffer_new(iocp->session_sendbuffer_size);
 
         session->send_ispending = false;
         session->send_isuse = false;
@@ -222,6 +210,16 @@ static void iocp_send_complete(struct iocp_s* iocp, struct session_s* session, s
         /*  调用上层发送完成通知  */
         /*  用于上层采用sendv接口时,调用此函数直接路由给上层进行下一步处理,此处不做任何其他操作   */
         (iocp->base.logic_on_sendfinish)(&iocp->base, session->ud, bytes);
+    }
+}
+
+static void iocp_session_on_disconnect(struct iocp_s* iocp, struct session_s* client)
+{
+    if (client->active)
+    {
+        /*  如果当前会话处于活动，则通知上层  */
+        client->active = false;
+        (iocp->base.logic_on_disconnection)(&iocp->base, client->ud);
     }
 }
 
@@ -354,7 +352,6 @@ static void iocp_start_callback(
     logic_on_enter_handle enter_pt,
     logic_on_disconnection_handle disconnection_pt,
     logic_on_recved_handle   recved_pt,
-    logic_on_cansend_handle cansend_pt,
     logic_on_sendfinish_handle  sendfinish_pt,
     logic_on_close_completed    closecompleted_pt
     )
@@ -372,7 +369,6 @@ static void iocp_start_callback(
         iocp->base.logic_on_enter = enter_pt;
         iocp->base.logic_on_disconnection = disconnection_pt;
         iocp->base.logic_on_recved = recved_pt;
-        iocp->base.logic_on_cansend = cansend_pt;
         iocp->base.logic_on_sendfinish = sendfinish_pt;
         iocp->base.logic_on_closecompleted = closecompleted_pt;
 
@@ -483,10 +479,7 @@ static bool iocp_register_callback(struct server_s* self, void* ud, int fd)
     }
     else
     {
-        free(session->ext_data);
-        free(session);
-
-        ret = false;
+        iocp_session_free(session);
     }
 
     return ret;
