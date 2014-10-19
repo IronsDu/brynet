@@ -267,61 +267,43 @@ epollserver_poll(struct server_s* self, int64_t timeout)
     struct epollserver_s* epollserver = (struct epollserver_s*)self;
     int epollfd = epollserver->epoll_fd;
     struct epoll_event events[MAX_EVENTS];
-    int64_t current_time = ox_getnowtime();
-    const int64_t end_time = current_time + timeout;
 
-    do
+    int i = 0;
+    int nfds = epoll_wait(epollfd, events, MAX_EVENTS, timeout);
+
+    for(i = 0; i < nfds; ++i)
     {
-        int i = 0;
-        int nfds = 0;
-        nfds = epoll_wait(epollfd, events, MAX_EVENTS, end_time - current_time);
-        if(-1 == nfds)
+        struct session_s*   session = (struct session_s*)(events[i].data.ptr);
+        uint32_t event_data = events[i].events;
+
+        if(session->status == session_status_connect)
         {
-            if(S_EINTR == sErrno)
+            if(event_data & EPOLLRDHUP)
             {
-                continue;
+                /*  可能数据和close一起触发,使用recv尝试读取数据且检测断开    */
+                epoll_recvdata_callback(session);
+                if(session->status == session_status_connect)
+                {
+                    /*  再次检测它的状态是否由recv逻辑进行了关闭，避免由于一些情况导致并没有进行关闭处理    */
+                    epollserver_halfclose_session(session->server, session);
+                    (*self->logic_on_close)(self, session->ud);
+                }
             }
             else
             {
-                break;
-            }
-        }
-
-        for(i = 0; i < nfds; ++i)
-        {
-            struct session_s*   session = (struct session_s*)(events[i].data.ptr);
-            uint32_t event_data = events[i].events;
-
-            if(session->status == session_status_connect)
-            {
-                if(event_data & EPOLLRDHUP)
+                if(event_data & EPOLLIN)
                 {
-                    /*  可能数据和close一起触发,使用recv尝试读取数据且检测断开    */
                     epoll_recvdata_callback(session);
-                    if(session->status == session_status_connect)
-                    {
-                        /*  再次检测它的状态是否由recv逻辑进行了关闭，避免由于一些情况导致并没有进行关闭处理    */
-                        epollserver_halfclose_session(session->server, session);
-                        (*self->logic_on_close)(self, session->ud);
-                    }
                 }
-                else
-                {
-                    if(event_data & EPOLLIN)
-                    {
-                        epoll_recvdata_callback(session);
-                    }
 
-                    if(event_data & EPOLLOUT)
-                    {
-                        epoll_handle_onoutevent(session);
-                    }
+                if(event_data & EPOLLOUT)
+                {
+                    epoll_handle_onoutevent(session);
                 }
             }
         }
+    }
 
-        current_time = ox_getnowtime();
-    }while(end_time > current_time);
     #endif
 }
 

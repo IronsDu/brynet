@@ -15,6 +15,15 @@
 #include "systemlib.h"
 #include "iocp.h"
 
+typedef BOOL(WINAPI *sGetQueuedCompletionStatusEx)
+(HANDLE CompletionPort,
+LPOVERLAPPED_ENTRY lpCompletionPortEntries,
+ULONG ulCount,
+PULONG ulNumEntriesRemoved,
+DWORD dwMilliseconds,
+BOOL fAlertable);
+sGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
+
 // IO操作码
 #define OVL_RECV    (1)
 #define OVL_SEND    (2)
@@ -279,52 +288,91 @@ static bool iocp_accept_complete(struct iocp_s* iocp, struct session_s* session)
     return true;
 }
 
+#define MAX_COMPLETE_PER_POLL       100
+
 static void
 iocp_poll_callback(struct server_s* self, int64_t timeout)
 {
+    OVERLAPPED_ENTRY entries[MAX_COMPLETE_PER_POLL];
     struct iocp_s* iocp = (struct iocp_s*)self;
-    struct ovl_ext_s*  ovl_p  = NULL;
-    struct complete_key_s* ck_p   = NULL;
-    struct session_s*    session_p    = NULL;
-    struct session_ext_s* ext_s = NULL;
-    DWORD Bytes   = 0;
-    int64_t current_time = ox_getnowtime();
-    int64_t end_time = current_time + timeout;
-    int64_t ms = end_time - current_time;
 
-    do
+    ULONG numComplete = 0;
+    bool rc = false;
+
+    if (pGetQueuedCompletionStatusEx != NULL)
     {
-        bool Success = GetQueuedCompletionStatus(iocp->iocp_handle, &Bytes, (PULONG_PTR)&ck_p, (LPOVERLAPPED*)&ovl_p, ms);
+        rc = pGetQueuedCompletionStatusEx(iocp->iocp_handle,
+            entries,
+            MAX_COMPLETE_PER_POLL,
+            &numComplete,
+            timeout,
+            FALSE);
+    }
+    else
+    {
+        rc = GetQueuedCompletionStatus(iocp->iocp_handle,
+            &entries[0].dwNumberOfBytesTransferred,
+            &entries[0].lpCompletionKey,
+            &entries[0].lpOverlapped,
+            timeout);
+        if (!rc && entries[0].lpOverlapped == NULL) {
+        }
+        else {
+            // check if more completions are ready
+            int lrc = 1;
+            rc = 1;
+            numComplete = 1;
 
-        if(!Success && ovl_p == NULL)    break;
+            while (numComplete < MAX_COMPLETE_PER_POLL) {
+                lrc = GetQueuedCompletionStatus(iocp->iocp_handle,
+                    &entries[numComplete].dwNumberOfBytesTransferred,
+                    &entries[numComplete].lpCompletionKey,
+                    &entries[numComplete].lpOverlapped,
+                    0);
+                if (lrc) {
+                    numComplete++;
+                }
+                else {
+                    if (entries[numComplete].lpOverlapped == NULL) break;
+                }
+            }
+        }
+    }
 
-        session_p = (struct session_s*)ck_p->ptr;
-
-        if(Bytes == 0)
+    if (rc && numComplete > 0)
+    {
+        LPOVERLAPPED_ENTRY entry = entries;
+        int j = 0;
+        for (j = 0; j < numComplete; j++, entry++)
         {
-            if(ovl_p == (struct ovl_ext_s*)0xcdcdcdcd)
+            struct complete_key_s* ck_p = (struct complete_key_s*)entry->lpCompletionKey;
+            struct ovl_ext_s* ovl_p = (struct ovl_ext_s*)entry->lpOverlapped;
+            DWORD Bytes = entry->dwNumberOfBytesTransferred;
+
+            struct session_s* session_p = (struct session_s*)ck_p->ptr;
+
+            if (Bytes == 0)
             {
-                /*  完成最后释放资源，并通知上层（才能释放其资源）  */
-                void* ud = session_p->ud;
-                iocp_session_free(session_p);
-                (self->logic_on_closecompleted)(self, ud);
+                if (ovl_p == (struct ovl_ext_s*)0xcdcdcdcd)
+                {
+                    /*  完成最后释放资源，并通知上层（才能释放其资源）  */
+                    void* ud = session_p->ud;
+                    iocp_session_free(session_p);
+                    (self->logic_on_closecompleted)(self, ud);
+                }
+                else
+                {
+                    /*  处理被动关闭socket    */
+                    iocp_session_on_disconnect(iocp, session_p);
+                }
             }
             else
             {
-                /*  处理被动关闭socket    */
-                iocp_session_on_disconnect(iocp, session_p);
+                struct session_ext_s* ext_s = (struct session_ext_s*)session_p->ext_data;
+                iocp_iocomplete(iocp, session_p, ext_s, ovl_p->base.Offset, Bytes);
             }
         }
-        else
-        {
-            ext_s = (struct session_ext_s*)session_p->ext_data;
-            iocp_iocomplete(iocp, session_p, ext_s, ovl_p->base.Offset, Bytes);
-        }
-
-        current_time = ox_getnowtime();
-        ms = end_time - current_time;
-        ovl_p = NULL;
-    }while(ms > 0);
+    }
 
 #if permormance
     {
@@ -490,6 +538,7 @@ struct server_s* iocp_create(
     int session_sendbuffer_size,
     void*   ext)
 {
+    HMODULE kernel32_module;
     struct server_s* ret = NULL;
     struct iocp_s* iocp = (struct iocp_s*)malloc(sizeof(struct iocp_s));
     if(iocp != NULL)
@@ -516,6 +565,14 @@ struct server_s* iocp_create(
         iocp->old_time = 0;
 #endif
         ret = &iocp->base;
+    }
+
+    pGetQueuedCompletionStatusEx = NULL;
+    kernel32_module = GetModuleHandleA("kernel32.dll");
+    if (kernel32_module != NULL) {
+        pGetQueuedCompletionStatusEx = (sGetQueuedCompletionStatusEx)GetProcAddress(
+            kernel32_module,
+            "GetQueuedCompletionStatusEx");
     }
 
     return ret;
