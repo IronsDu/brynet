@@ -29,10 +29,12 @@ struct pending_buffer
 
 class DataSocket : public Channel
 {
+public:
     typedef function<void(DataSocket*, const char* buffer, int len)>    DATA_PROC;
     typedef function<void(DataSocket*)>                                 DISCONNECT_PROC;
 public:
     DataSocket(int fd);
+    ~DataSocket();
 
     void                            setEventLoop(EventLoop* el);
 
@@ -54,7 +56,7 @@ private:
     bool                            checkWrite();
 
     void                            flush();
-    void                            procClose();
+    void                            onClose();
 private:
     struct ovl_ext_s                mOvlRecv;
     struct ovl_ext_s                mOvlSend;

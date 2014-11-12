@@ -31,152 +31,136 @@ ox_socket_connect(const char* server_ip, int port)
     return clientfd;
 }
 
-int
-ox_socket_listen(int port, int back_num)
+#include "TCPServer.h"
+#include "rwlist.h"
+
+struct NetMsg
 {
-    int socketfd = SOCKET_ERROR;
-    struct  sockaddr_in server_addr;
-    int reuseaddr_value = 1;
-
-    socketfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (socketfd != SOCKET_ERROR)
+    NetMsg(int t, Channel* c) : mType(t), mChannel(c)
     {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(port);
-        server_addr.sin_addr.s_addr = INADDR_ANY;
-
-        setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value, sizeof(int));
-
-        if (::bind(socketfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) == SOCKET_ERROR ||
-            listen(socketfd, back_num) == SOCKET_ERROR)
-        {
-            closesocket(socketfd);
-            socketfd = SOCKET_ERROR;
-        }
     }
 
-    return socketfd;
-}
+    void        setData(const char* data, int len)
+    {
+        mData = string(data, len);
+    }
 
+    int         mType;
+    Channel*    mChannel;
+    string      mData;
+};
 
 int main()
 {
+    double total_recv_len = 0;
+    double  packet_num = 0;
+
     WSADATA g_WSAData;
     WSAStartup(MAKEWORD(2, 2), &g_WSAData);
 
-    /*  服务器端eventloop   */
-    EventLoop serverEventLoop;
+    Rwlist<NetMsg*>  msgList;
+    EventLoop       mainLoop;
 
-    int total_recv_len = 0;
+    /*  TODO::怎么优化消息队列，网络层没有不断的flush消息队列，然而又不能在每个消息发送都强制flush，当然逻辑层也可以采取主动拉的方式。去强制拉过来   */
+    /*  TODO::把(每个IO线程一个消息队列)消息队列隐藏到TCPServer中。 对用户不可见    */
+    /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
+    TcpServer t(8888, 1);
+    t.setEnterHandle([&](Channel* c){
+        printf("enter client \n");
+        /*
+                NetMsg* msg = new NetMsg(1, c);
+                msgList.Push(msg);
+                mainLoop.wakeup();
+                */
+    });
 
-    /*  监听线程    */
-    std::thread listenthread([&]{
-        while (true)
-        {
-            int client_fd = SOCKET_ERROR;
-            struct sockaddr_in socketaddress;
-            socklen_t size = sizeof(struct sockaddr);
+    t.setDisconnectHandle([](DataSocket* c){
+        printf("client dis connect \n");
+        delete c;
 
-            int listen_fd = ox_socket_listen(8888, 25);
+    });
 
-            if (SOCKET_ERROR != listen_fd)
-            {
-                for (; ;)
-                {
-                    while ((client_fd = accept(listen_fd, (struct sockaddr*)&socketaddress, &size)) < 0)
-                    {
-                        if (EINTR == GetLastError())
-                        {
-                            continue;
-                        }
-                    }
-
-                    if (SOCKET_ERROR != client_fd)
-                    {
-                        printf("accept new client:%d\n", client_fd);
-                        int flag = 1;
-                        setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
-                        {
-                            int sd_size = 32 * 1024;
-                            int op_size = sizeof(sd_size);
-                            setsockopt(client_fd, SOL_SOCKET, SO_SNDBUF, (const char*)&sd_size, op_size);
-                        }
-
-                        Channel* channel = new DataSocket(client_fd);
-                        serverEventLoop.addConnection(client_fd, channel, [&](Channel* arg){
-                            DataSocket* ds = static_cast<DataSocket*>(arg);
-                            ds->setEventLoop(&serverEventLoop);
-                            printf("in net loop, on enter client \n");
-
-                            /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-
-                            ds->setDataHandle([&total_recv_len](DataSocket* ds, const char* buffer, int len){
-
-                                /*  reply client    */
-                                total_recv_len += len;
-                                ds->send(buffer, len);
-                            });
-                        });
-                    }
-                }
-
-                closesocket(listen_fd);
-                listen_fd = SOCKET_ERROR;
-            }
-            else
-            {
-                printf("listen failed\n");
-            }
-        }
+    t.setMsgHandle([&](DataSocket* d, const char* buffer, int len){
+        //printf("recv data \n");
+        /*
+        NetMsg* msg = new NetMsg(2, d);
+        msg->setData(buffer, len);
+        msgList.Push(msg);
+        mainLoop.wakeup();
+        */
+        d->send(buffer, len);
+        total_recv_len += len;
+        packet_num++;
     });
 
     /*  客户端IO线程   */
-    std::thread clientthread([]{
-        /*  客户端eventloop*/
-        EventLoop clientEventLoop;
+    for (int i = 0; i < 1; ++i)
+    {
+        new std::thread([&mainLoop]{
+            /*  客户端eventloop*/
+            EventLoop clientEventLoop;
 
-        /*  消息包大小定义 */
-        #define PACKET_LEN (1024 * 10)
-        #define CLIENT_NUM (5000)
+            /*  消息包大小定义 */
+#define PACKET_LEN (1)
+#define CLIENT_NUM (1000)
 
-        const char* senddata = (const char*)malloc(PACKET_LEN);
+            const char* senddata = (const char*)malloc(PACKET_LEN);
 
-        for (int i = 0; i < CLIENT_NUM; i++)
-        {
-            int client = ox_socket_connect("127.0.0.1", 8888);
-            clientEventLoop.addConnection(client, new DataSocket(client), [&](Channel* arg){
-                DataSocket* ds = static_cast<DataSocket*>(arg);
-                ds->setEventLoop(&clientEventLoop);
+            for (int i = 0; i < CLIENT_NUM; i++)
+            {
+                int client = ox_socket_connect("127.0.0.1", 8888);
+                int flag = 1;
+                int setret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+                cout << setret << endl;
 
-                /*  发送消息    */
-                ds->send(senddata, PACKET_LEN);
+                clientEventLoop.addConnection(client, new DataSocket(client), [&](Channel* arg){
+                    DataSocket* ds = static_cast<DataSocket*>(arg);
+                    ds->setEventLoop(&clientEventLoop);
 
-                /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
-                    ds->send(buffer, len);
+                    /*  发送消息    */
+                    ds->send(senddata, PACKET_LEN);
+
+                    /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
+                    ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
+                        ds->send(buffer, len);
+                    });
                 });
-            });
-        }
+            }
 
-        while (true)
-        {
-            clientEventLoop.loop(-1);
-        }
-    });
+            while (true)
+            {
+                clientEventLoop.loop(-1);
+            }
+        });
+    }
 
     /*  主线程处理服务器端IO*/
     DWORD lasttime = GetTickCount();
+    int total_fps = 0;
+
     while (true)
     {
-        serverEventLoop.loop(-1);
+        mainLoop.loop(10);
+        total_fps++;
+        msgList.ForceSyncWrite();
+        msgList.SyncRead(0);
+
+        NetMsg* msg = NULL;
+        while (msgList.ReadListSize() > 0)
+        {
+            msg = msgList.PopBack();
+            delete msg;
+        }
 
         DWORD now = GetTickCount();
         if ((now - lasttime) >= 1000)
         {
-            cout << "recv :" << (total_recv_len / 1024) << " K/s" << endl;
+            cout << "recv :" << (total_recv_len / 1024) / 1024 << " M/s, " << "packet num: " << packet_num  << endl;
+            cout << "fps:" << total_fps << endl;
+            total_fps = 0;
             lasttime = now;
             total_recv_len = 0;
+            packet_num = 0;
         }
     }
 }

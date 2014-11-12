@@ -28,10 +28,12 @@ class Channel;
 
 class EventLoop
 {
+public:
     typedef std::function<void(void)>       USER_PROC;
     typedef std::function<void(Channel*)>   CONNECTION_ENTER_HANDLE;
 public:
     EventLoop();
+    ~EventLoop();
 
     void                            loop(int64_t    timeout);
 
@@ -58,8 +60,10 @@ private:
     sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
     HANDLE                          mIOCP;
 
-    BOOL                            mInWaitIOEvent;
-    BOOL                            mIsAlreadyPostedWakeUp;
+    std::mutex                      mFlagMutex;
+    std::unique_lock<std::mutex>    mFlagLock;
+    BOOL                            mInWaitIOEvent;             /*  如果为false表示肯定没有等待IOCP，如果为true，表示即将或已经等待iocp*/
+    BOOL                            mIsAlreadyPostedWakeUp;     /*  表示是否已经投递过wakeup */
 
     vector<USER_PROC>               mAsyncProcs;
 

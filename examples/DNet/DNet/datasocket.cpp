@@ -28,6 +28,11 @@ DataSocket::DataSocket(int fd)
     mDataHandle = nullptr;
 }
 
+DataSocket::~DataSocket()
+{
+    disConnect();
+}
+
 void DataSocket::setEventLoop(EventLoop* el)
 {
     mEventLoop = el;
@@ -37,7 +42,7 @@ void DataSocket::setEventLoop(EventLoop* el)
 /*  添加发送数据队列    */
 void    DataSocket::send(const char* buffer, int len)
 {
-    mEventLoop->pushAsyncProc([=](){
+    mEventLoop->pushAsyncProc([this, buffer,len](){
         send_msg* m = new send_msg{ 0, buffer };
         mSendList.push_back({ m, len, len });
 
@@ -90,7 +95,7 @@ void    DataSocket::canRecv()
     if (must_close)
     {
         /*  回调到用户层  */
-        procClose();
+        onClose();
     }
 
     return;
@@ -149,25 +154,37 @@ void DataSocket::flush()
 
         if (must_close)
         {
-            procClose();
+            onClose();
         }
     }
 }
 
-void DataSocket::procClose()
+void DataSocket::onClose()
 {
-    mCanWrite = false;
-
     if (mFD != SOCKET_ERROR)
     {
-        closesocket(mFD);
-        mFD = SOCKET_ERROR;
-    }
+        for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
+        {
+            pending_buffer& b = *it;
+            delete b.data;
+        }
 
-    if (mDisConnectHandle != nullptr)
-    {
-        mDisConnectHandle(this);
-        mDisConnectHandle = nullptr;
+        mSendList.clear();
+
+        mCanWrite = false;
+
+        if (mFD != SOCKET_ERROR)
+        {
+            closesocket(mFD);
+            mFD = SOCKET_ERROR;
+        }
+
+        if (mDisConnectHandle != nullptr)
+        {
+            mEventLoop->pushAfterLoopProc([this](){
+                mDisConnectHandle(this);
+            });
+        }
     }
 }
 
@@ -223,5 +240,5 @@ void DataSocket::setDisConnectHandle(DISCONNECT_PROC proc)
 
 void DataSocket::disConnect()
 {
-    procClose();
+    onClose();
 }
