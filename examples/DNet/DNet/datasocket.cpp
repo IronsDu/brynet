@@ -42,9 +42,13 @@ void DataSocket::setEventLoop(EventLoop* el)
 /*  添加发送数据队列    */
 void    DataSocket::send(const char* buffer, int len)
 {
-    mEventLoop->pushAsyncProc([this, buffer,len](){
-        send_msg* m = new send_msg{ 0, buffer };
-        mSendList.push_back({ m, len, len });
+    sendPacket(makePacket(buffer, len));
+}
+
+void DataSocket::sendPacket(PACKET_PTR& packet)
+{
+    mEventLoop->pushAsyncProc([this, packet](){
+        mSendList.push_back({ packet, packet->size()});
 
         if (!mIsPostFlush)
         {
@@ -117,7 +121,7 @@ void DataSocket::flush()
         for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_buffer& b = *it;
-            int ret_len = ::send(mFD, b.data->data, b.leftpos, 0);
+            int ret_len = ::send(mFD, b.packet->c_str() + (b.packet->size()-b.left), b.left, 0);
             if (ret_len < 0)
             {
                 if (GetLastError() != WSAEWOULDBLOCK )
@@ -138,16 +142,15 @@ void DataSocket::flush()
                 break;
                 /*  close */
             }
-            else if (ret_len < b.leftpos)
+            else if (ret_len < b.left)
             {
-                b.leftpos -= ret_len;
+                b.left -= ret_len;
                 mCanWrite = false;
                 must_close = !checkWrite();
                 break;
             }
-            else if (ret_len == b.leftpos)
+            else if (ret_len == b.left)
             {
-                delete b.data;
                 it = mSendList.erase(it);
             }
         }
@@ -163,12 +166,6 @@ void DataSocket::onClose()
 {
     if (mFD != SOCKET_ERROR)
     {
-        for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
-        {
-            pending_buffer& b = *it;
-            delete b.data;
-        }
-
         mSendList.clear();
 
         mCanWrite = false;
@@ -186,11 +183,6 @@ void DataSocket::onClose()
             });
         }
     }
-}
-
-int     DataSocket::getFD()
-{
-    return mFD;
 }
 
 bool    DataSocket::checkRead()
@@ -241,4 +233,9 @@ void DataSocket::setDisConnectHandle(DISCONNECT_PROC proc)
 void DataSocket::disConnect()
 {
     onClose();
+}
+
+DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, int len)
+{
+    return std::make_shared<string>(buffer, len);
 }

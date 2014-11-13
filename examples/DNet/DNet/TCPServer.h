@@ -6,8 +6,9 @@
 
 class TcpServer
 {
+    typedef std::function<void (EventLoop&)> FRAME_CALLBACK;
 public:
-    TcpServer(int port, int threadNum);
+    TcpServer(int port, int threadNum, FRAME_CALLBACK callback = nullptr);  /*callback为IO线程每个loop循环都会执行的回调函数，可以为null*/
     ~TcpServer();
 
     void                                setEnterHandle(EventLoop::CONNECTION_ENTER_HANDLE handle);

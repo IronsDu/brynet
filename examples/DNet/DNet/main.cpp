@@ -64,7 +64,9 @@ int main()
     /*  TODO::怎么优化消息队列，网络层没有不断的flush消息队列，然而又不能在每个消息发送都强制flush，当然逻辑层也可以采取主动拉的方式。去强制拉过来   */
     /*  TODO::把(每个IO线程一个消息队列)消息队列隐藏到TCPServer中。 对用户不可见    */
     /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
-    TcpServer t(8888, 1);
+    TcpServer t(8888, 1, [](EventLoop& l){
+        cout << &l << endl;
+    });
     t.setEnterHandle([&](Channel* c){
         printf("enter client \n");
         /*
@@ -88,7 +90,9 @@ int main()
         msgList.Push(msg);
         mainLoop.wakeup();
         */
-        d->send(buffer, len);
+        DataSocket::PACKET_PTR packet = DataSocket::makePacket(buffer, len);
+        //d->send(buffer, len);
+        d->sendPacket(packet);
         total_recv_len += len;
         packet_num++;
     });
@@ -101,7 +105,7 @@ int main()
             EventLoop clientEventLoop;
 
             /*  消息包大小定义 */
-#define PACKET_LEN (1)
+#define PACKET_LEN (128)
 #define CLIENT_NUM (1000)
 
             const char* senddata = (const char*)malloc(PACKET_LEN);
@@ -122,7 +126,8 @@ int main()
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
                     ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
-                        ds->send(buffer, len);
+                        DataSocket::PACKET_PTR packet = DataSocket::makePacket(buffer, len);
+                        ds->sendPacket(packet);
                     });
                 });
             }

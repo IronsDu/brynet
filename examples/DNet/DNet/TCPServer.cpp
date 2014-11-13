@@ -35,7 +35,7 @@ ox_socket_listen(int port, int back_num)
     return socketfd;
 }
 
-TcpServer::TcpServer(int port, int threadNum)
+TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
 {
     mLoops = new EventLoop[threadNum];
     mIOThreads = new std::thread*[threadNum];
@@ -44,10 +44,14 @@ TcpServer::TcpServer(int port, int threadNum)
     for (int i = 0; i < mLoopNum; ++i)
     {
         EventLoop& l = mLoops[i];
-        mIOThreads[i] = new thread([&l](){
+        mIOThreads[i] = new thread([&l, callback](){
             while (true)
             {
                 l.loop(-1);
+                if (callback != nullptr)
+                {
+                    callback(l);
+                }
             }
         });
     }
