@@ -19,13 +19,12 @@ public:
 public:
     DataSocket(int fd);
     ~DataSocket();
-
-    void                            setEventLoop(EventLoop* el);
+    int                             getFD() const;
 
                                     /*  添加发送数据队列    */
     void                            send(const char* buffer, int len);
     void                            sendPacket(PACKET_PTR&);
-
+    void                            sendPacket(PACKET_PTR&&);
     void                            setDataHandle(DATA_PROC proc);
     void                            setDisConnectHandle(DISCONNECT_PROC proc);
 
@@ -33,6 +32,8 @@ public:
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
+    void                            setEventLoop(EventLoop* el);
+
     void                            canRecv();
     void                            canSend();
 
@@ -41,7 +42,10 @@ private:
 
     void                            flush();
     void                            onClose();
+
+    void                            runAfterFlush();
 private:
+#ifdef PLATFORM_WINDOWS
     struct ovl_ext_s
     {
         OVERLAPPED  base;
@@ -49,6 +53,9 @@ private:
     };
     struct ovl_ext_s                mOvlRecv;
     struct ovl_ext_s                mOvlSend;
+#else
+
+#endif
 
     int                             mFD;
     EventLoop*                      mEventLoop;
@@ -56,7 +63,7 @@ private:
     struct pending_buffer
     {
         PACKET_PTR  packet;
-        int         left;
+        size_t      left;
     };
     std::deque<pending_buffer>      mSendList;
 

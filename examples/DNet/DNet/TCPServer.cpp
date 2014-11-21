@@ -5,6 +5,8 @@
 #include <iostream>
 #include <exception>
 
+#include "platform.h"
+#include "socketlibtypes.h"
 #include "TCPServer.h"
 
 int
@@ -27,7 +29,11 @@ ox_socket_listen(int port, int back_num)
         if (::bind(socketfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) == SOCKET_ERROR ||
             listen(socketfd, back_num) == SOCKET_ERROR)
         {
+#ifdef PLATFORM_WINDOWS
             closesocket(socketfd);
+#else
+            close(socketfd);
+#endif
             socketfd = SOCKET_ERROR;
         }
     }
@@ -106,15 +112,18 @@ void TcpServer::RunListen(int port)
 
         if (SOCKET_ERROR != listen_fd)
         {
+            printf("listen : %d \n", port);
             for (;;)
             {
                 while ((client_fd = accept(listen_fd, (struct sockaddr*)&socketaddress, &size)) < 0)
                 {
-                    if (EINTR == GetLastError())
+                    if (EINTR == sErrno)
                     {
                         continue;
                     }
                 }
+
+                printf("accept fd : %d \n", client_fd);
 
                 if (SOCKET_ERROR != client_fd)
                 {
@@ -131,9 +140,6 @@ void TcpServer::RunListen(int port)
                     EventLoop& loop = mLoops[rand_num];
                     loop.addConnection(client_fd, channel, [&](Channel* arg){
                         DataSocket* ds = static_cast<DataSocket*>(arg);
-                        ds->setEventLoop(&loop);
-
-                        /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
                         ds->setDataHandle(mDataProc);
                         ds->setDisConnectHandle(mDisConnectHandle);
                         mEnterHandle(arg);
@@ -141,12 +147,17 @@ void TcpServer::RunListen(int port)
                 }
             }
 
+#ifdef PLATFORM_WINDOWS
             closesocket(listen_fd);
+#else
+            close(listen_fd);
+#endif
             listen_fd = SOCKET_ERROR;
         }
         else
         {
-            printf("listen failed\n");
+            printf("listen failed, error:%d \n", sErrno);
+            return;
         }
     }
 }

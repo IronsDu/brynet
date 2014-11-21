@@ -1,14 +1,58 @@
 #include "eventloop.h"
 #include "channel.h"
+#include "socketlibtypes.h"
+
 #include <iostream>
 #include <assert.h>
 #include <thread>
 
 using namespace std;
 
+#ifndef PLATFORM_WINDOWS
+class WeakupChannel : public Channel
+{
+public:
+    WeakupChannel(int fd)
+    {
+        mFd = fd;
+
+    }
+private:
+    void    canRecv()
+    {
+        //printf("weak channel can recv \n");
+        char temp[1024*10];
+        while(true)
+        {
+            ssize_t n = recv(mFd, temp, 1024*10, 0);
+            if(n == -1)
+            {
+                break;
+            }
+        }
+    }
+
+    void    canSend()
+    {
+    }
+
+    void    setEventLoop(EventLoop*)
+    {
+    }
+
+    void    disConnect()
+    {
+    }
+
+private:
+    int     mFd;
+};
+#endif
+
 EventLoop::EventLoop() : mLock(mMutex, std::defer_lock), mFlagLock(mFlagMutex, std::defer_lock)
 {
     mSelfThreadid = std::this_thread::get_id();
+#ifdef PLATFORM_WINDOWS
     mPGetQueuedCompletionStatusEx = NULL;
     HMODULE kernel32_module = GetModuleHandleA("kernel32.dll");
     if (kernel32_module != NULL) {
@@ -16,10 +60,16 @@ EventLoop::EventLoop() : mLock(mMutex, std::defer_lock), mFlagLock(mFlagMutex, s
             kernel32_module,
             "GetQueuedCompletionStatusEx");
     }
+    mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
+#else
+    mEpollFd = epoll_create(1);
+    mWeakupFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    mWeakupChannel = new WeakupChannel(mWeakupFd);
+    linkConnection(mWeakupFd, mWeakupChannel);
+#endif
 
     mIsAlreadyPostedWakeUp = false;
     mInWaitIOEvent = false;
-    mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
 
     mEventEntries = NULL;
     mEventEntriesNum = 0;
@@ -40,11 +90,11 @@ void EventLoop::loop(int64_t timeout)
         timeout = 0;
     }
 
-    ULONG numComplete = 0;
     mInWaitIOEvent = true;
 
+#ifdef PLATFORM_WINDOWS
+    ULONG numComplete = 0;
     BOOL rc = mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, mEventEntriesNum, &numComplete, static_cast<DWORD>(timeout), false);
-
     mIsAlreadyPostedWakeUp = false;
     mInWaitIOEvent = false;
 
@@ -74,6 +124,37 @@ void EventLoop::loop(int64_t timeout)
     {
         //cout << this << " error code:" << GetLastError() << endl;
     }
+#else
+    //printf("enter epoll_wait \n");
+    int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, timeout);
+    //printf("epoll_wait success: %d \n", numComplete);
+    mIsAlreadyPostedWakeUp = false;
+    mInWaitIOEvent = false;
+
+    for (int i = 0; i < numComplete; ++i)
+    {
+        Channel*   ds = (Channel*)(mEventEntries[i].data.ptr);
+        uint32_t event_data = mEventEntries[i].events;
+
+        if (event_data & EPOLLRDHUP)
+        {
+            ds->canRecv();
+            ds->disConnect();   /*  无条件调用断开处理，以防canRecv里没有recv 断开通知*/
+        }
+        else
+        {
+            if (event_data & EPOLLIN)
+            {
+                ds->canRecv();
+            }
+
+            if (event_data & EPOLLOUT)
+            {
+                ds->canSend();
+            }
+        }
+    }
+#endif
 
     vector<USER_PROC> temp;
     mMutex.lock();
@@ -99,8 +180,10 @@ void EventLoop::loop(int64_t timeout)
     }
 }
 
-void EventLoop::wakeup()
+bool EventLoop::wakeup()
 {
+    //printf("try wakeup \n");
+    bool ret = false;
     /*  TODO::1、保证线程安全；2、保证io线程处于wait状态时，外界尽可能少发送wakeup；3、是否io线程有必要自己向自身投递一个wakeup来唤醒下一次wait？ */
     if (mSelfThreadid != std::this_thread::get_id())
     {
@@ -110,7 +193,14 @@ void EventLoop::wakeup()
             /*这里只能无条件投递，而不能根据mIsAlreadyPostedWakeUp标志判断，因为可能iocp wait并还没返回*/
             /*如果iocp已经wakeup，然而这里不投递的话，有可能无法唤醒下一次iocp (这不像epoll lt模式下的eventfd，只要有数据没读，则epoll总会wakeup)*/
             mIsAlreadyPostedWakeUp = true;
+#ifdef PLATFORM_WINDOWS
             PostQueuedCompletionStatus(mIOCP, 0xDEADC0DE, 0, (LPOVERLAPPED)0xcdcdcdcd);
+#else
+            uint64_t one = 1;
+            ssize_t n = write(mWeakupFd, &one, sizeof one);
+            //printf("write %d to eventfd :%d\n", n, mWeakupFd);
+#endif
+            ret = true;
         }
         else
         {
@@ -123,23 +213,43 @@ void EventLoop::wakeup()
                 if (!mIsAlreadyPostedWakeUp)
                 {
                     mIsAlreadyPostedWakeUp = true;
+#ifdef PLATFORM_WINDOWS
                     PostQueuedCompletionStatus(mIOCP, 0xDEADC0DE, 0, (LPOVERLAPPED)0xcdcdcdcd);
+#else
+                    uint64_t one = 1;
+                    ssize_t n = write(mWeakupFd, &one, sizeof one);
+                    //printf("write %d to eventfd :%d\n", n, mWeakupFd);
+#endif
+                    ret = true;
                 }
                 mFlagLock.unlock();
             }
         }
     }
+
+    return ret;
 }
 
 void EventLoop::linkConnection(int fd, Channel* ptr)
 {
+    printf("link to fd:%d \n", fd);
+#ifdef PLATFORM_WINDOWS
     HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
+#else
+    struct epoll_event ev = { 0, { 0 } };
+    ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
+    ev.data.ptr = ptr;
+    int ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev);
+    printf("epoll ctl ret:%d \n", ret);
+#endif
 }
 
 void EventLoop::addConnection(int fd, Channel* c, CONNECTION_ENTER_HANDLE f)
 {
+    printf("addConnection fd:%d\n", fd);
     pushAsyncProc([fd, c, this, f] () {
             linkConnection(fd, c);
+            c->setEventLoop(this);
             f(c);
     });
 }
@@ -172,6 +282,11 @@ void EventLoop::recalocEventSize(int size)
         delete[] mEventEntries;
     }
 
+#ifdef PLATFORM_WINDOWS
     mEventEntries = new OVERLAPPED_ENTRY[size];
+#else
+    mEventEntries = new epoll_event[size];
+#endif
+
     mEventEntriesNum = size;
 }

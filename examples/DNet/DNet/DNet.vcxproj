@@ -125,13 +125,17 @@
   <ItemGroup>
     <ClInclude Include="channel.h" />
     <ClInclude Include="datasocket.h" />
+    <ClInclude Include="dllconf.h" />
     <ClInclude Include="eventloop.h" />
+    <ClInclude Include="socketlibtypes.h" />
+    <ClInclude Include="systemlib.h" />
     <ClInclude Include="TCPServer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="datasocket.cpp" />
     <ClCompile Include="eventloop.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="systemlib.c" />
     <ClCompile Include="TCPServer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

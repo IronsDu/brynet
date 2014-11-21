@@ -1,8 +1,14 @@
 #include <iostream>
 using namespace std;
 
+#include "platform.h"
+#ifdef PLATFORM_WINDOWS
+#else
+#include <sys/uio.h>
+#endif
+
 #include "eventloop.h"
-#include "httprequest.h"
+#include "socketlibtypes.h"
 #include "datasocket.h"
 
 DataSocket::DataSocket(int fd)
@@ -10,19 +16,21 @@ DataSocket::DataSocket(int fd)
     mEventLoop = nullptr;
     mIsPostFlush = false;
     mFD = fd;
-
-    unsigned long ul = true;
-
-    ioctlsocket(fd, FIONBIO, &ul);
-
     /*  默认可写    */
     mCanWrite = true;
 
+    unsigned long ul = true;
+
+#ifdef PLATFORM_WINDOWS
+    ioctlsocket(fd, FIONBIO, &ul);
     memset(&mOvlRecv, sizeof(mOvlRecv), 0);
     memset(&mOvlSend, sizeof(mOvlSend), 0);
 
     mOvlRecv.base.Offset = OVL_RECV;
     mOvlSend.base.Offset = OVL_SEND;
+#else
+    ioctl(fd, FIONBIO, &ul);
+#endif
 
     mDisConnectHandle = nullptr;
     mDataHandle = nullptr;
@@ -33,10 +41,18 @@ DataSocket::~DataSocket()
     disConnect();
 }
 
+int DataSocket::getFD() const
+{
+    return mFD;
+}
+
 void DataSocket::setEventLoop(EventLoop* el)
 {
-    mEventLoop = el;
-    checkRead();
+    if (mEventLoop == nullptr)
+    {
+        mEventLoop = el;
+        checkRead();
+    }
 }
 
 /*  添加发送数据队列    */
@@ -49,16 +65,15 @@ void DataSocket::sendPacket(PACKET_PTR& packet)
 {
     mEventLoop->pushAsyncProc([this, packet](){
         mSendList.push_back({ packet, packet->size()});
+        runAfterFlush();
+    });
+}
 
-        if (!mIsPostFlush)
-        {
-            mEventLoop->pushAfterLoopProc([this](){
-                mIsPostFlush = false;
-                flush();
-            });
-
-            mIsPostFlush = true;
-        }
+void DataSocket::sendPacket(PACKET_PTR&& packet)
+{
+    mEventLoop->pushAsyncProc([this, packet](){
+        mSendList.push_back({ packet, packet->size() });
+        runAfterFlush();
     });
 }
 
@@ -71,7 +86,7 @@ void    DataSocket::canRecv()
         int retlen = recv(mFD, temp, 1024 * 10, 0);
         if (retlen < 0)
         {
-            if (GetLastError() == WSAEWOULDBLOCK)
+            if (sErrno == S_EWOULDBLOCK)
             {
                 must_close = !checkRead();
             }
@@ -108,6 +123,20 @@ void    DataSocket::canRecv()
 void DataSocket::canSend()
 {
     mCanWrite = true;
+    runAfterFlush();
+}
+
+void DataSocket::runAfterFlush()
+{
+    if (!mIsPostFlush)
+    {
+        mEventLoop->pushAfterLoopProc([this](){
+            mIsPostFlush = false;
+            flush();
+        });
+
+        mIsPostFlush = true;
+    }
 }
 
 void DataSocket::flush()
@@ -116,15 +145,16 @@ void DataSocket::flush()
     {
         /*  TODO::windows下没有进行消息包合并，而是每一个sendmsg都进行一次send   */
         /*  Linux下使用writev进行合并操作    */
+#ifdef PLATFORM_WINDOWS
         bool must_close = false;
 
         for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_buffer& b = *it;
-            int ret_len = ::send(mFD, b.packet->c_str() + (b.packet->size()-b.left), b.left, 0);
+            int ret_len = ::send(mFD, b.packet->c_str() + (b.packet->size() - b.left), b.left, 0);
             if (ret_len < 0)
             {
-                if (GetLastError() != WSAEWOULDBLOCK )
+                if (sErrno != S_EWOULDBLOCK)
                 {
                     must_close = true;
                 }
@@ -159,6 +189,70 @@ void DataSocket::flush()
         {
             onClose();
         }
+#else
+#ifndef MAX_IOVEC
+#define  MAX_IOVEC 1024
+#endif
+
+        struct iovec iov[MAX_IOVEC];
+    SEND_PROC:
+        bool must_close = false;
+        int num = 0;
+        int ready_send_len = 0;
+        for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
+        {
+            pending_buffer& b = *it;
+            iov[num].iov_base = (void*)(b.packet->c_str() + (b.packet->size() - b.left));
+            iov[num].iov_len = b.left;
+            ready_send_len += b.left;
+
+            num++;
+            if(num <= MAX_IOVEC)
+            {
+                break;
+            }
+        }
+
+        if (num > 0)
+        {
+            int send_len = writev(mFD, iov, num);
+            if(send_len > 0)
+            {
+                int total_len = send_len;
+                for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
+                {
+                    pending_buffer& b = *it;
+                    if (b.left <= total_len)
+                    {
+                        total_len -= b.left;
+                        it = mSendList.erase(it);
+                    }
+                    else
+                    {
+                        b.left -= total_len;
+                        break;
+                    }
+                }
+
+                if(!mSendList.empty())
+                {
+                    goto SEND_PROC;
+                }
+            }
+            else
+            {
+                if (sErrno == S_EWOULDBLOCK)
+                {
+                    must_close = true;
+                }
+            }
+        }
+
+        if (must_close)
+        {
+            onClose();
+        }
+#endif
     }
 }
 
@@ -172,7 +266,12 @@ void DataSocket::onClose()
 
         if (mFD != SOCKET_ERROR)
         {
+#ifdef PLATFORM_WINDOWS
             closesocket(mFD);
+#else
+            close(mFD);
+#endif
+
             mFD = SOCKET_ERROR;
         }
 
@@ -187,13 +286,13 @@ void DataSocket::onClose()
 
 bool    DataSocket::checkRead()
 {
+    bool check_ret = true;
+#ifdef PLATFORM_WINDOWS
     static CHAR temp[] = { 0 };
     static WSABUF  in_buf = { 0, temp };
 
-    bool check_ret = true;
-
     /*  添加可读检测  */
-    
+
     DWORD   dwBytes = 0;
     DWORD   flag = 0;
     int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
@@ -201,14 +300,17 @@ bool    DataSocket::checkRead()
     {
         check_ret = GetLastError() == WSA_IO_PENDING;
     }
+#else
+#endif
+    
     return check_ret;
 }
 
 bool    DataSocket::checkWrite()
 {
-    static WSABUF wsendbuf[1] = { {NULL, 0} };
-
     bool check_ret = true;
+#ifdef PLATFORM_WINDOWS
+    static WSABUF wsendbuf[1] = { {NULL, 0} };
 
     DWORD send_len = 0;
     int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
@@ -216,6 +318,8 @@ bool    DataSocket::checkWrite()
     {
         check_ret = GetLastError() == WSA_IO_PENDING;
     }
+#else
+#endif
 
     return check_ret;
 }
