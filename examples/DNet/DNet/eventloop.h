@@ -67,11 +67,13 @@ private:
     OVERLAPPED_ENTRY*               mEventEntries;
     sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
     HANDLE                          mIOCP;
+    OVERLAPPED                      mWakeupOvl;
+    Channel*                        mWakeupChannel;
 #else
     int                             mEpollFd;
     epoll_event*                    mEventEntries;
-    int                             mWeakupFd;
-    Channel*                        mWeakupChannel;
+    int                             mWakeupFd;
+    Channel*                        mWakeupChannel;
 #endif
 
     std::mutex                      mFlagMutex;

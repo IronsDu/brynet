@@ -49,7 +49,6 @@ private:
     struct ovl_ext_s
     {
         OVERLAPPED  base;
-        void*   ptr;
     };
     struct ovl_ext_s                mOvlRecv;
     struct ovl_ext_s                mOvlSend;

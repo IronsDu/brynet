@@ -8,11 +8,10 @@
 
 using namespace std;
 
-#ifndef PLATFORM_WINDOWS
-class WeakupChannel : public Channel
+class WakeupChannel : public Channel
 {
 public:
-    WeakupChannel(int fd)
+    WakeupChannel(int fd)
     {
         mFd = fd;
 
@@ -20,16 +19,19 @@ public:
 private:
     void    canRecv()
     {
-        //printf("weak channel can recv \n");
-        char temp[1024*10];
-        while(true)
+#ifdef PLATFORM_WINDOWS
+#else
+        /*  linux 下必须读完所有数据 */
+        char temp[1024 * 10];
+        while (true)
         {
-            ssize_t n = recv(mFd, temp, 1024*10, 0);
-            if(n == -1)
+            ssize_t n = recv(mFd, temp, 1024 * 10, 0);
+            if (n == -1)
             {
                 break;
             }
         }
+#endif
     }
 
     void    canSend()
@@ -47,7 +49,6 @@ private:
 private:
     int     mFd;
 };
-#endif
 
 EventLoop::EventLoop() : mLock(mMutex, std::defer_lock), mFlagLock(mFlagMutex, std::defer_lock)
 {
@@ -61,11 +62,14 @@ EventLoop::EventLoop() : mLock(mMutex, std::defer_lock), mFlagLock(mFlagMutex, s
             "GetQueuedCompletionStatusEx");
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
+    memset(&mWakeupOvl, sizeof(mWakeupOvl), 0);
+    mWakeupOvl.Offset = OVL_RECV;
+    mWakeupChannel = new WakeupChannel(-1);
 #else
     mEpollFd = epoll_create(1);
-    mWeakupFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    mWeakupChannel = new WeakupChannel(mWeakupFd);
-    linkConnection(mWeakupFd, mWeakupChannel);
+    mWakeupFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    mWakeupChannel = new WakeupChannel(mWakeupFd);
+    linkConnection(mWakeupFd, mWakeupChannel);
 #endif
 
     mIsAlreadyPostedWakeUp = false;
@@ -103,20 +107,13 @@ void EventLoop::loop(int64_t timeout)
         for (ULONG i = 0; i < numComplete; ++i)
         {
             Channel* ds = (Channel*)mEventEntries[i].lpCompletionKey;
-            if (mEventEntries[i].lpOverlapped != (LPOVERLAPPED)0xcdcdcdcd)
+            if (mEventEntries[i].lpOverlapped->Offset == OVL_RECV)
             {
-                if (mEventEntries[i].lpOverlapped->Offset == OVL_RECV)
-                {
-                    ds->canRecv();
-                }
-                else if (mEventEntries[i].lpOverlapped->Offset == OVL_SEND)
-                {
-                    ds->canSend();
-                }
+                ds->canRecv();
             }
-            else
+            else if (mEventEntries[i].lpOverlapped->Offset == OVL_SEND)
             {
-                assert(mEventEntries[i].dwNumberOfBytesTransferred == 0xDEADC0DE);
+                ds->canSend();
             }
         }
     }
@@ -194,11 +191,11 @@ bool EventLoop::wakeup()
             /*如果iocp已经wakeup，然而这里不投递的话，有可能无法唤醒下一次iocp (这不像epoll lt模式下的eventfd，只要有数据没读，则epoll总会wakeup)*/
             mIsAlreadyPostedWakeUp = true;
 #ifdef PLATFORM_WINDOWS
-            PostQueuedCompletionStatus(mIOCP, 0xDEADC0DE, 0, (LPOVERLAPPED)0xcdcdcdcd);
+            PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, &mWakeupOvl);
 #else
             uint64_t one = 1;
-            ssize_t n = write(mWeakupFd, &one, sizeof one);
-            //printf("write %d to eventfd :%d\n", n, mWeakupFd);
+            ssize_t n = write(mWakeupFd, &one, sizeof one);
+            //printf("write %d to eventfd :%d\n", n, mWakeupFd);
 #endif
             ret = true;
         }
@@ -214,11 +211,11 @@ bool EventLoop::wakeup()
                 {
                     mIsAlreadyPostedWakeUp = true;
 #ifdef PLATFORM_WINDOWS
-                    PostQueuedCompletionStatus(mIOCP, 0xDEADC0DE, 0, (LPOVERLAPPED)0xcdcdcdcd);
+                    PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, &mWakeupOvl);
 #else
                     uint64_t one = 1;
-                    ssize_t n = write(mWeakupFd, &one, sizeof one);
-                    //printf("write %d to eventfd :%d\n", n, mWeakupFd);
+                    ssize_t n = write(mWakeupFd, &one, sizeof one);
+                    //printf("write %d to eventfd :%d\n", n, mWakeupFd);
 #endif
                     ret = true;
                 }
