@@ -16,8 +16,7 @@ struct fdset_s
 
     #if defined PLATFORM_LINUX
     struct array_s*    fds;
-    sock        max_fd;
-    sock        push_max_fd;
+    sock        max_fd; /*当前加入到fdset中的最大fd*/
     #endif
 };
 
@@ -40,7 +39,6 @@ ox_fdset_new(void)
         #ifdef PLATFORM_LINUX
         ret->max_fd = SOCKET_ERROR;
         ret->fds = NULL;
-        ret->push_max_fd = 0;
         #endif
     }
 
@@ -88,15 +86,30 @@ ox_fdset_delete(struct fdset_s* self)
 static void 
 fdset_push(struct fdset_s* self, sock fd)
 {
-    if(self->fds == NULL)
+    int old_fd_num = 0;
+    if(self->fds != NULL)
     {
-        self->fds = ox_array_new(fd, sizeof(bool));
+        old_fd_num = ox_array_num(self->fds);
     }
 
-    int fd_num = ox_array_num(self->fds);
-    if(fd_num <= fd)
+    if (old_fd_num <= fd)
     {
-        ox_array_increase(self->fds, fd_num);
+        if (self->fds == NULL)
+        {
+            self->fds = ox_array_new(fd + 1, sizeof(bool));
+        }
+        else
+        {
+            ox_array_increase(self->fds, fd - old_fd_num + 1);
+        }
+
+        int i = old_fd_num;
+        bool data = false;
+        int current_fd_num = ox_array_num(self->fds);
+        for (; i < current_fd_num; ++i)
+        {
+            ox_array_set(self->fds, i, &data);
+        }
     }
 
     bool data = true;
@@ -105,18 +118,6 @@ fdset_push(struct fdset_s* self, sock fd)
     if(fd > self->max_fd)
     {
         self->max_fd = fd;
-    }
-
-    int i = self->push_max_fd+1;
-    data = false;
-    for(; i < fd; ++i)
-    {
-        ox_array_set(self->fds, i, &data);
-    }
-
-    if(fd > self->push_max_fd)
-    {
-        self->push_max_fd = fd;
     }
 }
 
