@@ -55,6 +55,7 @@ public:
 
                                     /*  放入一个每次loop最后要执行的函数(TODO::仅在loop线程自身内调用)  */
                                     /*  比如实现一个datasocket有多个buffer要发送时，采用一个function进行合并包flush，则不是每一个buffer进行一次send   */
+                                    /*  非线程安全   */
     void                            pushAfterLoopProc(USER_PROC f);
 
 private:

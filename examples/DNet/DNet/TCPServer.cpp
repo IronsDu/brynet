@@ -46,6 +46,9 @@ TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
     mLoops = new EventLoop[threadNum];
     mIOThreads = new std::thread*[threadNum];
     mLoopNum = threadNum;
+    mIds = new IdTypes<DataSocket>[threadNum];
+    mIncIds = new int[threadNum];
+    memset(mIncIds, 0, sizeof(mIncIds[0])*threadNum);
 
     for (int i = 0; i < mLoopNum; ++i)
     {
@@ -85,19 +88,70 @@ TcpServer::~TcpServer()
     mLoops = NULL;
 }
 
-void TcpServer::setEnterHandle(EventLoop::CONNECTION_ENTER_HANDLE handle)
+void TcpServer::setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle)
 {
     mEnterHandle = handle;
 }
 
-void TcpServer::setDisconnectHandle(DataSocket::DISCONNECT_PROC handle)
+void TcpServer::setDisconnectHandle(TcpServer::DISCONNECT_PROC handle)
 {
     mDisConnectHandle = handle;
 }
 
-void TcpServer::setMsgHandle(DataSocket::DATA_PROC handle)
+void TcpServer::setMsgHandle(TcpServer::DATA_PROC handle)
 {
     mDataProc = handle;
+}
+
+void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)
+{
+    union  SessionId sid;
+    sid.id = id;
+
+    if (mIOThreads[sid.data.loopIndex]->get_id() != std::this_thread::get_id())
+    {
+        /*TODO::pushAsyncProc有效率问题。未知 */
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
+
+            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
+            if (ds != nullptr && ds->getUserData() == sid.id)
+            {
+                ds->sendPacket(packet);
+            }
+
+        });
+    }
+    else
+    {
+        DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
+        if (ds != nullptr && ds->getUserData() == sid.id)
+        {
+            ds->sendPacket(packet);
+        }
+    }
+}
+
+int64_t TcpServer::MakeID(int loopIndex)
+{
+    union SessionId sid;
+    sid.data.loopIndex = loopIndex;
+    sid.data.index = mIds[loopIndex].claimID();
+    sid.data.iid = mIncIds[loopIndex]++;
+
+    return sid.id;
+}
+
+void TcpServer::_onDataSocketClose(DataSocket* ds)
+{
+    int64_t id = ds->getUserData();
+    union SessionId sid;
+    sid.id = id;
+
+    mIds[sid.data.loopIndex].set(nullptr, sid.data.index);
+    mIds[sid.data.loopIndex].reclaimID(sid.data.index);
+
+    mDisConnectHandle(id);
+    delete ds;
 }
 
 void TcpServer::RunListen(int port)
@@ -136,13 +190,21 @@ void TcpServer::RunListen(int port)
                     }
 
                     Channel* channel = new DataSocket(client_fd);
-                    int rand_num = rand() % mLoopNum;
-                    EventLoop& loop = mLoops[rand_num];
+                    int loopIndex = rand() % mLoopNum;
+                    EventLoop& loop = mLoops[loopIndex];
                     loop.addConnection(client_fd, channel, [&](Channel* arg){
                         DataSocket* ds = static_cast<DataSocket*>(arg);
-                        ds->setDataHandle(mDataProc);
-                        ds->setDisConnectHandle(mDisConnectHandle);
-                        mEnterHandle(arg);
+
+                        int64_t id = MakeID(loopIndex);
+                        union SessionId sid;
+                        sid.id = id;
+                        mIds[loopIndex].set(ds, sid.data.index);
+                        ds->setUserData(id);
+                        ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
+                            mDataProc(ds->getUserData(), buffer, len);
+                        });
+                        ds->setDisConnectHandle(std::bind(&TcpServer::_onDataSocketClose, this, std::placeholders::_1));
+                        mEnterHandle(id);
                     });
                 }
             }

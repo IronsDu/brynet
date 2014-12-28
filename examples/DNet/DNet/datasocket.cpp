@@ -34,16 +34,12 @@ DataSocket::DataSocket(int fd)
 
     mDisConnectHandle = nullptr;
     mDataHandle = nullptr;
+    mUserData = -1;
 }
 
 DataSocket::~DataSocket()
 {
     disConnect();
-}
-
-int DataSocket::getFD() const
-{
-    return mFD;
 }
 
 void DataSocket::setEventLoop(EventLoop* el)
@@ -61,6 +57,14 @@ void    DataSocket::send(const char* buffer, int len)
     sendPacket(makePacket(buffer, len));
 }
 
+void DataSocket::sendPacket(const PACKET_PTR& packet)
+{
+    mEventLoop->pushAsyncProc([this, packet](){
+        mSendList.push_back({ packet, packet->size() });
+        runAfterFlush();
+    });
+}
+
 void DataSocket::sendPacket(PACKET_PTR& packet)
 {
     mEventLoop->pushAsyncProc([this, packet](){
@@ -71,10 +75,7 @@ void DataSocket::sendPacket(PACKET_PTR& packet)
 
 void DataSocket::sendPacket(PACKET_PTR&& packet)
 {
-    mEventLoop->pushAsyncProc([this, packet](){
-        mSendList.push_back({ packet, packet->size() });
-        runAfterFlush();
-    });
+    sendPacket(packet);
 }
 
 void    DataSocket::canRecv()
@@ -139,6 +140,11 @@ void DataSocket::runAfterFlush()
     }
 }
 
+void DataSocket::freeSendPacketList()
+{
+    mSendList.clear();
+}
+
 void DataSocket::flush()
 {
     if (mCanWrite)
@@ -148,9 +154,9 @@ void DataSocket::flush()
 #ifdef PLATFORM_WINDOWS
         bool must_close = false;
 
-        for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
+        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
-            pending_buffer& b = *it;
+            pending_packet& b = *it;
             int ret_len = ::send(mFD, b.packet->c_str() + (b.packet->size() - b.left), b.left, 0);
             if (ret_len < 0)
             {
@@ -199,9 +205,9 @@ void DataSocket::flush()
         bool must_close = false;
         int num = 0;
         int ready_send_len = 0;
-        for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
+        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
-            pending_buffer& b = *it;
+            pending_packet& b = *it;
             iov[num].iov_base = (void*)(b.packet->c_str() + (b.packet->size() - b.left));
             iov[num].iov_len = b.left;
             ready_send_len += b.left;
@@ -219,9 +225,9 @@ void DataSocket::flush()
             if(send_len > 0)
             {
                 int total_len = send_len;
-                for (std::deque<pending_buffer>::iterator it = mSendList.begin(); it != mSendList.end();)
+                for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
                 {
-                    pending_buffer& b = *it;
+                    pending_packet& b = *it;
                     if (b.left <= total_len)
                     {
                         total_len -= b.left;
@@ -260,7 +266,7 @@ void DataSocket::onClose()
 {
     if (mFD != SOCKET_ERROR)
     {
-        mSendList.clear();
+        freeSendPacketList();
 
         mCanWrite = false;
 
@@ -337,6 +343,16 @@ void DataSocket::setDisConnectHandle(DISCONNECT_PROC proc)
 void DataSocket::disConnect()
 {
     onClose();
+}
+
+void DataSocket::setUserData(int64_t value)
+{
+    mUserData = value;
+}
+
+int64_t DataSocket::getUserData() const
+{
+    return mUserData;
 }
 
 DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, int len)

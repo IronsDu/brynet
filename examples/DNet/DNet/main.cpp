@@ -89,20 +89,19 @@ int main()
     /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
     TcpServer t(5999, thread_num, [](EventLoop& l){
     });
-    t.setEnterHandle([&](Channel* c){
-        printf("enter client \n");
+    t.setEnterHandle([&](int64_t id){
+        printf("%lld enter client \n", id);
         mFlagMutex.lock();
         total_client_num++;
         mFlagMutex.unlock();
     });
 
-    t.setDisconnectHandle([&](DataSocket* c){
-        printf("client dis connect \n");
-        delete c;
+    t.setDisconnectHandle([&](int64_t id){
+        printf("client %lld dis connect \n", id);
     });
 
-    t.setMsgHandle([&](DataSocket* d, const char* buffer, int len){
-        d->send(buffer, len);
+    t.setMsgHandle([&](int64_t id, const char* buffer, int len){
+        t.send(id, DataSocket::makePacket(buffer, len));
         total_recv_len += len;
         packet_num++;
     });

@@ -19,16 +19,20 @@ public:
 public:
     DataSocket(int fd);
     ~DataSocket();
-    int                             getFD() const;
 
                                     /*  添加发送数据队列    */
     void                            send(const char* buffer, int len);
+
+    void                            sendPacket(const PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&&);
     void                            setDataHandle(DATA_PROC proc);
     void                            setDisConnectHandle(DISCONNECT_PROC proc);
 
     void                            disConnect();
+
+    void                            setUserData(int64_t value);
+    int64_t                         getUserData() const;
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
@@ -44,6 +48,8 @@ private:
     void                            onClose();
 
     void                            runAfterFlush();
+
+    void                            freeSendPacketList();
 private:
 #ifdef PLATFORM_WINDOWS
     struct ovl_ext_s
@@ -59,12 +65,14 @@ private:
     int                             mFD;
     EventLoop*                      mEventLoop;
 
-    struct pending_buffer
+    struct pending_packet
     {
         PACKET_PTR  packet;
         size_t      left;
     };
-    std::deque<pending_buffer>      mSendList;
+
+    typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
+    PACKET_LIST_TYPE                mSendList;
 
     bool                            mCanWrite;
 
@@ -72,6 +80,8 @@ private:
     DISCONNECT_PROC                 mDisConnectHandle;
 
     bool                            mIsPostFlush;
+
+    int64_t                         mUserData;
 };
 
 #endif
