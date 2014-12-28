@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <condition_variable>
+#include <deque>
 
 template<typename T>
 class Rwlist
@@ -125,6 +126,11 @@ public:
 
             mLock.unlock();
         }
+    }
+
+    size_t  ReadListSize() const
+    {
+        return mReadList.size();
     }
 
     size_t  WriteListSize() const
