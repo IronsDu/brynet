@@ -58,6 +58,8 @@ public:
                                     /*  非线程安全   */
     void                            pushAfterLoopProc(USER_PROC f);
 
+    void                            restoreThreadID();
+
 private:
     void                            recalocEventSize(int size);
     void                            linkConnection(int fd, Channel* ptr);
@@ -88,6 +90,8 @@ private:
 
     std::mutex                      mMutex;
     std::unique_lock<std::mutex>    mLock;
+
+    /*调用loop函数所在thread的id*/
     std::thread::id                 mSelfThreadid;
 };
 

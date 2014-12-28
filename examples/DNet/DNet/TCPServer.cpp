@@ -54,6 +54,7 @@ TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
     {
         EventLoop& l = mLoops[i];
         mIOThreads[i] = new thread([&l, callback](){
+            l.restoreThreadID();
             while (true)
             {
                 l.loop(-1);

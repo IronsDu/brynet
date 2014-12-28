@@ -272,6 +272,11 @@ void EventLoop::pushAfterLoopProc(USER_PROC f)
     mAfterLoopProcs.push_back(f);
 }
 
+void EventLoop::restoreThreadID()
+{
+    mSelfThreadid = std::this_thread::get_id();
+}
+
 void EventLoop::recalocEventSize(int size)
 {
     if (mEventEntries != NULL)
