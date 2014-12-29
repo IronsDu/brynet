@@ -226,7 +226,6 @@ void TcpServer::RunListen(int port)
                         int64_t id = MakeID(loopIndex);
                         union SessionId sid;
                         sid.id = id;
-                        printf("sid.data.index is :-----------------------------------------------loopIndex:%d--%p--- %d \n", loopIndex, &mIds[loopIndex], sid.data.index);
                         mIds[loopIndex].set(ds, sid.data.index);
                         ds->setUserData(id);
                         ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
@@ -234,8 +233,6 @@ void TcpServer::RunListen(int port)
                         });
 
                         ds->setDisConnectHandle([this](DataSocket* arg){
-                            /*如果上层投递了disConnect，则有可能出现重复释放ds的内存宕机问题*/
-                            /*有可能上层已经投递了异步断开到队列中。然而这里还是会调用mDisConnectHandle */
                             /*TODO::这里也需要一开始就保存this指针， delete datasocket之后，此lambda析构，绑定变量失效，所以最后继续访问this就会宕机*/
                             TcpServer* p = this;
                             int64_t id = arg->getUserData();

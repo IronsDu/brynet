@@ -39,14 +39,6 @@ public:
 
     void        set(T* t, size_t id)
     {
-        if (id >= 0 && id < mValues.size())
-        {
-
-        }
-        else
-        {
-            printf("error:--------------------------------%p,id:%d, size:%d \n", this, id, mValues.size());
-        }
         assert(id >= 0 && id < mValues.size());
         if (id >= 0 && id < mValues.size())
         {
