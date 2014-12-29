@@ -46,6 +46,10 @@ private:
     {
     }
 
+    void    onClose()
+    {
+    }
+
 private:
     int     mFd;
 };
@@ -136,7 +140,7 @@ void EventLoop::loop(int64_t timeout)
         if (event_data & EPOLLRDHUP)
         {
             ds->canRecv();
-            ds->disConnect();   /*  无条件调用断开处理，以防canRecv里没有recv 断开通知*/
+            ds->onClose();   /*  无条件调用断开处理，以防canRecv里没有recv 断开通知*/
         }
         else
         {
@@ -152,6 +156,12 @@ void EventLoop::loop(int64_t timeout)
         }
     }
 #endif
+    /*TODO::放在mAsyncProcs之前，是因为要在上层投递异步关闭之前处理io线程收集到的socket断开，否则容易出现断错误*/
+    for (auto& x : mAfterLoopProcs)
+    {
+        x();
+    }
+    mAfterLoopProcs.clear();
 
     vector<USER_PROC> temp;
     mMutex.lock();
@@ -167,7 +177,6 @@ void EventLoop::loop(int64_t timeout)
     {
         x();
     }
-
     mAfterLoopProcs.clear();
 
     if (numComplete == mEventEntriesNum)
@@ -255,6 +264,7 @@ void EventLoop::pushAsyncProc(std::function<void(void)> f)
 {
     if (mSelfThreadid != std::this_thread::get_id())
     {
+        /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mLock.lock();
         mAsyncProcs.push_back(f);
         mLock.unlock();

@@ -266,20 +266,7 @@ void DataSocket::onClose()
 {
     if (mFD != SOCKET_ERROR)
     {
-        freeSendPacketList();
-
-        mCanWrite = false;
-
-        if (mFD != SOCKET_ERROR)
-        {
-#ifdef PLATFORM_WINDOWS
-            closesocket(mFD);
-#else
-            close(mFD);
-#endif
-
-            mFD = SOCKET_ERROR;
-        }
+        _procClose();
 
         if (mDisConnectHandle != nullptr)
         {
@@ -287,6 +274,24 @@ void DataSocket::onClose()
                 mDisConnectHandle(this);
             });
         }
+    }
+}
+
+void DataSocket::_procClose()
+{
+    if (mFD != SOCKET_ERROR)
+    {
+        freeSendPacketList();
+
+        mCanWrite = false;
+
+        #ifdef PLATFORM_WINDOWS
+        closesocket(mFD);
+        #else
+        close(mFD);
+        #endif
+
+        mFD = SOCKET_ERROR;
     }
 }
 
@@ -342,7 +347,7 @@ void DataSocket::setDisConnectHandle(DISCONNECT_PROC proc)
 
 void DataSocket::disConnect()
 {
-    onClose();
+    _procClose();
 }
 
 void DataSocket::setUserData(int64_t value)

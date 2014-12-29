@@ -132,6 +132,35 @@ void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)
     }
 }
 
+void TcpServer::disConnect(int64_t id)
+{
+    union  SessionId sid;
+    sid.id = id;
+
+    if (mIOThreads[sid.data.loopIndex]->get_id() != std::this_thread::get_id())
+    {
+        /*TODO::pushAsyncProc有效率问题。未知 */
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
+
+            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
+            if (ds != nullptr && ds->getUserData() == sid.id)
+            {
+                ds->disConnect();
+                _procDataSocketClose(ds);
+            }
+
+        });
+    }
+    else
+    {
+        DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
+        if (ds != nullptr && ds->getUserData() == sid.id)
+        {
+            ds->disConnect();
+            _procDataSocketClose(ds);
+        }
+    }
+}
 int64_t TcpServer::MakeID(int loopIndex)
 {
     union SessionId sid;
@@ -142,7 +171,7 @@ int64_t TcpServer::MakeID(int loopIndex)
     return sid.id;
 }
 
-void TcpServer::_onDataSocketClose(DataSocket* ds)
+void TcpServer::_procDataSocketClose(DataSocket* ds)
 {
     int64_t id = ds->getUserData();
     union SessionId sid;
@@ -150,8 +179,6 @@ void TcpServer::_onDataSocketClose(DataSocket* ds)
 
     mIds[sid.data.loopIndex].set(nullptr, sid.data.index);
     mIds[sid.data.loopIndex].reclaimID(sid.data.index);
-
-    mDisConnectHandle(id);
     delete ds;
 }
 
@@ -193,18 +220,29 @@ void TcpServer::RunListen(int port)
                     Channel* channel = new DataSocket(client_fd);
                     int loopIndex = rand() % mLoopNum;
                     EventLoop& loop = mLoops[loopIndex];
-                    loop.addConnection(client_fd, channel, [&](Channel* arg){
+                    loop.addConnection(client_fd, channel, [this, loopIndex](Channel* arg){
                         DataSocket* ds = static_cast<DataSocket*>(arg);
 
                         int64_t id = MakeID(loopIndex);
                         union SessionId sid;
                         sid.id = id;
+                        printf("sid.data.index is :-----------------------------------------------loopIndex:%d--%p--- %d \n", loopIndex, &mIds[loopIndex], sid.data.index);
                         mIds[loopIndex].set(ds, sid.data.index);
                         ds->setUserData(id);
                         ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
                             mDataProc(ds->getUserData(), buffer, len);
                         });
-                        ds->setDisConnectHandle(std::bind(&TcpServer::_onDataSocketClose, this, std::placeholders::_1));
+
+                        ds->setDisConnectHandle([this](DataSocket* arg){
+                            /*如果上层投递了disConnect，则有可能出现重复释放ds的内存宕机问题*/
+                            /*有可能上层已经投递了异步断开到队列中。然而这里还是会调用mDisConnectHandle */
+                            /*TODO::这里也需要一开始就保存this指针， delete datasocket之后，此lambda析构，绑定变量失效，所以最后继续访问this就会宕机*/
+                            TcpServer* p = this;
+                            int64_t id = arg->getUserData();
+                            p->_procDataSocketClose(arg);
+                            p->mDisConnectHandle(id);
+                        });
+
                         mEnterHandle(id);
                     });
                 }

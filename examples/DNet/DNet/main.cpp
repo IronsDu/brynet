@@ -39,7 +39,7 @@ ox_socket_connect(const char* server_ip, int port)
 
 struct NetMsg
 {
-    NetMsg(int t, Channel* c) : mType(t), mChannel(c)
+    NetMsg(int t, int64_t id) : mType(t), mID(id)
     {
     }
 
@@ -49,9 +49,10 @@ struct NetMsg
     }
 
     int         mType;
-    Channel*    mChannel;
+    int64_t     mID;
     string      mData;
 };
+
 #include <chrono>
 #include <thread>
 int main()
@@ -87,23 +88,42 @@ int main()
     /*  TODO::怎么优化消息队列，网络层没有不断的flush消息队列，然而又不能在每个消息发送都强制flush，当然逻辑层也可以采取主动拉的方式。去强制拉过来   */
     /*  TODO::把(每个IO线程一个消息队列)消息队列隐藏到TCPServer中。 对用户不可见    */
     /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
-    TcpServer t(5999, thread_num, [](EventLoop& l){
+    TcpServer t(5999, thread_num, [&](EventLoop& l){
+        mFlagMutex.lock();
+        msgList.ForceSyncWrite();
+        mFlagMutex.unlock();
+
+        if (msgList.SharedListSize() > 0)
+        {
+            mainLoop.wakeup();
+        }
     });
     t.setEnterHandle([&](int64_t id){
-        printf("%lld enter client \n", id);
+        NetMsg* msg = new NetMsg(0, id);
         mFlagMutex.lock();
-        total_client_num++;
+        msgList.Push(msg);
         mFlagMutex.unlock();
+
+        mainLoop.wakeup();
     });
 
     t.setDisconnectHandle([&](int64_t id){
-        printf("client %lld dis connect \n", id);
+        NetMsg* msg = new NetMsg(1, id);
+        mFlagMutex.lock();
+        msgList.Push(msg);
+        mFlagMutex.unlock();
+
+        mainLoop.wakeup();
     });
 
     t.setMsgHandle([&](int64_t id, const char* buffer, int len){
-        t.send(id, DataSocket::makePacket(buffer, len));
-        total_recv_len += len;
-        packet_num++;
+        NetMsg* msg = new NetMsg(2, id);
+        msg->setData(buffer, len);
+        mFlagMutex.lock();
+        msgList.Push(msg);
+        mFlagMutex.unlock();
+
+        mainLoop.wakeup();
     });
 
     /*  客户端IO线程   */
@@ -155,6 +175,30 @@ int main()
     {
         mainLoop.loop(10);
 
+        msgList.SyncRead(0);
+
+        while (msgList.ReadListSize() > 0)
+        {
+            NetMsg* msg = msgList.PopFront();
+            if (msg->mType == 0)
+            {
+                printf("client %lld enter \n", msg->mID);
+                total_client_num++;
+            }
+            else if (msg->mType == 1)
+            {
+                printf("client %lld close \n", msg->mID);
+                total_client_num--;
+            }
+            else
+            {
+                t.send(msg->mID, DataSocket::makePacket(msg->mData.c_str(), msg->mData.size()));
+                total_recv_len += msg->mData.size();
+                packet_num++;
+            }
+
+            delete msg;
+        }
         int64_t now = ox_getnowtime();
         if ((now - lasttime) >= 1000)
         {

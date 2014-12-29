@@ -29,6 +29,7 @@ public:
     void                            setDataHandle(DATA_PROC proc);
     void                            setDisConnectHandle(DISCONNECT_PROC proc);
 
+    /*主动断开此链接，（则）不会触发断开回调*/
     void                            disConnect();
 
     void                            setUserData(int64_t value);
@@ -46,6 +47,7 @@ private:
 
     void                            flush();
     void                            onClose();
+    void                            _procClose();
 
     void                            runAfterFlush();
 

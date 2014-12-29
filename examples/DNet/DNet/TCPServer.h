@@ -39,6 +39,14 @@ public:
 
     void        set(T* t, size_t id)
     {
+        if (id >= 0 && id < mValues.size())
+        {
+
+        }
+        else
+        {
+            printf("error:--------------------------------%p,id:%d, size:%d \n", this, id, mValues.size());
+        }
         assert(id >= 0 && id < mValues.size());
         if (id >= 0 && id < mValues.size())
         {
@@ -64,10 +72,21 @@ private:
         const static int _NUM = 100;
 
         int oldsize = mValues.size();
-        mValues.resize(_NUM, nullptr);
-        for (int i = 0; i < _NUM; i++)
+        if (oldsize > 0)
         {
-            mIds.push_back(oldsize+i);
+            mValues.resize(oldsize + _NUM, nullptr);
+            for (int i = 0; i < _NUM; i++)
+            {
+                mIds.push_back(oldsize + i);
+            }
+        }
+        else
+        {
+            mValues.resize(oldsize + _NUM, nullptr);
+            for (int i = 0; i < _NUM; i++)
+            {
+                mIds.push_back(oldsize + i);
+            }
         }
     }
 
@@ -93,11 +112,14 @@ public:
 
     void                                send(int64_t id, DataSocket::PACKET_PTR& packet);
 
+    /*主动断开此id链接，但仍然可能收到此id的断开回调，需要上层逻辑自己处理这个"问题"*/
+    void                                disConnect(int64_t id);
+
 private:
     void                                RunListen(int port);
     int64_t                             MakeID(int loopIndex);
 
-    void                                _onDataSocketClose(DataSocket*);
+    void                                _procDataSocketClose(DataSocket*);
 
 private:
     EventLoop*                          mLoops;
