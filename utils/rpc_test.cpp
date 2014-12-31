@@ -235,39 +235,6 @@ namespace dodo
             _insertLambda(mNextID, lambdaObj, &T::operator());
             mNextID++;
         }
-
-        template<>
-        void insertLambda<int>(int _)
-        {
-        }
-        template<>
-        void insertLambda<const char*>(const char* _)
-        {
-        }
-        template<>
-        void insertLambda<string>(string _)
-        {
-        }
-        template<>
-        void insertLambda<vector<int>>(vector<int> _)
-        {
-        }
-        template<>
-        void insertLambda<vector<string>>(vector<string> _)
-        {
-        }
-        template<>
-        void insertLambda<map<string, string>>(map<string, string> _)
-        {
-        }
-        template<>
-        void insertLambda<map<int, string>>(map<int, string> _)
-        {
-        }
-        template<>
-        void insertLambda<map<string, int>>(map<string, int> _)
-        {
-        }
     private:
         template<typename RVal, typename T, typename T1 = void, typename T2 = void, typename T3 = void, typename T4 = void, typename T5 = void, typename T6 = void, typename T7 = void>
         struct LambdaFunctor
