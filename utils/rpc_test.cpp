@@ -546,25 +546,122 @@ namespace dodo
         }
 
     private:
-        template<typename ARGTYPE>
-        void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
+        template<typename TESTTYPE>
+        struct TypeIsLambda
         {
-            if (std::is_same<ARGTYPE, int>::value ||
-                std::is_same<ARGTYPE, const char*>::value ||
-                std::is_same<ARGTYPE, string>::value ||
-                std::is_same<ARGTYPE, vector<int>>::value ||
-                std::is_same<ARGTYPE, vector<string>>::value ||
-                std::is_same<ARGTYPE, map<string, string>>::value ||
-                std::is_same<ARGTYPE, map<int, string>>::value ||
-                std::is_same<ARGTYPE, map<string, int>>::value)
+            template<typename TESTTYPE>
+            struct _Select
+            {
+                enum
+                {
+                    value = true
+                };
+            };
+
+            template<>
+            struct _Select<int>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<const char*>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<string>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<vector<int>>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<vector<string>>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<map<string, string>>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<map<int, string>>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+            template<>
+            struct _Select<map<string, int>>
+            {
+                enum
+                {
+                    value = false
+                };
+            };
+
+            enum
+            {
+                Result = _Select<TESTTYPE>::value
+            };
+        };
+
+        template<bool>
+        struct SelectWriteArg;
+
+        template<>
+        struct SelectWriteArg<true>
+        {
+            template<typename ARGTYPE>
+            static  void    Write(LambdaMgr& lambdaMgr, JsonObject& parms, ARGTYPE arg, int index)
+            {
+                lambdaMgr.insertLambda(arg);
+            }
+        };
+
+        template<>
+        struct SelectWriteArg<false>
+        {
+            template<typename ARGTYPE>
+            static  void    Write(LambdaMgr& lambdaMgr, JsonObject& parms, ARGTYPE arg, int index)
             {
                 Utils::writeJsonByIndex(parms, arg, index);
             }
-            else
+        };
+
+        /*如果是lambda则加入回调管理器，否则添加到rpc参数*/
+        template<typename ARGTYPE>
+        void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
+        {
             {
-                /*记录lambda回调*/
-                mLambdaMgr.insertLambda(arg);
+                static SelectWriteArg<true> _tempT;
+                static SelectWriteArg<false> _tempF;
             }
+
+            SelectWriteArg<TypeIsLambda<ARGTYPE>::Result>::Write(mLambdaMgr, parms, arg, index);
         }
 
     private:
