@@ -864,7 +864,7 @@ int main()
             msg.setObject("parm", parm);
         }
 
-        /*模拟接收到调用方的reply消息，触发本方的lambda函数*/
+        /*模拟接收到被调用方的reply消息(rpc返回值)，触发本方的lambda函数(处理rpc返回值)*/
         rpc.callLambda(msg.toString().c_str());
     }
 
