@@ -55,6 +55,19 @@ struct NetMsg
 
 #include <chrono>
 #include <thread>
+
+std::mutex                      gTatisticsCppMutex;
+
+void    lockStatistics()
+{
+    gTatisticsCppMutex.lock();
+}
+
+void    unLockStatistics()
+{
+    gTatisticsCppMutex.unlock();
+}
+
 int main()
 {
     double total_recv_len = 0;
@@ -77,9 +90,7 @@ int main()
     WSAStartup(MAKEWORD(2, 2), &g_WSAData);
 #else
 #endif
-
-    std::mutex                      mFlagMutex;
-    std::unique_lock<std::mutex>    mFlagLock(mFlagMutex, std::defer_lock);
+    
     int total_client_num = 0;
 
     Rwlist<NetMsg*>  msgList;
@@ -89,47 +100,82 @@ int main()
     /*  TODO::把(每个IO线程一个消息队列)消息队列隐藏到TCPServer中。 对用户不可见    */
     /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
     TcpServer t(5999, thread_num, [&](EventLoop& l){
-        mFlagMutex.lock();
-        msgList.ForceSyncWrite();
-        mFlagMutex.unlock();
-
-        if (msgList.SharedListSize() > 0)
+        /*每帧回调函数里强制同步rwlist*/
+        if (true)
         {
-            mainLoop.wakeup();
+            lockStatistics();
+            msgList.ForceSyncWrite();
+            unLockStatistics();
+
+            if (msgList.SharedListSize() > 0)
+            {
+                mainLoop.wakeup();
+            }
         }
     });
     t.setEnterHandle([&](int64_t id){
-        NetMsg* msg = new NetMsg(0, id);
-        mFlagMutex.lock();
-        msgList.Push(msg);
-        mFlagMutex.unlock();
+        /*Linux下有宕机问题*/
+        if (true)
+        {
+            NetMsg* msg = new NetMsg(0, id);
+            lockStatistics();
+            msgList.Push(msg);
+            unLockStatistics();
 
-        mainLoop.wakeup();
+            mainLoop.wakeup();
+        }
+        else
+        {
+            lockStatistics();
+            total_client_num++;
+            unLockStatistics();
+        }
     });
 
     t.setDisconnectHandle([&](int64_t id){
-        NetMsg* msg = new NetMsg(1, id);
-        mFlagMutex.lock();
-        msgList.Push(msg);
-        mFlagMutex.unlock();
+        if (true)
+        {
+            NetMsg* msg = new NetMsg(1, id);
+            lockStatistics();
+            msgList.Push(msg);
+            unLockStatistics();
 
-        mainLoop.wakeup();
+            mainLoop.wakeup();
+        }
+        else
+        {
+            lockStatistics();
+            total_client_num--;
+            unLockStatistics();
+        }
     });
 
     t.setMsgHandle([&](int64_t id, const char* buffer, int len){
-        NetMsg* msg = new NetMsg(2, id);
-        msg->setData(buffer, len);
-        mFlagMutex.lock();
-        msgList.Push(msg);
-        mFlagMutex.unlock();
+        if (true)
+        {
+            NetMsg* msg = new NetMsg(2, id);
+            msg->setData(buffer, len);
+            lockStatistics();
+            msgList.Push(msg);
+            unLockStatistics();
 
-        mainLoop.wakeup();
+            mainLoop.wakeup();
+        }
+        else
+        {
+            t.send(id, DataSocket::makePacket(buffer, len));
+            lockStatistics();
+            total_recv_len += len;
+            packet_num++;
+            unLockStatistics();
+            
+        }
     });
 
     /*  客户端IO线程   */
     for (int i = 0; i < thread_num; ++i)
     {
-        new std::thread([&mainLoop, &msgList, &client_num, &packet_len]{
+        new std::thread([&mainLoop, &client_num, &packet_len]{
             printf("start one client thread \n");
             /*  客户端eventloop*/
             EventLoop clientEventLoop;
@@ -176,28 +222,36 @@ int main()
         mainLoop.loop(10);
 
         msgList.SyncRead(0);
-
+        NetMsg* msg = nullptr;
         while (msgList.ReadListSize() > 0)
         {
-            NetMsg* msg = msgList.PopFront();
-            if (msg->mType == 0)
+            bool ret = msgList.PopFront(&msg);
+            if (ret)
             {
-                printf("client %lld enter \n", msg->mID);
-                total_client_num++;
-            }
-            else if (msg->mType == 1)
-            {
-                printf("client %lld close \n", msg->mID);
-                total_client_num--;
+                if (msg->mType == 0)
+                {
+                    printf("client %lld enter \n", msg->mID);
+                    total_client_num++;
+                }
+                else if (msg->mType == 1)
+                {
+                    printf("client %lld close \n", msg->mID);
+                    total_client_num--;
+                }
+                else
+                {
+                    t.send(msg->mID, DataSocket::makePacket(msg->mData.c_str(), msg->mData.size()));
+                    total_recv_len += msg->mData.size();
+                    packet_num++;
+                }
+
+                delete msg;
+                msg = nullptr;
             }
             else
             {
-                t.send(msg->mID, DataSocket::makePacket(msg->mData.c_str(), msg->mData.size()));
-                total_recv_len += msg->mData.size();
-                packet_num++;
+                break;
             }
-
-            delete msg;
         }
         int64_t now = ox_getnowtime();
         if ((now - lasttime) >= 1000)

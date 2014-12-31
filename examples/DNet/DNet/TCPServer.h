@@ -102,6 +102,7 @@ public:
     void                                setDisconnectHandle(TcpServer::DISCONNECT_PROC handle);
     void                                setMsgHandle(TcpServer::DATA_PROC handle);
 
+    void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
     void                                send(int64_t id, DataSocket::PACKET_PTR& packet);
 
     /*主动断开此id链接，但仍然可能收到此id的断开回调，需要上层逻辑自己处理这个"问题"*/

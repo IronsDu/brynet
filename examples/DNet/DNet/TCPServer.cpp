@@ -1,6 +1,8 @@
-#include <functional>
 #include <time.h>
 #include <stdio.h>
+#include <string.h>
+
+#include <functional>
 #include <thread>
 #include <iostream>
 #include <exception>
@@ -102,6 +104,11 @@ void TcpServer::setDisconnectHandle(TcpServer::DISCONNECT_PROC handle)
 void TcpServer::setMsgHandle(TcpServer::DATA_PROC handle)
 {
     mDataProc = handle;
+}
+
+void TcpServer::send(int64_t id, DataSocket::PACKET_PTR&& packet)
+{
+    send(id, packet);
 }
 
 void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)

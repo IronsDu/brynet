@@ -80,7 +80,7 @@ private:
 #endif
 
     std::mutex                      mFlagMutex;
-    std::unique_lock<std::mutex>    mFlagLock;
+
     bool                            mInWaitIOEvent;             /*  如果为false表示肯定没有等待IOCP，如果为true，表示即将或已经等待iocp*/
     bool                            mIsAlreadyPostedWakeUp;     /*  表示是否已经投递过wakeup(避免其他线程投递太多(不必要)的wakeup) */
 
@@ -88,8 +88,7 @@ private:
 
     vector<USER_PROC>               mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数，只能在io线程自身内对此队列做添加操作    */
 
-    std::mutex                      mMutex;
-    std::unique_lock<std::mutex>    mLock;
+    std::mutex                      mAsyncListMutex;
 
     /*调用loop函数所在thread的id*/
     std::thread::id                 mSelfThreadid;

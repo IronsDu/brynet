@@ -11,8 +11,9 @@ class Rwlist
 public:
     typedef std::deque<T>   Container;
 
-    Rwlist() : mLock(mMutex, std::defer_lock)
-    {}
+    Rwlist()
+    {
+    }
 
     void    Push(T& t)
     {
@@ -29,12 +30,15 @@ public:
     {
         if (!mWriteList.empty() && mSharedList.empty())
         {
-            mLock.lock();
+            mMutex.lock();
 
-            mSharedList.swap(mWriteList);
-            mCond.notify_one();
+            if (!mWriteList.empty() && mSharedList.empty())
+            {
+                mSharedList.swap(mWriteList);
+                mCond.notify_one();
+            }
 
-            mLock.unlock();
+            mMutex.unlock();
         }
     }
 
@@ -50,60 +54,65 @@ public:
             }
             else
             {
-                mLock.lock();
+                mMutex.lock();
 
-                /*  强制写入    */
-                if (mWriteList.size() > mSharedList.size())
+                if (!mWriteList.empty())
                 {
-                    for (auto x : mSharedList)
+                    /*  强制写入    */
+                    if (mWriteList.size() > mSharedList.size())
                     {
-                        mWriteList.push_front(x);
+                        for (auto x : mSharedList)
+                        {
+                            mWriteList.push_front(x);
+                        }
+
+                        mSharedList.clear();
+                        mSharedList.swap(mWriteList);
+                    }
+                    else
+                    {
+                        for (auto x : mWriteList)
+                        {
+                            mSharedList.push_back(x);
+                        }
+
+                        mWriteList.clear();
                     }
 
-                    mSharedList.clear();
-                    mSharedList.swap(mWriteList);
-                }
-                else
-                {
-                    for (auto x : mWriteList)
-                    {
-                        mSharedList.push_back(x);
-                    }
-
-                    mWriteList.clear();
+                    mCond.notify_one();
                 }
 
-                mLock.unlock();
+                mMutex.unlock();
             }
         }
     }
 
-    T&      PopFront()
+    bool      PopFront(T* data)
     {
+        bool ret = false;
+
         if (!mReadList.empty())
         {
-            T& ret = mReadList.front();
+            *data = mReadList.front();
             mReadList.pop_front();
-            return ret;
+            ret = true;
         }
-        else
-        {
-            return *(T*)nullptr;
-        }
+
+        return ret;
     }
 
-    T&      PopBack()
+    bool      PopBack(T* data)
     {
+        bool ret = false;
+
         if (!mReadList.empty())
         {
-            T& ret = mReadList.back();
+            *data = mReadList.back();
             mReadList.pop_back();
-            return ret;
+            ret = true;
         }
-        else
-        {
-            return *(T*)nullptr;
-        }
+
+        return ret;
     }
 
     /*  从共享队列同步到读缓冲区(必须读缓冲区为空时) */
@@ -111,21 +120,26 @@ public:
     {
         if (mReadList.empty())
         {
-            mLock.lock();
-
-            if (mSharedList.empty() && waitMicroSecond > 0)
+            if (waitMicroSecond > 0)
             {
-                /*  如果共享队列没有数据且timeout大于0则需要等待通知,否则直接进行同步    */
-                mCond.wait_for(mLock, std::chrono::microseconds(waitMicroSecond), [](){return false; });
+                std::unique_lock<std::mutex>    tmp(mMutex);
+                mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond), [](){return false; });
             }
 
-            if (!mSharedList.empty())
+            mMutex.lock();
+
+            if (mReadList.empty() && !mSharedList.empty())
             {
                 mSharedList.swap(mReadList);
             }
 
-            mLock.unlock();
+            mMutex.unlock();
         }
+    }
+
+    size_t  SharedListSize() const
+    {
+        return mSharedList.size();
     }
 
     size_t  ReadListSize() const
@@ -140,7 +154,6 @@ public:
 
 private:
     std::mutex                      mMutex;
-    std::unique_lock<std::mutex>    mLock;
     std::condition_variable         mCond;
 
     /*  写缓冲 */

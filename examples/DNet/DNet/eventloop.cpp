@@ -54,7 +54,7 @@ private:
     int     mFd;
 };
 
-EventLoop::EventLoop() : mLock(mMutex, std::defer_lock), mFlagLock(mFlagMutex, std::defer_lock)
+EventLoop::EventLoop()
 {
     mSelfThreadid = std::this_thread::get_id();
 #ifdef PLATFORM_WINDOWS
@@ -87,7 +87,6 @@ EventLoop::EventLoop() : mLock(mMutex, std::defer_lock), mFlagLock(mFlagMutex, s
 
 EventLoop::~EventLoop()
 {
-    printf("~ EventLoop");
 }
 
 void EventLoop::loop(int64_t timeout)
@@ -125,10 +124,8 @@ void EventLoop::loop(int64_t timeout)
     {
         //cout << this << " error code:" << GetLastError() << endl;
     }
-#else
-    //printf("enter epoll_wait \n");
+#else;
     int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, timeout);
-    //printf("epoll_wait success: %d \n", numComplete);
     mIsAlreadyPostedWakeUp = false;
     mInWaitIOEvent = false;
 
@@ -164,9 +161,9 @@ void EventLoop::loop(int64_t timeout)
     mAfterLoopProcs.clear();
 
     vector<USER_PROC> temp;
-    mMutex.lock();
+    mAsyncListMutex.lock();
     temp.swap(mAsyncProcs);
-    mMutex.unlock();
+    mAsyncListMutex.unlock();
     
     for (auto& x : temp)
     {
@@ -189,7 +186,6 @@ void EventLoop::loop(int64_t timeout)
 
 bool EventLoop::wakeup()
 {
-    //printf("try wakeup \n");
     bool ret = false;
     /*  TODO::1、保证线程安全；2、保证io线程处于wait状态时，外界尽可能少发送wakeup；3、是否io线程有必要自己向自身投递一个wakeup来唤醒下一次wait？ */
     if (mSelfThreadid != std::this_thread::get_id())
@@ -205,7 +201,6 @@ bool EventLoop::wakeup()
 #else
             uint64_t one = 1;
             ssize_t n = write(mWakeupFd, &one, sizeof one);
-            //printf("write %d to eventfd :%d\n", n, mWakeupFd);
 #endif
             ret = true;
         }
@@ -216,7 +211,8 @@ bool EventLoop::wakeup()
             /*多个线程使用互斥锁判断mIsAlreadyPostedWakeUp标志，以保证不重复投递*/
             if (!mIsAlreadyPostedWakeUp)
             {
-                mFlagLock.lock();
+                mFlagMutex.lock();
+
                 if (!mIsAlreadyPostedWakeUp)
                 {
                     mIsAlreadyPostedWakeUp = true;
@@ -225,11 +221,11 @@ bool EventLoop::wakeup()
 #else
                     uint64_t one = 1;
                     ssize_t n = write(mWakeupFd, &one, sizeof one);
-                    //printf("write %d to eventfd :%d\n", n, mWakeupFd);
 #endif
                     ret = true;
                 }
-                mFlagLock.unlock();
+
+                mFlagMutex.unlock();
             }
         }
     }
@@ -247,7 +243,6 @@ void EventLoop::linkConnection(int fd, Channel* ptr)
     ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
     ev.data.ptr = ptr;
     int ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev);
-    printf("epoll ctl ret:%d \n", ret);
 #endif
 }
 
@@ -266,9 +261,9 @@ void EventLoop::pushAsyncProc(std::function<void(void)> f)
     if (mSelfThreadid != std::this_thread::get_id())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
-        mLock.lock();
+        mAsyncListMutex.lock();
         mAsyncProcs.push_back(f);
-        mLock.unlock();
+        mAsyncListMutex.unlock();
 
         wakeup();
     }
