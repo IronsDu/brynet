@@ -222,7 +222,11 @@ namespace dodo
             int id = msgObject.getInt("id");
             JsonObject parmObject = msgObject.getObject("parm");
 
-            mWrapFunctions[id](mRealLambdaPtr[id], parmObject.toString().c_str());
+            assert(mWrapFunctions.find(id) != mWrapFunctions.end());
+            if (mWrapFunctions.find(id) != mWrapFunctions.end())
+            {
+                mWrapFunctions[id](mRealLambdaPtr[id], parmObject.toString().c_str());
+            }
         }
 
         template<typename T>
@@ -234,6 +238,10 @@ namespace dodo
 
         template<>
         void insertLambda<int>(int _)
+        {
+        }
+        template<>
+        void insertLambda<const char*>(const char* _)
         {
         }
         template<>
@@ -542,6 +550,7 @@ namespace dodo
         void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
         {
             if (std::is_same<ARGTYPE, int>::value ||
+                std::is_same<ARGTYPE, const char*>::value ||
                 std::is_same<ARGTYPE, string>::value ||
                 std::is_same<ARGTYPE, vector<int>>::value ||
                 std::is_same<ARGTYPE, vector<string>>::value ||
@@ -696,21 +705,25 @@ namespace dodo
 
 void test1(int a, int b)
 {
+    cout << "in test1" << endl;
     cout << a << ", " << b << endl;
 }
 
 void test2(int a, int b, string c)
 {
+    cout << "in test2" << endl;
     cout << a << ", " << b << ", " << c << endl;
 }
 
 void test3(string a, int b, string c)
 {
+    cout << "in test3" << endl;
     cout << a << ", " << b << ", " << c << endl;
 }
 
 void test4(string a, int b, string c)
 {
+    cout << "in test4" << endl;
     cout << a << "," << b << "," << c << endl;
 }
 
@@ -740,6 +753,8 @@ int main()
         upvalue++;
         cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
     });
+    /*无lambda回调*/
+    rpc.call("test4", "a", 1, "b");
 
     /*模拟(被调用方)触发调用方的lambda函数*/
     {
