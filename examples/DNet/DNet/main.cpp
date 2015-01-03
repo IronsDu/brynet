@@ -3,12 +3,45 @@
 #include <stdio.h>
 #include <thread>
 #include <iostream>
+#include <assert.h>
 
 #include "eventloop.h"
 #include "datasocket.h"
 #include "platform.h"
 #include "socketlibtypes.h"
 #include "systemlib.h"
+
+#if defined PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h> // GetTickCount()
+#else
+#include <unistd.h>
+#include <sys/time.h> // struct timeval, gettimeofday()
+#endif
+
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+int64_t
+ox_getnowtime(void)
+{
+#if defined PLATFORM_WINDOWS
+    int64_t second = time(NULL);
+    SYSTEMTIME sys;
+    GetLocalTime(&sys);
+    return second * 1000 + sys.wMilliseconds;
+#elif defined(ENABLE_RDTSC)
+    return (unsigned int)((_rdtsc() - RDTSC_BEGINTICK) / RDTSC_CLOCK);
+#elif (defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK) /* posix compliant */) || (defined(__FreeBSD_cc_version) && __FreeBSD_cc_version >= 500005 /* FreeBSD >= 5.1.0 */)
+    struct timespec tval;
+    clock_gettime(CLOCK_MONOTONIC, &tval);
+    return tval.tv_sec * 1000 + tval.tv_nsec / 1000000;
+#else
+    struct timeval tval;
+    gettimeofday(&tval, NULL);
+    return tval.tv_sec * 1000 + tval.tv_usec / 1000;
+#endif
+}
 
 int
 ox_socket_connect(const char* server_ip, int port)
@@ -37,20 +70,27 @@ ox_socket_connect(const char* server_ip, int port)
 #include "TCPServer.h"
 #include "rwlist.h"
 
+enum NetMsgType
+{
+    NMT_ENTER,      /*链接进入*/
+    NMT_CLOSE,      /*链接断开*/
+    NMT_RECV_DATA,  /*收到消息*/
+};
+
 struct NetMsg
 {
-    NetMsg(int t, int64_t id) : mType(t), mID(id)
+    NetMsg(NetMsgType t, int64_t id) : mType(t), mID(id)
     {
     }
 
     void        setData(const char* data, int len)
     {
-        mData = string(data, len);
+        mData = std::string(data, len);
     }
 
-    int         mType;
+    NetMsgType  mType;
     int64_t     mID;
-    string      mData;
+    std::string      mData;
 };
 
 #include <chrono>
@@ -68,6 +108,8 @@ void    unLockStatistics()
     gTatisticsCppMutex.unlock();
 }
 
+#define TEST_PORT 5999
+
 int main()
 {
     double total_recv_len = 0;
@@ -77,14 +119,14 @@ int main()
     int thread_num;
     int packet_len;
 
-    cout << "enter client num:";
-    cin >> client_num;
+    std::cout << "enter client num:";
+    std::cin >> client_num;
 
-    cout << "enter thread num:";
-    cin >> thread_num;
+    std::cout << "enter thread num:";
+    std::cin >> thread_num;
 
-    cout << "enter packet len:";
-    cin >> packet_len;
+    std::cout << "enter packet len:";
+    std::cin >> packet_len;
 #ifdef PLATFORM_WINDOWS
     WSADATA g_WSAData;
     WSAStartup(MAKEWORD(2, 2), &g_WSAData);
@@ -99,7 +141,7 @@ int main()
     /*  TODO::怎么优化消息队列，网络层没有不断的flush消息队列，然而又不能在每个消息发送都强制flush，当然逻辑层也可以采取主动拉的方式。去强制拉过来   */
     /*  TODO::把(每个IO线程一个消息队列)消息队列隐藏到TCPServer中。 对用户不可见    */
     /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
-    TcpServer t(5999, thread_num, [&](EventLoop& l){
+    TcpServer t(TEST_PORT, thread_num, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         if (true)
         {
@@ -114,10 +156,9 @@ int main()
         }
     });
     t.setEnterHandle([&](int64_t id){
-        /*Linux下有宕机问题*/
         if (true)
         {
-            NetMsg* msg = new NetMsg(0, id);
+            NetMsg* msg = new NetMsg(NMT_ENTER, id);
             lockStatistics();
             msgList.Push(msg);
             unLockStatistics();
@@ -135,7 +176,7 @@ int main()
     t.setDisconnectHandle([&](int64_t id){
         if (true)
         {
-            NetMsg* msg = new NetMsg(1, id);
+            NetMsg* msg = new NetMsg(NMT_CLOSE, id);
             lockStatistics();
             msgList.Push(msg);
             unLockStatistics();
@@ -153,7 +194,7 @@ int main()
     t.setMsgHandle([&](int64_t id, const char* buffer, int len){
         if (true)
         {
-            NetMsg* msg = new NetMsg(2, id);
+            NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
             msg->setData(buffer, len);
             lockStatistics();
             msgList.Push(msg);
@@ -185,7 +226,7 @@ int main()
 
             for (int i = 0; i < client_num; i++)
             {
-                int client = ox_socket_connect("127.0.0.1", 5999);
+                int client = ox_socket_connect("127.0.0.1", TEST_PORT);
                 if (client == SOCKET_ERROR)
                 {
                     printf("error : %d \n", sErrno);
@@ -193,7 +234,7 @@ int main()
                 printf("connect fd: %d\n", client);
                 int flag = 1;
                 int setret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
-                cout << setret << endl;
+                std::cout << setret << std::endl;
 
                 clientEventLoop.addConnection(client, new DataSocket(client), [&](Channel* arg){
                     DataSocket* ds = static_cast<DataSocket*>(arg);
@@ -228,21 +269,25 @@ int main()
             bool ret = msgList.PopFront(&msg);
             if (ret)
             {
-                if (msg->mType == 0)
+                if (msg->mType == NMT_ENTER)
                 {
                     printf("client %lld enter \n", msg->mID);
                     total_client_num++;
                 }
-                else if (msg->mType == 1)
+                else if (msg->mType == NMT_CLOSE)
                 {
                     printf("client %lld close \n", msg->mID);
                     total_client_num--;
                 }
-                else
+                else if (msg->mType == NMT_RECV_DATA)
                 {
                     t.send(msg->mID, DataSocket::makePacket(msg->mData.c_str(), msg->mData.size()));
                     total_recv_len += msg->mData.size();
                     packet_num++;
+                }
+                else
+                {
+                    assert(false);
                 }
 
                 delete msg;
@@ -256,7 +301,7 @@ int main()
         int64_t now = ox_getnowtime();
         if ((now - lasttime) >= 1000)
         {
-            cout << "recv by clientnum:" << total_client_num << " of :" << (total_recv_len / 1024) / 1024 << " M / s, " << "packet num : " << packet_num  << endl;
+            std::cout << "recv by clientnum:" << total_client_num << " of :" << (total_recv_len / 1024) / 1024 << " M / s, " << "packet num : " << packet_num << std::endl;
             lasttime = now;
             total_recv_len = 0;
             packet_num = 0;

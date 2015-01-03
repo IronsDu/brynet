@@ -1,9 +1,6 @@
 #ifndef _TCP_SERVER_H
 #define _TCP_SERVER_H
 
-#include "eventloop.h"
-#include "datasocket.h"
-
 #include <vector>
 #include <assert.h>
 
@@ -86,6 +83,9 @@ private:
     std::vector<T*>     mValues;
     std::vector<size_t> mIds;
 };
+
+class EventLoop;
+class DataSocket;
 
 class TcpServer
 {

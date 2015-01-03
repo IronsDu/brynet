@@ -1,14 +1,7 @@
 #include <iostream>
-using namespace std;
 
-#include "platform.h"
-#ifdef PLATFORM_WINDOWS
-#else
-#include <sys/uio.h>
-#endif
-
-#include "eventloop.h"
 #include "socketlibtypes.h"
+#include "eventloop.h"
 #include "datasocket.h"
 
 DataSocket::DataSocket(int fd)
@@ -26,8 +19,8 @@ DataSocket::DataSocket(int fd)
     memset(&mOvlRecv, sizeof(mOvlRecv), 0);
     memset(&mOvlSend, sizeof(mOvlSend), 0);
 
-    mOvlRecv.base.Offset = OVL_RECV;
-    mOvlSend.base.Offset = OVL_SEND;
+    mOvlRecv.base.Offset = EventLoop::OVL_RECV;
+    mOvlSend.base.Offset = EventLoop::OVL_SEND;
 #else
     ioctl(fd, FIONBIO, &ul);
 #endif
@@ -362,5 +355,5 @@ int64_t DataSocket::getUserData() const
 
 DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, int len)
 {
-    return std::make_shared<string>(buffer, len);
+    return std::make_shared<std::string>(buffer, len);
 }

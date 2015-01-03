@@ -1,12 +1,9 @@
-#include "eventloop.h"
-#include "channel.h"
-#include "socketlibtypes.h"
-
 #include <iostream>
 #include <assert.h>
 #include <thread>
 
-using namespace std;
+#include "channel.h"
+#include "eventloop.h"
 
 class WakeupChannel : public Channel
 {
@@ -67,7 +64,7 @@ EventLoop::EventLoop()
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
     memset(&mWakeupOvl, sizeof(mWakeupOvl), 0);
-    mWakeupOvl.Offset = OVL_RECV;
+    mWakeupOvl.Offset = EventLoop::OVL_RECV;
     mWakeupChannel = new WakeupChannel(-1);
 #else
     mEpollFd = epoll_create(1);
@@ -110,11 +107,11 @@ void EventLoop::loop(int64_t timeout)
         for (ULONG i = 0; i < numComplete; ++i)
         {
             Channel* ds = (Channel*)mEventEntries[i].lpCompletionKey;
-            if (mEventEntries[i].lpOverlapped->Offset == OVL_RECV)
+            if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_RECV)
             {
                 ds->canRecv();
             }
-            else if (mEventEntries[i].lpOverlapped->Offset == OVL_SEND)
+            else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_SEND)
             {
                 ds->canSend();
             }
@@ -124,7 +121,7 @@ void EventLoop::loop(int64_t timeout)
     {
         //cout << this << " error code:" << GetLastError() << endl;
     }
-#else;
+#else
     int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, timeout);
     mIsAlreadyPostedWakeUp = false;
     mInWaitIOEvent = false;
@@ -153,6 +150,7 @@ void EventLoop::loop(int64_t timeout)
         }
     }
 #endif
+
     /*TODO::放在mAsyncProcs之前，是因为要在上层投递异步关闭之前处理io线程收集到的socket断开，否则容易出现断错误*/
     for (auto& x : mAfterLoopProcs)
     {
@@ -160,7 +158,7 @@ void EventLoop::loop(int64_t timeout)
     }
     mAfterLoopProcs.clear();
 
-    vector<USER_PROC> temp;
+    std::vector<USER_PROC> temp;
     mAsyncListMutex.lock();
     temp.swap(mAsyncProcs);
     mAsyncListMutex.unlock();

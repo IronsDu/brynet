@@ -1,20 +1,20 @@
 #ifndef _DATASOCKET_H
 #define _DATASOCKET_H
 
-#include "eventloop.h"
-#include "channel.h"
-
 #include <memory>
 #include <functional>
 #include <deque>
-using namespace std;
+
+#include "channel.h"
+
+class EventLoop;
 
 class DataSocket : public Channel
 {
 public:
-    typedef function<void(DataSocket*, const char* buffer, int len)>    DATA_PROC;
-    typedef function<void(DataSocket*)>                                 DISCONNECT_PROC;
-    typedef std::shared_ptr<string>                                     PACKET_PTR;
+    typedef std::function<void(DataSocket*, const char* buffer, int len)>    DATA_PROC;
+    typedef std::function<void(DataSocket*)>                                 DISCONNECT_PROC;
+    typedef std::shared_ptr<std::string>                                     PACKET_PTR;
 
 public:
     DataSocket(int fd);
@@ -26,6 +26,7 @@ public:
     void                            sendPacket(const PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&&);
+
     void                            setDataHandle(DATA_PROC proc);
     void                            setDisConnectHandle(DISCONNECT_PROC proc);
 
@@ -53,16 +54,15 @@ private:
 
     void                            freeSendPacketList();
 private:
-#ifdef PLATFORM_WINDOWS
+    #ifdef PLATFORM_WINDOWS
+    #include <windows.h>
     struct ovl_ext_s
     {
         OVERLAPPED  base;
     };
     struct ovl_ext_s                mOvlRecv;
     struct ovl_ext_s                mOvlSend;
-#else
-
-#endif
+    #endif
 
     int                             mFD;
     EventLoop*                      mEventLoop;

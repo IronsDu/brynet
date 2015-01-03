@@ -7,8 +7,11 @@
 #include <iostream>
 #include <exception>
 
-#include "platform.h"
 #include "socketlibtypes.h"
+
+#include "eventloop.h"
+#include "datasocket.h"
+
 #include "TCPServer.h"
 
 int
@@ -55,7 +58,7 @@ TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
     for (int i = 0; i < mLoopNum; ++i)
     {
         EventLoop& l = mLoops[i];
-        mIOThreads[i] = new thread([&l, callback](){
+        mIOThreads[i] = new std::thread([&l, callback](){
             l.restoreThreadID();
             while (true)
             {

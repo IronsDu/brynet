@@ -11,6 +11,8 @@
 #include <errno.h>
 
 #elif defined PLATFORM_LINUX
+#include <signal.h>
+#include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -22,6 +24,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/eventfd.h>
+#include <sys/uio.h>
 #endif
 
 #if defined PLATFORM_WINDOWS
