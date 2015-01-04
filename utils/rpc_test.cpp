@@ -11,6 +11,19 @@
 
 using namespace std;
 
+template <typename T>
+class HasCallOperator
+{
+    typedef char _One;
+    typedef struct{ char a[2]; }_Two;
+    template<typename T>
+    static _One hasFunc(decltype(&T::operator()));
+    template<typename T>
+    static _Two hasFunc(...);
+public:
+    static const bool value = sizeof(hasFunc<T>(nullptr)) == sizeof(_One);
+};
+
 namespace dodo
 {
     class Utils
@@ -421,89 +434,6 @@ namespace dodo
         map<int, void*>         mRealLambdaPtr;
     };
 
-    template<typename TESTTYPE>
-    struct TypeIsLambda
-    {
-        template<typename TESTTYPE>
-        struct _Select
-        {
-            enum
-            {
-                value = true
-            };
-        };
-
-        template<>
-        struct _Select<int>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<const char*>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<string>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<vector<int>>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<vector<string>>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<map<string, string>>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<map<int, string>>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-        template<>
-        struct _Select<map<string, int>>
-        {
-            enum
-            {
-                value = false
-            };
-        };
-
-        enum
-        {
-            Result = _Select<TESTTYPE>::value
-        };
-    };
-
     template<bool>
     struct SelectWriteArg;
 
@@ -625,7 +555,7 @@ namespace dodo
         template<typename ARGTYPE>
         void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
         {
-            SelectWriteArg<TypeIsLambda<ARGTYPE>::Result>::Write(mLambdaMgr, parms, arg, index);
+            SelectWriteArg<HasCallOperator<ARGTYPE>::value>::Write(mLambdaMgr, parms, arg, index);
         }
 
     private:
