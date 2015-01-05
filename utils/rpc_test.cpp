@@ -29,35 +29,51 @@ namespace dodo
     class Utils
     {
     public:
-        template<typename T>
-        T static readJson(JsonObject& msg, const char* key);
+		template<typename U, typename V>
+		void static readJson(JsonObject& msg, const char* key, map<U, V>& tmp)
+		{
+			/*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
+			JsonObject mapObject = msg.getObject(key);
+			/*遍历此map的jsonobject*/
+			for (Json::Value::const_iterator it = mapObject.begin(); it != mapObject.end(); ++it)
+			{
+				/*根据此索引的key，从map的jsonobject里读取对应的value*/
+				V tv;
+				Json::Value vkey = it.key();
+				readJson(mapObject, vkey.asString().c_str(), tv);
 
-        template<>
-        char static readJson<char>(JsonObject& msg, const char* key)
+				/*把json中的key(总是string)转换到真实的key(int或string)*/
+				U realKey;
+				stringstream ss;
+				ss << vkey.asString();
+				ss >> realKey;
+
+				/*把value放入到结果map中*/
+				tmp[realKey] = tv;
+			}	
+		}
+
+        void static readJson(JsonObject& msg, const char* key, char& tmp)
         {
-            return msg.getInt(key);
+			tmp = msg.getInt(key);
         }
 
-        template<>
-        int static readJson<int>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, int& tmp)
         {
-            return msg.getInt(key);
+			tmp = msg.getInt(key);
         }
 
-        template<>
-        JsonObject static readJson<JsonObject>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, JsonObject& tmp)
         {
-            return msg.getObject(key);
+            tmp = msg.getObject(key);
         }
 
-        template<>
-        string static readJson<string>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, string& tmp)
         {
-            return msg.getStr(key);
+            tmp = msg.getStr(key);
         }
 
-        template<>
-        vector<int> static readJson<vector<int>>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, vector<int>& tmp)
         {
             vector<int> ret;
             JsonObject arrayJson = msg.getObject(key);
@@ -68,11 +84,10 @@ namespace dodo
                 JsonObject valueObject = arrayJson.getByIndex(i);
                 ret.push_back(atoi(valueObject.toString().c_str()));
             }
-            return ret;
+			tmp = ret;
         }
 
-        template<>
-        vector<string> static readJson<vector<string>>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, vector<string>& tmp)
         {
             vector<string> ret;
             JsonObject arrayJson = msg.getObject(key);
@@ -83,11 +98,10 @@ namespace dodo
                 JsonObject valueObject = arrayJson.getByIndex(i);
                 ret.push_back(valueObject.getJsonValue().asString());
             }
-            return ret;
+			tmp = ret;
         }
 
-        template<>
-        map<string, string> static readJson<map<string, string>>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, map<string, string>& tmp)
         {
             map<string, string> ret;
             JsonObject mapJson = msg.getObject(key);
@@ -98,11 +112,10 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[vkey.asString()] = vvalue.asString();
             }
-            return ret;
+			tmp = ret;
         }
 
-        template<>
-        map<int, string> static readJson<map<int, string>>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, map<int, string>& tmp)
         {
             map<int, string> ret;
             JsonObject mapJson = msg.getObject(key);
@@ -113,11 +126,10 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[atoi(vkey.asString().c_str())] = vvalue.asString();
             }
-            return ret;
+			tmp = ret;
         }
 
-        template<>
-        map<string, int> static readJson<map<string, int>>(JsonObject& msg, const char* key)
+		void static readJson(JsonObject& msg, const char* key, map<string, int>& tmp)
         {
             map<string, int> ret;
             JsonObject mapJson = msg.getObject(key);
@@ -128,7 +140,7 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[vkey.asString()] = vvalue.asInt();
             }
-            return ret;
+            tmp = ret;
         }
 
         template<typename T>
@@ -136,39 +148,33 @@ namespace dodo
         {
             stringstream ss;
             ss << index;
-            return readJson<T>(msg, ss.str().c_str());
+			T tmp;
+            readJson(msg, ss.str().c_str(), tmp);
+			return tmp;
         }
 
     public:
-        template<typename T>
-        void    static  writeJson(JsonObject& msg, T t, const char* key){}
-
-        template<>
-        void    static  writeJson<int>(JsonObject& msg, int value, const char* key)
+        void    static  writeJson(JsonObject& msg, int value, const char* key)
         {
             msg.setInt(key, value);
         }
 
-        template<>
-        void    static  writeJson<const char*>(JsonObject& msg, const char* value, const char* key)
+        void    static  writeJson(JsonObject& msg, const char* value, const char* key)
         {
             msg.setStr(key, value);
         }
 
-        template<>
-        void    static  writeJson<string>(JsonObject& msg, string value, const char* key)
+        void    static  writeJson(JsonObject& msg, string value, const char* key)
         {
             msg.setStr(key, value.c_str());
         }
 
-        template<>
-        void    static  writeJson<JsonObject>(JsonObject& msg, JsonObject value, const char* key)
+        void    static  writeJson(JsonObject& msg, JsonObject value, const char* key)
         {
             msg.setObject(key, value);
         }
 
-        template<>
-        void    static  writeJson<vector<int>>(JsonObject& msg, vector<int> value, const char* key)
+        void    static  writeJson(JsonObject& msg, vector<int> value, const char* key)
         {
             JsonObject arrayObject;
             for (size_t i = 0; i < value.size(); ++i)
@@ -178,8 +184,24 @@ namespace dodo
             msg.setObject(key, arrayObject);
         }
 
-        template<>
-        void    static  writeJson<vector<string>>(JsonObject& msg, vector<string> value, const char* key)
+		template<typename T, typename V>
+		void	static	writeJson(JsonObject& msg, map<T, V> value, const char* key)
+		{
+			JsonObject mapObject;
+			/*遍历此map*/
+			for (map<T, V>::iterator it = value.begin(); it != value.end(); ++it)
+			{
+				stringstream ss;
+				ss << it->first;
+				/*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
+				writeJson(mapObject, it->second, ss.str().c_str());
+			}
+
+			/*把此map添加到msg中*/
+			msg.setObject(key, mapObject);
+		}
+
+        void    static  writeJson(JsonObject& msg, vector<string> value, const char* key)
         {
             JsonObject arrayObject;
             for (size_t i = 0; i < value.size(); ++i)
@@ -189,8 +211,7 @@ namespace dodo
             msg.setObject(key, arrayObject);
         }
 
-        template<>
-        void    static  writeJson<map<string, string>>(JsonObject& msg, map<string, string> value, const char* key)
+        void    static  writeJson(JsonObject& msg, map<string, string> value, const char* key)
         {
             JsonObject mapObject;
             map<string, string>::iterator itend = value.end();
@@ -201,8 +222,7 @@ namespace dodo
             msg.setObject(key, mapObject);
         }
 
-        template<>
-        void    static  writeJson<map<int, string>>(JsonObject& msg, map<int, string> value, const char* key)
+        void    static  writeJson(JsonObject& msg, map<int, string> value, const char* key)
         {
             JsonObject mapObject;
             map<int, string>::iterator itend = value.end();
@@ -215,8 +235,7 @@ namespace dodo
             msg.setObject(key, mapObject);
         }
 
-        template<>
-        void    static  writeJson<map<string, int>>(JsonObject& msg, map<string, int> value, const char* key)
+        void    static  writeJson(JsonObject& msg, map<string, int> value, const char* key)
         {
             JsonObject mapObject;
             map<string, int>::iterator itend = value.end();
@@ -232,7 +251,7 @@ namespace dodo
         {
             stringstream ss;
             ss << index;
-            writeJson<T>(msg, t, ss.str().c_str());
+            writeJson(msg, t, ss.str().c_str());
         }
     };
 
@@ -562,7 +581,6 @@ namespace dodo
 
     private:
 
-
         /*如果是lambda则加入回调管理器，否则添加到rpc参数*/
         template<typename ARGTYPE>
         void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
@@ -732,11 +750,11 @@ void test4(string a, int b, string c)
     cout << a << "," << b << "," << c << endl;
 }
 
-void test5(string a, int b, string c, map<string, string> vlist)
+void test5(string a, int b, map<int, map<int, string>> vlist)
 {
 }
 
-void test6(string a, int b, string c, map<string, int> vlist)
+void test6(string a, int b, map<string, int> vlist)
 {
 }
 
@@ -745,16 +763,26 @@ int main()
     int upvalue = 10;
     using namespace dodo;
     rpc rpc;
-    rpc.def("test4", test4);
+	rpc.def("test4", test4);
+	rpc.def("test5", test5);
 
-    map<int, string> vlist = { { 1, "Li" }, { 2, "Deng" } };
+	map<int, string> t1;
+	t1[1] = "Li";
+
+	map<int, string> t2;
+	t2[2] = "Deng";
+
+	map<int, map<int, string>> vlist;
+
+	vlist[100] = t1;
+	vlist[200] = t2;
 
     /*调用远程函数,并设置lambda回调函数*/
-    rpc.call("test4", "a", 1, "b", [&upvalue](int a, int b){
+    rpc.call("test5", "a", 1, vlist, [&upvalue](int a, int b){
         upvalue++;
         cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << endl;
     });
-    rpc.call("test4", "a", 1, "b", [&upvalue](string a, string b, int c){
+	rpc.call("test5", "a", 1, vlist, [&upvalue](string a, string b, int c){
         upvalue++;
         cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
     });
