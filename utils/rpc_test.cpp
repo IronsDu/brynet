@@ -45,6 +45,12 @@ namespace dodo
         }
 
         template<>
+        JsonObject static readJson<JsonObject>(JsonObject& msg, const char* key)
+        {
+            return msg.getObject(key);
+        }
+
+        template<>
         string static readJson<string>(JsonObject& msg, const char* key)
         {
             return msg.getStr(key);
@@ -153,6 +159,12 @@ namespace dodo
         void    static  writeJson<string>(JsonObject& msg, string value, const char* key)
         {
             msg.setStr(key, value.c_str());
+        }
+
+        template<>
+        void    static  writeJson<JsonObject>(JsonObject& msg, JsonObject value, const char* key)
+        {
+            msg.setObject(key, value);
         }
 
         template<>
