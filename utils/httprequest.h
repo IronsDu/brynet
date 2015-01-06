@@ -1,6 +1,7 @@
 #ifndef _HTTPREQUEST_H
 #define _HTTPREQUEST_H
 
+#include <assert.h>
 #include <string>
 using namespace std;
 
@@ -24,9 +25,19 @@ public:
         m_host = host;
     }
 
+    void        setCookie(const char* v)
+    {
+        m_cookie = v;
+    }
+
     void        setRequestUrl(const char* url)
     {
         m_url = url;
+    }
+
+    void        addParameter(const char* v)
+    {
+        m_parameter += v;
     }
 
     void        addParameter(const char* k, const char* v)
@@ -68,11 +79,18 @@ public:
         ret += m_host;
         ret += "\r\n";
 
+        if(!m_cookie.empty())
+        {
+            ret += "Cookie: ";
+            ret += m_cookie;
+            ret += "\r\n";
+        }
+
         if(m_eProtocol == HRP_POST)
         {
             ret += "Content-Length: ";
             char temp[1024];
-            sprintf(temp, "%d", m_parameter.size());
+            sprintf_s(temp, 1024, "%d", m_parameter.size());
             ret += temp;
             ret += "\r\n";
 
@@ -95,6 +113,7 @@ private:
     string                  m_url;
     HTTPREQUEST_PROTOCOL    m_eProtocol;
     string                  m_parameter;
+    string                  m_cookie;
 };
 
 #endif

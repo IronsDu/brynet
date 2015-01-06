@@ -63,7 +63,6 @@ static void foo2(int a, int b)
 #include <set>
 
 #include "cpp_connection.h"
-#include "httprequest.h"
 
 
 string static getipofhost(const char* host)
@@ -94,75 +93,14 @@ int index = 0;
 
 int main()
 {
-    /*  toto:让用户自定义ud   */
-    CppServer cserver;
-    cserver.create(5999, 1, 1024, [](CppServer&, void* ud, const char* buffer, int len){
-        return len;
-    });
-
-    cserver.setMsgHandle([](CppServer& server, struct nrmgr_net_msg* msg){
-        printf("收到消息:%d\n", msg->type);
-    });
-
+    int i = 0;
     while (true)
     {
-        cserver.logicPoll(1);
+        i++;
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
+
+        cout << "i is " << i << endl;
     }
-
-    cin.get();
-    pmm = (char*)malloc(110599);
-    memset(pmm, 0, 110599);
-    ox_socket_init();
-    NetConnection ncc;
-    ncc.create(10024, 10024);
-    ncc.setCheckPacketHandle([](const char* buffer, int len)
-        {
-        /*  收到任意数据都认为已收到完整消息包   */
-        return len;
-    });
-
-    ncc.setMsgHandle([&ncc](struct msg_data_s* msg)
-    {
-        if (msg->type == net_msg_establish)
-        {
-            printf("链接服务器成功\n");
-
-            HttpRequest hr;
-            hr.setHost("sx.co3g.com");
-            hr.setRange(100, 200);
-            hr.setRequestUrl("/bag/1.2/1.png");
-            hr.setProtocol(HRP_GET);
-            ncc.sendData(hr.getResult().c_str(), hr.getResult().size() + 1);    /*  发送数据    */
-        }
-        else if (msg->type == net_msg_data)
-        {
-            printf("接收到数据为: %s \n", msg->data);
-            memcpy(pmm+index, msg->data, msg->len);
-            index += msg->len;
-            //ncc.sendDisconnect();   /*  断开连接    */
-        }
-    });
-
-    ncc.sendConnect(getipofhost("sx.co3g.com").c_str(), 80, 1000); /*  请求链接,超时一秒    */
-
-    std::thread net_thread([&ncc](){
-
-        while (true)
-        {
-            ncc.netPoll(1);
-        }
-    });
-
-    std::thread logic_thread([&ncc](){
-
-        while (true)
-        {
-            ncc.logicPoll(1);
-        }
-    });
-
-    set<int> fuckset;
-
     cin.get();
     
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -170,8 +108,6 @@ int main()
     auto    mr = make_shared<Rwlist<int>>();
     Rwlist<string>  aaaaa;
     aaaaa.Push("hal");
-    int ffff = *fuckset.begin();
-    cout << ffff << endl;
     {
         mr->Push(1);
         mr->ForceSyncWrite();
@@ -223,6 +159,7 @@ int main()
             }
         }, mr);
 
+
         auto tmp = t.AddTimer(3000, [](){
             cout << "3000 " <<  endl;
         });
@@ -267,7 +204,9 @@ int main()
         Haha* haha = new Haha;
         t.AddTimer(1000, foo1, 1, "hello");
         t.AddTimer(1000, foo);
-        t.AddTimer(1000, &Haha::test, haha, 1);
+        auto temp = t.AddTimer(1000, &Haha::test, haha, 1);
+        delete haha;
+        temp.cancel();
 
         while (true)
         {
