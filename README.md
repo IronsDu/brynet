@@ -4,12 +4,14 @@
 * C语言部分(common和net目录):
     * 网络库
     * 基础数据结构
+    * 定时器(使用id)
     * 线程相关(线程池,线程间消息队列)
     * 协程
 * C++部分(cpp_common和cpp_net目录):
     * 网络库
-    * 定时器
+    * 定时器(使用weak_tr)
 * 其他(utils目录)
     * C++版本RPC
     * 动态序列化Protocol Buffer
     * 读取lua table.
+    * AOI模块
