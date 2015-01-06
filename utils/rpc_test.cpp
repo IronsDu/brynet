@@ -29,51 +29,51 @@ namespace dodo
     class Utils
     {
     public:
-		template<typename U, typename V>
-		void static readJson(JsonObject& msg, const char* key, map<U, V>& tmp)
-		{
-			/*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
-			JsonObject mapObject = msg.getObject(key);
-			/*遍历此map的jsonobject*/
-			for (Json::Value::const_iterator it = mapObject.begin(); it != mapObject.end(); ++it)
-			{
-				/*根据此索引的key，从map的jsonobject里读取对应的value*/
-				V tv;
-				Json::Value vkey = it.key();
-				readJson(mapObject, vkey.asString().c_str(), tv);
+        template<typename U, typename V>
+        void static readJson(JsonObject& msg, const char* key, map<U, V>& tmp)
+        {
+            /*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
+            JsonObject mapObject = msg.getObject(key);
+            /*遍历此map的jsonobject*/
+            for (Json::Value::const_iterator it = mapObject.begin(); it != mapObject.end(); ++it)
+            {
+                /*根据此索引的key，从map的jsonobject里读取对应的value*/
+                V tv;
+                Json::Value vkey = it.key();
+                readJson(mapObject, vkey.asString().c_str(), tv);
 
-				/*把json中的key(总是string)转换到真实的key(int或string)*/
-				U realKey;
-				stringstream ss;
-				ss << vkey.asString();
-				ss >> realKey;
+                /*把json中的key(总是string)转换到真实的key(int或string)*/
+                U realKey;
+                stringstream ss;
+                ss << vkey.asString();
+                ss >> realKey;
 
-				/*把value放入到结果map中*/
-				tmp[realKey] = tv;
-			}	
-		}
+                /*把value放入到结果map中*/
+                tmp[realKey] = tv;
+            }    
+        }
 
         void static readJson(JsonObject& msg, const char* key, char& tmp)
         {
-			tmp = msg.getInt(key);
+            tmp = msg.getInt(key);
         }
 
-		void static readJson(JsonObject& msg, const char* key, int& tmp)
+        void static readJson(JsonObject& msg, const char* key, int& tmp)
         {
-			tmp = msg.getInt(key);
+            tmp = msg.getInt(key);
         }
 
-		void static readJson(JsonObject& msg, const char* key, JsonObject& tmp)
+        void static readJson(JsonObject& msg, const char* key, JsonObject& tmp)
         {
             tmp = msg.getObject(key);
         }
 
-		void static readJson(JsonObject& msg, const char* key, string& tmp)
+        void static readJson(JsonObject& msg, const char* key, string& tmp)
         {
             tmp = msg.getStr(key);
         }
 
-		void static readJson(JsonObject& msg, const char* key, vector<int>& tmp)
+        void static readJson(JsonObject& msg, const char* key, vector<int>& tmp)
         {
             vector<int> ret;
             JsonObject arrayJson = msg.getObject(key);
@@ -84,10 +84,10 @@ namespace dodo
                 JsonObject valueObject = arrayJson.getByIndex(i);
                 ret.push_back(atoi(valueObject.toString().c_str()));
             }
-			tmp = ret;
+            tmp = ret;
         }
 
-		void static readJson(JsonObject& msg, const char* key, vector<string>& tmp)
+        void static readJson(JsonObject& msg, const char* key, vector<string>& tmp)
         {
             vector<string> ret;
             JsonObject arrayJson = msg.getObject(key);
@@ -98,10 +98,10 @@ namespace dodo
                 JsonObject valueObject = arrayJson.getByIndex(i);
                 ret.push_back(valueObject.getJsonValue().asString());
             }
-			tmp = ret;
+            tmp = ret;
         }
 
-		void static readJson(JsonObject& msg, const char* key, map<string, string>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<string, string>& tmp)
         {
             map<string, string> ret;
             JsonObject mapJson = msg.getObject(key);
@@ -112,10 +112,10 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[vkey.asString()] = vvalue.asString();
             }
-			tmp = ret;
+            tmp = ret;
         }
 
-		void static readJson(JsonObject& msg, const char* key, map<int, string>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<int, string>& tmp)
         {
             map<int, string> ret;
             JsonObject mapJson = msg.getObject(key);
@@ -126,10 +126,10 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[atoi(vkey.asString().c_str())] = vvalue.asString();
             }
-			tmp = ret;
+            tmp = ret;
         }
 
-		void static readJson(JsonObject& msg, const char* key, map<string, int>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<string, int>& tmp)
         {
             map<string, int> ret;
             JsonObject mapJson = msg.getObject(key);
@@ -148,9 +148,9 @@ namespace dodo
         {
             stringstream ss;
             ss << index;
-			T tmp;
+            T tmp;
             readJson(msg, ss.str().c_str(), tmp);
-			return tmp;
+            return tmp;
         }
 
     public:
@@ -184,22 +184,22 @@ namespace dodo
             msg.setObject(key, arrayObject);
         }
 
-		template<typename T, typename V>
-		void	static	writeJson(JsonObject& msg, map<T, V> value, const char* key)
-		{
-			JsonObject mapObject;
-			/*遍历此map*/
-			for (map<T, V>::iterator it = value.begin(); it != value.end(); ++it)
-			{
-				stringstream ss;
-				ss << it->first;
-				/*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
-				writeJson(mapObject, it->second, ss.str().c_str());
-			}
+        template<typename T, typename V>
+        void    static    writeJson(JsonObject& msg, map<T, V> value, const char* key)
+        {
+            JsonObject mapObject;
+            /*遍历此map*/
+            for (map<T, V>::iterator it = value.begin(); it != value.end(); ++it)
+            {
+                stringstream ss;
+                ss << it->first;
+                /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
+                writeJson(mapObject, it->second, ss.str().c_str());
+            }
 
-			/*把此map添加到msg中*/
-			msg.setObject(key, mapObject);
-		}
+            /*把此map添加到msg中*/
+            msg.setObject(key, mapObject);
+        }
 
         void    static  writeJson(JsonObject& msg, vector<string> value, const char* key)
         {
@@ -497,63 +497,31 @@ namespace dodo
             regFunctor(funname, func);
         }
 
-        template<typename PARM1>
-        void    call(const char* funname, PARM1 p1)
-        {
-            JsonObject msg;
-            msg.setStr("name", funname);
-            JsonObject parms;
-            int index = 0;
-            _selectWriteArg(parms, p1, index++);
+        void    writeCallArg(JsonObject& msg, int& index){}
 
-            handleMsg(msg.toString().c_str());
+        template<typename Arg>
+        void    writeCallArg(JsonObject& msg, int& index, const Arg& arg)
+        {
+            /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
+            _selectWriteArg(msg, arg, index++);
         }
 
-        template<typename PARM1, typename PARM2>
-        void    call(const char* funname, PARM1 p1, PARM2 p2)
+        template<typename Arg1, typename... Args>
+        void    writeCallArg(JsonObject& msg, int& index, const Arg1& arg1, const Args&... args)
         {
-            JsonObject msg;
-            msg.setStr("name", funname);
-
-            JsonObject parms;
-            int index = 0;
-            Utils::writeJsonByIndex(parms, p1, index++);
-            _selectWriteArg(parms, p2, index++);
-
-            msg.setObject("parm", parms);
-
-            handleMsg(msg.toString().c_str());
+            Utils::writeJsonByIndex(msg, arg1, index++);
+            writeCallArg(msg, index, args...);
         }
 
-        template<typename PARM1, typename PARM2, typename PARM3>
-        void    call(const char* funname, PARM1 p1, PARM2 p2, PARM3 p3)
+        template<typename... Args>
+        void    call(const char* funname, const Args&... args)
         {
             JsonObject msg;
             msg.setStr("name", funname);
 
             JsonObject parms;
             int index = 0;
-            Utils::writeJsonByIndex(parms, p1, index++);
-            Utils::writeJsonByIndex(parms, p2, index++);
-            _selectWriteArg(parms, p3, index++);
-
-            msg.setObject("parm", parms);
-
-            handleMsg(msg.toString().c_str());
-        }
-
-        template<typename PARM1, typename PARM2, typename PARM3, typename PARM4>
-        void    call(const char* funname, PARM1 p1, PARM2 p2, PARM3 p3, PARM4 p4)
-        {
-            JsonObject msg;
-            msg.setStr("name", funname);
-
-            JsonObject parms;
-            int index = 0;
-            Utils::writeJsonByIndex(parms, p1, index++);
-            Utils::writeJsonByIndex(parms, p2, index++);
-            Utils::writeJsonByIndex(parms, p3, index++);
-            _selectWriteArg(parms, p4, index++);
+            writeCallArg(parms, index, args...);
 
             msg.setObject("parm", parms);
 
@@ -680,41 +648,12 @@ namespace dodo
             }
         };
 
-        template<typename RVal>
-        void regFunctor(const char* funname, RVal(*func)())
+        template<typename RVal, typename ...Args>
+        void regFunctor(const char* funname, RVal(*func)(Args...))
         {
-            mWrapFunctions[funname] = functor<RVal>::invoke;
+            mWrapFunctions[funname] = functor<RVal, Args...>::invoke;
             mRealFunctions[funname] = func;
         }
-
-        template<typename RVal, typename PARM1>
-        void regFunctor(const char* funname, RVal(*func)(PARM1))
-        {
-            mWrapFunctions[funname] = functor<RVal, PARM1>::invoke;
-            mRealFunctions[funname] = func;
-        }
-
-        template<typename RVal, typename PARM1, typename PARM2>
-        void regFunctor(const char* funname, RVal(*func)(PARM1, PARM2))
-        {
-            mWrapFunctions[funname] = functor<RVal, PARM1, PARM2>::invoke;
-            mRealFunctions[funname] = func;
-        }
-
-        template<typename RVal, typename PARM1, typename PARM2, typename PARM3>
-        void regFunctor(const char* funname, RVal(*func)(PARM1, PARM2, PARM3))
-        {
-            mWrapFunctions[funname] = functor<RVal, PARM1, PARM2, PARM3>::invoke;
-            mRealFunctions[funname] = func;
-        }
-
-        template<typename RVal, typename PARM1, typename PARM2, typename PARM3, typename PARM4>
-        void regFunctor(const char* funname, RVal(*func)(PARM1, PARM2, PARM3, PARM4))
-        {
-            mWrapFunctions[funname] = functor<RVal, PARM1, PARM2, PARM3, PARM4>::invoke;
-            mRealFunctions[funname] = func;
-        }
-
     private:
         typedef void(*pf_wrap)(void* realFunc, const char* parmStr);
         map<string, pf_wrap>    mWrapFunctions; /*  包装函数表   */
@@ -763,26 +702,26 @@ int main()
     int upvalue = 10;
     using namespace dodo;
     rpc rpc;
-	rpc.def("test4", test4);
-	rpc.def("test5", test5);
+    rpc.def("test4", test4);
+    rpc.def("test5", test5);
 
-	map<int, string> t1;
-	t1[1] = "Li";
+    map<int, string> t1;
+    t1[1] = "Li";
 
-	map<int, string> t2;
-	t2[2] = "Deng";
+    map<int, string> t2;
+    t2[2] = "Deng";
 
-	map<int, map<int, string>> vlist;
+    map<int, map<int, string>> vlist;
 
-	vlist[100] = t1;
-	vlist[200] = t2;
+    vlist[100] = t1;
+    vlist[200] = t2;
 
     /*调用远程函数,并设置lambda回调函数*/
     rpc.call("test5", "a", 1, vlist, [&upvalue](int a, int b){
         upvalue++;
         cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << endl;
     });
-	rpc.call("test5", "a", 1, vlist, [&upvalue](string a, string b, int c){
+    rpc.call("test5", "a", 1, vlist, [&upvalue](string a, string b, int c){
         upvalue++;
         cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
     });
