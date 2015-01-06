@@ -6,6 +6,7 @@
 #include <map>
 #include <vector>
 #include <functional>
+#include <tuple>
 
 #include "json_object.h"
 
@@ -557,101 +558,53 @@ namespace dodo
         }
 
     private:
-        template<typename RVal, typename PARM1 = void, typename PARM2 = void, typename PARM3 = void, typename T4 = void, typename T5 = void, typename T6 = void, typename T7 = void>
-        struct functor
+        template<typename RVal, typename ...Args>
+        struct VariadicFunctor
         {
-            static void invoke(void* realfunc, const char* str);
-        };
-
-        template<typename RVal>
-        struct functor<RVal>
-        {
-            static void invoke(void* realfunc, const char* str)
+            static  void    invoke(void* realfunc, const char* str)
             {
-                typedef void(*pf_0parm)();
-                pf_0parm p = (pf_0parm)realfunc;
-                p();
+                JsonObject msg;
+                msg.read(str);
+                int parmIndex = 0;  /*parmIndex作为json中每个变量的key迭代器*/
+                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), realfunc, msg, parmIndex);
             }
-        };
 
-        template<typename RVal, typename PARM1>
-        struct functor<RVal, PARM1>
-        {
-            static void invoke(void* realfunc, const char* str)
+            template<int Size>
+            struct SizeType
             {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
-                int parmIndex = 0;
-                PARM1 parm1 = Utils::readJsonByIndex<PARM1>(jsonObject, parmIndex++);
-
-                typedef void(*pf_1parm)(PARM1);
-                pf_1parm p = (pf_1parm)realfunc;
-                p(parm1);
-            }
-        };
-
-        template<typename RVal, typename PARM1, typename PARM2>
-        struct functor<RVal, PARM1, PARM2>
-        {
-            static void invoke(void* realfunc, const char* str)
+                typedef int TYPE;
+            };
+            template<>
+            struct SizeType<0> 
             {
-                JsonObject jsonObject;
-                jsonObject.read(str);
+                typedef char TYPE;
+            };
 
-                int parmIndex = 0;
-                PARM1 parm1 = Utils::readJsonByIndex<PARM1>(jsonObject, parmIndex++);
-                PARM2 parm2 = Utils::readJsonByIndex<PARM2>(jsonObject, parmIndex++);
-
-                typedef void(*pf_2parm)(PARM1, PARM2);
-                pf_2parm p = (pf_2parm)realfunc;
-                p(parm1, parm2);
-            }
-        };
-
-        template<typename RVal, typename PARM1, typename PARM2, typename PARM3>
-        struct functor<RVal, PARM1, PARM2, PARM3>
-        {
-            static void invoke(void* realfunc, const char* str)
+            template<typename T, typename ...LeftArgs, typename ...NowArgs>
+            static  void    eval(int _, void* realfunc, JsonObject& msg, int& parmIndex, const NowArgs&... args)
             {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
-                int parmIndex = 0;
-                PARM1 parm1 = Utils::readJsonByIndex<PARM1>(jsonObject, parmIndex++);
-                PARM2 parm2 = Utils::readJsonByIndex<PARM2>(jsonObject, parmIndex++);
-                PARM3 parm3 = Utils::readJsonByIndex<PARM3>(jsonObject, parmIndex++);
-
-                typedef void(*pf_3parm)(PARM1, PARM2, PARM3);
-                pf_3parm p = (pf_3parm)realfunc;
-                p(parm1, parm2, parm3);
+                /*args为已经求值的参数列表*/
+                /*cur_arg为即将求值的参数*/
+                T cur_arg = Utils::readJsonByIndex<T>(msg, parmIndex++);
+                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), realfunc, msg, parmIndex, args..., cur_arg);
             }
-        };
 
-        template<typename RVal, typename PARM1, typename PARM2, typename PARM3, typename PARM4>
-        struct functor<RVal, PARM1, PARM2, PARM3, PARM4>
-        {
-            static void invoke(void* realfunc, const char* str)
+            template<typename ...NowArgs>
+            static  void    eval(char _, void* realfunc, JsonObject& msg, int& parmIndex, const NowArgs&... args)
             {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
-                int parmIndex = 0;
-                PARM1 parm1 = Utils::readJsonByIndex<PARM1>(jsonObject, parmIndex++);
-                PARM2 parm2 = Utils::readJsonByIndex<PARM2>(jsonObject, parmIndex++);
-                PARM3 parm3 = Utils::readJsonByIndex<PARM3>(jsonObject, parmIndex++);
-                PARM4 parm4 = Utils::readJsonByIndex<PARM4>(jsonObject, parmIndex++);
-
-                typedef void(*pf_4parm)(PARM1, PARM2, PARM3, PARM4);
-                pf_4parm p = (pf_4parm)realfunc;
-                p(parm1, parm2, parm3, parm4);
+                /*没有任何剩下的未知参数类型，那么 args 形参就是最终的所有参数，在此回调函数即可*/
+                typedef void(*pf)(NowArgs...);
+                pf p = (pf)realfunc;
+                p(args...);
             }
+
+        private:
         };
 
         template<typename RVal, typename ...Args>
         void regFunctor(const char* funname, RVal(*func)(Args...))
         {
-            mWrapFunctions[funname] = functor<RVal, Args...>::invoke;
+            mWrapFunctions[funname] = VariadicFunctor<RVal, Args...>::invoke;
             mRealFunctions[funname] = func;
         }
     private:
@@ -683,10 +636,10 @@ void test3(string a, int b, string c)
     cout << a << ", " << b << ", " << c << endl;
 }
 
-void test4(string a, int b, string c)
+void test4(string a, int b)
 {
     cout << "in test4" << endl;
-    cout << a << "," << b << "," << c << endl;
+    cout << a << "," << b <<  endl;
 }
 
 void test5(string a, int b, map<int, map<int, string>> vlist)
@@ -697,6 +650,9 @@ void test6(string a, int b, map<string, int> vlist)
 {
 }
 
+void test7()
+{}
+
 int main()
 {
     int upvalue = 10;
@@ -704,6 +660,7 @@ int main()
     rpc rpc;
     rpc.def("test4", test4);
     rpc.def("test5", test5);
+    rpc.def("test7", test7);
 
     map<int, string> t1;
     t1[1] = "Li";
@@ -716,6 +673,8 @@ int main()
     vlist[100] = t1;
     vlist[200] = t2;
 
+    rpc.call("test7");
+
     /*调用远程函数,并设置lambda回调函数*/
     rpc.call("test5", "a", 1, vlist, [&upvalue](int a, int b){
         upvalue++;
@@ -726,7 +685,7 @@ int main()
         cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
     });
     /*无lambda回调*/
-    rpc.call("test4", "a", 1, "b");
+    rpc.call("test4", "a", 1);
 
     /*模拟(被调用方)触发调用方的lambda函数*/
     {
