@@ -25,6 +25,17 @@ public:
     static const bool value = sizeof(hasFunc<T>(nullptr)) == sizeof(_One);
 };
 
+template<int Size>
+struct SizeType
+{
+    typedef int TYPE;
+};
+template<>
+struct SizeType<0>
+{
+    typedef char TYPE;
+};
+
 namespace dodo
 {
     class Utils
@@ -281,181 +292,45 @@ namespace dodo
             mNextID++;
         }
     private:
-        template<typename RVal, typename T, typename T1 = void, typename T2 = void, typename T3 = void, typename T4 = void, typename T5 = void, typename T6 = void, typename T7 = void>
-        struct LambdaFunctor
+        template<typename RVal, typename T, typename ...Args>
+        struct VariadicLambdaFunctor
         {
-            static int invoke(void* pvoid, const char* str)
-            {
-            }
-        };
-
-        template<typename RVal, typename T, typename T1, typename T2, typename T3, typename T4>
-        struct LambdaFunctor<RVal, T, T1, T2, T3, T4>
-        {
-        public:
-            LambdaFunctor(std::function<void(T1, T2, T3, T4)> f)
+            VariadicLambdaFunctor(std::function<void(Args...)> f)
             {
                 mf = f;
             }
 
             static void invoke(void* pvoid, const char* str)
             {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
+                JsonObject msg;
+                msg.read(str);
                 int parmIndex = 0;
-                T1 parm1 = Utils::readJsonByIndex<T1>(jsonObject, parmIndex++);
-                T2 parm2 = Utils::readJsonByIndex<T2>(jsonObject, parmIndex++);
-                T3 parm3 = Utils::readJsonByIndex<T3>(jsonObject, parmIndex++);
-                T4 parm4 = Utils::readJsonByIndex<T4>(jsonObject, parmIndex++);
-
-                LambdaFunctor<RVal, T, T1, T2, T3, T4>* pthis = (LambdaFunctor<RVal, T, T1, T2, T3, T4>*)pvoid;
-                (pthis->mf)(parm1, parm2, parm3, parm4);
+                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pvoid, msg, parmIndex);
             }
 
-        private:
-            std::function<void(T1, T2, T3, T4)>   mf;
-        };
-
-        template<typename RVal, typename T, typename T1, typename T2, typename T3>
-        struct LambdaFunctor<RVal, T, T1, T2, T3>
-        {
-        public:
-            LambdaFunctor(std::function<void(T1, T2, T3)> f)
+            template<typename T, typename ...LeftArgs, typename ...NowArgs>
+            static  void    eval(int _, void* pvoid, JsonObject& msg, int& parmIndex, const NowArgs&... args)
             {
-                mf = f;
+                T cur_arg = Utils::readJsonByIndex<T>(msg, parmIndex++);
+                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, msg, parmIndex, args..., cur_arg);
             }
 
-            static void invoke(void* pvoid, const char* str)
+            template<typename ...NowArgs>
+            static  void    eval(char _, void* pvoid, JsonObject& msg, int& parmIndex, const NowArgs&... args)
             {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
-                int parmIndex = 0;
-                T1 parm1 = Utils::readJsonByIndex<T1>(jsonObject, parmIndex++);
-                T2 parm2 = Utils::readJsonByIndex<T2>(jsonObject, parmIndex++);
-                T3 parm3 = Utils::readJsonByIndex<T3>(jsonObject, parmIndex++);
-
-                LambdaFunctor<RVal, T, T1, T2, T3>* pthis = (LambdaFunctor<RVal, T, T1, T2, T3>*)pvoid;
-                (pthis->mf)(parm1, parm2, parm3);
-            }
-
-        private:
-            std::function<void(T1, T2, T3)>   mf;
-        };
-
-        template<typename RVal, typename T, typename T1, typename T2>
-        struct LambdaFunctor<RVal, T, T1, T2>
-        {
-        public:
-            LambdaFunctor(std::function<void(T1, T2)> f)
-            {
-                mf = f;
-            }
-
-            static void invoke(void* pvoid, const char* str)
-            {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
-                int parmIndex = 0;
-                T1 parm1 = Utils::readJsonByIndex<T1>(jsonObject, parmIndex++);
-                T2 parm2 = Utils::readJsonByIndex<T2>(jsonObject, parmIndex++);
-
-                LambdaFunctor<RVal, T, T1, T2>* pthis = (LambdaFunctor<RVal, T, T1, T2>*)pvoid;
-                (pthis->mf)(parm1, parm2);
-            }
-
-        private:
-            std::function<void(T1, T2)>   mf;
-        };
-
-        template<typename RVal, typename T, typename T1>
-        struct LambdaFunctor<RVal, T, T1>
-        {
-        public:
-            LambdaFunctor(std::function<void(T1)> f)
-            {
-                mf = f;
-            }
-
-            static void invoke(void* pvoid, const char* str)
-            {
-                JsonObject jsonObject;
-                jsonObject.read(str);
-
-                int parmIndex = 0;
-                T1 parm1 = Utils::readJsonByIndex<T1>(jsonObject, parmIndex++);
-
-                LambdaFunctor<RVal, T, T1>* pthis = (LambdaFunctor<RVal, T, T1>*)pvoid;
-                (pthis->mf)(parm1, parm2);
+                VariadicLambdaFunctor<RVal, T, Args...>* pthis = (VariadicLambdaFunctor<RVal, T, Args...>*)pvoid;
+                (pthis->mf)(args...);
             }
         private:
-            std::function<void(T1)>   mf;
+            std::function<void(Args...)>   mf;
         };
 
-        template<typename RVal, typename T>
-        struct LambdaFunctor<RVal, T>
+        template<typename LAMBDA_OBJ_TYPE, typename RVal, typename ...Args>
+        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)(Args...) const)
         {
-        public:
-            LambdaFunctor(std::function<void(void)> f)
-            {
-                mf = f;
-            }
+            void* pbase = new VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>(obj);
 
-            static void invoke(void* pvoid, const char* str)
-            {
-                LambdaFunctor<RVal, T>* pthis = (LambdaFunctor<RVal, T>*)pvoid;
-                (pthis->mf)();
-            }
-
-        private:
-            std::function<void(void)>   mf;
-        };
-
-        template<typename LAMBDA_OBJ_TYPE, typename RVal>
-        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)() const)
-        {
-            void* pbase = new LambdaFunctor<void, LAMBDA_OBJ_TYPE>(obj);
-
-            mWrapFunctions[mNextID] = LambdaFunctor<void, LAMBDA_OBJ_TYPE>::invoke;
-            mRealLambdaPtr[mNextID] = pbase;
-        }
-
-
-        template<typename LAMBDA_OBJ_TYPE, typename RVal, typename T1>
-        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)(T1) const)
-        {
-            void* pbase = new LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1>(obj);
-
-            mWrapFunctions[mNextID] = LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1>::invoke;
-            mRealLambdaPtr[mNextID] = pbase;
-        }
-
-        template<typename LAMBDA_OBJ_TYPE, typename RVal, typename T1, typename T2>
-        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)(T1, T2) const)
-        {
-            void* pbase = new LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1, T2>(obj);
-
-            mWrapFunctions[mNextID] = LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1, T2>::invoke;
-            mRealLambdaPtr[mNextID] = pbase;
-        }
-
-        template<typename LAMBDA_OBJ_TYPE, typename RVal, typename T1, typename T2, typename T3>
-        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)(T1, T2, T3) const)
-        {
-            void* pbase = new LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1, T2, T3>(obj);
-
-            mWrapFunctions[mNextID] = LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1, T2, T3>::invoke;
-            mRealLambdaPtr[mNextID] = pbase;
-        }
-
-        template<typename LAMBDA_OBJ_TYPE, typename RVal, typename T1, typename T2, typename T3, typename T4>
-        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)(T1, T2, T3, T4) const)
-        {
-            void* pbase = new LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1, T2, T3, T4>(obj);
-
-            mWrapFunctions[mNextID] = LambdaFunctor<void, LAMBDA_OBJ_TYPE, T1, T2, T3, T4>::invoke;
+            mWrapFunctions[mNextID] = VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>::invoke;
             mRealLambdaPtr[mNextID] = pbase;
         }
     private:
@@ -568,17 +443,6 @@ namespace dodo
                 int parmIndex = 0;  /*parmIndex作为json中每个变量的key迭代器*/
                 eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), realfunc, msg, parmIndex);
             }
-
-            template<int Size>
-            struct SizeType
-            {
-                typedef int TYPE;
-            };
-            template<>
-            struct SizeType<0> 
-            {
-                typedef char TYPE;
-            };
 
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(int _, void* realfunc, JsonObject& msg, int& parmIndex, const NowArgs&... args)
