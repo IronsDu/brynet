@@ -12,59 +12,35 @@
 
 using namespace std;
 
-template <typename T>
-class HasCallOperator
-{
-    typedef char _One;
-    typedef struct{ char a[2]; }_Two;
-    template<typename T>
-    static _One hasFunc(decltype(&T::operator()));
-    template<typename T>
-    static _Two hasFunc(...);
-public:
-    static const bool value = sizeof(hasFunc<T>(nullptr)) == sizeof(_One);
-};
-
-template<int Size>
-struct SizeType
-{
-    typedef int TYPE;
-};
-template<>
-struct SizeType<0>
-{
-    typedef char TYPE;
-};
-
 namespace dodo
 {
+    template <typename T>
+    class HasCallOperator
+    {
+        typedef char _One;
+        typedef struct{ char a[2]; }_Two;
+        template<typename T>
+        static _One hasFunc(decltype(&T::operator()));
+        template<typename T>
+        static _Two hasFunc(...);
+    public:
+        static const bool value = sizeof(hasFunc<T>(nullptr)) == sizeof(_One);
+    };
+
+    template<int Size>
+    struct SizeType
+    {
+        typedef int TYPE;
+    };
+    template<>
+    struct SizeType<0>
+    {
+        typedef char TYPE;
+    };
+
     class Utils
     {
     public:
-        template<typename U, typename V>
-        void static readJson(JsonObject& msg, const char* key, map<U, V>& tmp)
-        {
-            /*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
-            JsonObject mapObject = msg.getObject(key);
-            /*遍历此map的jsonobject*/
-            for (Json::Value::const_iterator it = mapObject.begin(); it != mapObject.end(); ++it)
-            {
-                /*根据此索引的key，从map的jsonobject里读取对应的value*/
-                V tv;
-                Json::Value vkey = it.key();
-                readJson(mapObject, vkey.asString().c_str(), tv);
-
-                /*把json中的key(总是string)转换到真实的key(int或string)*/
-                U realKey;
-                stringstream ss;
-                ss << vkey.asString();
-                ss >> realKey;
-
-                /*把value放入到结果map中*/
-                tmp[realKey] = tv;
-            }    
-        }
-
         void static readJson(JsonObject& msg, const char* key, char& tmp)
         {
             tmp = msg.getInt(key);
@@ -111,6 +87,30 @@ namespace dodo
                 ret.push_back(valueObject.getJsonValue().asString());
             }
             tmp = ret;
+        }
+
+        template<typename U, typename V>
+        void static readJson(JsonObject& msg, const char* key, map<U, V>& tmp)
+        {
+            /*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
+            JsonObject mapObject = msg.getObject(key);
+            /*遍历此map的jsonobject*/
+            for (Json::Value::const_iterator it = mapObject.begin(); it != mapObject.end(); ++it)
+            {
+                /*根据此索引的key，从map的jsonobject里读取对应的value*/
+                V tv;
+                Json::Value vkey = it.key();
+                readJson(mapObject, vkey.asString().c_str(), tv);
+
+                /*把json中的key(总是string)转换到真实的key(int或string)*/
+                U realKey;
+                stringstream ss;
+                ss << vkey.asString();
+                ss >> realKey;
+
+                /*把value放入到结果map中*/
+                tmp[realKey] = tv;
+            }
         }
 
         void static readJson(JsonObject& msg, const char* key, map<string, string>& tmp)
@@ -196,6 +196,16 @@ namespace dodo
             msg.setObject(key, arrayObject);
         }
 
+        void    static  writeJson(JsonObject& msg, vector<string> value, const char* key)
+        {
+            JsonObject arrayObject;
+            for (size_t i = 0; i < value.size(); ++i)
+            {
+                arrayObject.appendStr(value[i].c_str());
+            }
+            msg.setObject(key, arrayObject);
+        }
+
         template<typename T, typename V>
         void    static    writeJson(JsonObject& msg, map<T, V> value, const char* key)
         {
@@ -211,16 +221,6 @@ namespace dodo
 
             /*把此map添加到msg中*/
             msg.setObject(key, mapObject);
-        }
-
-        void    static  writeJson(JsonObject& msg, vector<string> value, const char* key)
-        {
-            JsonObject arrayObject;
-            for (size_t i = 0; i < value.size(); ++i)
-            {
-                arrayObject.appendStr(value[i].c_str());
-            }
-            msg.setObject(key, arrayObject);
         }
 
         void    static  writeJson(JsonObject& msg, map<string, string> value, const char* key)
@@ -288,8 +288,13 @@ namespace dodo
         template<typename T>
         void insertLambda(T lambdaObj)
         {
-            _insertLambda(mNextID, lambdaObj, &T::operator());
-            mNextID++;
+            mReqID++;
+            _insertLambda(mReqID, lambdaObj, &T::operator());
+        }
+
+        int getCurrentReqID() const
+        {
+            return mReqID;
         }
     private:
         template<typename RVal, typename T, typename ...Args>
@@ -330,11 +335,11 @@ namespace dodo
         {
             void* pbase = new VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>(obj);
 
-            mWrapFunctions[mNextID] = VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>::invoke;
-            mRealLambdaPtr[mNextID] = pbase;
+            mWrapFunctions[mReqID] = VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>::invoke;
+            mRealLambdaPtr[mReqID] = pbase;
         }
     private:
-        int     mNextID;
+        int     mReqID;
 
         typedef void(*pf_wrap)(void* pbase, const char* parmStr);
         map<int, pf_wrap>       mWrapFunctions;
@@ -373,6 +378,63 @@ namespace dodo
             regFunctor(funname, func);
         }
 
+        /*  远程调用，返回值为经过序列化后的消息  */
+        template<typename... Args>
+        string    call(const char* funname, const Args&... args)
+        {
+            JsonObject msg;
+            msg.setStr("name", funname);
+
+            int old_req_id = mLambdaMgr.getCurrentReqID();
+            JsonObject parms;
+            int index = 0;
+            writeCallArg(parms, index, args...);
+
+            msg.setObject("parm", parms);
+            int now_req_id = mLambdaMgr.getCurrentReqID();
+            msg.setInt("req_id", old_req_id == now_req_id ? -1 : now_req_id);   /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
+
+            return msg.toString();
+        }
+
+        /*  被调用方处理收到的rpc消息*/
+        void handleRpc(string str)
+        {
+            JsonObject msg;
+            msg.read(str.c_str());
+
+            string funname = msg.getStr("name");
+            JsonObject parm = msg.getObject("parm");
+            assert(mWrapFunctions.find(funname) != mWrapFunctions.end());
+            if (mWrapFunctions.find(funname) != mWrapFunctions.end())
+            {
+                mWrapFunctions[funname](mRealFunctions[funname], parm.toString().c_str());
+            }
+        }
+
+        /*  返回数据给RPC调用端    */
+        template<typename... Args>
+        string    reply(int id, const Args&... args)
+        {
+            JsonObject msg;
+            msg.setInt("id", id);
+
+            JsonObject parms;
+            int index = 0;
+            writeCallArg(parms, index, args...);
+
+            msg.setObject("parm", parms);
+
+            return msg.toString();
+        }
+
+        /*  调用方处理收到的rpc返回值(消息)*/
+        void    handleResponse(string str)
+        {
+            mLambdaMgr.callLambda(str.c_str());
+        }
+
+    private:
         void    writeCallArg(JsonObject& msg, int& index){}
 
         template<typename Arg>
@@ -388,41 +450,6 @@ namespace dodo
             Utils::writeJsonByIndex(msg, arg1, index++);
             writeCallArg(msg, index, args...);
         }
-
-        template<typename... Args>
-        void    call(const char* funname, const Args&... args)
-        {
-            JsonObject msg;
-            msg.setStr("name", funname);
-
-            JsonObject parms;
-            int index = 0;
-            writeCallArg(parms, index, args...);
-
-            msg.setObject("parm", parms);
-
-            handleMsg(msg.toString().c_str());
-        }
-
-        void    callLambda(const char* str)
-        {
-            mLambdaMgr.callLambda(str);
-        }
-
-        void handleMsg(const char* str)
-        {
-            JsonObject msg;
-            msg.read(str);
-
-            string funname = msg.getStr("name");
-            JsonObject parm = msg.getObject("parm");
-            assert(mWrapFunctions.find(funname) != mWrapFunctions.end());
-            if (mWrapFunctions.find(funname) != mWrapFunctions.end())
-            {
-                mWrapFunctions[funname](mRealFunctions[funname], parm.toString().c_str());
-            }
-        }
-
     private:
 
         /*如果是lambda则加入回调管理器，否则添加到rpc参数*/
@@ -515,70 +542,71 @@ void test6(string a, int b, map<string, int> vlist)
 }
 
 void test7()
-{}
+{
+    cout << "in test7" << endl;
+}
 
 int main()
 {
     int upvalue = 10;
     using namespace dodo;
-    rpc rpc;
-    rpc.def("test4", test4);
-    rpc.def("test5", test5);
-    rpc.def("test7", test7);
 
-    map<int, string> t1;
-    t1[1] = "Li";
+    rpc rpc_server; /*rpc服务器*/
+    rpc rpc_client; /*rpc客户端*/
 
-    map<int, string> t2;
-    t2[2] = "Deng";
+    rpc_server.def("test4", test4);
+    rpc_server.def("test5", test5);
+    rpc_server.def("test7", test7);
 
-    map<int, map<int, string>> vlist;
+    string rpc_request_msg; /*  rpc消息   */
+    string rpc_response_str;       /*  rpc返回值  */
 
-    vlist[100] = t1;
-    vlist[200] = t2;
-
-    rpc.call("test7");
-
-    /*调用远程函数,并设置lambda回调函数*/
-    rpc.call("test5", "a", 1, vlist, [&upvalue](int a, int b){
-        upvalue++;
-        cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << endl;
-    });
-    rpc.call("test5", "a", 1, vlist, [&upvalue](string a, string b, int c){
-        upvalue++;
-        cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
-    });
-    /*无lambda回调*/
-    rpc.call("test4", "a", 1);
-
-    /*模拟(被调用方)触发调用方的lambda函数*/
     {
-        JsonObject msg;
-        msg.setInt("id", 0);        /*设置远程调用的lambda id*/
+        rpc_request_msg = rpc_client.call("test7");
 
-        {
-            JsonObject parm;        /*添加远程调用的参数*/
-            parm.setInt("0", 1);
-            parm.setInt("1", 2);
-            msg.setObject("parm", parm);
-        }
+        rpc_server.handleRpc(rpc_request_msg);
+    }
 
-        /*模拟接收到被调用方的reply消息(rpc返回值)，触发本方的lambda函数(处理rpc返回值)*/
-        rpc.callLambda(msg.toString().c_str());
+    map<int, string> m1;
+    m1[1] = "Li";
+    map<int, string> m2;
+    m2[2] = "Deng";
+    map<int, map<int, string>> mlist;
+    mlist[100] = m1;
+    mlist[200] = m2;
+
+    {
+        rpc_request_msg = rpc_client.call("test5", "a", 1, mlist, [&upvalue](int a, int b){
+            upvalue++;
+            cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << endl;
+        });
+
+        rpc_server.handleRpc(rpc_request_msg);
     }
 
     {
-        JsonObject msg;
-        msg.setInt("id", 1);
+        rpc_request_msg = rpc_client.call("test5", "a", 1, mlist, [&upvalue](string a, string b, int c){
+            upvalue++;
+            cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
+        });
 
-        {
-            JsonObject parm;
-            parm.setStr("0", "hello");
-            parm.setStr("1", "world");
-            parm.setInt("2", 3);
-            msg.setObject("parm", parm);
-        }
-        rpc.callLambda(msg.toString().c_str());
+        rpc_server.handleRpc(rpc_request_msg);
+    }
+
+    {
+        rpc_request_msg = rpc_client.call("test4", "a", 1);
+        rpc_server.handleRpc(rpc_request_msg);
+    }
+    
+    /*  模拟服务器通过reply返回数据给rpc client,然后rpc client处理收到的rpc返回值 */
+    {
+        rpc_response_str = rpc_server.reply(1, 1, 2);   /* (1,1,2)中的1为调用方的req_id, (1,2)为返回值 */
+        rpc_client.handleResponse(rpc_response_str);
+    }
+
+    {
+        rpc_response_str = rpc_server.reply(2, "hello", "world", 3);
+        rpc_client.handleResponse(rpc_response_str);
     }
 
     cin.get();
