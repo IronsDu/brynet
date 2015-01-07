@@ -4,85 +4,7 @@
 #include <vector>
 #include <assert.h>
 
-template<typename T>
-class IdTypes
-{
-public:
-    int         claimID()
-    {
-        int ret = -1;
-
-        if (mIds.empty())
-        {
-            increase();
-        }
-
-        assert(!mIds.empty());
-
-        if (!mIds.empty())
-        {
-            ret = mIds[mIds.size() - 1];
-            mIds.pop_back();
-        }
-        
-        return ret;
-    }
-
-    void        reclaimID(size_t id)
-    {
-        assert(id >= 0 && id < mValues.size());
-        mIds.push_back(id);
-    }
-
-    void        set(T* t, size_t id)
-    {
-        assert(id >= 0 && id < mValues.size());
-        if (id >= 0 && id < mValues.size())
-        {
-            mValues[id] = t;
-        }
-    }
-
-    T*          get(size_t id)
-    {
-        T* ret = nullptr;
-        assert(id >= 0 && id < mValues.size());
-        if (id >= 0 && id < mValues.size())
-        {
-            ret = mValues[id];
-        }
-
-        return ret;
-    }
-
-private:
-    void                increase()
-    {
-        const static int _NUM = 100;
-
-        int oldsize = mValues.size();
-        if (oldsize > 0)
-        {
-            mValues.resize(oldsize + _NUM, nullptr);
-            for (int i = 0; i < _NUM; i++)
-            {
-                mIds.push_back(oldsize + i);
-            }
-        }
-        else
-        {
-            mValues.resize(oldsize + _NUM, nullptr);
-            for (int i = 0; i < _NUM; i++)
-            {
-                mIds.push_back(oldsize + i);
-            }
-        }
-    }
-
-private:
-    std::vector<T*>     mValues;
-    std::vector<size_t> mIds;
-};
+#include "typeids.h"
 
 class EventLoop;
 class DataSocket;
@@ -120,7 +42,7 @@ private:
     int                                 mLoopNum;
     std::thread*                        mListenThread;
 
-    IdTypes<DataSocket>*                mIds;
+    TypeIDS<DataSocket>*                mIds;
     int*                                mIncIds;
 
     TcpServer::CONNECTION_ENTER_HANDLE  mEnterHandle;
@@ -131,10 +53,10 @@ private:
     {
         struct
         {
-            int16_t loopIndex;
-            int16_t index;
+            int8_t loopIndex;
+            int32_t index:24;
             int32_t iid;
-        }data;
+        }data;  /*TODO::so,服务器最大支持0x7f个io loop线程，每一个io loop最大支持0x7fffff个链接。*/
 
         int64_t id;
     };

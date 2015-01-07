@@ -18,9 +18,15 @@ DataSocket::DataSocket(int fd)
     ioctlsocket(fd, FIONBIO, &ul);
     memset(&mOvlRecv, sizeof(mOvlRecv), 0);
     memset(&mOvlSend, sizeof(mOvlSend), 0);
+    memset(&mOvlClose, sizeof(mOvlClose), 0);
 
     mOvlRecv.base.Offset = EventLoop::OVL_RECV;
     mOvlSend.base.Offset = EventLoop::OVL_SEND;
+    mOvlClose.base.Offset = EventLoop::OVL_CLOSE;
+
+    mPostRecvCheck = false;
+    mPostWriteCheck = false;
+    mPostClose = false;
 #else
     ioctl(fd, FIONBIO, &ul);
 #endif
@@ -32,7 +38,6 @@ DataSocket::DataSocket(int fd)
 
 DataSocket::~DataSocket()
 {
-    disConnect();
 }
 
 void DataSocket::setEventLoop(EventLoop* el)
@@ -40,7 +45,10 @@ void DataSocket::setEventLoop(EventLoop* el)
     if (mEventLoop == nullptr)
     {
         mEventLoop = el;
-        checkRead();
+        if (!checkRead())
+        {
+            tryOnClose();
+        }
     }
 }
 
@@ -73,9 +81,13 @@ void DataSocket::sendPacket(PACKET_PTR&& packet)
 
 void    DataSocket::canRecv()
 {
+#ifdef PLATFORM_WINDOWS
+    mPostRecvCheck = false;
+#endif
+
     bool must_close = false;
     char temp[1024*10];
-    while (true)
+    while (mFD != SOCKET_ERROR)
     {
         int retlen = recv(mFD, temp, 1024 * 10, 0);
         if (retlen < 0)
@@ -108,14 +120,15 @@ void    DataSocket::canRecv()
     if (must_close)
     {
         /*  回调到用户层  */
-        onClose();
+        tryOnClose();
     }
-
-    return;
 }
 
 void DataSocket::canSend()
 {
+#ifdef PLATFORM_WINDOWS
+    mPostWriteCheck = false;
+#endif
     mCanWrite = true;
     runAfterFlush();
 }
@@ -140,7 +153,7 @@ void DataSocket::freeSendPacketList()
 
 void DataSocket::flush()
 {
-    if (mCanWrite)
+    if (mCanWrite && mFD != SOCKET_ERROR)
     {
         /*  TODO::windows下没有进行消息包合并，而是每一个sendmsg都进行一次send   */
         /*  Linux下使用writev进行合并操作    */
@@ -186,7 +199,7 @@ void DataSocket::flush()
 
         if (must_close)
         {
-            onClose();
+            tryOnClose();
         }
 #else
 #ifndef MAX_IOVEC
@@ -249,28 +262,44 @@ void DataSocket::flush()
 
         if (must_close)
         {
-            onClose();
+            tryOnClose();
         }
 #endif
     }
+}
+
+void DataSocket::tryOnClose()
+{
+#ifdef PLATFORM_WINDOWS
+    /*TODO::windows下需要没有投递过任何IOCP请求才能真正处理close,否则等待所有通知到达*/
+    if (!mPostWriteCheck && !mPostRecvCheck && !mPostClose)
+    {
+        onClose();
+    }
+#else
+    onClose();
+#endif
 }
 
 void DataSocket::onClose()
 {
     if (mFD != SOCKET_ERROR)
     {
-        _procClose();
+        _procCloseSocket();
 
         if (mDisConnectHandle != nullptr)
         {
-            mEventLoop->pushAfterLoopProc([this](){
-                mDisConnectHandle(this);
+            /*TODO::投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
+            mDisConnectHandle析构，然后闭包变量就失效的宕机问题*/
+            DISCONNECT_PROC temp = mDisConnectHandle;
+            mEventLoop->pushAfterLoopProc([temp, this](){
+                temp(this);
             });
         }
     }
 }
 
-void DataSocket::_procClose()
+void DataSocket::_procCloseSocket()
 {
     if (mFD != SOCKET_ERROR)
     {
@@ -304,7 +333,11 @@ bool    DataSocket::checkRead()
     {
         check_ret = GetLastError() == WSA_IO_PENDING;
     }
-#else
+
+    if (check_ret)
+    {
+        mPostRecvCheck = true;
+    }
 #endif
     
     return check_ret;
@@ -322,7 +355,11 @@ bool    DataSocket::checkWrite()
     {
         check_ret = GetLastError() == WSA_IO_PENDING;
     }
-#else
+
+    if (check_ret)
+    {
+        mPostWriteCheck = true;
+    }
 #endif
 
     return check_ret;
@@ -338,9 +375,25 @@ void DataSocket::setDisConnectHandle(DISCONNECT_PROC proc)
     mDisConnectHandle = proc;
 }
 
-void DataSocket::disConnect()
+void DataSocket::postDisConnect()
 {
-    _procClose();
+#ifdef PLATFORM_WINDOWS
+    if (mPostWriteCheck || mPostRecvCheck)
+    {
+        if (!mPostClose)
+        {
+            _procCloseSocket();
+            PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
+            mPostClose = true;
+        }
+    }
+    else
+    {
+        onClose();
+    }
+#else
+    onClose();
+#endif
 }
 
 void DataSocket::setUserData(int64_t value)

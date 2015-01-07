@@ -30,8 +30,8 @@ public:
     void                            setDataHandle(DATA_PROC proc);
     void                            setDisConnectHandle(DISCONNECT_PROC proc);
 
-    /*主动断开此链接，（则）不会触发断开回调*/
-    void                            disConnect();
+    /*主动(请求)断开连接*/
+    void                            postDisConnect();
 
     void                            setUserData(int64_t value);
     int64_t                         getUserData() const;
@@ -47,8 +47,11 @@ private:
     bool                            checkWrite();
 
     void                            flush();
+
+    /*此函数主要为了在windows下尝试调用onClose*/
+    void                            tryOnClose();
     void                            onClose();
-    void                            _procClose();
+    void                            _procCloseSocket();
 
     void                            runAfterFlush();
 
@@ -62,6 +65,11 @@ private:
     };
     struct ovl_ext_s                mOvlRecv;
     struct ovl_ext_s                mOvlSend;
+    struct ovl_ext_s                mOvlClose;
+
+    bool                            mPostRecvCheck;
+    bool                            mPostWriteCheck;
+    bool                            mPostClose;
     #endif
 
     int                             mFD;

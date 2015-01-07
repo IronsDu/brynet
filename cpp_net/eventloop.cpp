@@ -39,7 +39,7 @@ private:
     {
     }
 
-    void    disConnect()
+    void    postDisConnect()
     {
     }
 
@@ -115,6 +115,14 @@ void EventLoop::loop(int64_t timeout)
             {
                 ds->canSend();
             }
+            else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_CLOSE)
+            {
+                ds->onClose();
+            }
+            else
+            {
+                assert(false);
+            }
         }
     }
     else
@@ -151,29 +159,47 @@ void EventLoop::loop(int64_t timeout)
     }
 #endif
 
-    /*TODO::放在mAsyncProcs之前，是因为要在上层投递异步关闭之前处理io线程收集到的socket断开，否则容易出现断错误*/
-    for (auto& x : mAfterLoopProcs)
     {
-        x();
-    }
-    mAfterLoopProcs.clear();
-
-    std::vector<USER_PROC> temp;
-    mAsyncListMutex.lock();
-    temp.swap(mAsyncProcs);
-    mAsyncListMutex.unlock();
-    
-    for (auto& x : temp)
-    {
-        x();
+        /*TODO::放在mAsyncProcs之前处理mAfterLoopProcs（此时可能其中有断开回调），如果在上层投递异步关闭（会释放DataSocket）之后再回调disconnect时，就容易出现断错误*/
+        copyAfterLoopProcs.swap(mAfterLoopProcs);
+        for (auto& x : copyAfterLoopProcs)
+        {
+            x();
+        }
+        copyAfterLoopProcs.clear();
     }
 
-    /*TODO::继续放在mAsyncProcs进行处理，是因为合并flush send处理*/
-    for (auto& x : mAfterLoopProcs)
     {
-        x();
+        std::vector<USER_PROC> temp;
+        mAsyncListMutex.lock();
+        temp.swap(mAsyncProcs);
+        mAsyncListMutex.unlock();
+
+        for (auto& x : temp)
+        {
+            x();
+        }
     }
-    mAfterLoopProcs.clear();
+
+    {
+        /*TODO::继续放在mAsyncProcs进行处理，是因为它可能会向mAfterLoopProcs添加flush send处理*/
+        copyAfterLoopProcs.swap(mAfterLoopProcs);
+        for (auto& x : copyAfterLoopProcs)
+        {
+            x();
+        }
+        copyAfterLoopProcs.clear();
+
+        /*继续处理mAfterLoopProcs，是因为在上面的遍历中可能会收集到socket 断开，则又向mAfterLoopProcs添加了断开回调函数*/
+        copyAfterLoopProcs.swap(mAfterLoopProcs);
+        for (auto& x : copyAfterLoopProcs)
+        {
+            x();
+        }
+        copyAfterLoopProcs.clear();
+
+        assert(mAfterLoopProcs.empty());
+    }
 
     if (numComplete == mEventEntriesNum)
     {
@@ -280,6 +306,13 @@ void EventLoop::restoreThreadID()
 {
     mSelfThreadid = std::this_thread::get_id();
 }
+
+#ifdef PLATFORM_WINDOWS
+HANDLE EventLoop::getIOCPHandle() const
+{
+    return mIOCP;
+}
+#endif
 
 void EventLoop::recalocEventSize(int size)
 {

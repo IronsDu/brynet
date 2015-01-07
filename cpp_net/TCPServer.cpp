@@ -7,6 +7,7 @@
 #include <iostream>
 #include <exception>
 
+#include "socketlibfunction.h"
 #include "socketlibtypes.h"
 
 #include "eventloop.h"
@@ -14,44 +15,18 @@
 
 #include "TCPServer.h"
 
-int
-ox_socket_listen(int port, int back_num)
-{
-    int socketfd = SOCKET_ERROR;
-    struct  sockaddr_in server_addr;
-    int reuseaddr_value = 1;
-
-    socketfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (socketfd != SOCKET_ERROR)
-    {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(port);
-        server_addr.sin_addr.s_addr = INADDR_ANY;
-
-        setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value, sizeof(int));
-
-        if (::bind(socketfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) == SOCKET_ERROR ||
-            listen(socketfd, back_num) == SOCKET_ERROR)
-        {
-#ifdef PLATFORM_WINDOWS
-            closesocket(socketfd);
-#else
-            close(socketfd);
-#endif
-            socketfd = SOCKET_ERROR;
-        }
-    }
-
-    return socketfd;
-}
-
 TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
 {
+    {
+        SessionId tmp;
+        (void)tmp;
+        assert(sizeof(tmp) == sizeof(tmp.id));
+    }
+
     mLoops = new EventLoop[threadNum];
     mIOThreads = new std::thread*[threadNum];
     mLoopNum = threadNum;
-    mIds = new IdTypes<DataSocket>[threadNum];
+    mIds = new TypeIDS<DataSocket>[threadNum];
     mIncIds = new int[threadNum];
     memset(mIncIds, 0, sizeof(mIncIds[0])*threadNum);
 
@@ -155,8 +130,7 @@ void TcpServer::disConnect(int64_t id)
             DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
             if (ds != nullptr && ds->getUserData() == sid.id)
             {
-                ds->disConnect();
-                _procDataSocketClose(ds);
+                ds->postDisConnect();
             }
 
         });
@@ -166,8 +140,7 @@ void TcpServer::disConnect(int64_t id)
         DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
         if (ds != nullptr && ds->getUserData() == sid.id)
         {
-            ds->disConnect();
-            _procDataSocketClose(ds);
+            ds->postDisConnect();
         }
     }
 }

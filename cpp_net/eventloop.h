@@ -22,6 +22,7 @@ public:
     {
         OVL_RECV = 1,
         OVL_SEND,
+        OVL_CLOSE,
     };
     #endif
 
@@ -45,6 +46,10 @@ public:
     void                            pushAfterLoopProc(USER_PROC f);
 
     void                            restoreThreadID();
+
+#ifdef PLATFORM_WINDOWS
+    HANDLE                          getIOCPHandle() const;
+#endif
 
 private:
     void                            recalocEventSize(int size);
@@ -75,6 +80,7 @@ private:
     std::vector<USER_PROC>          mAsyncProcs;                /*  异步function队列,投递到此eventloop执行的回调函数   */
 
     std::vector<USER_PROC>          mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数，只能在io线程自身内对此队列做添加操作    */
+    std::vector<USER_PROC>          copyAfterLoopProcs;         /*用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素*/
 
     std::mutex                      mAsyncListMutex;
 

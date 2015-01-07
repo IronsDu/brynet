@@ -6,12 +6,12 @@
 #include <deque>
 
 template<typename T>
-class Rwlist
+class MsgQueue
 {
 public:
     typedef std::deque<T>   Container;
 
-    Rwlist()
+    MsgQueue()
     {
     }
 
