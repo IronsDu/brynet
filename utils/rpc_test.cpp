@@ -41,29 +41,28 @@ namespace dodo
     class Utils
     {
     public:
-        void static readJson(JsonObject& msg, const char* key, char& tmp)
+        void static readJson(JsonObject& msg, const char* key, char& ret)
         {
-            tmp = msg.getInt(key);
+            ret = msg.getInt(key);
         }
 
-        void static readJson(JsonObject& msg, const char* key, int& tmp)
+        void static readJson(JsonObject& msg, const char* key, int& ret)
         {
-            tmp = msg.getInt(key);
+            ret = msg.getInt(key);
         }
 
-        void static readJson(JsonObject& msg, const char* key, JsonObject& tmp)
+        void static readJson(JsonObject& msg, const char* key, JsonObject& ret)
         {
-            tmp = msg.getObject(key);
+            ret = msg.getObject(key);
         }
 
-        void static readJson(JsonObject& msg, const char* key, string& tmp)
+        void static readJson(JsonObject& msg, const char* key, string& ret)
         {
-            tmp = msg.getStr(key);
+            ret = msg.getStr(key);
         }
 
-        void static readJson(JsonObject& msg, const char* key, vector<int>& tmp)
+        void static readJson(JsonObject& msg, const char* key, vector<int>& ret)
         {
-            vector<int> ret;
             JsonObject arrayJson = msg.getObject(key);
             for (int i = 0; i < arrayJson.getSize(); ++i)
             {
@@ -72,12 +71,10 @@ namespace dodo
                 JsonObject valueObject = arrayJson.getByIndex(i);
                 ret.push_back(atoi(valueObject.toString().c_str()));
             }
-            tmp = ret;
         }
 
-        void static readJson(JsonObject& msg, const char* key, vector<string>& tmp)
+        void static readJson(JsonObject& msg, const char* key, vector<string>& ret)
         {
-            vector<string> ret;
             JsonObject arrayJson = msg.getObject(key);
             for (int i = 0; i < arrayJson.getSize(); ++i)
             {
@@ -86,11 +83,25 @@ namespace dodo
                 JsonObject valueObject = arrayJson.getByIndex(i);
                 ret.push_back(valueObject.getJsonValue().asString());
             }
-            tmp = ret;
+        }
+
+        template<typename T>
+        void static readJson(JsonObject& msg, const char* key, vector<T>& ret)
+        {
+            JsonObject arrayJson = msg.getObject(key);
+            for (int i = 0; i < arrayJson.getSize(); ++i)
+            {
+                stringstream ss;
+                ss << i;
+                T o;
+                JsonObject valueJson = arrayJson.getByIndex(i);
+                readJson(valueJson, ss.str().c_str(), o);
+                ret.push_back(o);
+            }
         }
 
         template<typename U, typename V>
-        void static readJson(JsonObject& msg, const char* key, map<U, V>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<U, V>& ret)
         {
             /*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
             JsonObject mapObject = msg.getObject(key);
@@ -109,13 +120,12 @@ namespace dodo
                 ss >> realKey;
 
                 /*把value放入到结果map中*/
-                tmp[realKey] = tv;
+                ret[realKey] = tv;
             }
         }
 
-        void static readJson(JsonObject& msg, const char* key, map<string, string>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<string, string>& ret)
         {
-            map<string, string> ret;
             JsonObject mapJson = msg.getObject(key);
             Json::Value::const_iterator itend = mapJson.end();
             for (Json::Value::const_iterator it = mapJson.begin(); it != itend; ++it)
@@ -124,12 +134,10 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[vkey.asString()] = vvalue.asString();
             }
-            tmp = ret;
         }
 
-        void static readJson(JsonObject& msg, const char* key, map<int, string>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<int, string>& ret)
         {
-            map<int, string> ret;
             JsonObject mapJson = msg.getObject(key);
             Json::Value::const_iterator itend = mapJson.end();
             for (Json::Value::const_iterator it = mapJson.begin(); it != itend; ++it)
@@ -138,12 +146,10 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[atoi(vkey.asString().c_str())] = vvalue.asString();
             }
-            tmp = ret;
         }
 
-        void static readJson(JsonObject& msg, const char* key, map<string, int>& tmp)
+        void static readJson(JsonObject& msg, const char* key, map<string, int>& ret)
         {
-            map<string, int> ret;
             JsonObject mapJson = msg.getObject(key);
             Json::Value::const_iterator itend = mapJson.end();
             for (Json::Value::const_iterator it = mapJson.begin(); it != itend; ++it)
@@ -152,7 +158,6 @@ namespace dodo
                 Json::Value vvalue = *it;
                 ret[vkey.asString()] = vvalue.asInt();
             }
-            tmp = ret;
         }
 
         template<typename T>
@@ -202,6 +207,21 @@ namespace dodo
             for (size_t i = 0; i < value.size(); ++i)
             {
                 arrayObject.appendStr(value[i].c_str());
+            }
+            msg.setObject(key, arrayObject);
+        }
+
+        template<typename T>
+        void    static  writeJson(JsonObject& msg, vector<T> value, const char* key)
+        {
+            JsonObject arrayObject;
+            for (size_t i = 0; i < value.size(); ++i)
+            {
+                JsonObject valueObject;
+                stringstream ss;
+                ss << i;
+                writeJson(valueObject, value[i], ss.str().c_str());
+                arrayObject.appendObject(valueObject);
             }
             msg.setObject(key, arrayObject);
         }
@@ -541,7 +561,7 @@ void test6(string a, int b, map<string, int> vlist)
 {
 }
 
-void test7()
+void test7(vector<map<int,string>> vlist)
 {
     cout << "in test7" << endl;
 }
@@ -562,7 +582,12 @@ int main()
     string rpc_response_str;       /*  rpc返回值  */
 
     {
-        rpc_request_msg = rpc_client.call("test7");
+        vector<map<int, string>> vlist;
+        map<int, string> a = { { 1, "dzw" } };
+        map<int, string> b = { { 2, "haha" } };
+        vlist.push_back(a);
+        vlist.push_back(b);
+        rpc_request_msg = rpc_client.call("test7", vlist);
 
         rpc_server.handleRpc(rpc_request_msg);
     }
