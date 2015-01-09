@@ -504,10 +504,41 @@ namespace dodo
         FunctionMgr               mResponseCallbacks;
         FunctionMgr               mRpcFunctions;
     };
-
-    template struct SelectWriteArg<true>;
-    template struct SelectWriteArg<false>;
 }
+
+class Player : public dodo::rpc
+{
+public:
+    Player()
+    {
+        registerHandle("player_attack", &Player::attack);
+        registerHandle("player_hi", &Player::hi);
+    }
+
+private:
+    template<typename... Args>
+    void        registerHandle(string name, void (Player::*callback)(Args...))
+    {
+        def(name.c_str(), [this, callback](Args... args){
+            (this->*callback)(args...);
+        });
+    }
+
+private:
+    void    attack(string target)
+    {
+        cout << "attack:" << target << endl;
+    }
+
+    void    hi(string i, string j)
+    {
+        cout << i << j << endl;
+    }
+
+private:
+    int ma;
+    int mb;
+};
 
 void test1(int a, int b)
 {
@@ -551,8 +582,8 @@ int main()
     int upvalue = 10;
     using namespace dodo;
 
-    rpc rpc_server; /*rpc服务器*/
-    rpc rpc_client; /*rpc客户端*/
+    Player rpc_server; /*rpc服务器*/
+    Player rpc_client; /*rpc客户端*/
 
     string rpc_request_msg; /*  rpc消息   */
     string rpc_response_str;       /*  rpc返回值  */
@@ -572,6 +603,11 @@ int main()
     rpc_request_msg = rpc_client.call("test_functor", 1);
     rpc_server.handleRpc(rpc_request_msg);
     rpc_request_msg = rpc_client.call("test_lambda", 2);
+    rpc_server.handleRpc(rpc_request_msg);
+
+    rpc_request_msg = rpc_client.call("player_attack", "Li Lei");
+    rpc_server.handleRpc(rpc_request_msg);
+    rpc_request_msg = rpc_client.call("player_hi", "Hello", "World");
     rpc_server.handleRpc(rpc_request_msg);
     
     {
