@@ -89,13 +89,11 @@ namespace dodo
         void static readJson(JsonObject& msg, const char* key, vector<T>& ret)
         {
             JsonObject arrayJson = msg.getObject(key);
-            for (int i = 0; i < arrayJson.getSize(); ++i)
+            for (Json::Value::const_iterator it = arrayJson.begin(); it != arrayJson.end(); ++it)
             {
-                stringstream ss;
-                ss << i;
+                Json::Value vkey = it.key();
                 T o;
-                JsonObject valueJson = arrayJson.getByIndex(i);
-                readJson(valueJson, ss.str().c_str(), o);
+                readJson(arrayJson, vkey.asString().c_str(), o);
                 ret.push_back(o);
             }
         }
@@ -220,8 +218,7 @@ namespace dodo
                 JsonObject valueObject;
                 stringstream ss;
                 ss << i;
-                writeJson(valueObject, value[i], ss.str().c_str());
-                arrayObject.appendObject(valueObject);
+                writeJson(arrayObject, value[i], ss.str().c_str());
             }
             msg.setObject(key, arrayObject);
         }
@@ -287,40 +284,54 @@ namespace dodo
         }
     };
 
-    class LambdaMgr
+    class FunctionMgr
     {
     public:
-        void    callLambda(const char* str)
+        void    execute(const char* str)
         {
             JsonObject msgObject;
             msgObject.read(str);
 
-            int id = msgObject.getInt("id");
+            string name = msgObject.getStr("name");
             JsonObject parmObject = msgObject.getObject("parm");
 
-            assert(mWrapFunctions.find(id) != mWrapFunctions.end());
-            if (mWrapFunctions.find(id) != mWrapFunctions.end())
+            assert(mWrapFunctions.find(name) != mWrapFunctions.end());
+            if (mWrapFunctions.find(name) != mWrapFunctions.end())
             {
-                mWrapFunctions[id](mRealLambdaPtr[id], parmObject.toString().c_str());
+                mWrapFunctions[name](mRealFunctionPtr[name], parmObject.toString().c_str());
             }
         }
 
         template<typename T>
-        void insertLambda(T lambdaObj)
+        void insertLambda(string name, T lambdaObj)
         {
-            mReqID++;
-            _insertLambda(mReqID, lambdaObj, &T::operator());
+            _insertLambda<T>(name, lambdaObj, &T::operator());
         }
 
-        int getCurrentReqID() const
+        template<typename ...Args>
+        void insertStaticFunction(string name, void(*func)(Args...))
         {
-            return mReqID;
+            void* pbase = new VariadicArgFunctor<Args...>(func);
+
+            mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
+            mRealFunctionPtr[name] = pbase;
+        }
+
+        int     makeNextID()
+        {
+            mNextID++;
+            return mNextID;
+        }
+
+        int     getNowID() const
+        {
+            return mNextID;
         }
     private:
-        template<typename RVal, typename T, typename ...Args>
-        struct VariadicLambdaFunctor
+        template<typename ...Args>
+        struct VariadicArgFunctor
         {
-            VariadicLambdaFunctor(std::function<void(Args...)> f)
+            VariadicArgFunctor(std::function<void(Args...)> f)
             {
                 mf = f;
             }
@@ -343,27 +354,27 @@ namespace dodo
             template<typename ...NowArgs>
             static  void    eval(char _, void* pvoid, JsonObject& msg, int& parmIndex, const NowArgs&... args)
             {
-                VariadicLambdaFunctor<RVal, T, Args...>* pthis = (VariadicLambdaFunctor<RVal, T, Args...>*)pvoid;
+                VariadicArgFunctor<Args...>* pthis = (VariadicArgFunctor<Args...>*)pvoid;
                 (pthis->mf)(args...);
             }
         private:
             std::function<void(Args...)>   mf;
         };
 
-        template<typename LAMBDA_OBJ_TYPE, typename RVal, typename ...Args>
-        void _insertLambda(int iid, LAMBDA_OBJ_TYPE obj, RVal(LAMBDA_OBJ_TYPE::*func)(Args...) const)
+        template<typename LAMBDA_OBJ_TYPE, typename ...Args>
+        void _insertLambda(string name, LAMBDA_OBJ_TYPE obj, void(LAMBDA_OBJ_TYPE::*func)(Args...) const)
         {
-            void* pbase = new VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>(obj);
+            void* pbase = new VariadicArgFunctor<Args...>(obj);
 
-            mWrapFunctions[mReqID] = VariadicLambdaFunctor<void, LAMBDA_OBJ_TYPE, Args...>::invoke;
-            mRealLambdaPtr[mReqID] = pbase;
+            mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
+            mRealFunctionPtr[name] = pbase;
         }
-    private:
-        int     mReqID;
 
+    private:
         typedef void(*pf_wrap)(void* pbase, const char* parmStr);
-        map<int, pf_wrap>       mWrapFunctions;
-        map<int, void*>         mRealLambdaPtr;
+        map<string, pf_wrap>       mWrapFunctions;
+        map<string, void*>         mRealFunctionPtr;
+        int                         mNextID;
     };
 
     template<bool>
@@ -373,9 +384,12 @@ namespace dodo
     struct SelectWriteArg<true>
     {
         template<typename ARGTYPE>
-        static  void    Write(LambdaMgr& lambdaMgr, JsonObject& parms, ARGTYPE arg, int index)
+        static  void    Write(FunctionMgr& functionMgr, JsonObject& parms, ARGTYPE arg, int index)
         {
-            lambdaMgr.insertLambda(arg);
+            int id = functionMgr.makeNextID();
+            stringstream ss;
+            ss << id;
+            functionMgr.insertLambda(ss.str(), arg);
         }
     };
 
@@ -383,7 +397,7 @@ namespace dodo
     struct SelectWriteArg<false>
     {
         template<typename ARGTYPE>
-        static  void    Write(LambdaMgr& lambdaMgr, JsonObject& parms, ARGTYPE arg, int index)
+        static  void    Write(FunctionMgr& functionMgr, JsonObject& parms, ARGTYPE arg, int index)
         {
             Utils::writeJsonByIndex(parms, arg, index);
         }
@@ -392,6 +406,14 @@ namespace dodo
     class rpc
     {
     public:
+        rpc()
+        {
+            /*  注册rpc_reply 服务函数，处理rpc返回值   */
+            def("rpc_reply", [this](string response){
+                handleResponse(response);
+            });
+        }
+
         template<typename F>
         void        def(const char* funname, F func)
         {
@@ -405,53 +427,40 @@ namespace dodo
             JsonObject msg;
             msg.setStr("name", funname);
 
-            int old_req_id = mLambdaMgr.getCurrentReqID();
+            int old_req_id = mResponseCallbacks.getNowID();
             JsonObject parms;
             int index = 0;
             writeCallArg(parms, index, args...);
 
             msg.setObject("parm", parms);
-            int now_req_id = mLambdaMgr.getCurrentReqID();
+            int now_req_id = mResponseCallbacks.getNowID();
             msg.setInt("req_id", old_req_id == now_req_id ? -1 : now_req_id);   /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
 
             return msg.toString();
         }
 
-        /*  被调用方处理收到的rpc消息*/
-        void handleRpc(string str)
+        /*  处理rpc请求 */
+        void    handleRpc(string str)
         {
-            JsonObject msg;
-            msg.read(str.c_str());
-
-            string funname = msg.getStr("name");
-            JsonObject parm = msg.getObject("parm");
-            assert(mWrapFunctions.find(funname) != mWrapFunctions.end());
-            if (mWrapFunctions.find(funname) != mWrapFunctions.end())
-            {
-                mWrapFunctions[funname](mRealFunctions[funname], parm.toString().c_str());
-            }
+            mRpcFunctions.execute(str.c_str());
         }
 
         /*  返回数据给RPC调用端    */
         template<typename... Args>
-        string    reply(int id, const Args&... args)
+        string    reply(int reqid, const Args&... args)
         {
-            JsonObject msg;
-            msg.setInt("id", id);
+            /*  把实际返回值打包作为参数,调用对端的rpc_reply 函数*/
+            stringstream ss;
+            ss << reqid;
+            string response = call(ss.str().c_str(), args...);
 
-            JsonObject parms;
-            int index = 0;
-            writeCallArg(parms, index, args...);
-
-            msg.setObject("parm", parms);
-
-            return msg.toString();
+            return call("rpc_reply", response);
         }
 
         /*  调用方处理收到的rpc返回值(消息)*/
         void    handleResponse(string str)
         {
-            mLambdaMgr.callLambda(str.c_str());
+            mResponseCallbacks.execute(str.c_str());
         }
 
     private:
@@ -476,53 +485,24 @@ namespace dodo
         template<typename ARGTYPE>
         void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
         {
-            SelectWriteArg<HasCallOperator<ARGTYPE>::value>::Write(mLambdaMgr, parms, arg, index);
+            SelectWriteArg<HasCallOperator<ARGTYPE>::value>::Write(mResponseCallbacks, parms, arg, index);
         }
 
     private:
-        template<typename RVal, typename ...Args>
-        struct VariadicFunctor
+        template<typename ...Args>
+        void regFunctor(const char* funname, void(*func)(Args...))
         {
-            static  void    invoke(void* realfunc, const char* str)
-            {
-                JsonObject msg;
-                msg.read(str);
-                int parmIndex = 0;  /*parmIndex作为json中每个变量的key迭代器*/
-                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), realfunc, msg, parmIndex);
-            }
-
-            template<typename T, typename ...LeftArgs, typename ...NowArgs>
-            static  void    eval(int _, void* realfunc, JsonObject& msg, int& parmIndex, const NowArgs&... args)
-            {
-                /*args为已经求值的参数列表*/
-                /*cur_arg为即将求值的参数*/
-                T cur_arg = Utils::readJsonByIndex<T>(msg, parmIndex++);
-                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), realfunc, msg, parmIndex, args..., cur_arg);
-            }
-
-            template<typename ...NowArgs>
-            static  void    eval(char _, void* realfunc, JsonObject& msg, int& parmIndex, const NowArgs&... args)
-            {
-                /*没有任何剩下的未知参数类型，那么 args 形参就是最终的所有参数，在此回调函数即可*/
-                typedef void(*pf)(NowArgs...);
-                pf p = (pf)realfunc;
-                p(args...);
-            }
-
-        private:
-        };
-
-        template<typename RVal, typename ...Args>
-        void regFunctor(const char* funname, RVal(*func)(Args...))
+            mRpcFunctions.insertStaticFunction(funname, func);
+        }
+        
+        template<typename LAMBDA>
+        void regFunctor(const char* funname, LAMBDA lambdaObj)
         {
-            mWrapFunctions[funname] = VariadicFunctor<RVal, Args...>::invoke;
-            mRealFunctions[funname] = func;
+            mRpcFunctions.insertLambda(funname, lambdaObj);
         }
     private:
-        typedef void(*pf_wrap)(void* realFunc, const char* parmStr);
-        map<string, pf_wrap>    mWrapFunctions; /*  包装函数表   */
-        map<string, void*>      mRealFunctions; /*  真实函数表   */
-        LambdaMgr               mLambdaMgr;
+        FunctionMgr               mResponseCallbacks;
+        FunctionMgr               mRpcFunctions;
     };
 
     template struct SelectWriteArg<true>;
@@ -574,13 +554,26 @@ int main()
     rpc rpc_server; /*rpc服务器*/
     rpc rpc_client; /*rpc客户端*/
 
+    string rpc_request_msg; /*  rpc消息   */
+    string rpc_response_str;       /*  rpc返回值  */
+
     rpc_server.def("test4", test4);
     rpc_server.def("test5", test5);
     rpc_server.def("test7", test7);
 
-    string rpc_request_msg; /*  rpc消息   */
-    string rpc_response_str;       /*  rpc返回值  */
-
+    std::function<void(int)> functor = [](int i){
+        cout << "i is " << i << endl;
+    };
+    rpc_server.def("test_functor", functor);
+    rpc_server.def("test_lambda", [](int j){
+        cout << "j is " << j << endl;
+    });
+    
+    rpc_request_msg = rpc_client.call("test_functor", 1);
+    rpc_server.handleRpc(rpc_request_msg);
+    rpc_request_msg = rpc_client.call("test_lambda", 2);
+    rpc_server.handleRpc(rpc_request_msg);
+    
     {
         vector<map<int, string>> vlist;
         map<int, string> a = { { 1, "dzw" } };
@@ -622,18 +615,19 @@ int main()
         rpc_request_msg = rpc_client.call("test4", "a", 1);
         rpc_server.handleRpc(rpc_request_msg);
     }
-    
+
     /*  模拟服务器通过reply返回数据给rpc client,然后rpc client处理收到的rpc返回值 */
     {
         rpc_response_str = rpc_server.reply(1, 1, 2);   /* (1,1,2)中的1为调用方的req_id, (1,2)为返回值 */
-        rpc_client.handleResponse(rpc_response_str);
+        rpc_client.handleRpc(rpc_response_str);
     }
 
     {
         rpc_response_str = rpc_server.reply(2, "hello", "world", 3);
-        rpc_client.handleResponse(rpc_response_str);
+        rpc_client.handleRpc(rpc_response_str);
     }
 
     cin.get();
+
     return 0;
 }
