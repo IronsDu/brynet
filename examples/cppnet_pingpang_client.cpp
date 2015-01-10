@@ -71,7 +71,7 @@ int main()
                 int setret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
                 std::cout << setret << std::endl;
 
-                clientEventLoop.addConnection(client, new DataSocket(client), [&](Channel* arg){
+                clientEventLoop.addChannel(client, new DataSocket(client), [&](Channel* arg){
                     DataSocket* ds = static_cast<DataSocket*>(arg);
                     /*  ·¢ËÍÏûÏ¢    */
                     if (senddata != nullptr)
