@@ -70,7 +70,7 @@ EventLoop::EventLoop()
     mEpollFd = epoll_create(1);
     mWakeupFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     mWakeupChannel = new WakeupChannel(mWakeupFd);
-    linkConnection(mWakeupFd, mWakeupChannel);
+    linkChannel(mWakeupFd, mWakeupChannel);
 #endif
 
     mIsAlreadyPostedWakeUp = false;
@@ -257,7 +257,7 @@ bool EventLoop::wakeup()
     return ret;
 }
 
-void EventLoop::linkConnection(int fd, Channel* ptr)
+void EventLoop::linkChannel(int fd, Channel* ptr)
 {
     printf("link to fd:%d \n", fd);
 #ifdef PLATFORM_WINDOWS
@@ -270,11 +270,11 @@ void EventLoop::linkConnection(int fd, Channel* ptr)
 #endif
 }
 
-void EventLoop::addConnection(int fd, Channel* c, CONNECTION_ENTER_HANDLE f)
+void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
 {
-    printf("addConnection fd:%d\n", fd);
+    printf("addChannel fd:%d\n", fd);
     pushAsyncProc([fd, c, this, f] () {
-            linkConnection(fd, c);
+            linkChannel(fd, c);
             c->setEventLoop(this);
             f(c);
     });

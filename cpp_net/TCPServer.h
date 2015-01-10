@@ -13,16 +13,16 @@ class TcpServer
 {
     typedef std::function<void (EventLoop&)> FRAME_CALLBACK;
     typedef std::function<void(int64_t)>    CONNECTION_ENTER_HANDLE;
-    typedef std::function<void(int64_t)>    DISCONNECT_PROC;
-    typedef std::function<void(int64_t, const char* buffer, int len)>    DATA_PROC;
+    typedef std::function<void(int64_t)>    DISCONNECT_HANDLE;
+    typedef std::function<void(int64_t, const char* buffer, int len)>    DATA_HANDLE;
 
 public:
     TcpServer(int port, int threadNum, FRAME_CALLBACK callback = nullptr);  /*callback为IO线程每个loop循环都会执行的回调函数，可以为null*/
     ~TcpServer();
 
     void                                setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle);
-    void                                setDisconnectHandle(TcpServer::DISCONNECT_PROC handle);
-    void                                setMsgHandle(TcpServer::DATA_PROC handle);
+    void                                setDisconnectHandle(TcpServer::DISCONNECT_HANDLE handle);
+    void                                setMsgHandle(TcpServer::DATA_HANDLE handle);
 
     void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
     void                                send(int64_t id, DataSocket::PACKET_PTR& packet);
@@ -46,8 +46,8 @@ private:
     int*                                mIncIds;
 
     TcpServer::CONNECTION_ENTER_HANDLE  mEnterHandle;
-    TcpServer::DISCONNECT_PROC          mDisConnectHandle;
-    TcpServer::DATA_PROC                mDataProc;
+    TcpServer::DISCONNECT_HANDLE        mDisConnectHandle;
+    TcpServer::DATA_HANDLE              mDataHandle;
 
     union SessionId
     {

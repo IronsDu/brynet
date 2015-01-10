@@ -74,14 +74,14 @@ void TcpServer::setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle)
     mEnterHandle = handle;
 }
 
-void TcpServer::setDisconnectHandle(TcpServer::DISCONNECT_PROC handle)
+void TcpServer::setDisconnectHandle(TcpServer::DISCONNECT_HANDLE handle)
 {
     mDisConnectHandle = handle;
 }
 
-void TcpServer::setMsgHandle(TcpServer::DATA_PROC handle)
+void TcpServer::setMsgHandle(TcpServer::DATA_HANDLE handle)
 {
-    mDataProc = handle;
+    mDataHandle = handle;
 }
 
 void TcpServer::send(int64_t id, DataSocket::PACKET_PTR&& packet)
@@ -203,7 +203,7 @@ void TcpServer::RunListen(int port)
                     Channel* channel = new DataSocket(client_fd);
                     int loopIndex = rand() % mLoopNum;
                     EventLoop& loop = mLoops[loopIndex];
-                    loop.addConnection(client_fd, channel, [this, loopIndex](Channel* arg){
+                    loop.addChannel(client_fd, channel, [this, loopIndex](Channel* arg){
                         DataSocket* ds = static_cast<DataSocket*>(arg);
 
                         int64_t id = MakeID(loopIndex);
@@ -212,7 +212,7 @@ void TcpServer::RunListen(int port)
                         mIds[loopIndex].set(ds, sid.data.index);
                         ds->setUserData(id);
                         ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
-                            mDataProc(ds->getUserData(), buffer, len);
+                            mDataHandle(ds->getUserData(), buffer, len);
                         });
 
                         ds->setDisConnectHandle([this](DataSocket* arg){

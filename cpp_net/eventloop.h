@@ -15,16 +15,16 @@ class EventLoop
 {
 public:
     typedef std::function<void(void)>       USER_PROC;
-    typedef std::function<void(Channel*)>   CONNECTION_ENTER_HANDLE;
+    typedef std::function<void(Channel*)>   CHANNEL_ENTER_HANDLE;
 
-    #ifdef PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
     enum OLV_VALUE
     {
-        OVL_RECV = 1,
+        OVL_RECV,
         OVL_SEND,
         OVL_CLOSE,
     };
-    #endif
+#endif
 
 public:
     EventLoop();
@@ -35,7 +35,7 @@ public:
     bool                            wakeup();
 
     /*  投递一个链接，跟此eventloopEventLoop绑定，当被eventloop处理时会触发f回调  */
-    void                            addConnection(int fd, Channel*, CONNECTION_ENTER_HANDLE f);
+    void                            addChannel(int fd, Channel*, CHANNEL_ENTER_HANDLE f);
 
     /*  投递一个异步function，此eventloop被唤醒后，会回调此f*/
     void                            pushAsyncProc(USER_PROC f);
@@ -53,7 +53,7 @@ public:
 
 private:
     void                            recalocEventSize(int size);
-    void                            linkConnection(int fd, Channel* ptr);
+    void                            linkChannel(int fd, Channel* ptr);
 
 private:
     int                             mEventEntriesNum;

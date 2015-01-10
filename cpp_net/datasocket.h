@@ -12,23 +12,22 @@ class EventLoop;
 class DataSocket : public Channel
 {
 public:
-    typedef std::function<void(DataSocket*, const char* buffer, int len)>    DATA_PROC;
-    typedef std::function<void(DataSocket*)>                                 DISCONNECT_PROC;
+    typedef std::function<void(DataSocket*, const char* buffer, int len)>    DATA_HANDLE;
+    typedef std::function<void(DataSocket*)>                                 DISCONNECT_HANDLE;
     typedef std::shared_ptr<std::string>                                     PACKET_PTR;
 
 public:
     DataSocket(int fd);
     ~DataSocket();
 
-                                    /*  添加发送数据队列    */
     void                            send(const char* buffer, int len);
 
     void                            sendPacket(const PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&&);
 
-    void                            setDataHandle(DATA_PROC proc);
-    void                            setDisConnectHandle(DISCONNECT_PROC proc);
+    void                            setDataHandle(DATA_HANDLE proc);
+    void                            setDisConnectHandle(DISCONNECT_HANDLE proc);
 
     /*主动(请求)断开连接*/
     void                            postDisConnect();
@@ -57,7 +56,8 @@ private:
 
     void                            freeSendPacketList();
 private:
-    #ifdef PLATFORM_WINDOWS
+
+#ifdef PLATFORM_WINDOWS
     #include <windows.h>
     struct ovl_ext_s
     {
@@ -70,7 +70,7 @@ private:
     bool                            mPostRecvCheck;
     bool                            mPostWriteCheck;
     bool                            mPostClose;
-    #endif
+#endif
 
     int                             mFD;
     EventLoop*                      mEventLoop;
@@ -86,8 +86,8 @@ private:
 
     bool                            mCanWrite;
 
-    DATA_PROC                       mDataHandle;
-    DISCONNECT_PROC                 mDisConnectHandle;
+    DATA_HANDLE                     mDataHandle;
+    DISCONNECT_HANDLE               mDisConnectHandle;
 
     bool                            mIsPostFlush;
 

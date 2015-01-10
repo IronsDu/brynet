@@ -135,7 +135,7 @@ void DataSocket::canSend()
 
 void DataSocket::runAfterFlush()
 {
-    if (!mIsPostFlush)
+    if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
     {
         mEventLoop->pushAfterLoopProc([this](){
             mIsPostFlush = false;
@@ -291,7 +291,7 @@ void DataSocket::onClose()
         {
             /*TODO::投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
             mDisConnectHandle析构，然后闭包变量就失效的宕机问题*/
-            DISCONNECT_PROC temp = mDisConnectHandle;
+            DISCONNECT_HANDLE temp = mDisConnectHandle;
             mEventLoop->pushAfterLoopProc([temp, this](){
                 temp(this);
             });
@@ -365,12 +365,12 @@ bool    DataSocket::checkWrite()
     return check_ret;
 }
 
-void DataSocket::setDataHandle(DATA_PROC proc)
+void DataSocket::setDataHandle(DATA_HANDLE proc)
 {
     mDataHandle = proc;
 }
 
-void DataSocket::setDisConnectHandle(DISCONNECT_PROC proc)
+void DataSocket::setDisConnectHandle(DISCONNECT_HANDLE proc)
 {
     mDisConnectHandle = proc;
 }
