@@ -89,7 +89,7 @@ void    DataSocket::canRecv()
     char temp[1024*10];
     while (mFD != SOCKET_ERROR)
     {
-        int retlen = recv(mFD, temp, 1024 * 10, 0);
+        int retlen = recv(mFD, temp, sizeof(temp), 0);
         if (retlen < 0)
         {
             if (sErrno == S_EWOULDBLOCK)

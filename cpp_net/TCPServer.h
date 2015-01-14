@@ -45,18 +45,20 @@ private:
     TypeIDS<DataSocket>*                mIds;
     int*                                mIncIds;
 
+    /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
     TcpServer::CONNECTION_ENTER_HANDLE  mEnterHandle;
     TcpServer::DISCONNECT_HANDLE        mDisConnectHandle;
     TcpServer::DATA_HANDLE              mDataHandle;
 
+    /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
     union SessionId
     {
         struct
         {
-            int8_t loopIndex;
-            int32_t index:24;
-            int32_t iid;
-        }data;  /*TODO::so,服务器最大支持0x7f个io loop线程，每一个io loop最大支持0x7fffff个链接。*/
+            int8_t loopIndex;       /*  会话所属的eventloop的(在mLoops中的)索引  */
+            int32_t index : 24;     /*  会话在mIds[loopIndex]中的索引值 */
+            int32_t iid;            /*  自增计数器   */
+        }data;  /*  warn::so,服务器最大支持0x7f个io loop线程，每一个io loop最大支持0x7fffff个链接。*/
 
         int64_t id;
     };

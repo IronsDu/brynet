@@ -30,17 +30,17 @@ public:
     void                            setDisConnectHandle(DISCONNECT_HANDLE proc);
 
     /*主动(请求)断开连接*/
-    void                            postDisConnect();
+    void                            postDisConnect() override;
 
     void                            setUserData(int64_t value);
     int64_t                         getUserData() const;
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
-    void                            setEventLoop(EventLoop* el);
+    void                            setEventLoop(EventLoop* el) override;
 
-    void                            canRecv();
-    void                            canSend();
+    void                            canRecv() override;
+    void                            canSend() override;
 
     bool                            checkRead();
     bool                            checkWrite();
@@ -49,7 +49,7 @@ private:
 
     /*此函数主要为了在windows下尝试调用onClose*/
     void                            tryOnClose();
-    void                            onClose();
+    void                            onClose() override;
     void                            _procCloseSocket();
 
     void                            runAfterFlush();
@@ -67,9 +67,9 @@ private:
     struct ovl_ext_s                mOvlSend;
     struct ovl_ext_s                mOvlClose;
 
-    bool                            mPostRecvCheck;
-    bool                            mPostWriteCheck;
-    bool                            mPostClose;
+    bool                            mPostRecvCheck;     /*  是否投递了可读检测   */
+    bool                            mPostWriteCheck;    /*  是否投递了可写检测   */
+    bool                            mPostClose;         /*  是否投递了断开socket的(模拟)完成通知  */
 #endif
 
     int                             mFD;
@@ -82,14 +82,14 @@ private:
     };
 
     typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
-    PACKET_LIST_TYPE                mSendList;
+    PACKET_LIST_TYPE                mSendList;          /*  发送消息列表  */
 
-    bool                            mCanWrite;
+    bool                            mCanWrite;          /*  socket是否可写  */
 
     DATA_HANDLE                     mDataHandle;
     DISCONNECT_HANDLE               mDisConnectHandle;
 
-    bool                            mIsPostFlush;
+    bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
 
     int64_t                         mUserData;
 };

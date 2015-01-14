@@ -14,7 +14,7 @@ public:
 
     }
 private:
-    void    canRecv()
+    void    canRecv() override
     {
 #ifdef PLATFORM_WINDOWS
 #else
@@ -31,19 +31,19 @@ private:
 #endif
     }
 
-    void    canSend()
+    void    canSend() override
     {
     }
 
-    void    setEventLoop(EventLoop*)
+    void    setEventLoop(EventLoop*) override
     {
     }
 
-    void    postDisConnect()
+    void    postDisConnect() override
     {
     }
 
-    void    onClose()
+    void    onClose() override
     {
     }
 
@@ -88,7 +88,7 @@ EventLoop::~EventLoop()
 
 void EventLoop::loop(int64_t timeout)
 {
-    /*  TODO::防止在loop之前就添加了一些function回调，则没有新的操作wakeup此loop的问题 */
+    /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调），将timeout改为0，表示不阻塞iocp/epoll wait   */
     if (!mAfterLoopProcs.empty())
     {
         timeout = 0;
@@ -125,10 +125,6 @@ void EventLoop::loop(int64_t timeout)
             }
         }
     }
-    else
-    {
-        //cout << this << " error code:" << GetLastError() << endl;
-    }
 #else
     int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, timeout);
     mIsAlreadyPostedWakeUp = false;
@@ -142,7 +138,7 @@ void EventLoop::loop(int64_t timeout)
         if (event_data & EPOLLRDHUP)
         {
             ds->canRecv();
-            ds->onClose();   /*  无条件调用断开处理，以防canRecv里没有recv 断开通知*/
+            ds->onClose();   /*  无条件调用断开处理(安全的，不会造成重复close)，以防canRecv里没有recv 断开通知*/
         }
         else
         {
@@ -160,7 +156,11 @@ void EventLoop::loop(int64_t timeout)
 #endif
 
     {
-        /*TODO::放在mAsyncProcs之前处理mAfterLoopProcs（此时可能其中有断开回调），如果在上层投递异步关闭（会释放DataSocket）之后再回调disconnect时，就容易出现断错误*/
+        /*  
+            warn::  此时mAfterLoopProcs里面可能包括了断开回调，而mAsyncProcs里也可能有异步断开请求。  
+                    在处理mAsyncProcs的断开请求中会释放Channel。因此必须先处理mAfterLoopProcs，以执行断开回调，如果在mAsyncProcs之后处理mAfterLoopProcs，
+                    就会出现段错误。
+        */
         copyAfterLoopProcs.swap(mAfterLoopProcs);
         for (auto& x : copyAfterLoopProcs)
         {
@@ -170,10 +170,11 @@ void EventLoop::loop(int64_t timeout)
     }
 
     {
+        /*  执行异步请求  */
         std::vector<USER_PROC> temp;
-        mAsyncListMutex.lock();
+        mAsyncProcsMutex.lock();
         temp.swap(mAsyncProcs);
-        mAsyncListMutex.unlock();
+        mAsyncProcsMutex.unlock();
 
         for (auto& x : temp)
         {
@@ -181,8 +182,9 @@ void EventLoop::loop(int64_t timeout)
         }
     }
 
+    /*  warn::  理论上可以不做下面的两次mAfterLoopProcs遍历，因为loop函数之前会判断mAfterLoopProcs是否为空。如果不为空，则不会阻塞epoll或iocp    */
     {
-        /*TODO::继续放在mAsyncProcs进行处理，是因为它可能会向mAfterLoopProcs添加flush send处理*/
+        /*  warn::  继续处理mAfterLoopProcs，是因为在执行异步请求队列时可能会向mAfterLoopProcs添加flush send等回调  */
         copyAfterLoopProcs.swap(mAfterLoopProcs);
         for (auto& x : copyAfterLoopProcs)
         {
@@ -190,7 +192,7 @@ void EventLoop::loop(int64_t timeout)
         }
         copyAfterLoopProcs.clear();
 
-        /*继续处理mAfterLoopProcs，是因为在上面的遍历中可能会收集到socket 断开，则又向mAfterLoopProcs添加了断开回调函数*/
+        /*继续处理mAfterLoopProcs，是因为在上面的遍历(执行回调）中可能会收集到socket 断开，则又向mAfterLoopProcs添加了断开回调函数*/
         copyAfterLoopProcs.swap(mAfterLoopProcs);
         for (auto& x : copyAfterLoopProcs)
         {
@@ -203,7 +205,7 @@ void EventLoop::loop(int64_t timeout)
 
     if (numComplete == mEventEntriesNum)
     {
-        /*  如果事件被填充满了，则扩大事件队列大小 */
+        /*  如果事件被填充满了，则扩大事件结果队列大小，可以让一次epoll/iocp wait获得尽可能更多的通知 */
         recalocEventSize(mEventEntriesNum + 128);
     }
 }
@@ -230,7 +232,7 @@ bool EventLoop::wakeup()
         }
         else
         {
-            /*如果一定没有处于iocp wait*/
+            /*如果一定没有处于epoll/iocp wait*/
             /*进入此else，则mIsAlreadyPostedWakeUp一定为false*/
             /*多个线程使用互斥锁判断mIsAlreadyPostedWakeUp标志，以保证不重复投递*/
             if (!mIsAlreadyPostedWakeUp)
@@ -259,7 +261,6 @@ bool EventLoop::wakeup()
 
 void EventLoop::linkChannel(int fd, Channel* ptr)
 {
-    printf("link to fd:%d \n", fd);
 #ifdef PLATFORM_WINDOWS
     HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
 #else
@@ -272,7 +273,6 @@ void EventLoop::linkChannel(int fd, Channel* ptr)
 
 void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
 {
-    printf("addChannel fd:%d\n", fd);
     pushAsyncProc([fd, c, this, f] () {
             linkChannel(fd, c);
             c->setEventLoop(this);
@@ -285,9 +285,9 @@ void EventLoop::pushAsyncProc(std::function<void(void)> f)
     if (mSelfThreadid != std::this_thread::get_id())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
-        mAsyncListMutex.lock();
+        mAsyncProcsMutex.lock();
         mAsyncProcs.push_back(f);
-        mAsyncListMutex.unlock();
+        mAsyncProcsMutex.unlock();
 
         wakeup();
     }

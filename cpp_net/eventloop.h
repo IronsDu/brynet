@@ -74,15 +74,15 @@ private:
 
     std::mutex                      mFlagMutex;
 
-    bool                            mInWaitIOEvent;             /*  如果为false表示肯定没有等待IOCP，如果为true，表示即将或已经等待iocp*/
+    bool                            mInWaitIOEvent;             /*  如果为false表示肯定没有处于epoll/iocp wait，如果为true，表示即将或已经等待*/
     bool                            mIsAlreadyPostedWakeUp;     /*  表示是否已经投递过wakeup(避免其他线程投递太多(不必要)的wakeup) */
 
     std::vector<USER_PROC>          mAsyncProcs;                /*  异步function队列,投递到此eventloop执行的回调函数   */
 
     std::vector<USER_PROC>          mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数，只能在io线程自身内对此队列做添加操作    */
-    std::vector<USER_PROC>          copyAfterLoopProcs;         /*用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素*/
+    std::vector<USER_PROC>          copyAfterLoopProcs;         /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
 
-    std::mutex                      mAsyncListMutex;
+    std::mutex                      mAsyncProcsMutex;
 
     /*调用loop函数所在thread的id*/
     std::thread::id                 mSelfThreadid;

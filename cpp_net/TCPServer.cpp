@@ -203,7 +203,9 @@ void TcpServer::RunListen(int port)
                     Channel* channel = new DataSocket(client_fd);
                     int loopIndex = rand() % mLoopNum;
                     EventLoop& loop = mLoops[loopIndex];
+                    /*  随机为此链接分配一个eventloop */
                     loop.addChannel(client_fd, channel, [this, loopIndex](Channel* arg){
+                        /*  当eventloop接管此链接后，执行此lambda回调    */
                         DataSocket* ds = static_cast<DataSocket*>(arg);
 
                         int64_t id = MakeID(loopIndex);
