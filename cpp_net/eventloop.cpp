@@ -155,58 +155,52 @@ void EventLoop::loop(int64_t timeout)
     }
 #endif
 
-    {
-        /*  
-            warn::  此时mAfterLoopProcs里面可能包括了断开回调，而mAsyncProcs里也可能有异步断开请求。  
-                    在处理mAsyncProcs的断开请求中会释放Channel。因此必须先处理mAfterLoopProcs，以执行断开回调，如果在mAsyncProcs之后处理mAfterLoopProcs，
-                    就会出现段错误。
-        */
-        copyAfterLoopProcs.swap(mAfterLoopProcs);
-        for (auto& x : copyAfterLoopProcs)
-        {
-            x();
-        }
-        copyAfterLoopProcs.clear();
-    }
+    /*
+    warn::  此时mAfterLoopProcs里面可能包括了断开回调，而mAsyncProcs里也可能有异步断开请求。
+    在处理mAsyncProcs的断开请求中会释放Channel。因此必须先处理mAfterLoopProcs，以执行断开回调，如果在mAsyncProcs之后处理mAfterLoopProcs，
+    就会出现段错误。
+    */
+    processAfterLoopProcs();
 
-    {
-        /*  执行异步请求  */
-        std::vector<USER_PROC> temp;
-        mAsyncProcsMutex.lock();
-        temp.swap(mAsyncProcs);
-        mAsyncProcsMutex.unlock();
+    /*  执行异步请求  */
+    processAsyncProcs();
 
-        for (auto& x : temp)
-        {
-            x();
-        }
-    }
+    /*  warn::  理论上可以不做下面的两次mAfterLoopProcs遍历，因为loop函数之前会判断mAfterLoopProcs是否为空。如果不为空，则不会阻塞epoll或iocp，但这样直接让epoll/iocp返回可能会浪费一些CPU（需要具体测试）    */
 
-    /*  warn::  理论上可以不做下面的两次mAfterLoopProcs遍历，因为loop函数之前会判断mAfterLoopProcs是否为空。如果不为空，则不会阻塞epoll或iocp    */
-    {
-        /*  warn::  继续处理mAfterLoopProcs，是因为在执行异步请求队列时可能会向mAfterLoopProcs添加flush send等回调  */
-        copyAfterLoopProcs.swap(mAfterLoopProcs);
-        for (auto& x : copyAfterLoopProcs)
-        {
-            x();
-        }
-        copyAfterLoopProcs.clear();
+    /*  warn::  继续处理mAfterLoopProcs，是因为在执行异步请求队列时可能会向mAfterLoopProcs添加flush send等回调  */
+    processAfterLoopProcs();
+    /*  warn::  继续处理mAfterLoopProcs，是因为在上面的遍历(执行回调）中可能会收集到socket 断开，则又向mAfterLoopProcs添加了断开回调函数*/
+    processAfterLoopProcs();
 
-        /*继续处理mAfterLoopProcs，是因为在上面的遍历(执行回调）中可能会收集到socket 断开，则又向mAfterLoopProcs添加了断开回调函数*/
-        copyAfterLoopProcs.swap(mAfterLoopProcs);
-        for (auto& x : copyAfterLoopProcs)
-        {
-            x();
-        }
-        copyAfterLoopProcs.clear();
-
-        assert(mAfterLoopProcs.empty());
-    }
+    assert(mAfterLoopProcs.empty());
 
     if (numComplete == mEventEntriesNum)
     {
         /*  如果事件被填充满了，则扩大事件结果队列大小，可以让一次epoll/iocp wait获得尽可能更多的通知 */
         recalocEventSize(mEventEntriesNum + 128);
+    }
+}
+
+void EventLoop::processAfterLoopProcs()
+{
+    copyAfterLoopProcs.swap(mAfterLoopProcs);
+    for (auto& x : copyAfterLoopProcs)
+    {
+        x();
+    }
+    copyAfterLoopProcs.clear();
+}
+
+void EventLoop::processAsyncProcs()
+{
+    std::vector<USER_PROC> temp;
+    mAsyncProcsMutex.lock();
+    temp.swap(mAsyncProcs);
+    mAsyncProcsMutex.unlock();
+
+    for (auto& x : temp)
+    {
+        x();
     }
 }
 

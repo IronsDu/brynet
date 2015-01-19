@@ -37,9 +37,6 @@ int main()
 
     EventLoop       mainLoop;
 
-    /*  TODO::怎么优化消息队列，网络层没有不断的flush消息队列，然而又不能在每个消息发送都强制flush，当然逻辑层也可以采取主动拉的方式。去强制拉过来   */
-    /*  TODO::把(每个IO线程一个消息队列)消息队列隐藏到TCPServer中。 对用户不可见    */
-    /*逻辑线程对DataSocket不可见，而是采用id通信(也要确保不串话)。逻辑线程会：1，发数据。2，断开链接。  所以TCPServer的loop要每个循环处理消息队列*/
     /*  客户端IO线程   */
 
     std::thread** ts = new std::thread*[thread_num];
@@ -96,7 +93,6 @@ int main()
             }
         });
     }
-
 
     for (int i = 0; i < thread_num; ++i)
     {

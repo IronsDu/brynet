@@ -37,12 +37,9 @@ public:
     /*  投递一个链接，跟此eventloopEventLoop绑定，当被eventloop处理时会触发f回调  */
     void                            addChannel(int fd, Channel*, CHANNEL_ENTER_HANDLE f);
 
-    /*  投递一个异步function，此eventloop被唤醒后，会回调此f*/
+    /*  投递一个异步回调，在EventLoop::loop被唤醒后执行 */
     void                            pushAsyncProc(USER_PROC f);
-
-                                    /*  放入一个每次loop最后要执行的函数(TODO::仅在loop线程自身内调用)  */
-                                    /*  比如实现一个datasocket有多个buffer要发送时，采用一个function进行合并包flush，则不是每一个buffer进行一次send   */
-                                    /*  非线程安全   */
+    /*  非线程安全:投递回调放置在单次loop结尾时执行   */
     void                            pushAfterLoopProc(USER_PROC f);
 
     void                            restoreThreadID();
@@ -54,6 +51,8 @@ public:
 private:
     void                            recalocEventSize(int size);
     void                            linkChannel(int fd, Channel* ptr);
+    void                            processAfterLoopProcs();
+    void                            processAsyncProcs();
 
 private:
     int                             mEventEntriesNum;
@@ -77,9 +76,9 @@ private:
     bool                            mInWaitIOEvent;             /*  如果为false表示肯定没有处于epoll/iocp wait，如果为true，表示即将或已经等待*/
     bool                            mIsAlreadyPostedWakeUp;     /*  表示是否已经投递过wakeup(避免其他线程投递太多(不必要)的wakeup) */
 
-    std::vector<USER_PROC>          mAsyncProcs;                /*  异步function队列,投递到此eventloop执行的回调函数   */
+    std::vector<USER_PROC>          mAsyncProcs;                /*  投递到此eventloop的异步function队列    */
 
-    std::vector<USER_PROC>          mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数，只能在io线程自身内对此队列做添加操作    */
+    std::vector<USER_PROC>          mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数   */
     std::vector<USER_PROC>          copyAfterLoopProcs;         /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
 
     std::mutex                      mAsyncProcsMutex;

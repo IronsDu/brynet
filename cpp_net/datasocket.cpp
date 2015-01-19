@@ -84,12 +84,45 @@ void    DataSocket::canRecv()
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
 #endif
+    mEventLoop->pushAfterLoopProc([this](){
+        recv();
+    });
+}
 
+void DataSocket::canSend()
+{
+#ifdef PLATFORM_WINDOWS
+    mPostWriteCheck = false;
+#endif
+    mCanWrite = true;
+    runAfterFlush();
+}
+
+void DataSocket::runAfterFlush()
+{
+    if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
+    {
+        mEventLoop->pushAfterLoopProc([this](){
+            mIsPostFlush = false;
+            flush();
+        });
+
+        mIsPostFlush = true;
+    }
+}
+
+void DataSocket::freeSendPacketList()
+{
+    mSendList.clear();
+}
+
+void DataSocket::recv()
+{
     bool must_close = false;
-    char temp[1024*10];
+    char temp[1024 * 10];
     while (mFD != SOCKET_ERROR)
     {
-        int retlen = recv(mFD, temp, sizeof(temp), 0);
+        int retlen = ::recv(mFD, temp, sizeof(temp), 0);
         if (retlen < 0)
         {
             if (sErrno == S_EWOULDBLOCK)
@@ -122,33 +155,6 @@ void    DataSocket::canRecv()
         /*  回调到用户层  */
         tryOnClose();
     }
-}
-
-void DataSocket::canSend()
-{
-#ifdef PLATFORM_WINDOWS
-    mPostWriteCheck = false;
-#endif
-    mCanWrite = true;
-    runAfterFlush();
-}
-
-void DataSocket::runAfterFlush()
-{
-    if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
-    {
-        mEventLoop->pushAfterLoopProc([this](){
-            mIsPostFlush = false;
-            flush();
-        });
-
-        mIsPostFlush = true;
-    }
-}
-
-void DataSocket::freeSendPacketList()
-{
-    mSendList.clear();
 }
 
 void DataSocket::flush()

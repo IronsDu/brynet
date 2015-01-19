@@ -17,11 +17,7 @@
 
 TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
 {
-    {
-        SessionId tmp;
-        (void)tmp;
-        assert(sizeof(tmp) == sizeof(tmp.id));
-    }
+    static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
 
     mLoops = new EventLoop[threadNum];
     mIOThreads = new std::thread*[threadNum];

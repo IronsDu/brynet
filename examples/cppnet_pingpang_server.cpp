@@ -67,7 +67,9 @@ int main()
     
     int total_client_num = 0;
 
-    MsgQueue<NetMsg*>  msgList; /*  用于网络IO线程发送网络消息给逻辑线程 */
+    /*  用于网络IO线程发送消息给逻辑线程的消息队列,当网络线程的回调函数push消息后，需要wakeup主线程 */
+    /*  当然，TcpServer的各个回调函数中可以自己处理消息，而不必发送到msgList队列    */
+    MsgQueue<NetMsg*>  msgList;
     EventLoop       mainLoop;
 
     TcpServer t(port_num, thread_num, [&](EventLoop& l){
@@ -142,7 +144,7 @@ int main()
         }
     });
 
-    /*  主线程处理服务器端IO*/
+    /*  主线程处理msgList消息队列    */
     int64_t lasttime = ox_getnowtime();
 
     while (true)

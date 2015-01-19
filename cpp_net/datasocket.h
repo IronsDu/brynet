@@ -45,6 +45,7 @@ private:
     bool                            checkRead();
     bool                            checkWrite();
 
+    void                            recv();
     void                            flush();
 
     /*此函数主要为了在windows下尝试调用onClose*/
@@ -91,7 +92,7 @@ private:
 
     bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
 
-    int64_t                         mUserData;
+    int64_t                         mUserData;          /*  链接的用户自定义数据  */
 };
 
 #endif

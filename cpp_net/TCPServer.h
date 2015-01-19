@@ -51,17 +51,19 @@ private:
     TcpServer::DATA_HANDLE              mDataHandle;
 
     /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
+    
     union SessionId
     {
         struct
         {
-            int8_t loopIndex;       /*  会话所属的eventloop的(在mLoops中的)索引  */
-            int32_t index : 24;     /*  会话在mIds[loopIndex]中的索引值 */
-            int32_t iid;            /*  自增计数器   */
-        }data;  /*  warn::so,服务器最大支持0x7f个io loop线程，每一个io loop最大支持0x7fffff个链接。*/
+            uint16_t    loopIndex;      /*  会话所属的eventloop的(在mLoops中的)索引  */
+            uint16_t    index;          /*  会话在mIds[loopIndex]中的索引值 */
+            uint32_t    iid;            /*  自增计数器   */
+        }data;  /*  warn::so,服务器最大支持0xFFFF(65536)个io loop线程，每一个io loop最大支持0xFFFF(65536)个链接。*/
 
         int64_t id;
     };
+    
 };
 
 #endif
