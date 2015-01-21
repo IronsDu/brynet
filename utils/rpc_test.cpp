@@ -567,23 +567,14 @@ void test6(string a, int b, map<string, int> vlist)
 {
 }
 
-void test7(vector<map<int,string>> vlist)
+void test7(vector<map<int,string>>& vlist)
 {
-    cout << "in test7" << endl;
 }
-
-class Test
-{
-public:
-    void    foo(int i, int j)
-    {
-        cout << i << j << endl;
-    }
-};
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
 int main()
 {
-    Test* pt = new Test;
-    std::function<void(int, int)> fff = std::bind(&Test::foo, pt, std::placeholders::_1, std::placeholders::_2);
     int upvalue = 10;
     using namespace dodo;
 
@@ -605,8 +596,20 @@ int main()
         cout << "j is " << j << endl;
     });
     
-    rpc_request_msg = rpc_client.call("test_functor", 1);
-    rpc_server.handleRpc(rpc_request_msg);
+    int count = 0;
+#ifdef _MSC_VER
+#include <Windows.h>
+    DWORD starttime = GetTickCount();
+    while (count++ <= 100000)
+    {
+        rpc_request_msg = rpc_client.call("test_functor", 1);
+        rpc_server.handleRpc(rpc_request_msg);
+    }
+
+    cout << "cost :" << GetTickCount() - starttime << endl;
+#endif
+    
+
     rpc_request_msg = rpc_client.call("test_lambda", 2);
     rpc_server.handleRpc(rpc_request_msg);
 
@@ -621,9 +624,19 @@ int main()
         map<int, string> b = { { 2, "haha" } };
         vlist.push_back(a);
         vlist.push_back(b);
-        rpc_request_msg = rpc_client.call("test7", vlist);
 
-        rpc_server.handleRpc(rpc_request_msg);
+        int count = 0;
+#ifdef _MSC_VER
+#include <Windows.h>
+        DWORD starttime = GetTickCount();
+        while (count++ <= 100000)
+        {
+            rpc_request_msg = rpc_client.call("test7", vlist);
+            rpc_server.handleRpc(rpc_request_msg);
+        }
+
+        cout << "cost :" << GetTickCount() - starttime << endl;
+#endif
     }
 
     map<int, string> m1;
