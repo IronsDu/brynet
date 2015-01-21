@@ -8,8 +8,11 @@
 #include <functional>
 #include <tuple>
 
-#include "json_object.h"
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
+using namespace rapidjson;
 using namespace std;
 
 namespace dodo
@@ -38,249 +41,243 @@ namespace dodo
         typedef char TYPE;
     };
 
+    template<typename A>
+    struct remove_const { typedef A type; };
+    template<typename A>
+    struct remove_const<const A> { typedef A type; };
+
+    template<typename A>
+    struct base_type { typedef A type; };
+    template<typename A>
+    struct base_type<A*> { typedef A type; };
+    template<typename A>
+    struct base_type<A&> { typedef A type; };
+
     class Utils
     {
     public:
-        void static readJson(JsonObject& msg, const char* key, char& ret)
+        /*  反序列-从json中读取数据  */
+        static  void    readJson(Document& doc, const Value& msg, char& ret)
         {
-            ret = msg.getInt(key);
+            ret = msg.GetInt();
         }
 
-        void static readJson(JsonObject& msg, const char* key, int& ret)
+        static  void    readJson(Document& doc, const Value& msg, int& ret)
         {
-            ret = msg.getInt(key);
+            ret = msg.GetInt();
         }
 
-        void static readJson(JsonObject& msg, const char* key, JsonObject& ret)
+        /*  TODO::因为Value无法拷贝，且没有空构造函数，所以实际上rpc function不支持Value作为参数;如果需要用json表示复杂参数，只能用字符串json代替   */
+        static  void    readJson(Document& doc, const Value& msg, Value& ret)
         {
-            ret = msg.getObject(key);
+            ret.CopyFrom(msg, doc.GetAllocator());
         }
 
-        void static readJson(JsonObject& msg, const char* key, string& ret)
+        static  void    readJson(Document& doc, const Value& msg, string& ret)
         {
-            ret = msg.getStr(key);
+            ret = msg.GetString();
         }
 
-        void static readJson(JsonObject& msg, const char* key, vector<int>& ret)
+        static  void    readJson(Document& doc, const Value& msg, vector<int>& ret)
         {
-            JsonObject arrayJson = msg.getObject(key);
-            for (int i = 0; i < arrayJson.getSize(); ++i)
+            for (size_t i = 0; i < msg.Size(); ++i)
             {
-                stringstream ss;
-                ss << i;
-                JsonObject valueObject = arrayJson.getByIndex(i);
-                ret.push_back(atoi(valueObject.toString().c_str()));
+                ret.push_back(msg[i].GetInt());
             }
         }
 
-        void static readJson(JsonObject& msg, const char* key, vector<string>& ret)
+        static  void    readJson(Document& doc, const Value& msg, vector<string>& ret)
         {
-            JsonObject arrayJson = msg.getObject(key);
-            for (int i = 0; i < arrayJson.getSize(); ++i)
+            for (size_t i = 0; i < msg.Size(); ++i)
             {
-                stringstream ss;
-                ss << i;
-                JsonObject valueObject = arrayJson.getByIndex(i);
-                ret.push_back(valueObject.getJsonValue().asString());
+                ret.push_back(msg[i].GetString());
             }
         }
 
         template<typename T>
-        void static readJson(JsonObject& msg, const char* key, vector<T>& ret)
+        static  void    readJson(Document& doc, const Value& msg, vector<T>& ret)
         {
-            JsonObject arrayJson = msg.getObject(key);
-            for (Json::Value::const_iterator it = arrayJson.begin(); it != arrayJson.end(); ++it)
+            for (size_t i = 0; i < msg.Size(); ++i)
             {
-                Json::Value vkey = it.key();
-                T o;
-                readJson(arrayJson, vkey.asString().c_str(), o);
-                ret.push_back(o);
-            }
-        }
-
-        template<typename U, typename V>
-        void static readJson(JsonObject& msg, const char* key, map<U, V>& ret)
-        {
-            /*根据map对象在msg中的key，获取map对象所对应的jsonobject*/
-            JsonObject mapObject = msg.getObject(key);
-            /*遍历此map的jsonobject*/
-            for (Json::Value::const_iterator it = mapObject.begin(); it != mapObject.end(); ++it)
-            {
-                /*根据此索引的key，从map的jsonobject里读取对应的value*/
-                V tv;
-                Json::Value vkey = it.key();
-                readJson(mapObject, vkey.asString().c_str(), tv);
-
-                /*把json中的key(总是string)转换到真实的key(int或string)*/
-                U realKey;
-                stringstream ss;
-                ss << vkey.asString();
-                ss >> realKey;
-
-                /*把value放入到结果map中*/
-                ret[realKey] = tv;
-            }
-        }
-
-        void static readJson(JsonObject& msg, const char* key, map<string, string>& ret)
-        {
-            JsonObject mapJson = msg.getObject(key);
-            Json::Value::const_iterator itend = mapJson.end();
-            for (Json::Value::const_iterator it = mapJson.begin(); it != itend; ++it)
-            {
-                Json::Value vkey = it.key();
-                Json::Value vvalue = *it;
-                ret[vkey.asString()] = vvalue.asString();
-            }
-        }
-
-        void static readJson(JsonObject& msg, const char* key, map<int, string>& ret)
-        {
-            JsonObject mapJson = msg.getObject(key);
-            Json::Value::const_iterator itend = mapJson.end();
-            for (Json::Value::const_iterator it = mapJson.begin(); it != itend; ++it)
-            {
-                Json::Value vkey = it.key();
-                Json::Value vvalue = *it;
-                ret[atoi(vkey.asString().c_str())] = vvalue.asString();
-            }
-        }
-
-        void static readJson(JsonObject& msg, const char* key, map<string, int>& ret)
-        {
-            JsonObject mapJson = msg.getObject(key);
-            Json::Value::const_iterator itend = mapJson.end();
-            for (Json::Value::const_iterator it = mapJson.begin(); it != itend; ++it)
-            {
-                Json::Value vkey = it.key();
-                Json::Value vvalue = *it;
-                ret[vkey.asString()] = vvalue.asInt();
+                T element;
+                readJson(doc, msg[i], element);
+                ret.push_back(element);
             }
         }
 
         template<typename T>
-        T static readJsonByIndex(JsonObject& msg, int index)
+        static  void    readJson(Document& doc, const Value& msg, map<string, T>& ret)
         {
-            stringstream ss;
-            ss << index;
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            {
+                T tv;
+                readJson(doc, (*itr).value, tv);
+                ret[(*itr).name.GetString()] = tv;
+            }
+        }
+
+        template<typename T>
+        static  void    readJson(Document& doc, const Value& msg, map<int, T>& ret)
+        {
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            {
+                T tv;
+                readJson(doc, (*itr).value, tv);
+                ret[atoi((*itr).name.GetString())] = tv;
+            }
+        }
+
+        static  void    readJson(Document& doc, const Value& msg, map<string, string>& ret)
+        {
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            {
+                ret[(*itr).name.GetString()] = (*itr).value.GetString();
+            }
+        }
+
+        static  void    readJson(Document& doc, const Value& msg, map<int, string>& ret)
+        {
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            {
+                ret[atoi((*itr).name.GetString())] = (*itr).value.GetString();
+            }
+        }
+
+        static  void    readJson(Document& doc, const Value& msg, map<string, int>& ret)
+        {
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            {
+                ret[(*itr).name.GetString()] = (*itr).value.GetInt();
+            }
+        }
+
+        template<typename T>
+        static  T   readJsonByIndex(Document& doc, const Value& msg, int index)
+        {
             T tmp;
-            readJson(msg, ss.str().c_str(), tmp);
+            const Value& element = msg[Utils::itoa(index)];
+            /*  TODO::readJson无法解决递归map和vector中的偏特化问题,所以有不必要的临时变量生成（无法利用右值引用),可用类模板解决   */
+            readJson(doc,element, tmp);
             return tmp;
         }
 
     public:
-        void    static  writeJson(JsonObject& msg, int value, const char* key)
+        /*  序列化-把数据转换为json  */
+        static  Value    writeJson(Document& doc, const int& value)
         {
-            msg.setInt(key, value);
+            return Value(value);
         }
 
-        void    static  writeJson(JsonObject& msg, const char* value, const char* key)
+        static  Value   writeJson(Document& doc, const char* const& value)
         {
-            msg.setStr(key, value);
+            return Value(value, doc.GetAllocator());
         }
 
-        void    static  writeJson(JsonObject& msg, string value, const char* key)
+        static  Value   writeJson(Document& doc, const string& value)
         {
-            msg.setStr(key, value.c_str());
+            return Value(value.c_str(), doc.GetAllocator());
         }
 
-        void    static  writeJson(JsonObject& msg, JsonObject value, const char* key)
+        static  Value   writeJson(Document& doc, const Value& value)
         {
-            msg.setObject(key, value);
+            Value ret;
+            ret.CopyFrom(value, doc.GetAllocator());
+            return ret;
         }
 
-        void    static  writeJson(JsonObject& msg, vector<int> value, const char* key)
+        static  Value   writeJson(Document& doc, const vector<int>& value)
         {
-            JsonObject arrayObject;
+            Value arrayObject(kArrayType);
             for (size_t i = 0; i < value.size(); ++i)
             {
-                arrayObject.appendInt(value[i]);
+                arrayObject.PushBack(Value(value[i]), doc.GetAllocator());
             }
-            msg.setObject(key, arrayObject);
+            return arrayObject;
         }
 
-        void    static  writeJson(JsonObject& msg, vector<string> value, const char* key)
+        static  Value   writeJson(Document& doc, const vector<string>& value)
         {
-            JsonObject arrayObject;
+            Value arrayObject(kArrayType);
             for (size_t i = 0; i < value.size(); ++i)
             {
-                arrayObject.appendStr(value[i].c_str());
+                arrayObject.PushBack(Value(value[i].c_str(), doc.GetAllocator()), doc.GetAllocator());
             }
-            msg.setObject(key, arrayObject);
+            return arrayObject;
         }
 
         template<typename T>
-        void    static  writeJson(JsonObject& msg, vector<T> value, const char* key)
+        static  Value   writeJson(Document& doc, const vector<T>& value)
         {
-            JsonObject arrayObject;
+            Value arrayObject(kArrayType);
             for (size_t i = 0; i < value.size(); ++i)
             {
-                JsonObject valueObject;
-                stringstream ss;
-                ss << i;
-                writeJson(arrayObject, value[i], ss.str().c_str());
+                Value&& v = writeJson(doc, value[i]);
+                arrayObject.PushBack(std::forward<Value&&>(v), doc.GetAllocator());
             }
-            msg.setObject(key, arrayObject);
+            return arrayObject;
         }
 
         template<typename T, typename V>
-        void    static    writeJson(JsonObject& msg, map<T, V> value, const char* key)
+        static  Value   writeJson(Document& doc, const map<T, V>& value)
         {
-            JsonObject mapObject;
+            Value mapObject(kObjectType);
             /*遍历此map*/
-            for (map<T, V>::iterator it = value.begin(); it != value.end(); ++it)
+            for (map<T, V>::const_iterator it = value.begin(); it != value.end(); ++it)
             {
-                stringstream ss;
-                ss << it->first;
                 /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
-                writeJson(mapObject, it->second, ss.str().c_str());
+                Value&& v = writeJson(doc, it->second);
+                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa(it->first), doc.GetAllocator()), std::forward<Value&&>(v), doc.GetAllocator());
             }
 
             /*把此map添加到msg中*/
-            msg.setObject(key, mapObject);
+            return mapObject;
         }
 
-        void    static  writeJson(JsonObject& msg, map<string, string> value, const char* key)
+        static  Value   writeJson(Document& doc, const map<string, string>& value)
         {
-            JsonObject mapObject;
-            map<string, string>::iterator itend = value.end();
-            for (map<string, string>::iterator it = value.begin(); it != itend; ++it)
+            Value mapObject(kObjectType);
+            map<string, string>::const_iterator itend = value.end();
+            for (map<string, string>::const_iterator it = value.begin(); it != itend; ++it)
             {
-                mapObject.setStr(it->first.c_str(), it->second.c_str());
+                mapObject.AddMember(GenericValue<UTF8<>>(it->first.c_str(), doc.GetAllocator()), Value(it->second.c_str(), doc.GetAllocator()), doc.GetAllocator());
             }
-            msg.setObject(key, mapObject);
+            return mapObject;
         }
 
-        void    static  writeJson(JsonObject& msg, map<int, string> value, const char* key)
+        static  Value   writeJson(Document& doc, const map<int, string>& value)
         {
-            JsonObject mapObject;
-            map<int, string>::iterator itend = value.end();
-            for (map<int, string>::iterator it = value.begin(); it != itend; ++it)
+            Value mapObject(kObjectType);
+            map<int, string>::const_iterator itend = value.end();
+            for (map<int, string>::const_iterator it = value.begin(); it != itend; ++it)
             {
-                stringstream ss;
-                ss << it->first;
-                mapObject.setStr(ss.str().c_str(), it->second.c_str());
+                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa((*it).first), doc.GetAllocator()), Value(it->second.c_str(), doc.GetAllocator()), doc.GetAllocator());
             }
-            msg.setObject(key, mapObject);
+            return mapObject;
         }
 
-        void    static  writeJson(JsonObject& msg, map<string, int> value, const char* key)
+        static  Value   writeJson(Document& doc, const map<string, int>& value)
         {
-            JsonObject mapObject;
-            map<string, int>::iterator itend = value.end();
-            for (map<string, int>::iterator it = value.begin(); it != itend; ++it)
+            Value mapObject(kObjectType);
+            map<string, int>::const_iterator itend = value.end();
+            for (map<string, int>::const_iterator it = value.begin(); it != itend; ++it)
             {
-                mapObject.setInt(it->first.c_str(), it->second);
+                mapObject.AddMember(GenericValue<UTF8<>>(it->first.c_str(), doc.GetAllocator()), Value(it->second), doc.GetAllocator());
             }
-            msg.setObject(key, mapObject);
+            return mapObject;
         }
 
         template<typename T>
-        void    static  writeJsonByIndex(JsonObject& msg, T t, int index)
+        static  void    writeJsonByIndex(Document& doc, Value& msg, const T& t, int index)
         {
-            stringstream ss;
-            ss << index;
-            writeJson(msg, t, ss.str().c_str());
+            Value&& v = writeJson(doc, t);
+            msg.AddMember(GenericValue<UTF8<>>(Utils::itoa(index), doc.GetAllocator()), std::forward<Value&&>(v), doc.GetAllocator());
+        }
+
+        static  char*   itoa(int value)
+        {
+            static char tmp[1024];
+            sprintf(tmp, "%d", value);
+            return tmp;
         }
     };
 
@@ -289,16 +286,15 @@ namespace dodo
     public:
         void    execute(const char* str)
         {
-            JsonObject msgObject;
-            msgObject.read(str);
+            mDoc.Parse(str);
 
-            string name = msgObject.getStr("name");
-            JsonObject parmObject = msgObject.getObject("parm");
+            string name = mDoc["name"].GetString();
+            const Value& parmObject = mDoc["parm"];
 
             assert(mWrapFunctions.find(name) != mWrapFunctions.end());
             if (mWrapFunctions.find(name) != mWrapFunctions.end())
             {
-                mWrapFunctions[name](mRealFunctionPtr[name], parmObject.toString().c_str());
+                mWrapFunctions[name](mRealFunctionPtr[name], mDoc, parmObject);
             }
         }
 
@@ -336,23 +332,21 @@ namespace dodo
                 mf = f;
             }
 
-            static void invoke(void* pvoid, const char* str)
+            static void invoke(void* pvoid, Document& doc, const Value& msg)
             {
-                JsonObject msg;
-                msg.read(str);
                 int parmIndex = 0;
-                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pvoid, msg, parmIndex);
+                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pvoid, doc, msg, parmIndex);
             }
 
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
-            static  void    eval(int _, void* pvoid, JsonObject& msg, int& parmIndex, const NowArgs&... args)
+            static  void    eval(int _, void* pvoid, Document& doc, const Value& msg, int& parmIndex, NowArgs&... args)
             {
-                T cur_arg = Utils::readJsonByIndex<T>(msg, parmIndex++);
-                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, msg, parmIndex, args..., cur_arg);
+                remove_const<base_type<T>::type>::type cur_arg = Utils::readJsonByIndex<remove_const<base_type<T>::type>::type>(doc, msg, parmIndex++);
+                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, doc, msg, parmIndex, args..., cur_arg);
             }
 
             template<typename ...NowArgs>
-            static  void    eval(char _, void* pvoid, JsonObject& msg, int& parmIndex, const NowArgs&... args)
+            static  void    eval(char _, void* pvoid, Document& doc, const Value& msg, int& parmIndex, NowArgs&... args)
             {
                 VariadicArgFunctor<Args...>* pthis = (VariadicArgFunctor<Args...>*)pvoid;
                 (pthis->mf)(args...);
@@ -371,10 +365,11 @@ namespace dodo
         }
 
     private:
-        typedef void(*pf_wrap)(void* pbase, const char* parmStr);
-        map<string, pf_wrap>       mWrapFunctions;
-        map<string, void*>         mRealFunctionPtr;
+        typedef void(*pf_wrap)(void* pbase, Document& doc, const Value& msg);
+        map<string, pf_wrap>        mWrapFunctions;
+        map<string, void*>          mRealFunctionPtr;
         int                         mNextID;
+        Document                    mDoc;
     };
 
     template<bool>
@@ -384,12 +379,10 @@ namespace dodo
     struct SelectWriteArg<true>
     {
         template<typename ARGTYPE>
-        static  void    Write(FunctionMgr& functionMgr, JsonObject& parms, ARGTYPE arg, int index)
+        static  void    Write(FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
         {
             int id = functionMgr.makeNextID();
-            stringstream ss;
-            ss << id;
-            functionMgr.insertLambda(ss.str(), arg);
+            functionMgr.insertLambda(Utils::itoa(id), arg);
         }
     };
 
@@ -397,16 +390,16 @@ namespace dodo
     struct SelectWriteArg<false>
     {
         template<typename ARGTYPE>
-        static  void    Write(FunctionMgr& functionMgr, JsonObject& parms, ARGTYPE arg, int index)
+        static  void    Write(FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
         {
-            Utils::writeJsonByIndex(parms, arg, index);
+            Utils::writeJsonByIndex(doc, parms, arg, index);
         }
     };
 
     class rpc
     {
     public:
-        rpc()
+        rpc() : mWriter(mBuffer)
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
             def("rpc_reply", [this](string response){
@@ -424,19 +417,24 @@ namespace dodo
         template<typename... Args>
         string    call(const char* funname, const Args&... args)
         {
-            JsonObject msg;
-            msg.setStr("name", funname);
-
             int old_req_id = mResponseCallbacks.getNowID();
-            JsonObject parms;
+
+            Value msg(kObjectType);
+            msg.AddMember(GenericValue<UTF8<>>("name", mDoc.GetAllocator()), Value(funname, mDoc.GetAllocator()), mDoc.GetAllocator());
             int index = 0;
-            writeCallArg(parms, index, args...);
+            
+            Value parms(kObjectType);
+            writeCallArg(mDoc, parms, index, args...);
+            msg.AddMember(GenericValue<UTF8<>>("parm", mDoc.GetAllocator()), parms, mDoc.GetAllocator());
 
-            msg.setObject("parm", parms);
             int now_req_id = mResponseCallbacks.getNowID();
-            msg.setInt("req_id", old_req_id == now_req_id ? -1 : now_req_id);   /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
+            /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
+            msg.AddMember(GenericValue<UTF8<>>("req_id", mDoc.GetAllocator()), Value(old_req_id == now_req_id ? -1 : now_req_id), mDoc.GetAllocator());
 
-            return msg.toString();
+            mBuffer.Clear();
+            mWriter.Reset(mBuffer);
+            msg.Accept(mWriter);
+            return mBuffer.GetString();
         }
 
         /*  处理rpc请求 */
@@ -450,9 +448,7 @@ namespace dodo
         string    reply(int reqid, const Args&... args)
         {
             /*  把实际返回值打包作为参数,调用对端的rpc_reply 函数*/
-            stringstream ss;
-            ss << reqid;
-            string response = call(ss.str().c_str(), args...);
+            string response = call(Utils::itoa(reqid), args...);
 
             return call("rpc_reply", response);
         }
@@ -464,28 +460,28 @@ namespace dodo
         }
 
     private:
-        void    writeCallArg(JsonObject& msg, int& index){}
+        void    writeCallArg(Document& doc, int& index){}
 
         template<typename Arg>
-        void    writeCallArg(JsonObject& msg, int& index, const Arg& arg)
+        void    writeCallArg(Document& doc, Value& msg, int& index, const Arg& arg)
         {
             /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-            _selectWriteArg(msg, arg, index++);
+            _selectWriteArg(doc, msg, arg, index++);
         }
 
         template<typename Arg1, typename... Args>
-        void    writeCallArg(JsonObject& msg, int& index, const Arg1& arg1, const Args&... args)
+        void    writeCallArg(Document& doc, Value& msg, int& index, const Arg1& arg1, const Args&... args)
         {
-            Utils::writeJsonByIndex(msg, arg1, index++);
-            writeCallArg(msg, index, args...);
+            Utils::writeJsonByIndex(doc, msg, arg1, index++);
+            writeCallArg(doc, msg, index, args...);
         }
     private:
 
         /*如果是lambda则加入回调管理器，否则添加到rpc参数*/
         template<typename ARGTYPE>
-        void    _selectWriteArg(JsonObject& parms, ARGTYPE arg, int index)
+        void    _selectWriteArg(Document& doc, Value& msg, const ARGTYPE& arg, int index)
         {
-            SelectWriteArg<HasCallOperator<ARGTYPE>::value>::Write(mResponseCallbacks, parms, arg, index);
+            SelectWriteArg<HasCallOperator<ARGTYPE>::value>::Write(mResponseCallbacks, doc, msg, arg, index);
         }
 
     private:
@@ -501,8 +497,11 @@ namespace dodo
             mRpcFunctions.insertLambda(funname, lambdaObj);
         }
     private:
-        FunctionMgr               mResponseCallbacks;
-        FunctionMgr               mRpcFunctions;
+        FunctionMgr                 mResponseCallbacks;
+        FunctionMgr                 mRpcFunctions;
+        Document                    mDoc;
+        StringBuffer                mBuffer;
+        Writer<StringBuffer>        mWriter;
     };
 }
 
@@ -534,10 +533,6 @@ private:
     {
         cout << i << j << endl;
     }
-
-private:
-    int ma;
-    int mb;
 };
 
 void test1(int a, int b)
@@ -558,13 +553,13 @@ void test3(string a, int b, string c)
     cout << a << ", " << b << ", " << c << endl;
 }
 
-void test4(string a, int b)
+void test4(const string a, int b)
 {
     cout << "in test4" << endl;
     cout << a << "," << b <<  endl;
 }
 
-void test5(string a, int b, map<int, map<int, string>> vlist)
+void test5(const string a, int& b, const map<int, map<int, string>>& vlist)
 {
 }
 
@@ -577,8 +572,18 @@ void test7(vector<map<int,string>> vlist)
     cout << "in test7" << endl;
 }
 
+class Test
+{
+public:
+    void    foo(int i, int j)
+    {
+        cout << i << j << endl;
+    }
+};
 int main()
 {
+    Test* pt = new Test;
+    std::function<void(int, int)> fff = std::bind(&Test::foo, pt, std::placeholders::_1, std::placeholders::_2);
     int upvalue = 10;
     using namespace dodo;
 
