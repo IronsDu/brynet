@@ -56,113 +56,153 @@ namespace dodo
     class Utils
     {
     public:
-        /*  反序列-从json中读取数据  */
-        static  void    readJson(Document& doc, const Value& msg, char& ret)
-        {
-            ret = msg.GetInt();
-        }
+        /*  反序列化    */
+        template<typename T>
+        struct ReadJson;
 
-        static  void    readJson(Document& doc, const Value& msg, int& ret)
+        template<>
+        struct ReadJson<char>
         {
-            ret = msg.GetInt();
-        }
-
-        /*  TODO::因为Value无法拷贝，且没有空构造函数，所以实际上rpc function不支持Value作为参数;如果需要用json表示复杂参数，只能用字符串json代替   */
-        static  void    readJson(Document& doc, const Value& msg, Value& ret)
-        {
-            ret.CopyFrom(msg, doc.GetAllocator());
-        }
-
-        static  void    readJson(Document& doc, const Value& msg, string& ret)
-        {
-            ret = msg.GetString();
-        }
-
-        static  void    readJson(Document& doc, const Value& msg, vector<int>& ret)
-        {
-            for (size_t i = 0; i < msg.Size(); ++i)
+            static  char    read(const Value& msg)
             {
-                ret.push_back(msg[i].GetInt());
+                return msg.GetInt();
             }
-        }
+        };
 
-        static  void    readJson(Document& doc, const Value& msg, vector<string>& ret)
+        template<>
+        struct ReadJson<int>
         {
-            for (size_t i = 0; i < msg.Size(); ++i)
+            static  int    read(const Value& msg)
             {
-                ret.push_back(msg[i].GetString());
+                return msg.GetInt();
             }
-        }
+        };
+
+        template<>
+        struct ReadJson<string>
+        {
+            static  string    read(const Value& msg)
+            {
+                return msg.GetString();
+            }
+        };
+
+        template<>
+        struct ReadJson<vector<int>>
+        {
+            static  vector<int>    read(const Value& msg)
+            {
+                vector<int> ret;
+                for (size_t i = 0; i < msg.Size(); ++i)
+                {
+                    ret.push_back(msg[i].GetInt());
+                }
+
+                return ret;
+            }
+        };
+
+        template<>
+        struct ReadJson<vector<string>>
+        {
+            static  vector<string>    read(const Value& msg)
+            {
+                vector<string> ret;
+                for (size_t i = 0; i < msg.Size(); ++i)
+                {
+                    ret.push_back(msg[i].GetString());
+                }
+
+                return ret;
+            }
+        };
 
         template<typename T>
-        static  void    readJson(Document& doc, const Value& msg, vector<T>& ret)
+        struct ReadJson<vector<T>>
         {
-            for (size_t i = 0; i < msg.Size(); ++i)
+            static  vector<T>    read(const Value& msg)
             {
-                T element;
-                readJson(doc, msg[i], element);
-                ret.push_back(element);
+                vector<T> ret;
+                for (size_t i = 0; i < msg.Size(); ++i)
+                {
+                    ret.push_back(ReadJson<T>::read(msg[i]));
+                }
+
+                return ret;
             }
-        }
+        };
+
+        template<>
+        struct ReadJson<map<string, string>>
+        {
+            static  map<string, string>    read(const Value& msg)
+            {
+                map<string, string> ret;
+                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+                {
+                    ret[(*itr).name.GetString()] = (*itr).value.GetString();
+                }
+                return ret;
+            }
+        };
+
+        template<>
+        class ReadJson<map<int, int>>
+        {
+            static  map<int, int>    read(const Value& msg)
+            {
+                map<int, int> ret;
+                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+                {
+                    ret[atoi((*itr).name.GetString())] = (*itr).value.GetInt();
+                }
+                return ret;
+            }
+        };
+
+        template<>
+        struct ReadJson<map<string, int>>
+        {
+            static  map<string, int>    read(const Value& msg)
+            {
+                map<string, int> ret;
+                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+                {
+                    ret[(*itr).name.GetString()] = (*itr).value.GetInt();
+                }
+                return ret;
+            }
+        };
 
         template<typename T>
-        static  void    readJson(Document& doc, const Value& msg, map<string, T>& ret)
+        struct ReadJson<map<string, T>>
         {
-            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            static  map<string, T>    read(const Value& msg)
             {
-                T tv;
-                readJson(doc, (*itr).value, tv);
-                ret[(*itr).name.GetString()] = tv;
+                map<string, T> ret;
+                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+                {
+                    ret[(*itr).name.GetString()] = ReadJson<T>::read((*itr).value);
+                }
+                return ret;
             }
-        }
+        };
 
         template<typename T>
-        static  void    readJson(Document& doc, const Value& msg, map<int, T>& ret)
+        struct ReadJson<map<int, T>>
         {
-            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+            static  map<int, T>    read(const Value& msg)
             {
-                T tv;
-                readJson(doc, (*itr).value, tv);
-                ret[atoi((*itr).name.GetString())] = tv;
+                map<int, T> ret;
+                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
+                {
+                    ret[atoi((*itr).name.GetString())] = ReadJson<T>::read((*itr).value);
+                }
+                return ret;
             }
-        }
+        };
 
-        static  void    readJson(Document& doc, const Value& msg, map<string, string>& ret)
-        {
-            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-            {
-                ret[(*itr).name.GetString()] = (*itr).value.GetString();
-            }
-        }
-
-        static  void    readJson(Document& doc, const Value& msg, map<int, string>& ret)
-        {
-            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-            {
-                ret[atoi((*itr).name.GetString())] = (*itr).value.GetString();
-            }
-        }
-
-        static  void    readJson(Document& doc, const Value& msg, map<string, int>& ret)
-        {
-            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-            {
-                ret[(*itr).name.GetString()] = (*itr).value.GetInt();
-            }
-        }
-
-        template<typename T>
-        static  T   readJsonByIndex(Document& doc, const Value& msg, int index)
-        {
-            T tmp;
-            const Value& element = msg[Utils::itoa(index)];
-            /*  TODO::readJson无法解决递归map和vector中的偏特化问题,所以有不必要的临时变量生成（无法利用右值引用),可用类模板解决   */
-            readJson(doc,element, tmp);
-            return tmp;
-        }
-
-    public:
-        /*  序列化-把数据转换为json  */
+        /*  序列化-把数据转换为Json对象  */
         static  Value    writeJson(Document& doc, const int& value)
         {
             return Value(value);
@@ -176,13 +216,6 @@ namespace dodo
         static  Value   writeJson(Document& doc, const string& value)
         {
             return Value(value.c_str(), doc.GetAllocator());
-        }
-
-        static  Value   writeJson(Document& doc, const Value& value)
-        {
-            Value ret;
-            ret.CopyFrom(value, doc.GetAllocator());
-            return ret;
         }
 
         static  Value   writeJson(Document& doc, const vector<int>& value)
@@ -211,8 +244,7 @@ namespace dodo
             Value arrayObject(kArrayType);
             for (size_t i = 0; i < value.size(); ++i)
             {
-                Value&& v = writeJson(doc, value[i]);
-                arrayObject.PushBack(std::forward<Value&&>(v), doc.GetAllocator());
+                arrayObject.PushBack(writeJson(doc, value[i]), doc.GetAllocator());
             }
             return arrayObject;
         }
@@ -225,8 +257,7 @@ namespace dodo
             for (map<T, V>::const_iterator it = value.begin(); it != value.end(); ++it)
             {
                 /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
-                Value&& v = writeJson(doc, it->second);
-                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa(it->first), doc.GetAllocator()), std::forward<Value&&>(v), doc.GetAllocator());
+                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa(it->first), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
             }
 
             /*把此map添加到msg中*/
@@ -269,8 +300,7 @@ namespace dodo
         template<typename T>
         static  void    writeJsonByIndex(Document& doc, Value& msg, const T& t, int index)
         {
-            Value&& v = writeJson(doc, t);
-            msg.AddMember(GenericValue<UTF8<>>(Utils::itoa(index), doc.GetAllocator()), std::forward<Value&&>(v), doc.GetAllocator());
+            msg.AddMember(GenericValue<UTF8<>>(Utils::itoa(index), doc.GetAllocator()), writeJson(doc, t), doc.GetAllocator());
         }
 
         static  char*   itoa(int value)
@@ -294,7 +324,7 @@ namespace dodo
             assert(mWrapFunctions.find(name) != mWrapFunctions.end());
             if (mWrapFunctions.find(name) != mWrapFunctions.end())
             {
-                mWrapFunctions[name](mRealFunctionPtr[name], mDoc, parmObject);
+                mWrapFunctions[name](mRealFunctionPtr[name], parmObject);
             }
         }
 
@@ -332,21 +362,21 @@ namespace dodo
                 mf = f;
             }
 
-            static void invoke(void* pvoid, Document& doc, const Value& msg)
+            static void invoke(void* pvoid, const Value& msg)
             {
                 int parmIndex = 0;
-                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pvoid, doc, msg, parmIndex);
+                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pvoid, msg, parmIndex);
             }
 
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
-            static  void    eval(int _, void* pvoid, Document& doc, const Value& msg, int& parmIndex, NowArgs&... args)
+            static  void    eval(int _, void* pvoid, const Value& msg, int& parmIndex, NowArgs&&... args)
             {
-                remove_const<base_type<T>::type>::type cur_arg = Utils::readJsonByIndex<remove_const<base_type<T>::type>::type>(doc, msg, parmIndex++);
-                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, doc, msg, parmIndex, args..., cur_arg);
+                const Value& element = msg[Utils::itoa(parmIndex++)];
+                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, msg, parmIndex, args..., Utils::ReadJson<remove_const<base_type<T>::type>::type>::read(element));
             }
 
             template<typename ...NowArgs>
-            static  void    eval(char _, void* pvoid, Document& doc, const Value& msg, int& parmIndex, NowArgs&... args)
+            static  void    eval(char _, void* pvoid, const Value& msg, int& parmIndex, NowArgs&&... args)
             {
                 VariadicArgFunctor<Args...>* pthis = (VariadicArgFunctor<Args...>*)pvoid;
                 (pthis->mf)(args...);
@@ -365,7 +395,7 @@ namespace dodo
         }
 
     private:
-        typedef void(*pf_wrap)(void* pbase, Document& doc, const Value& msg);
+        typedef void(*pf_wrap)(void* pbase, const Value& msg);
         map<string, pf_wrap>        mWrapFunctions;
         map<string, void*>          mRealFunctionPtr;
         int                         mNextID;
@@ -448,9 +478,7 @@ namespace dodo
         string    reply(int reqid, const Args&... args)
         {
             /*  把实际返回值打包作为参数,调用对端的rpc_reply 函数*/
-            string response = call(Utils::itoa(reqid), args...);
-
-            return call("rpc_reply", response);
+            return call("rpc_reply", call(Utils::itoa(reqid), args...));
         }
 
         /*  调用方处理收到的rpc返回值(消息)*/
@@ -589,7 +617,7 @@ int main()
     rpc_server.def("test7", test7);
 
     std::function<void(int)> functor = [](int i){
-        cout << "i is " << i << endl;
+        //cout << "i is " << i << endl;
     };
     rpc_server.def("test_functor", functor);
     rpc_server.def("test_lambda", [](int j){
@@ -609,7 +637,6 @@ int main()
     cout << "cost :" << GetTickCount() - starttime << endl;
 #endif
     
-
     rpc_request_msg = rpc_client.call("test_lambda", 2);
     rpc_server.handleRpc(rpc_request_msg);
 
