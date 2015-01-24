@@ -266,7 +266,7 @@ namespace dodo
             map<int, string>::const_iterator itend = value.end();
             for (map<int, string>::const_iterator it = value.begin(); it != itend; ++it)
             {
-                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa((*it).first), doc.GetAllocator()), Value(it->second.c_str(), doc.GetAllocator()), doc.GetAllocator());
+                mapObject.AddMember(GenericValue<UTF8<>>(std::to_string((*it).first).c_str(), doc.GetAllocator()), Value(it->second.c_str(), doc.GetAllocator()), doc.GetAllocator());
             }
             return mapObject;
         }
@@ -290,7 +290,7 @@ namespace dodo
             for (map<int, V>::const_iterator it = value.begin(); it != value.end(); ++it)
             {
                 /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
-                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa(it->first), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
+                mapObject.AddMember(GenericValue<UTF8<>>(std::to_string(it->first).c_str(), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
             }
 
             /*把此map添加到msg中*/
@@ -315,14 +315,7 @@ namespace dodo
         template<typename T>
         static  void    writeJsonByIndex(Document& doc, Value& msg, const T& t, int index)
         {
-            msg.AddMember(GenericValue<UTF8<>>(Utils::itoa(index), doc.GetAllocator()), writeJson(doc, t), doc.GetAllocator());
-        }
-
-        static  char*   itoa(int value)
-        {
-            static char tmp[1024];
-            sprintf(tmp, "%d", value);
-            return tmp;
+            msg.AddMember(GenericValue<UTF8<>>(std::to_string(index).c_str(), doc.GetAllocator()), writeJson(doc, t), doc.GetAllocator());
         }
     };
 
@@ -336,10 +329,11 @@ namespace dodo
             string name = mDoc["name"].GetString();
             const Value& parmObject = mDoc["parm"];
 
-            assert(mWrapFunctions.find(name) != mWrapFunctions.end());
-            if (mWrapFunctions.find(name) != mWrapFunctions.end())
+			map<string, pf_wrap>::iterator it = mWrapFunctions.find(name);
+			assert(it != mWrapFunctions.end());
+			if (it != mWrapFunctions.end())
             {
-                mWrapFunctions[name](mRealFunctionPtr[name], parmObject);
+				((*it).second)(mRealFunctionPtr[name], parmObject);
             }
         }
 
@@ -386,7 +380,7 @@ namespace dodo
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(int _, void* pvoid, const Value& msg, int& parmIndex, NowArgs&&... args)
             {
-                const Value& element = msg[Utils::itoa(parmIndex++)];
+                const Value& element = msg[std::to_string(parmIndex++).c_str()];
                 eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, msg, parmIndex, args..., Utils::ReadJson<remove_const<base_type<T>::type>::type>::read(element));
             }
 
@@ -427,7 +421,7 @@ namespace dodo
         static  void    Write(FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
         {
             int id = functionMgr.makeNextID();
-            functionMgr.insertLambda(Utils::itoa(id), arg);
+            functionMgr.insertLambda(std::to_string(id), arg);
         }
     };
 
@@ -493,7 +487,7 @@ namespace dodo
         string    reply(int reqid, const Args&... args)
         {
             /*  把实际返回值打包作为参数,调用对端的rpc_reply 函数*/
-            return call("rpc_reply", call(Utils::itoa(reqid), args...));
+            return call("rpc_reply", call(std::to_string(reqid).c_str(), args...));
         }
 
         /*  调用方处理收到的rpc返回值(消息)*/
