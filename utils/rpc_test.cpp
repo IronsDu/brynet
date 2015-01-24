@@ -322,6 +322,14 @@ namespace dodo
     class FunctionMgr
     {
     public:
+		~FunctionMgr()
+		{
+			for (auto& p : mRealFunctionPtr)
+			{
+				delete p.second;
+			}
+		}
+
         void    execute(const char* str)
         {
             mDoc.Parse(str);
@@ -347,7 +355,7 @@ namespace dodo
         void insertStaticFunction(string name, void(*func)(Args...))
         {
             void* pbase = new VariadicArgFunctor<Args...>(func);
-
+			assert(mWrapFunctions.find(name) == mWrapFunctions.end());
             mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
             mRealFunctionPtr[name] = pbase;
         }
@@ -398,7 +406,7 @@ namespace dodo
         void _insertLambda(string name, LAMBDA_OBJ_TYPE obj, void(LAMBDA_OBJ_TYPE::*func)(Args...) const)
         {
             void* pbase = new VariadicArgFunctor<Args...>(obj);
-
+			assert(mWrapFunctions.find(name) == mWrapFunctions.end());
             mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
             mRealFunctionPtr[name] = pbase;
         }
@@ -441,7 +449,7 @@ namespace dodo
         rpc() : mWriter(mBuffer)
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
-            def("rpc_reply", [this](string response){
+            def("rpc_reply", [this](const string& response){
                 handleResponse(response);
             });
         }
@@ -477,10 +485,14 @@ namespace dodo
         }
 
         /*  处理rpc请求 */
-        void    handleRpc(string str)
+        void    handleRpc(const string& str)
         {
             mRpcFunctions.execute(str.c_str());
         }
+		void    handleRpc(const string&& str)
+		{
+			handleRpc(str);
+		}
 
         /*  返回数据给RPC调用端    */
         template<typename... Args>
@@ -491,10 +503,14 @@ namespace dodo
         }
 
         /*  调用方处理收到的rpc返回值(消息)*/
-        void    handleResponse(string str)
+        void    handleResponse(const string& str)
         {
             mResponseCallbacks.execute(str.c_str());
         }
+		void    handleResponse(const string&& str)
+		{
+			handleResponse(str);
+		}
 
     private:
         void    writeCallArg(Document& doc, int& index){}
