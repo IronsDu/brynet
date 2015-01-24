@@ -1,4 +1,4 @@
-#include <stdio.h>
+ï»¿#include <stdio.h>
 #include <assert.h>
 #include <string>
 #include <iostream>
@@ -41,168 +41,143 @@ namespace dodo
         typedef char TYPE;
     };
 
-    template<typename A>
-    struct remove_const { typedef A type; };
-    template<typename A>
-    struct remove_const<const A> { typedef A type; };
-
-    template<typename A>
-    struct base_type { typedef A type; };
-    template<typename A>
-    struct base_type<A*> { typedef A type; };
-    template<typename A>
-    struct base_type<A&> { typedef A type; };
-
     class Utils
     {
     public:
-        /*  ·´ĞòÁĞ»¯    */
+        /*  ååºåˆ—åŒ–    */
         template<typename T>
         struct ReadJson;
 
         template<>
         struct ReadJson<char>
         {
-            static  char    read(const Value& msg)
+            static  void    read(const Value& msg, char& ret)
             {
-                return msg.GetInt();
+                ret = msg.GetInt();
             }
         };
 
         template<>
         struct ReadJson<int>
         {
-            static  int    read(const Value& msg)
+            static  void    read(const Value& msg, int& ret)
             {
-                return msg.GetInt();
+                ret = msg.GetInt();
             }
         };
 
         template<>
         struct ReadJson<string>
         {
-            static  string    read(const Value& msg)
+            static  void    read(const Value& msg, string& ret)
             {
-                return msg.GetString();
+                ret = msg.GetString();
             }
         };
 
         template<>
         struct ReadJson<vector<int>>
         {
-            static  vector<int>    read(const Value& msg)
+            static  void    read(const Value& msg, vector<int>& ret)
             {
-                vector<int> ret;
                 for (size_t i = 0; i < msg.Size(); ++i)
                 {
                     ret.push_back(msg[i].GetInt());
                 }
-
-                return ret;
             }
         };
 
         template<>
         struct ReadJson<vector<string>>
         {
-            static  vector<string>    read(const Value& msg)
+            static  void    read(const Value& msg, vector<string>& ret)
             {
-                vector<string> ret;
                 for (size_t i = 0; i < msg.Size(); ++i)
                 {
                     ret.push_back(msg[i].GetString());
                 }
-
-                return ret;
             }
         };
 
         template<typename T>
         struct ReadJson<vector<T>>
         {
-            static  vector<T>    read(const Value& msg)
+            static  void    read(const Value& msg, vector<T>& ret)
             {
-                vector<T> ret;
                 for (size_t i = 0; i < msg.Size(); ++i)
                 {
-                    ret.push_back(ReadJson<T>::read(msg[i]));
+                    T tmp;
+                    ReadJson<T>::read(msg[i], tmp);
+                    ret.push_back(std::move(tmp));
                 }
-
-                return ret;
             }
         };
 
         template<>
         struct ReadJson<map<string, string>>
         {
-            static  map<string, string>    read(const Value& msg)
+            static  void    read(const Value& msg, map<string, string>& ret)
             {
-                map<string, string> ret;
                 for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
                 {
                     ret[(*itr).name.GetString()] = (*itr).value.GetString();
                 }
-                return ret;
             }
         };
 
         template<>
         class ReadJson<map<int, int>>
         {
-            static  map<int, int>    read(const Value& msg)
+            static  void    read(const Value& msg, map<int, int>& ret)
             {
-                map<int, int> ret;
                 for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
                 {
                     ret[atoi((*itr).name.GetString())] = (*itr).value.GetInt();
                 }
-                return ret;
             }
         };
 
         template<>
         struct ReadJson<map<string, int>>
         {
-            static  map<string, int>    read(const Value& msg)
+            static  void    read(const Value& msg, map<string, int>& ret)
             {
-                map<string, int> ret;
                 for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
                 {
                     ret[(*itr).name.GetString()] = (*itr).value.GetInt();
                 }
-                return ret;
             }
         };
 
         template<typename T>
         struct ReadJson<map<string, T>>
         {
-            static  map<string, T>    read(const Value& msg)
+            static  void    read(const Value& msg, map<string, T>& ret)
             {
-                map<string, T> ret;
                 for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
                 {
-                    ret[(*itr).name.GetString()] = ReadJson<T>::read((*itr).value);
+                    T tmp;
+                    ReadJson<T>::read((*itr).value, tmp);
+                    ret[(*itr).name.GetString()] = std::move(tmp);
                 }
-                return ret;
             }
         };
 
         template<typename T>
         struct ReadJson<map<int, T>>
         {
-            static  map<int, T>    read(const Value& msg)
+            static  void    read(const Value& msg, map<int, T>& ret)
             {
-                map<int, T> ret;
                 for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
                 {
-                    ret[atoi((*itr).name.GetString())] = ReadJson<T>::read((*itr).value);
+                    T tmp;
+                    ReadJson<T>::read((*itr).value, tmp);
+                    ret[atoi((*itr).name.GetString())] = std::move(tmp);
                 }
-                return ret;
             }
         };
 
-        /*  ĞòÁĞ»¯-°ÑÊı¾İ×ª»»ÎªJson¶ÔÏó  */
+        /*  åºåˆ—åŒ–-æŠŠæ•°æ®è½¬æ¢ä¸ºJsonå¯¹è±¡  */
         static  Value    writeJson(Document& doc, const int& value)
         {
             return Value(value);
@@ -286,14 +261,14 @@ namespace dodo
         static  Value   writeJson(Document& doc, const map<int, V>& value)
         {
             Value mapObject(kObjectType);
-            /*±éÀú´Ëmap*/
+            /*éå†æ­¤map*/
             for (map<int, V>::const_iterator it = value.begin(); it != value.end(); ++it)
             {
-                /*°ÑvalueĞòÁĞ»¯µ½mapµÄjsonobjectÖĞ,key¾ÍÊÇËüÔÚmap½á¹¹ÖĞµÄkey*/
+                /*æŠŠvalueåºåˆ—åŒ–åˆ°mapçš„jsonobjectä¸­,keyå°±æ˜¯å®ƒåœ¨mapç»“æ„ä¸­çš„key*/
                 mapObject.AddMember(GenericValue<UTF8<>>(std::to_string(it->first).c_str(), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
             }
 
-            /*°Ñ´ËmapÌí¼Óµ½msgÖĞ*/
+            /*æŠŠæ­¤mapæ·»åŠ åˆ°msgä¸­*/
             return mapObject;
         }
 
@@ -301,14 +276,14 @@ namespace dodo
         static  Value   writeJson(Document& doc, const map<string, V>& value)
         {
             Value mapObject(kObjectType);
-            /*±éÀú´Ëmap*/
+            /*éå†æ­¤map*/
             for (map<string, V>::const_iterator it = value.begin(); it != value.end(); ++it)
             {
-                /*°ÑvalueĞòÁĞ»¯µ½mapµÄjsonobjectÖĞ,key¾ÍÊÇËüÔÚmap½á¹¹ÖĞµÄkey*/
+                /*æŠŠvalueåºåˆ—åŒ–åˆ°mapçš„jsonobjectä¸­,keyå°±æ˜¯å®ƒåœ¨mapç»“æ„ä¸­çš„key*/
                 mapObject.AddMember(GenericValue<UTF8<>>(it->first.c_str(), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
             }
 
-            /*°Ñ´ËmapÌí¼Óµ½msgÖĞ*/
+            /*æŠŠæ­¤mapæ·»åŠ åˆ°msgä¸­*/
             return mapObject;
         }
 
@@ -381,25 +356,54 @@ namespace dodo
 
             static void invoke(void* pvoid, const Value& msg)
             {
+                VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
                 int parmIndex = 0;
-                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pvoid, msg, parmIndex);
+                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pThis, msg, parmIndex);
+            }
+
+            template<typename T>
+            static void    clearValue(map<int, T>& t)
+            {
+                t.clear();
+            }
+
+            template<typename T>
+            static void    clearValue(map<string, T>& t)
+            {
+                t.clear();
+            }
+
+            template<typename T>
+            static void    clearValue(vector<T>& t)
+            {
+                t.clear();
+            }
+
+            template<typename ...Args>
+            static void    clearValue(Args&... args)
+            {
             }
 
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
-            static  void    eval(int _, void* pvoid, const Value& msg, int& parmIndex, NowArgs&&... args)
+            static  void    eval(int _, VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
             {
                 const Value& element = msg[std::to_string(parmIndex++).c_str()];
-                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pvoid, msg, parmIndex, args..., Utils::ReadJson<remove_const<base_type<T>::type>::type>::read(element));
+
+                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
+                clearValue(value);
+                Utils::ReadJson<std::remove_const<std::remove_reference<T>::type>::type>::read(element, value);
+
+                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pThis, msg, parmIndex, args..., value);
             }
 
             template<typename ...NowArgs>
-            static  void    eval(char _, void* pvoid, const Value& msg, int& parmIndex, NowArgs&&... args)
+            static  void    eval(char _, VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
             {
-                VariadicArgFunctor<Args...>* pthis = (VariadicArgFunctor<Args...>*)pvoid;
-                (pthis->mf)(args...);
+                (pThis->mf)(args...);
             }
         private:
             std::function<void(Args...)>   mf;
+            std::tuple<typename std::remove_const<typename std::remove_reference<Args>::type>::type...>  mTuple;    /*å›è°ƒå‡½æ•°æ‰€éœ€è¦çš„å‚æ•°åˆ—è¡¨*/
         };
 
         template<typename LAMBDA_OBJ_TYPE, typename ...Args>
@@ -448,7 +452,7 @@ namespace dodo
     public:
         rpc() : mWriter(mBuffer)
         {
-            /*  ×¢²árpc_reply ·şÎñº¯Êı£¬´¦Àírpc·µ»ØÖµ   */
+            /*  æ³¨å†Œrpc_reply æœåŠ¡å‡½æ•°ï¼Œå¤„ç†rpcè¿”å›å€¼   */
             def("rpc_reply", [this](const string& response){
                 handleResponse(response);
             });
@@ -460,7 +464,7 @@ namespace dodo
             regFunctor(funname, func);
         }
 
-        /*  Ô¶³Ìµ÷ÓÃ£¬·µ»ØÖµÎª¾­¹ıĞòÁĞ»¯ºóµÄÏûÏ¢  */
+        /*  è¿œç¨‹è°ƒç”¨ï¼Œè¿”å›å€¼ä¸ºç»è¿‡åºåˆ—åŒ–åçš„æ¶ˆæ¯  */
         template<typename... Args>
         string    call(const char* funname, const Args&... args)
         {
@@ -475,7 +479,7 @@ namespace dodo
             msg.AddMember(GenericValue<UTF8<>>("parm", mDoc.GetAllocator()), parms, mDoc.GetAllocator());
 
             int now_req_id = mResponseCallbacks.getNowID();
-            /*req_id±íÊ¾µ÷ÓÃ·½µÄÇëÇóid£¬·şÎñÆ÷(rpc±»µ÷ÓÃ·½)Í¨¹ı´Ëid·µ»ØÏûÏ¢(·µ»ØÖµ)¸øµ÷ÓÃ·½*/
+            /*req_idè¡¨ç¤ºè°ƒç”¨æ–¹çš„è¯·æ±‚idï¼ŒæœåŠ¡å™¨(rpcè¢«è°ƒç”¨æ–¹)é€šè¿‡æ­¤idè¿”å›æ¶ˆæ¯(è¿”å›å€¼)ç»™è°ƒç”¨æ–¹*/
             msg.AddMember(GenericValue<UTF8<>>("req_id", mDoc.GetAllocator()), Value(old_req_id == now_req_id ? -1 : now_req_id), mDoc.GetAllocator());
 
             mBuffer.Clear();
@@ -484,7 +488,7 @@ namespace dodo
             return mBuffer.GetString();
         }
 
-        /*  ´¦ÀírpcÇëÇó */
+        /*  å¤„ç†rpcè¯·æ±‚ */
         void    handleRpc(const string& str)
         {
             mRpcFunctions.execute(str.c_str());
@@ -494,15 +498,15 @@ namespace dodo
             handleRpc(str);
         }
 
-        /*  ·µ»ØÊı¾İ¸øRPCµ÷ÓÃ¶Ë    */
+        /*  è¿”å›æ•°æ®ç»™RPCè°ƒç”¨ç«¯    */
         template<typename... Args>
         string    reply(int reqid, const Args&... args)
         {
-            /*  °ÑÊµ¼Ê·µ»ØÖµ´ò°ü×÷Îª²ÎÊı,µ÷ÓÃ¶Ô¶ËµÄrpc_reply º¯Êı*/
+            /*  æŠŠå®é™…è¿”å›å€¼æ‰“åŒ…ä½œä¸ºå‚æ•°,è°ƒç”¨å¯¹ç«¯çš„rpc_reply å‡½æ•°*/
             return call("rpc_reply", call(std::to_string(reqid).c_str(), args...));
         }
 
-        /*  µ÷ÓÃ·½´¦ÀíÊÕµ½µÄrpc·µ»ØÖµ(ÏûÏ¢)*/
+        /*  è°ƒç”¨æ–¹å¤„ç†æ”¶åˆ°çš„rpcè¿”å›å€¼(æ¶ˆæ¯)*/
         void    handleResponse(const string& str)
         {
             mResponseCallbacks.execute(str.c_str());
@@ -518,7 +522,7 @@ namespace dodo
         template<typename Arg>
         void    writeCallArg(Document& doc, Value& msg, int& index, const Arg& arg)
         {
-            /*Ö»(Ê£)ÓĞÒ»¸ö²ÎÊı,¿Ï¶¨Ò²Îª×îºóÒ»¸ö²ÎÊı£¬ÔÊĞíÎªlambda*/
+            /*åª(å‰©)æœ‰ä¸€ä¸ªå‚æ•°,è‚¯å®šä¹Ÿä¸ºæœ€åä¸€ä¸ªå‚æ•°ï¼Œå…è®¸ä¸ºlambda*/
             _selectWriteArg(doc, msg, arg, index++);
         }
 
@@ -530,7 +534,7 @@ namespace dodo
         }
     private:
 
-        /*Èç¹ûÊÇlambdaÔò¼ÓÈë»Øµ÷¹ÜÀíÆ÷£¬·ñÔòÌí¼Óµ½rpc²ÎÊı*/
+        /*å¦‚æœæ˜¯lambdaåˆ™åŠ å…¥å›è°ƒç®¡ç†å™¨ï¼Œå¦åˆ™æ·»åŠ åˆ°rpcå‚æ•°*/
         template<typename ARGTYPE>
         void    _selectWriteArg(Document& doc, Value& msg, const ARGTYPE& arg, int index)
         {
@@ -620,9 +624,10 @@ void test6(string a, int b, map<string, int> vlist)
 {
 }
 
-void test7(vector<map<int,string>>& vlist)
+void test7(vector<map<int,string>>& vlist, vector<int>& vec)
 {
 }
+#include <utility>
 #ifdef _MSC_VER
 #include <Windows.h>
 #endif
@@ -631,11 +636,11 @@ int main()
     int upvalue = 10;
     using namespace dodo;
 
-    Player rpc_server; /*rpc·şÎñÆ÷*/
-    Player rpc_client; /*rpc¿Í»§¶Ë*/
+    Player rpc_server; /*rpcæœåŠ¡å™¨*/
+    Player rpc_client; /*rpcå®¢æˆ·ç«¯*/
 
-    string rpc_request_msg; /*  rpcÏûÏ¢   */
-    string rpc_response_str;       /*  rpc·µ»ØÖµ  */
+    string rpc_request_msg; /*  rpcæ¶ˆæ¯   */
+    string rpc_response_str;       /*  rpcè¿”å›å€¼  */
 
     rpc_server.def("test4", test4);
     rpc_server.def("test5", test5);
@@ -677,13 +682,18 @@ int main()
         vlist.push_back(a);
         vlist.push_back(b);
 
+        vector<int> vec;
+        vec.push_back(1);
+        vec.push_back(2);
+        vec.push_back(3);
+
         int count = 0;
 #ifdef _MSC_VER
 #include <Windows.h>
         DWORD starttime = GetTickCount();
         while (count++ <= 100000)
         {
-            rpc_request_msg = rpc_client.call("test7", vlist);
+            rpc_request_msg = rpc_client.call("test7", vlist, vec);
             rpc_server.handleRpc(rpc_request_msg);
         }
 
@@ -722,9 +732,9 @@ int main()
         rpc_server.handleRpc(rpc_request_msg);
     }
 
-    /*  Ä£Äâ·şÎñÆ÷Í¨¹ıreply·µ»ØÊı¾İ¸ørpc client,È»ºórpc client´¦ÀíÊÕµ½µÄrpc·µ»ØÖµ */
+    /*  æ¨¡æ‹ŸæœåŠ¡å™¨é€šè¿‡replyè¿”å›æ•°æ®ç»™rpc client,ç„¶årpc clientå¤„ç†æ”¶åˆ°çš„rpcè¿”å›å€¼ */
     {
-        rpc_response_str = rpc_server.reply(1, 1, 2);   /* (1,1,2)ÖĞµÄ1Îªµ÷ÓÃ·½µÄreq_id, (1,2)Îª·µ»ØÖµ */
+        rpc_response_str = rpc_server.reply(1, 1, 2);   /* (1,1,2)ä¸­çš„1ä¸ºè°ƒç”¨æ–¹çš„req_id, (1,2)ä¸ºè¿”å›å€¼ */
         rpc_client.handleRpc(rpc_response_str);
     }
 
