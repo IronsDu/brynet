@@ -322,13 +322,13 @@ namespace dodo
     class FunctionMgr
     {
     public:
-		~FunctionMgr()
-		{
-			for (auto& p : mRealFunctionPtr)
-			{
-				delete p.second;
-			}
-		}
+        ~FunctionMgr()
+        {
+            for (auto& p : mRealFunctionPtr)
+            {
+                delete p.second;
+            }
+        }
 
         void    execute(const char* str)
         {
@@ -337,11 +337,11 @@ namespace dodo
             string name = mDoc["name"].GetString();
             const Value& parmObject = mDoc["parm"];
 
-			map<string, pf_wrap>::iterator it = mWrapFunctions.find(name);
-			assert(it != mWrapFunctions.end());
-			if (it != mWrapFunctions.end())
+            map<string, pf_wrap>::iterator it = mWrapFunctions.find(name);
+            assert(it != mWrapFunctions.end());
+            if (it != mWrapFunctions.end())
             {
-				((*it).second)(mRealFunctionPtr[name], parmObject);
+                ((*it).second)(mRealFunctionPtr[name], parmObject);
             }
         }
 
@@ -355,7 +355,7 @@ namespace dodo
         void insertStaticFunction(string name, void(*func)(Args...))
         {
             void* pbase = new VariadicArgFunctor<Args...>(func);
-			assert(mWrapFunctions.find(name) == mWrapFunctions.end());
+            assert(mWrapFunctions.find(name) == mWrapFunctions.end());
             mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
             mRealFunctionPtr[name] = pbase;
         }
@@ -406,7 +406,7 @@ namespace dodo
         void _insertLambda(string name, LAMBDA_OBJ_TYPE obj, void(LAMBDA_OBJ_TYPE::*func)(Args...) const)
         {
             void* pbase = new VariadicArgFunctor<Args...>(obj);
-			assert(mWrapFunctions.find(name) == mWrapFunctions.end());
+            assert(mWrapFunctions.find(name) == mWrapFunctions.end());
             mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
             mRealFunctionPtr[name] = pbase;
         }
@@ -489,10 +489,10 @@ namespace dodo
         {
             mRpcFunctions.execute(str.c_str());
         }
-		void    handleRpc(const string&& str)
-		{
-			handleRpc(str);
-		}
+        void    handleRpc(const string&& str)
+        {
+            handleRpc(str);
+        }
 
         /*  返回数据给RPC调用端    */
         template<typename... Args>
@@ -507,10 +507,10 @@ namespace dodo
         {
             mResponseCallbacks.execute(str.c_str());
         }
-		void    handleResponse(const string&& str)
-		{
-			handleResponse(str);
-		}
+        void    handleResponse(const string&& str)
+        {
+            handleResponse(str);
+        }
 
     private:
         void    writeCallArg(Document& doc, int& index){}
