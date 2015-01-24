@@ -249,21 +249,6 @@ namespace dodo
             return arrayObject;
         }
 
-        template<typename T, typename V>
-        static  Value   writeJson(Document& doc, const map<T, V>& value)
-        {
-            Value mapObject(kObjectType);
-            /*遍历此map*/
-            for (map<T, V>::const_iterator it = value.begin(); it != value.end(); ++it)
-            {
-                /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
-                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa(it->first), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
-            }
-
-            /*把此map添加到msg中*/
-            return mapObject;
-        }
-
         static  Value   writeJson(Document& doc, const map<string, string>& value)
         {
             Value mapObject(kObjectType);
@@ -294,6 +279,36 @@ namespace dodo
             {
                 mapObject.AddMember(GenericValue<UTF8<>>(it->first.c_str(), doc.GetAllocator()), Value(it->second), doc.GetAllocator());
             }
+            return mapObject;
+        }
+
+        template< typename V>
+        static  Value   writeJson(Document& doc, const map<int, V>& value)
+        {
+            Value mapObject(kObjectType);
+            /*遍历此map*/
+            for (map<int, V>::const_iterator it = value.begin(); it != value.end(); ++it)
+            {
+                /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
+                mapObject.AddMember(GenericValue<UTF8<>>(Utils::itoa(it->first), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
+            }
+
+            /*把此map添加到msg中*/
+            return mapObject;
+        }
+
+        template<typename V>
+        static  Value   writeJson(Document& doc, const map<string, V>& value)
+        {
+            Value mapObject(kObjectType);
+            /*遍历此map*/
+            for (map<string, V>::const_iterator it = value.begin(); it != value.end(); ++it)
+            {
+                /*把value序列化到map的jsonobject中,key就是它在map结构中的key*/
+                mapObject.AddMember(GenericValue<UTF8<>>(it->first.c_str(), doc.GetAllocator()), writeJson(doc, it->second), doc.GetAllocator());
+            }
+
+            /*把此map添加到msg中*/
             return mapObject;
         }
 
@@ -587,7 +602,7 @@ void test4(const string a, int b)
     cout << a << "," << b <<  endl;
 }
 
-void test5(const string a, int& b, const map<int, map<int, string>>& vlist)
+void test5(const string a, int& b, const map<string, map<int, string>>& vlist)
 {
 }
 
@@ -670,9 +685,9 @@ int main()
     m1[1] = "Li";
     map<int, string> m2;
     m2[2] = "Deng";
-    map<int, map<int, string>> mlist;
-    mlist[100] = m1;
-    mlist[200] = m2;
+    map<string, map<int, string>> mlist;
+    mlist["100"] = m1;
+    mlist["200"] = m2;
 
     {
         rpc_request_msg = rpc_client.call("test5", "a", 1, mlist, [&upvalue](int a, int b){
