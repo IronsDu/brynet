@@ -30,152 +30,97 @@ namespace dodo
         static const bool value = sizeof(hasFunc<T>(nullptr)) == sizeof(_One);
     };
 
-    template<int Size>
-    struct SizeType
-    {
-        typedef int TYPE;
-    };
-    template<>
-    struct SizeType<0>
-    {
-        typedef char TYPE;
-    };
-
     class Utils
     {
     public:
         /*  反序列化    */
-        template<typename T>
-        struct ReadJson;
-
-        template<>
-        struct ReadJson<char>
+        static  void    readJson(const Value& msg, char& ret)
         {
-            static  void    read(const Value& msg, char& ret)
-            {
-                ret = msg.GetInt();
-            }
-        };
+            ret = msg.GetInt();
+        }
 
-        template<>
-        struct ReadJson<int>
+        static  void    readJson(const Value& msg, int& ret)
         {
-            static  void    read(const Value& msg, int& ret)
-            {
-                ret = msg.GetInt();
-            }
-        };
+            ret = msg.GetInt();
+        }
 
-        template<>
-        struct ReadJson<string>
+        static  void    readJson(const Value& msg, string& ret)
         {
-            static  void    read(const Value& msg, string& ret)
-            {
-                ret = msg.GetString();
-            }
-        };
+            ret = msg.GetString();
+        }
 
-        template<>
-        struct ReadJson<vector<int>>
+        static  void    readJson(const Value& msg, vector<int>& ret)
         {
-            static  void    read(const Value& msg, vector<int>& ret)
+            for (size_t i = 0; i < msg.Size(); ++i)
             {
-                for (size_t i = 0; i < msg.Size(); ++i)
-                {
-                    ret.push_back(msg[i].GetInt());
-                }
+                ret.push_back(msg[i].GetInt());
             }
-        };
+        }
 
-        template<>
-        struct ReadJson<vector<string>>
+        static  void    readJson(const Value& msg, vector<string>& ret)
         {
-            static  void    read(const Value& msg, vector<string>& ret)
+            for (size_t i = 0; i < msg.Size(); ++i)
             {
-                for (size_t i = 0; i < msg.Size(); ++i)
-                {
-                    ret.push_back(msg[i].GetString());
-                }
+                ret.push_back(msg[i].GetString());
             }
-        };
+        }
 
         template<typename T>
-        struct ReadJson<vector<T>>
+        static  void    readJson(const Value& msg, vector<T>& ret)
         {
-            static  void    read(const Value& msg, vector<T>& ret)
+            for (size_t i = 0; i < msg.Size(); ++i)
             {
-                for (size_t i = 0; i < msg.Size(); ++i)
-                {
-                    T tmp;
-                    ReadJson<T>::read(msg[i], tmp);
-                    ret.push_back(std::move(tmp));
-                }
+                T tmp;
+                readJson(msg[i], tmp);
+                ret.push_back(std::move(tmp));
             }
-        };
+        }
 
-        template<>
-        struct ReadJson<map<string, string>>
+        static  void    readJson(const Value& msg, map<string, string>& ret)
         {
-            static  void    read(const Value& msg, map<string, string>& ret)
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
             {
-                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-                {
-                    ret[(*itr).name.GetString()] = (*itr).value.GetString();
-                }
+                ret[(*itr).name.GetString()] = (*itr).value.GetString();
             }
-        };
+        }
 
-        template<>
-        class ReadJson<map<int, int>>
+        static  void    readJson(const Value& msg, map<int, int>& ret)
         {
-            static  void    read(const Value& msg, map<int, int>& ret)
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
             {
-                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-                {
-                    ret[atoi((*itr).name.GetString())] = (*itr).value.GetInt();
-                }
+                ret[atoi((*itr).name.GetString())] = (*itr).value.GetInt();
             }
-        };
+        }
 
-        template<>
-        struct ReadJson<map<string, int>>
+        static  void    readJson(const Value& msg, map<string, int>& ret)
         {
-            static  void    read(const Value& msg, map<string, int>& ret)
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
             {
-                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-                {
-                    ret[(*itr).name.GetString()] = (*itr).value.GetInt();
-                }
+                ret[(*itr).name.GetString()] = (*itr).value.GetInt();
             }
-        };
+        }
 
         template<typename T>
-        struct ReadJson<map<string, T>>
+        static  void    readJson(const Value& msg, map<string, T>& ret)
         {
-            static  void    read(const Value& msg, map<string, T>& ret)
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
             {
-                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-                {
-                    T tmp;
-                    ReadJson<T>::read((*itr).value, tmp);
-                    ret[(*itr).name.GetString()] = std::move(tmp);
-                }
+                T tmp;
+                readJson((*itr).value, tmp);
+                ret[(*itr).name.GetString()] = std::move(tmp);
             }
-        };
+        }
 
         template<typename T>
-        struct ReadJson<map<int, T>>
+        static  void    readJson(const Value& msg, map<int, T>& ret)
         {
-            static  void    read(const Value& msg, map<int, T>& ret)
+            for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
             {
-                for (Value::ConstMemberIterator itr = msg.MemberBegin(); itr != msg.MemberEnd(); ++itr)
-                {
-                    T tmp;
-                    ReadJson<T>::read((*itr).value, tmp);
-                    ret[atoi((*itr).name.GetString())] = std::move(tmp);
-                }
+                T tmp;
+                readJson((*itr).value, tmp);
+                ret[atoi((*itr).name.GetString())] = std::move(tmp);
             }
-        };
+        }
 
         /*  序列化-把数据转换为Json对象  */
         static  Value    writeJson(Document& doc, const int& value)
@@ -354,11 +299,37 @@ namespace dodo
                 mf = f;
             }
 
+            template<int SIZE>
+            struct Eval
+            {
+                template<typename T, typename ...LeftArgs, typename ...NowArgs>
+                static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+                {
+                    const Value& element = msg[std::to_string(parmIndex++).c_str()];
+
+                    auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
+                    clearValue(value);
+                    Utils::readJson(element, value);
+
+                    Eval<sizeof...(LeftArgs)>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
+                }
+            };
+
+            template<>
+            struct Eval<0>
+            {
+                template<typename ...NowArgs>
+                static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+                {
+                    (pThis->mf)(args...);
+                }
+            };
+
             static void invoke(void* pvoid, const Value& msg)
             {
                 VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
                 int parmIndex = 0;
-                eval<Args...>(SizeType<sizeof...(Args)>::TYPE(), pThis, msg, parmIndex);
+                Eval<sizeof...(Args)>::eval<Args...>(pThis, msg, parmIndex);
             }
 
             template<typename T>
@@ -382,24 +353,6 @@ namespace dodo
             template<typename ...Args>
             static void    clearValue(Args&... args)
             {
-            }
-
-            template<typename T, typename ...LeftArgs, typename ...NowArgs>
-            static  void    eval(int _, VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
-            {
-                const Value& element = msg[std::to_string(parmIndex++).c_str()];
-
-                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
-                clearValue(value);
-                Utils::ReadJson<std::remove_const<std::remove_reference<T>::type>::type>::read(element, value);
-
-                eval<LeftArgs...>(SizeType<sizeof...(LeftArgs)>::TYPE(), pThis, msg, parmIndex, args..., value);
-            }
-
-            template<typename ...NowArgs>
-            static  void    eval(char _, VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
-            {
-                (pThis->mf)(args...);
             }
         private:
             std::function<void(Args...)>   mf;
