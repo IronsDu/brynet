@@ -11,8 +11,11 @@
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
-
 using namespace rapidjson;
+
+#include "msgpack.hpp"
+using namespace msgpack;
+
 using namespace std;
 
 namespace dodo
@@ -239,30 +242,52 @@ namespace dodo
         }
     };
 
-    class FunctionMgr
+    template<typename T>
+    static void    clear(map<int, T>& v)
+    {
+        v.clear();
+    }
+
+    template<typename T>
+    static void    clear(map<string, T>& v)
+    {
+        v.clear();
+    }
+
+    template<typename T>
+    static void    clear(vector<T>& v)
+    {
+        v.clear();
+    }
+
+    template<typename ...Args>
+    static void    clear(Args&... args)
+    {
+    }
+
+    template<typename ...Args>
+    struct VariadicArgFunctor
+    {
+        VariadicArgFunctor(std::function<void(Args...)> f)
+        {
+            mf = f;
+        }
+
+        std::function<void(Args...)>   mf;
+        std::tuple<typename std::remove_const<typename std::remove_reference<Args>::type>::type...>  mTuple;    /*回调函数所需要的参数列表*/
+    };
+
+    template<typename CALLBACK_TYPE, typename INVOKE_TYPE>
+    class BaseFunctorMgr
     {
     public:
-        ~FunctionMgr()
+        virtual ~BaseFunctorMgr()
         {
             for (auto& p : mRealFunctionPtr)
             {
                 delete p.second;
             }
-        }
-
-        void    execute(const char* str)
-        {
-            mDoc.Parse(str);
-
-            string name = mDoc["name"].GetString();
-            const Value& parmObject = mDoc["parm"];
-
-            map<string, pf_wrap>::iterator it = mWrapFunctions.find(name);
-            assert(it != mWrapFunctions.end());
-            if (it != mWrapFunctions.end())
-            {
-                ((*it).second)(mRealFunctionPtr[name], parmObject);
-            }
+            mRealFunctionPtr.clear();
         }
 
         template<typename T>
@@ -276,10 +301,28 @@ namespace dodo
         {
             void* pbase = new VariadicArgFunctor<Args...>(func);
             assert(mWrapFunctions.find(name) == mWrapFunctions.end());
-            mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
+            mWrapFunctions[name] = INVOKE_TYPE::Invoke<Args...>::invoke;
+            mRealFunctionPtr[name] = pbase;
+        }
+    private:
+        template<typename LAMBDA_OBJ_TYPE, typename ...Args>
+        void _insertLambda(string name, LAMBDA_OBJ_TYPE obj, void(LAMBDA_OBJ_TYPE::*func)(Args...) const)
+        {
+            void* pbase = new VariadicArgFunctor<Args...>(obj);
+            assert(mWrapFunctions.find(name) == mWrapFunctions.end());
+            mWrapFunctions[name] = INVOKE_TYPE::Invoke<Args...>::invoke;
             mRealFunctionPtr[name] = pbase;
         }
 
+    protected:
+        map<string, typename CALLBACK_TYPE>         mWrapFunctions;
+        map<string, void*>                          mRealFunctionPtr;
+    };
+
+    class BaseCaller
+    {
+    public:
+        BaseCaller() : mNextID(0){}
         int     makeNextID()
         {
             mNextID++;
@@ -291,119 +334,284 @@ namespace dodo
             return mNextID;
         }
     private:
-        template<typename ...Args>
-        struct VariadicArgFunctor
+        int         mNextID;
+    };
+
+    struct JsonProtocol
+    {
+        typedef void(*pf_callback)(void* pbase, const Value& msg);
+
+        struct Decode
         {
-            VariadicArgFunctor(std::function<void(Args...)> f)
+            template<typename ...Args>
+            struct Invoke
             {
-                mf = f;
+            public:
+                static void invoke(void* pvoid, const Value& msg)
+                {
+                    VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
+                    int parmIndex = 0;
+                    Eval<sizeof...(Args), Args...>::eval<Args...>(pThis, msg, parmIndex);
+                }
+            };
+        };
+
+        template<int SIZE, typename ...Args>
+        struct Eval
+        {
+            template<typename T, typename ...LeftArgs, typename ...NowArgs>
+            static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+            {
+                const Value& element = msg[std::to_string(parmIndex++).c_str()];
+
+                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
+                clear(value);
+                Utils::readJson(element, value);
+
+                Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
+            }
+        };
+
+        template<typename ...Args>
+        struct Eval<0, Args...>
+        {
+            template<typename ...NowArgs>
+            static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+            {
+                (pThis->mf)(args...);
+            }
+        };
+
+        class FunctionMgr : public BaseFunctorMgr<pf_callback, Decode>
+        {
+        public:
+            void    execute(const char* str, size_t size)
+            {
+                mDoc.Parse(str);
+
+                string name = mDoc["name"].GetString();
+                const Value& parmObject = mDoc["parm"];
+
+                auto it = mWrapFunctions.find(name);
+                assert(it != mWrapFunctions.end());
+                if (it != mWrapFunctions.end())
+                {
+                    ((*it).second)(mRealFunctionPtr[name], parmObject);
+                }
+            }
+        private:
+            Document                    mDoc;
+        };
+
+        class Caller : public BaseCaller
+        {
+        public:
+            Caller() : mWriter(mBuffer){}
+
+            template<typename... Args>
+            string    call(FunctionMgr& jsonFunctionResponseMgr, const char* funname, const Args&... args)
+            {
+                int old_req_id = getNowID();
+
+                Value msg(kObjectType);
+                msg.AddMember(GenericValue<UTF8<>>("name", mDoc.GetAllocator()), Value(funname, mDoc.GetAllocator()), mDoc.GetAllocator());
+                int index = 0;
+
+                Value parms(kObjectType);
+                writeCallArg(jsonFunctionResponseMgr, mDoc, parms, index, args...);
+                msg.AddMember(GenericValue<UTF8<>>("parm", mDoc.GetAllocator()), parms, mDoc.GetAllocator());
+
+                int now_req_id = getNowID();
+                /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
+                msg.AddMember(GenericValue<UTF8<>>("req_id", mDoc.GetAllocator()), Value(old_req_id == now_req_id ? -1 : now_req_id), mDoc.GetAllocator());
+
+                mBuffer.Clear();
+                mWriter.Reset(mBuffer);
+                msg.Accept(mWriter);
+                return mBuffer.GetString();
+            }
+        private:
+            void    writeCallArg(FunctionMgr& jsonFunctionResponseMgr, Document& doc, Value&, int& index){}
+
+            template<typename Arg>
+            void    writeCallArg(FunctionMgr& jsonFunctionResponseMgr, Document& doc, Value& msg, int& index, const Arg& arg)
+            {
+                /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
+                SelectWriteArgJson<HasCallOperator<Arg>::value>::Write(*this, jsonFunctionResponseMgr, doc, msg, arg, index++);
             }
 
-            template<int SIZE>
-            struct Eval
+            template<typename Arg1, typename... Args>
+            void    writeCallArg(FunctionMgr& jsonFunctionResponseMgr, Document& doc, Value& msg, int& index, const Arg1& arg1, const Args&... args)
             {
-                template<typename T, typename ...LeftArgs, typename ...NowArgs>
-                static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+                Utils::writeJsonByIndex(doc, msg, arg1, index++);
+                writeCallArg(jsonFunctionResponseMgr, doc, msg, index, args...);
+            }
+
+            template<bool>
+            struct SelectWriteArgJson;
+
+            template<>
+            struct SelectWriteArgJson<true>
+            {
+                template<typename ARGTYPE>
+                static  void    Write(Caller& jc, FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
                 {
-                    const Value& element = msg[std::to_string(parmIndex++).c_str()];
-
-                    auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
-                    clearValue(value);
-                    Utils::readJson(element, value);
-
-                    Eval<sizeof...(LeftArgs)>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
+                    int id = jc.makeNextID();
+                    functionMgr.insertLambda(std::to_string(id), arg);
                 }
             };
 
             template<>
-            struct Eval<0>
+            struct SelectWriteArgJson<false>
             {
-                template<typename ...NowArgs>
-                static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+                template<typename ARGTYPE>
+                static  void    Write(Caller& jc, FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
                 {
-                    (pThis->mf)(args...);
+                    Utils::writeJsonByIndex(doc, parms, arg, index);
+                }
+            };
+        private:
+            Document                    mDoc;
+            StringBuffer                mBuffer;
+            Writer<StringBuffer>        mWriter;
+        };
+    };
+
+    struct MsgpackProtocol
+    {
+        typedef void(*pf_callback)(void* pbase, const char* buffer, size_t size, size_t& off);
+
+        struct Decode
+        {
+            template<typename ...Args>
+            struct Invoke
+            {
+            public:
+                static void invoke(void* pvoid, const char* buffer, size_t len, size_t& off)
+                {
+                    VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
+                    Eval<sizeof...(Args), Args...>::eval<Args...>(pThis, buffer, len, off);
+                }
+            };
+        };
+
+        template<int SIZE, typename ...Args>
+        struct Eval
+        {
+            template<typename T, typename ...LeftArgs, typename ...NowArgs>
+            static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
+            {
+                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
+                clear(value);
+
+                msgpack::unpacked result;
+                unpack(result, buffer, size, off);
+                const msgpack::object& o = result.get();
+                o.convert(&value);
+
+                Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
+            }
+        };
+
+        template<typename ...Args>
+        struct Eval<0, Args...>
+        {
+            template<typename ...NowArgs>
+            static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
+            {
+                (pThis->mf)(args...);
+            }
+        };
+
+        class FunctionMgr : public BaseFunctorMgr<pf_callback, Decode>
+        {
+        public:
+            void    execute(const char* str, size_t size)
+            {
+                msgpack::unpacked result;
+                std::size_t off = 0;
+
+                unpack(result, str, size, off);
+                msgpack::object o = result.get();
+                string name;
+                o.convert(&name);
+
+                auto it = mWrapFunctions.find(name);
+                assert(it != mWrapFunctions.end());
+                if (it != mWrapFunctions.end())
+                {
+                    ((*it).second)(mRealFunctionPtr[name], str, size, off);
+                }
+            }
+        };
+
+        class Caller : public BaseCaller
+        {
+        public:
+            template<typename... Args>
+            string    call(FunctionMgr& msgpackFunctionResponseMgr, const char* funname, const Args&... args)
+            {
+                msgpack::sbuffer sbuf;
+                msgpack::pack(&sbuf, funname);
+
+                int old_req_id = getNowID();
+
+                writeCallArg(msgpackFunctionResponseMgr, sbuf, args...);
+
+                int now_req_id = getNowID();
+                /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
+                msgpack::pack(&sbuf, old_req_id == now_req_id ? -1 : now_req_id);
+
+                return string(sbuf.data(), sbuf.size());
+            }
+        private:
+            void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, int& index){}
+
+            template<typename Arg>
+            void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, const Arg& arg)
+            {
+                /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
+                SelectWriteArgMsgpack<HasCallOperator<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, arg);
+            }
+
+            template<typename Arg1, typename... Args>
+            void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, const Arg1& arg1, const Args&... args)
+            {
+                msgpack::pack(&sbuf, arg1);
+                writeCallArg(msgpackFunctionResponseMgr, sbuf, args...);
+            }
+
+            template<bool>
+            struct SelectWriteArgMsgpack;
+
+            template<>
+            struct SelectWriteArgMsgpack<true>
+            {
+                template<typename ARGTYPE>
+                static  void    Write(Caller& mc, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, const ARGTYPE& arg)
+                {
+                    int id = mc.makeNextID();
+                    functionMgr.insertLambda(std::to_string(id), arg);
                 }
             };
 
-            static void invoke(void* pvoid, const Value& msg)
+            template<>
+            struct SelectWriteArgMsgpack<false>
             {
-                VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
-                int parmIndex = 0;
-                Eval<sizeof...(Args)>::eval<Args...>(pThis, msg, parmIndex);
-            }
-
-            template<typename T>
-            static void    clearValue(map<int, T>& t)
-            {
-                t.clear();
-            }
-
-            template<typename T>
-            static void    clearValue(map<string, T>& t)
-            {
-                t.clear();
-            }
-
-            template<typename T>
-            static void    clearValue(vector<T>& t)
-            {
-                t.clear();
-            }
-
-            template<typename ...Args>
-            static void    clearValue(Args&... args)
-            {
-            }
-        private:
-            std::function<void(Args...)>   mf;
-            std::tuple<typename std::remove_const<typename std::remove_reference<Args>::type>::type...>  mTuple;    /*回调函数所需要的参数列表*/
+                template<typename ARGTYPE>
+                static  void    Write(Caller& mc, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, const ARGTYPE& arg)
+                {
+                    msgpack::pack(&sbuf, arg);
+                }
+            };
         };
-
-        template<typename LAMBDA_OBJ_TYPE, typename ...Args>
-        void _insertLambda(string name, LAMBDA_OBJ_TYPE obj, void(LAMBDA_OBJ_TYPE::*func)(Args...) const)
-        {
-            void* pbase = new VariadicArgFunctor<Args...>(obj);
-            assert(mWrapFunctions.find(name) == mWrapFunctions.end());
-            mWrapFunctions[name] = VariadicArgFunctor<Args...>::invoke;
-            mRealFunctionPtr[name] = pbase;
-        }
-
-    private:
-        typedef void(*pf_wrap)(void* pbase, const Value& msg);
-        map<string, pf_wrap>        mWrapFunctions;
-        map<string, void*>          mRealFunctionPtr;
-        int                         mNextID;
-        Document                    mDoc;
     };
 
-    template<bool>
-    struct SelectWriteArg;
-
-    template<>
-    struct SelectWriteArg<true>
-    {
-        template<typename ARGTYPE>
-        static  void    Write(FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
-        {
-            int id = functionMgr.makeNextID();
-            functionMgr.insertLambda(std::to_string(id), arg);
-        }
-    };
-
-    template<>
-    struct SelectWriteArg<false>
-    {
-        template<typename ARGTYPE>
-        static  void    Write(FunctionMgr& functionMgr, Document& doc, Value& parms, const ARGTYPE& arg, int index)
-        {
-            Utils::writeJsonByIndex(doc, parms, arg, index);
-        }
-    };
-
+    template<typename PROTOCOL_TYPE = MsgpackProtocol>
     class rpc
     {
     public:
-        rpc() : mWriter(mBuffer)
+        rpc()
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
             def("rpc_reply", [this](const string& response){
@@ -421,30 +629,13 @@ namespace dodo
         template<typename... Args>
         string    call(const char* funname, const Args&... args)
         {
-            int old_req_id = mResponseCallbacks.getNowID();
-
-            Value msg(kObjectType);
-            msg.AddMember(GenericValue<UTF8<>>("name", mDoc.GetAllocator()), Value(funname, mDoc.GetAllocator()), mDoc.GetAllocator());
-            int index = 0;
-            
-            Value parms(kObjectType);
-            writeCallArg(mDoc, parms, index, args...);
-            msg.AddMember(GenericValue<UTF8<>>("parm", mDoc.GetAllocator()), parms, mDoc.GetAllocator());
-
-            int now_req_id = mResponseCallbacks.getNowID();
-            /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
-            msg.AddMember(GenericValue<UTF8<>>("req_id", mDoc.GetAllocator()), Value(old_req_id == now_req_id ? -1 : now_req_id), mDoc.GetAllocator());
-
-            mBuffer.Clear();
-            mWriter.Reset(mBuffer);
-            msg.Accept(mWriter);
-            return mBuffer.GetString();
+            return mCaller.call(mResponseCallbacks, funname, args...);
         }
 
         /*  处理rpc请求 */
         void    handleRpc(const string& str)
         {
-            mRpcFunctions.execute(str.c_str());
+            mRpcFunctions.execute(str.c_str(), str.size());
         }
         void    handleRpc(const string&& str)
         {
@@ -462,60 +653,32 @@ namespace dodo
         /*  调用方处理收到的rpc返回值(消息)*/
         void    handleResponse(const string& str)
         {
-            mResponseCallbacks.execute(str.c_str());
+            mResponseCallbacks.execute(str.c_str(), str.size());
         }
         void    handleResponse(const string&& str)
         {
             handleResponse(str);
         }
-
-    private:
-        void    writeCallArg(Document& doc, int& index){}
-
-        template<typename Arg>
-        void    writeCallArg(Document& doc, Value& msg, int& index, const Arg& arg)
-        {
-            /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-            _selectWriteArg(doc, msg, arg, index++);
-        }
-
-        template<typename Arg1, typename... Args>
-        void    writeCallArg(Document& doc, Value& msg, int& index, const Arg1& arg1, const Args&... args)
-        {
-            Utils::writeJsonByIndex(doc, msg, arg1, index++);
-            writeCallArg(doc, msg, index, args...);
-        }
-    private:
-
-        /*如果是lambda则加入回调管理器，否则添加到rpc参数*/
-        template<typename ARGTYPE>
-        void    _selectWriteArg(Document& doc, Value& msg, const ARGTYPE& arg, int index)
-        {
-            SelectWriteArg<HasCallOperator<ARGTYPE>::value>::Write(mResponseCallbacks, doc, msg, arg, index);
-        }
-
     private:
         template<typename ...Args>
         void regFunctor(const char* funname, void(*func)(Args...))
         {
             mRpcFunctions.insertStaticFunction(funname, func);
         }
-        
+
         template<typename LAMBDA>
         void regFunctor(const char* funname, LAMBDA lambdaObj)
         {
             mRpcFunctions.insertLambda(funname, lambdaObj);
         }
     private:
-        FunctionMgr                 mResponseCallbacks;
-        FunctionMgr                 mRpcFunctions;
-        Document                    mDoc;
-        StringBuffer                mBuffer;
-        Writer<StringBuffer>        mWriter;
+        typename PROTOCOL_TYPE::FunctionMgr      mResponseCallbacks;
+        typename PROTOCOL_TYPE::FunctionMgr      mRpcFunctions;
+        typename PROTOCOL_TYPE::Caller           mCaller;
     };
 }
 
-class Player : public dodo::rpc
+class Player : public dodo::rpc<>
 {
 public:
     Player()
@@ -566,7 +729,7 @@ void test3(string a, int b, string c)
 void test4(const string a, int b)
 {
     cout << "in test4" << endl;
-    cout << a << "," << b <<  endl;
+    cout << a << "," << b << endl;
 }
 
 void test5(const string a, int& b, const map<string, map<int, string>>& vlist)
@@ -577,7 +740,7 @@ void test6(string a, int b, map<string, int> vlist)
 {
 }
 
-void test7(vector<map<int,string>>& vlist, vector<int>& vec)
+void test7(vector<map<int, string>>& vlist, vector<int>& vec)
 {
 }
 #include <utility>
@@ -606,7 +769,7 @@ int main()
     rpc_server.def("test_lambda", [](int j){
         cout << "j is " << j << endl;
     });
-    
+
     int count = 0;
 #ifdef _MSC_VER
 #include <Windows.h>
@@ -619,7 +782,7 @@ int main()
 
     cout << "cost :" << GetTickCount() - starttime << endl;
 #endif
-    
+
     rpc_request_msg = rpc_client.call("test_lambda", 2);
     rpc_server.handleRpc(rpc_request_msg);
 
@@ -627,7 +790,7 @@ int main()
     rpc_server.handleRpc(rpc_request_msg);
     rpc_request_msg = rpc_client.call("player_hi", "Hello", "World");
     rpc_server.handleRpc(rpc_request_msg);
-    
+
     {
         vector<map<int, string>> vlist;
         map<int, string> a = { { 1, "dzw" } };
