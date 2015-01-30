@@ -339,8 +339,6 @@ namespace dodo
 
     struct JsonProtocol
     {
-        typedef void(*pf_callback)(void* pbase, const Value& msg);
-
         struct Decode
         {
             template<typename ...Args>
@@ -349,7 +347,7 @@ namespace dodo
             public:
                 static void invoke(void* pvoid, const Value& msg)
                 {
-                    VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
+                    auto pThis = (VariadicArgFunctor<Args...>*)pvoid;
                     int parmIndex = 0;
                     Eval<sizeof...(Args), Args...>::eval<Args...>(pThis, msg, parmIndex);
                 }
@@ -382,7 +380,7 @@ namespace dodo
             }
         };
 
-        class FunctionMgr : public BaseFunctorMgr<pf_callback, Decode>
+        class FunctionMgr : public BaseFunctorMgr<decltype(&Decode::Invoke<void>::invoke), Decode>
         {
         public:
             void    execute(const char* str, size_t size)
@@ -479,8 +477,6 @@ namespace dodo
 
     struct MsgpackProtocol
     {
-        typedef void(*pf_callback)(void* pbase, const char* buffer, size_t size, size_t& off);
-
         struct Decode
         {
             template<typename ...Args>
@@ -489,7 +485,7 @@ namespace dodo
             public:
                 static void invoke(void* pvoid, const char* buffer, size_t len, size_t& off)
                 {
-                    VariadicArgFunctor<Args...>* pThis = (VariadicArgFunctor<Args...>*)pvoid;
+                    auto pThis = (VariadicArgFunctor<Args...>*)pvoid;
                     Eval<sizeof...(Args), Args...>::eval<Args...>(pThis, buffer, len, off);
                 }
             };
@@ -523,7 +519,7 @@ namespace dodo
             }
         };
 
-        class FunctionMgr : public BaseFunctorMgr<pf_callback, Decode>
+        class FunctionMgr : public BaseFunctorMgr<decltype(&Decode::Invoke<void>::invoke), Decode>
         {
         public:
             void    execute(const char* str, size_t size)
