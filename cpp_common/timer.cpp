@@ -50,12 +50,12 @@ bool TimerMgr::IsEmpty()
 
 time_t TimerMgr::NearEndMs()
 {
-	if (mTimers.empty())
-	{
-		return 0;
-	}
-	else
-	{
-		return mTimers.top()->GetEndMs();
-	}
+    if (mTimers.empty())
+    {
+        return 0;
+    }
+    else
+    {
+        return mTimers.top()->GetEndMs();
+    }
 }

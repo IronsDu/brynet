@@ -77,7 +77,7 @@ private:
     int                             mFD;
     EventLoop*                      mEventLoop;
 
-	buffer_s*						mRecvBuffer;
+    buffer_s*                       mRecvBuffer;
 
     struct pending_packet
     {

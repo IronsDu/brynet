@@ -37,16 +37,16 @@ DataSocket::DataSocket(int fd)
     mDataHandle = nullptr;
     mUserData = -1;
 
-	mRecvBuffer = ox_buffer_new(1024);
+    mRecvBuffer = ox_buffer_new(1024);
 }
 
 DataSocket::~DataSocket()
 {
-	if (mRecvBuffer != nullptr)
-	{
-		ox_buffer_delete(mRecvBuffer);
-		mRecvBuffer = nullptr;
-	}
+    if (mRecvBuffer != nullptr)
+    {
+        ox_buffer_delete(mRecvBuffer);
+        mRecvBuffer = nullptr;
+    }
 }
 
 void DataSocket::setEventLoop(EventLoop* el)
@@ -127,20 +127,20 @@ void DataSocket::freeSendPacketList()
 
 void DataSocket::recv()
 {
-	static	const	int RECVBUFFER_SIZE = 1024 * 16;
+    static  const   int RECVBUFFER_SIZE = 1024 * 16;
 
     bool must_close = false;
-	char tmpRecvBuffer[RECVBUFFER_SIZE];	/*	临时读缓冲区	*/
-	int	recvBufferWritePos = 0;				/*	当前临时读缓冲区的写入位置	*/
-	int bufferParseStart = 0;				/*	当前消息包解析起始点	*/
+    char tmpRecvBuffer[RECVBUFFER_SIZE];    /*  临时读缓冲区  */
+    int recvBufferWritePos = 0;             /*  当前临时读缓冲区的写入位置   */
+    int bufferParseStart = 0;               /*  当前消息包解析起始点  */
 
-	{
-		/*	先把内置缓冲区的数据拷贝到读缓冲区,然后置空内置缓冲区	*/
-		memcpy(tmpRecvBuffer, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
-		recvBufferWritePos += ox_buffer_getreadvalidcount(mRecvBuffer);
-		ox_buffer_addreadpos(mRecvBuffer, ox_buffer_getreadvalidcount(mRecvBuffer));
-		ox_buffer_adjustto_head(mRecvBuffer);
-	}
+    {
+        /*  先把内置缓冲区的数据拷贝到读缓冲区,然后置空内置缓冲区 */
+        memcpy(tmpRecvBuffer, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
+        recvBufferWritePos += ox_buffer_getreadvalidcount(mRecvBuffer);
+        ox_buffer_addreadpos(mRecvBuffer, ox_buffer_getreadvalidcount(mRecvBuffer));
+        ox_buffer_adjustto_head(mRecvBuffer);
+    }
 
     while (mFD != SOCKET_ERROR)
     {
@@ -168,32 +168,32 @@ void DataSocket::recv()
         {
             if (mDataHandle != nullptr)
             {
-				recvBufferWritePos += retlen;
-				int proclen = mDataHandle(this, tmpRecvBuffer + bufferParseStart, recvBufferWritePos-bufferParseStart);
-				bufferParseStart += proclen;
+                recvBufferWritePos += retlen;
+                int proclen = mDataHandle(this, tmpRecvBuffer + bufferParseStart, recvBufferWritePos-bufferParseStart);
+                bufferParseStart += proclen;
 
-				if (recvBufferWritePos == sizeof(tmpRecvBuffer))
-				{
-					recvBufferWritePos -= bufferParseStart;
-					bufferParseStart = 0;
-				}
+                if (recvBufferWritePos == sizeof(tmpRecvBuffer))
+                {
+                    recvBufferWritePos -= bufferParseStart;
+                    bufferParseStart = 0;
+                }
             }
         }
     }
 
-	int leftlen = recvBufferWritePos - bufferParseStart;
-	if (leftlen > 0)
-	{
-		/*	表示有剩余未解析数据,需要拷贝到内置缓冲区	*/
-		if (leftlen > ox_buffer_getsize(mRecvBuffer))
-		{
-			struct buffer_s* newbuffer = ox_buffer_new(leftlen);
-			ox_buffer_delete(mRecvBuffer);
-			mRecvBuffer = newbuffer;
-		}
+    int leftlen = recvBufferWritePos - bufferParseStart;
+    if (leftlen > 0)
+    {
+        /*  表示有剩余未解析数据,需要拷贝到内置缓冲区   */
+        if (leftlen > ox_buffer_getsize(mRecvBuffer))
+        {
+            struct buffer_s* newbuffer = ox_buffer_new(leftlen);
+            ox_buffer_delete(mRecvBuffer);
+            mRecvBuffer = newbuffer;
+        }
 
-		ox_buffer_write(mRecvBuffer, tmpRecvBuffer + bufferParseStart, leftlen);
-	}
+        ox_buffer_write(mRecvBuffer, tmpRecvBuffer + bufferParseStart, leftlen);
+    }
 
     if (must_close)
     {
@@ -209,79 +209,79 @@ void DataSocket::flush()
 #ifdef PLATFORM_WINDOWS
         bool must_close = false;
 
-		static	const	int SENDBUF_SIZE = 1024*16;
-		char	sendbuf[SENDBUF_SIZE];
-		int		wait_send_size = 0;
+        static  const   int SENDBUF_SIZE = 1024*16;
+        char    sendbuf[SENDBUF_SIZE];
+        int     wait_send_size = 0;
 
-		SEND_PROC:
+        SEND_PROC:
 
-		wait_send_size = 0;
+        wait_send_size = 0;
 
         for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_packet& b = *it;
-			if ((wait_send_size + b.left) <= sizeof(sendbuf))
-			{
-				memcpy(sendbuf + wait_send_size, b.packet->c_str() + (b.packet->size() - b.left), b.left);
-				wait_send_size += b.left;
-			}
-			else
-			{
-				break;
-			}
+            if ((wait_send_size + b.left) <= sizeof(sendbuf))
+            {
+                memcpy(sendbuf + wait_send_size, b.packet->c_str() + (b.packet->size() - b.left), b.left);
+                wait_send_size += b.left;
+            }
+            else
+            {
+                break;
+            }
         }
 
-		if (wait_send_size > 0)
-		{
-			const int send_len = ::send(mFD, sendbuf, wait_send_size, 0);
-			if (send_len > 0)
-			{
-				size_t tmp_len = send_len;
-				for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
-				{
-					pending_packet& b = *it;
-					if (b.left <= tmp_len)
-					{
-						tmp_len -= b.left;
-						it = mSendList.erase(it);
-					}
-					else
-					{
-						b.left -= tmp_len;
-						break;
-					}
-				}
+        if (wait_send_size > 0)
+        {
+            const int send_len = ::send(mFD, sendbuf, wait_send_size, 0);
+            if (send_len > 0)
+            {
+                size_t tmp_len = send_len;
+                for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+                {
+                    pending_packet& b = *it;
+                    if (b.left <= tmp_len)
+                    {
+                        tmp_len -= b.left;
+                        it = mSendList.erase(it);
+                    }
+                    else
+                    {
+                        b.left -= tmp_len;
+                        break;
+                    }
+                }
 
-				if (send_len == wait_send_size)
-				{
-					if (!mSendList.empty())
-					{
-						goto SEND_PROC;
-					}
-				}
-				else
-				{
-					mCanWrite = false;
-					must_close = checkWrite();
-				}
-			}
-			else if (send_len == 0)
-			{
-				must_close = true;
-			}
-			else
-			{
-				if (sErrno != S_EWOULDBLOCK)
-				{
-					must_close = true;
-				}
-				else
-				{
-					mCanWrite = false;
-					must_close = checkWrite();
-				}
-			}
-		}
+                if (send_len == wait_send_size)
+                {
+                    if (!mSendList.empty())
+                    {
+                        goto SEND_PROC;
+                    }
+                }
+                else
+                {
+                    mCanWrite = false;
+                    must_close = checkWrite();
+                }
+            }
+            else if (send_len == 0)
+            {
+                must_close = true;
+            }
+            else
+            {
+                if (sErrno != S_EWOULDBLOCK)
+                {
+                    must_close = true;
+                }
+                else
+                {
+                    mCanWrite = false;
+                    must_close = checkWrite();
+                }
+            }
+        }
 
         if (must_close)
         {
@@ -357,7 +357,7 @@ void DataSocket::flush()
 void DataSocket::tryOnClose()
 {
 #ifdef PLATFORM_WINDOWS
-    /*	windows下需要没有投递过任何IOCP请求才能真正处理close,否则等待所有通知到达*/
+    /*  windows下需要没有投递过任何IOCP请求才能真正处理close,否则等待所有通知到达*/
     if (!mPostWriteCheck && !mPostRecvCheck && !mPostClose)
     {
         onClose();
@@ -375,8 +375,8 @@ void DataSocket::onClose()
 
         if (mDisConnectHandle != nullptr)
         {
-            /*	投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
-				mDisConnectHandle析构，然后闭包变量就失效的宕机问题	*/
+            /*  投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
+                mDisConnectHandle析构，然后闭包变量就失效的宕机问题  */
             DISCONNECT_HANDLE temp = mDisConnectHandle;
             mEventLoop->pushAfterLoopProc([temp, this](){
                 temp(this);
