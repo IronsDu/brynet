@@ -79,6 +79,7 @@ int main()
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
                     ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
                         ds->send(buffer, len);
+						return len;
                     });
 
                     ds->setDisConnectHandle([](DataSocket* arg){

@@ -8,11 +8,12 @@
 #include "channel.h"
 
 class EventLoop;
+struct buffer_s;
 
 class DataSocket : public Channel
 {
 public:
-    typedef std::function<void(DataSocket*, const char* buffer, int len)>    DATA_HANDLE;
+    typedef std::function<int (DataSocket*, const char* buffer, int len)>    DATA_HANDLE;
     typedef std::function<void(DataSocket*)>                                 DISCONNECT_HANDLE;
     typedef std::shared_ptr<std::string>                                     PACKET_PTR;
 
@@ -75,6 +76,8 @@ private:
 
     int                             mFD;
     EventLoop*                      mEventLoop;
+
+	buffer_s*						mRecvBuffer;
 
     struct pending_packet
     {

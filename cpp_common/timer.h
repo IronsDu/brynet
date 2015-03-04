@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+#include "systemlib.h"
+
 class TimerMgr;
 
 class Timer
@@ -46,7 +48,7 @@ public:
     template<typename F, typename ...TArgs>
     Timer::WeakPtr                          AddTimer(time_t delayMs, F callback, typename TArgs&& ...args)
     {
-        auto t = std::make_shared<Timer>(delayMs + static_cast<time_t>(GetTickCount()), 
+		auto t = std::make_shared<Timer>(delayMs + static_cast<time_t>(ox_getnowtime()),
                                             std::bind(callback, std::forward<TArgs>(args)...));
         mTimers.push(t);
 
@@ -56,6 +58,8 @@ public:
     void                                    Schedule();
 
     bool                                    IsEmpty();
+
+	time_t									NearEndMs();
 
 private:
     class CompareTimer

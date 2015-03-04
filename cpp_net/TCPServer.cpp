@@ -210,7 +210,7 @@ void TcpServer::RunListen(int port)
                         mIds[loopIndex].set(ds, sid.data.index);
                         ds->setUserData(id);
                         ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
-                            mDataHandle(ds->getUserData(), buffer, len);
+                            return mDataHandle(ds->getUserData(), buffer, len);
                         });
 
                         ds->setDisConnectHandle([this](DataSocket* arg){

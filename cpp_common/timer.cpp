@@ -31,7 +31,7 @@ void TimerMgr::Schedule()
     {
         auto tmp = mTimers.top();
 
-        if (tmp->GetEndMs() < GetTickCount())
+        if (tmp->GetEndMs() < ox_getnowtime())
         {
             mTimers.pop();
             tmp->operator() ();
@@ -46,4 +46,16 @@ void TimerMgr::Schedule()
 bool TimerMgr::IsEmpty()
 {
     return mTimers.empty();
+}
+
+time_t TimerMgr::NearEndMs()
+{
+	if (mTimers.empty())
+	{
+		return 0;
+	}
+	else
+	{
+		return mTimers.top()->GetEndMs();
+	}
 }

@@ -4,7 +4,7 @@
 
 #if defined PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h> // GetTickCount()
+#include <windows.h>
 #else
 #include <unistd.h>
 #include <sys/time.h> // struct timeval, gettimeofday()

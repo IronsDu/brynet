@@ -142,6 +142,8 @@ int main()
             unLockStatistics();
             
         }
+
+		return len;
     });
 
     /*  主线程处理msgList消息队列    */

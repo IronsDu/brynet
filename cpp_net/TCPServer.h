@@ -14,7 +14,7 @@ class TcpServer
     typedef std::function<void (EventLoop&)> FRAME_CALLBACK;
     typedef std::function<void(int64_t)>    CONNECTION_ENTER_HANDLE;
     typedef std::function<void(int64_t)>    DISCONNECT_HANDLE;
-    typedef std::function<void(int64_t, const char* buffer, int len)>    DATA_HANDLE;
+    typedef std::function<int (int64_t, const char* buffer, int len)>    DATA_HANDLE;
 
 public:
     TcpServer(int port, int threadNum, FRAME_CALLBACK callback = nullptr);  /*callback为IO线程每个loop循环都会执行的回调函数，可以为null*/
