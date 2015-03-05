@@ -2,6 +2,7 @@
 #define _TCP_SERVER_H
 
 #include <vector>
+#include <string>
 #include <assert.h>
 
 #include "typeids.h"
@@ -17,7 +18,7 @@ class TcpServer
     typedef std::function<int (int64_t, const char* buffer, int len)>    DATA_HANDLE;
 
 public:
-    TcpServer(int port, int threadNum, FRAME_CALLBACK callback = nullptr);  /*callback为IO线程每个loop循环都会执行的回调函数，可以为null*/
+    TcpServer(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback = nullptr);  /*callback为IO线程每个loop循环都会执行的回调函数，可以为null*/
     ~TcpServer();
 
     void                                setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle);
@@ -64,6 +65,8 @@ private:
         int64_t id;
     };
     
+    std::string                         mCertificate;
+    std::string                         mPrivatekey;
 };
 
 #endif

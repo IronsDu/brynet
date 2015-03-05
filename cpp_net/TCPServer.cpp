@@ -15,7 +15,7 @@
 
 #include "TCPServer.h"
 
-TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
+TcpServer::TcpServer(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback)
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
 
@@ -42,6 +42,15 @@ TcpServer::TcpServer(int port, int threadNum, FRAME_CALLBACK callback)
         });
     }
     
+    if (certificate != nullptr)
+    {
+        mCertificate = certificate;
+    }
+    if (privatekey != nullptr)
+    {
+        mPrivatekey = privatekey;
+    }
+
     mListenThread = new std::thread([this, port](){
         RunListen(port);
     });
@@ -163,80 +172,102 @@ void TcpServer::_procDataSocketClose(DataSocket* ds)
 
 void TcpServer::RunListen(int port)
 {
-    while (true)
+    int client_fd = SOCKET_ERROR;
+    struct sockaddr_in socketaddress;
+    socklen_t size = sizeof(struct sockaddr);
+
+    int listen_fd = ox_socket_listen(port, 25);
+    SSL_CTX *ctx = nullptr;
+
+    if (!mCertificate.empty() && !mPrivatekey.empty())
     {
-        int client_fd = SOCKET_ERROR;
-        struct sockaddr_in socketaddress;
-        socklen_t size = sizeof(struct sockaddr);
+        ctx = SSL_CTX_new(SSLv23_server_method());
+        if (SSL_CTX_use_certificate_file(ctx, mCertificate.c_str(), SSL_FILETYPE_PEM) <= 0) {
+            SSL_CTX_free(ctx);
+            ctx = nullptr;
+        }
+        /* 载入用户私钥 */
+        if (SSL_CTX_use_PrivateKey_file(ctx, mPrivatekey.c_str(), SSL_FILETYPE_PEM) <= 0) {
+            SSL_CTX_free(ctx);
+            ctx = nullptr;
+        }
+        /* 检查用户私钥是否正确 */
+        if (!SSL_CTX_check_private_key(ctx)) {
+            SSL_CTX_free(ctx);
+            ctx = nullptr;
+        }
+    }
 
-        int listen_fd = ox_socket_listen(port, 25);
-
-        if (SOCKET_ERROR != listen_fd)
+    if (SOCKET_ERROR != listen_fd)
+    {
+        printf("listen : %d \n", port);
+        for (;;)
         {
-            printf("listen : %d \n", port);
-            for (;;)
+            while ((client_fd = accept(listen_fd, (struct sockaddr*)&socketaddress, &size)) < 0)
             {
-                while ((client_fd = accept(listen_fd, (struct sockaddr*)&socketaddress, &size)) < 0)
+                if (EINTR == sErrno)
                 {
-                    if (EINTR == sErrno)
-                    {
-                        continue;
-                    }
-                }
-
-                printf("accept fd : %d \n", client_fd);
-
-                if (SOCKET_ERROR != client_fd)
-                {
-                    int flag = 1;
-                    setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
-                    {
-                        int sd_size = 32 * 1024;
-                        int op_size = sizeof(sd_size);
-                        setsockopt(client_fd, SOL_SOCKET, SO_SNDBUF, (const char*)&sd_size, op_size);
-                    }
-
-                    Channel* channel = new DataSocket(client_fd);
-                    int loopIndex = rand() % mLoopNum;
-                    EventLoop& loop = mLoops[loopIndex];
-                    /*  随机为此链接分配一个eventloop */
-                    loop.addChannel(client_fd, channel, [this, loopIndex](Channel* arg){
-                        /*  当eventloop接管此链接后，执行此lambda回调    */
-                        DataSocket* ds = static_cast<DataSocket*>(arg);
-
-                        int64_t id = MakeID(loopIndex);
-                        union SessionId sid;
-                        sid.id = id;
-                        mIds[loopIndex].set(ds, sid.data.index);
-                        ds->setUserData(id);
-                        ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
-                            return mDataHandle(ds->getUserData(), buffer, len);
-                        });
-
-                        ds->setDisConnectHandle([this](DataSocket* arg){
-                            /*TODO::这里也需要一开始就保存this指针， delete datasocket之后，此lambda析构，绑定变量失效，所以最后继续访问this就会宕机*/
-                            TcpServer* p = this;
-                            int64_t id = arg->getUserData();
-                            p->_procDataSocketClose(arg);
-                            p->mDisConnectHandle(id);
-                        });
-
-                        mEnterHandle(id);
-                    });
+                    continue;
                 }
             }
 
+            printf("accept fd : %d \n", client_fd);
+
+            if (SOCKET_ERROR != client_fd)
+            {
+                int flag = 1;
+                setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+                {
+                    int sd_size = 32 * 1024;
+                    int op_size = sizeof(sd_size);
+                    setsockopt(client_fd, SOL_SOCKET, SO_SNDBUF, (const char*)&sd_size, op_size);
+                }
+
+                DataSocket* channel = new DataSocket(client_fd);
+                if (ctx != nullptr)
+                {
+                    channel->setupAcceptSSL(ctx);
+                }
+
+                int loopIndex = rand() % mLoopNum;
+                EventLoop& loop = mLoops[loopIndex];
+                /*  随机为此链接分配一个eventloop */
+                loop.addChannel(client_fd, channel, [this, loopIndex](Channel* arg){
+                    /*  当eventloop接管此链接后，执行此lambda回调    */
+                    DataSocket* ds = static_cast<DataSocket*>(arg);
+
+                    int64_t id = MakeID(loopIndex);
+                    union SessionId sid;
+                    sid.id = id;
+                    mIds[loopIndex].set(ds, sid.data.index);
+                    ds->setUserData(id);
+                    ds->setDataHandle([this](DataSocket* ds, const char* buffer, int len){
+                        return mDataHandle(ds->getUserData(), buffer, len);
+                    });
+
+                    ds->setDisConnectHandle([this](DataSocket* arg){
+                        /*TODO::这里也需要一开始就保存this指针， delete datasocket之后，此lambda析构，绑定变量失效，所以最后继续访问this就会宕机*/
+                        TcpServer* p = this;
+                        int64_t id = arg->getUserData();
+                        p->_procDataSocketClose(arg);
+                        p->mDisConnectHandle(id);
+                    });
+
+                    mEnterHandle(id);
+                });
+            }
+        }
+
 #ifdef PLATFORM_WINDOWS
-            closesocket(listen_fd);
+        closesocket(listen_fd);
 #else
-            close(listen_fd);
+        close(listen_fd);
 #endif
-            listen_fd = SOCKET_ERROR;
-        }
-        else
-        {
-            printf("listen failed, error:%d \n", sErrno);
-            return;
-        }
+        listen_fd = SOCKET_ERROR;
+    }
+    else
+    {
+        printf("listen failed, error:%d \n", sErrno);
+        return;
     }
 }

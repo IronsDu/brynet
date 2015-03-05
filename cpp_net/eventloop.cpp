@@ -268,9 +268,10 @@ void EventLoop::linkChannel(int fd, Channel* ptr)
 void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
 {
     pushAsyncProc([fd, c, this, f] () {
-            linkChannel(fd, c);
-            c->setEventLoop(this);
-            f(c);
+        c->setNoBlock();
+        linkChannel(fd, c);
+        c->setEventLoop(this);
+        f(c);
     });
 }
 

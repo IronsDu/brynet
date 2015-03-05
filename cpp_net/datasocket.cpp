@@ -14,10 +14,7 @@ DataSocket::DataSocket(int fd)
     /*  默认可写    */
     mCanWrite = true;
 
-    unsigned long ul = true;
-
 #ifdef PLATFORM_WINDOWS
-    ioctlsocket(fd, FIONBIO, &ul);
     memset(&mOvlRecv, sizeof(mOvlRecv), 0);
     memset(&mOvlSend, sizeof(mOvlSend), 0);
     memset(&mOvlClose, sizeof(mOvlClose), 0);
@@ -29,8 +26,6 @@ DataSocket::DataSocket(int fd)
     mPostRecvCheck = false;
     mPostWriteCheck = false;
     mPostClose = false;
-#else
-    ioctl(fd, FIONBIO, &ul);
 #endif
 
     mDisConnectHandle = nullptr;
@@ -38,6 +33,9 @@ DataSocket::DataSocket(int fd)
     mUserData = -1;
 
     mRecvBuffer = ox_buffer_new(1024);
+
+    mSSLCtx = nullptr;
+    mSSL = nullptr;
 }
 
 DataSocket::~DataSocket()
@@ -47,6 +45,26 @@ DataSocket::~DataSocket()
         ox_buffer_delete(mRecvBuffer);
         mRecvBuffer = nullptr;
     }
+    if (mSSLCtx != nullptr)
+    {
+        SSL_CTX_free(mSSLCtx);
+        mSSLCtx = nullptr;
+    }
+    if (mSSL != nullptr)
+    {
+        SSL_free(mSSL);
+        mSSL = nullptr;
+    }
+}
+
+void DataSocket::setNoBlock()
+{
+#ifdef PLATFORM_WINDOWS
+    unsigned long ul = true;
+    ioctlsocket(mFD, FIONBIO, &ul);
+#else
+    ioctl(fd, FIONBIO, &ul);
+#endif
 }
 
 void DataSocket::setEventLoop(EventLoop* el)
@@ -144,17 +162,40 @@ void DataSocket::recv()
 
     while (mFD != SOCKET_ERROR)
     {
-        int retlen = ::recv(mFD, tmpRecvBuffer+recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos, 0);
+        int retlen = 0;
+        if (mSSL != nullptr)
+        {
+            retlen = SSL_read(mSSL, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos);
+        }
+        else
+        {
+            retlen = ::recv(mFD, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos, 0);
+        }
 
         if (retlen < 0)
         {
-            if (sErrno == S_EWOULDBLOCK)
+            if (mSSL != nullptr)
             {
-                must_close = !checkRead();
+                int error = SSL_get_error(mSSL, retlen);
+                if (SSL_ERROR_WANT_READ == error)
+                {
+                    must_close = !checkRead();
+                }
+                else
+                {
+                    must_close = true;
+                }
             }
             else
             {
-                must_close = true;
+                if (sErrno == S_EWOULDBLOCK)
+                {
+                    must_close = !checkRead();
+                }
+                else
+                {
+                    must_close = true;
+                }
             }
 
             break;
@@ -207,67 +248,107 @@ void DataSocket::flush()
     if (mCanWrite && mFD != SOCKET_ERROR)
     {
 #ifdef PLATFORM_WINDOWS
-        bool must_close = false;
-
-        static  const   int SENDBUF_SIZE = 1024*16;
-        char    sendbuf[SENDBUF_SIZE];
-        int     wait_send_size = 0;
-
-        SEND_PROC:
-
-        wait_send_size = 0;
-
-        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+        normalFlush();
+#else
+        if (mSSL != nullptr)
         {
-            pending_packet& b = *it;
-            if ((wait_send_size + b.left) <= sizeof(sendbuf))
-            {
-                memcpy(sendbuf + wait_send_size, b.packet->c_str() + (b.packet->size() - b.left), b.left);
-                wait_send_size += b.left;
-            }
-            else
-            {
-                break;
-            }
+            normalFlush();
+        }
+        else
+        {
+            quickFlush();
+        }
+#endif
+    }
+}
+
+void DataSocket::normalFlush()
+{
+    bool must_close = false;
+
+    static  const   int SENDBUF_SIZE = 1024 * 16;
+    char    sendbuf[SENDBUF_SIZE];
+    int     wait_send_size = 0;
+
+SEND_PROC:
+
+    wait_send_size = 0;
+
+    for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+    {
+        pending_packet& b = *it;
+        if ((wait_send_size + b.left) <= sizeof(sendbuf))
+        {
+            memcpy(sendbuf + wait_send_size, b.packet->c_str() + (b.packet->size() - b.left), b.left);
+            wait_send_size += b.left;
+            ++it;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (wait_send_size > 0)
+    {
+        int send_retlen = 0;
+        if (mSSL != nullptr)
+        {
+            send_retlen = SSL_write(mSSL, sendbuf, wait_send_size);
+        }
+        else
+        {
+            send_retlen = ::send(mFD, sendbuf, wait_send_size, 0);
         }
 
-        if (wait_send_size > 0)
+        if (send_retlen > 0)
         {
-            const int send_len = ::send(mFD, sendbuf, wait_send_size, 0);
-            if (send_len > 0)
+            size_t tmp_len = send_retlen;
+            for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
             {
-                size_t tmp_len = send_len;
-                for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+                pending_packet& b = *it;
+                if (b.left <= tmp_len)
                 {
-                    pending_packet& b = *it;
-                    if (b.left <= tmp_len)
-                    {
-                        tmp_len -= b.left;
-                        it = mSendList.erase(it);
-                    }
-                    else
-                    {
-                        b.left -= tmp_len;
-                        break;
-                    }
-                }
-
-                if (send_len == wait_send_size)
-                {
-                    if (!mSendList.empty())
-                    {
-                        goto SEND_PROC;
-                    }
+                    tmp_len -= b.left;
+                    it = mSendList.erase(it);
                 }
                 else
                 {
-                    mCanWrite = false;
-                    must_close = checkWrite();
+                    b.left -= tmp_len;
+                    break;
                 }
             }
-            else if (send_len == 0)
+
+            if (send_retlen == wait_send_size)
             {
-                must_close = true;
+                if (!mSendList.empty())
+                {
+                    goto SEND_PROC;
+                }
+            }
+            else
+            {
+                mCanWrite = false;
+                must_close = checkWrite();
+            }
+        }
+        else if (send_retlen == 0)
+        {
+            must_close = true;
+        }
+        else
+        {
+            if (mSSL != nullptr)
+            {
+                int error = SSL_get_error(mSSL, send_retlen);
+                if (SSL_ERROR_WANT_WRITE == error)
+                {
+                    must_close = !checkWrite();
+                }
+                else
+                {
+                    must_close = true;
+                }
             }
             else
             {
@@ -282,76 +363,81 @@ void DataSocket::flush()
                 }
             }
         }
+    }
 
-        if (must_close)
-        {
-            tryOnClose();
-        }
-#else
+    if (must_close)
+    {
+        tryOnClose();
+    }
+}
+
+void DataSocket::quickFlush()
+{
+#ifdef PLATFORM_LINUX
 #ifndef MAX_IOVEC
 #define  MAX_IOVEC 1024
 #endif
 
-        struct iovec iov[MAX_IOVEC];
-    SEND_PROC:
-        bool must_close = false;
-        int num = 0;
-        int ready_send_len = 0;
-        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+    struct iovec iov[MAX_IOVEC];
+SEND_PROC:
+    bool must_close = false;
+    int num = 0;
+    int ready_send_len = 0;
+    for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+    {
+        pending_packet& b = *it;
+        iov[num].iov_base = (void*)(b.packet->c_str() + (b.packet->size() - b.left));
+        iov[num].iov_len = b.left;
+        ready_send_len += b.left;
+
+        ++it;
+        num++;
+        if (num <= MAX_IOVEC)
         {
-            pending_packet& b = *it;
-            iov[num].iov_base = (void*)(b.packet->c_str() + (b.packet->size() - b.left));
-            iov[num].iov_len = b.left;
-            ready_send_len += b.left;
-
-            num++;
-            if(num <= MAX_IOVEC)
-            {
-                break;
-            }
+            break;
         }
-
-        if (num > 0)
-        {
-            int send_len = writev(mFD, iov, num);
-            if(send_len > 0)
-            {
-                int tmp_len = send_len;
-                for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
-                {
-                    pending_packet& b = *it;
-                    if (b.left <= tmp_len)
-                    {
-                        tmp_len -= b.left;
-                        it = mSendList.erase(it);
-                    }
-                    else
-                    {
-                        b.left -= tmp_len;
-                        break;
-                    }
-                }
-
-                if(!mSendList.empty())
-                {
-                    goto SEND_PROC;
-                }
-            }
-            else
-            {
-                if (sErrno == S_EWOULDBLOCK)
-                {
-                    must_close = true;
-                }
-            }
-        }
-
-        if (must_close)
-        {
-            tryOnClose();
-        }
-#endif
     }
+
+    if (num > 0)
+    {
+        int send_len = writev(mFD, iov, num);
+        if (send_len > 0)
+        {
+            int tmp_len = send_len;
+            for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+            {
+                pending_packet& b = *it;
+                if (b.left <= tmp_len)
+                {
+                    tmp_len -= b.left;
+                    it = mSendList.erase(it);
+                }
+                else
+                {
+                    b.left -= tmp_len;
+                    break;
+                }
+            }
+
+            if (!mSendList.empty())
+            {
+                goto SEND_PROC;
+            }
+        }
+        else
+        {
+            if (sErrno == S_EWOULDBLOCK)
+            {
+                must_close = true;
+            }
+        }
+    }
+
+    if (must_close)
+    {
+        tryOnClose();
+    }
+#endif
 }
 
 void DataSocket::tryOnClose()
@@ -412,17 +498,20 @@ bool    DataSocket::checkRead()
 
     /*  添加可读检测  */
 
-    DWORD   dwBytes = 0;
-    DWORD   flag = 0;
-    int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
-    if (ret == -1)
+    if (!mPostRecvCheck)
     {
-        check_ret = GetLastError() == WSA_IO_PENDING;
-    }
+        DWORD   dwBytes = 0;
+        DWORD   flag = 0;
+        int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
+        if (ret == -1)
+        {
+            check_ret = GetLastError() == WSA_IO_PENDING;
+        }
 
-    if (check_ret)
-    {
-        mPostRecvCheck = true;
+        if (check_ret)
+        {
+            mPostRecvCheck = true;
+        }
     }
 #endif
     
@@ -435,16 +524,19 @@ bool    DataSocket::checkWrite()
 #ifdef PLATFORM_WINDOWS
     static WSABUF wsendbuf[1] = { {NULL, 0} };
 
-    DWORD send_len = 0;
-    int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
-    if (ret == -1)
+    if (!mPostWriteCheck)
     {
-        check_ret = GetLastError() == WSA_IO_PENDING;
-    }
+        DWORD send_len = 0;
+        int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
+        if (ret == -1)
+        {
+            check_ret = GetLastError() == WSA_IO_PENDING;
+        }
 
-    if (check_ret)
-    {
-        mPostWriteCheck = true;
+        if (check_ret)
+        {
+            mPostWriteCheck = true;
+        }
     }
 #endif
 
@@ -490,6 +582,21 @@ void DataSocket::setUserData(int64_t value)
 int64_t DataSocket::getUserData() const
 {
     return mUserData;
+}
+
+void DataSocket::setupAcceptSSL(SSL_CTX* ctx)
+{
+    mSSL = SSL_new(ctx);
+    SSL_set_fd(mSSL, mFD);
+    SSL_accept(mSSL);
+}
+
+void DataSocket::setupConnectSSL()
+{
+    mSSLCtx = SSL_CTX_new(SSLv23_client_method());
+    mSSL = SSL_new(mSSLCtx);
+    SSL_set_fd(mSSL, mFD);
+    SSL_connect(mSSL);
 }
 
 DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, int len)

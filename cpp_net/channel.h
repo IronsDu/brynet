@@ -12,6 +12,7 @@ public:
     virtual void    setEventLoop(EventLoop*) = 0;
     virtual void    postDisConnect() = 0;
     virtual void    onClose() = 0;
+    virtual void    setNoBlock() {};
 };
 
 #endif

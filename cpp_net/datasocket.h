@@ -7,6 +7,14 @@
 
 #include "channel.h"
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+#include "openssl/ssl.h"
+#ifdef  __cplusplus
+}
+#endif
+
 class EventLoop;
 struct buffer_s;
 
@@ -36,8 +44,12 @@ public:
     void                            setUserData(int64_t value);
     int64_t                         getUserData() const;
 
+    void                            setupAcceptSSL(SSL_CTX*);
+    void                            setupConnectSSL();
+
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
+    void                            setNoBlock() override;
     void                            setEventLoop(EventLoop* el) override;
 
     void                            canRecv() override;
@@ -48,6 +60,8 @@ private:
 
     void                            recv();
     void                            flush();
+    void                            normalFlush();
+    void                            quickFlush();
 
     /*此函数主要为了在windows下尝试调用onClose*/
     void                            tryOnClose();
@@ -96,6 +110,9 @@ private:
     bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
 
     int64_t                         mUserData;          /*  链接的用户自定义数据  */
+
+    SSL_CTX*                        mSSLCtx;
+    SSL*                            mSSL;
 };
 
 #endif
