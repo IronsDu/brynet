@@ -71,6 +71,10 @@ private:
     void                            runAfterFlush();
 
     void                            freeSendPacketList();
+#ifdef PLATFORM_LINUX
+    void                            removeCheckWrite();
+#endif
+
 private:
 
 #ifdef PLATFORM_WINDOWS

@@ -72,7 +72,7 @@ int main()
     MsgQueue<NetMsg*>  msgList;
     EventLoop       mainLoop;
 
-    TcpServer t(port_num, thread_num, [&](EventLoop& l){
+    TcpServer t(port_num, nullptr, nullptr, thread_num, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         if (true)
         {

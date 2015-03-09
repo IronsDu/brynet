@@ -19,6 +19,9 @@ TcpServer::TcpServer(int port, const char *certificate, const char *privatekey, 
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
 
+    mPort = port;
+    mRunService = true;
+
     mLoops = new EventLoop[threadNum];
     mIOThreads = new std::thread*[threadNum];
     mLoopNum = threadNum;
@@ -29,9 +32,9 @@ TcpServer::TcpServer(int port, const char *certificate, const char *privatekey, 
     for (int i = 0; i < mLoopNum; ++i)
     {
         EventLoop& l = mLoops[i];
-        mIOThreads[i] = new std::thread([&l, callback](){
+        mIOThreads[i] = new std::thread([this, &l, callback](){
             l.restoreThreadID();
-            while (true)
+            while (mRunService)
             {
                 l.loop(-1);
                 if (callback != nullptr)
@@ -149,6 +152,20 @@ void TcpServer::disConnect(int64_t id)
         }
     }
 }
+
+void TcpServer::closeService()
+{
+    mRunService = false;
+
+    sock tmp = ox_socket_connect("127.0.0.1", mPort);
+    ox_socket_close(tmp);
+
+    for (int i = 0; i < mLoopNum; ++i)
+    {
+        mLoops[i].wakeup();
+    }
+}
+
 int64_t TcpServer::MakeID(int loopIndex)
 {
     union SessionId sid;
@@ -172,11 +189,11 @@ void TcpServer::_procDataSocketClose(DataSocket* ds)
 
 void TcpServer::RunListen(int port)
 {
-    int client_fd = SOCKET_ERROR;
+    sock client_fd = SOCKET_ERROR;
     struct sockaddr_in socketaddress;
     socklen_t size = sizeof(struct sockaddr);
 
-    int listen_fd = ox_socket_listen(port, 25);
+    sock listen_fd = ox_socket_listen(port, 25);
     SSL_CTX *ctx = nullptr;
 
     if (!mCertificate.empty() && !mPrivatekey.empty())
@@ -201,7 +218,7 @@ void TcpServer::RunListen(int port)
     if (SOCKET_ERROR != listen_fd)
     {
         printf("listen : %d \n", port);
-        for (;;)
+        for (;mRunService;)
         {
             while ((client_fd = accept(listen_fd, (struct sockaddr*)&socketaddress, &size)) < 0)
             {

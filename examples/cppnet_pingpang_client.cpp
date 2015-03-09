@@ -69,9 +69,11 @@ int main()
                 senddata[packet_len - 1] = 0;
             }
 
+#if 0
             for (int i = 0; i < client_num; i++)
             {
-                int client = ox_socket_connect("180.97.33.107", port_num);
+                /*int client = ox_socket_connect("180.97.33.107", port_num);*/
+                int client = ox_socket_nonblockconnect("180.97.33.107", port_num);
                 if (client == SOCKET_ERROR)
                 {
                     printf("error : %d \n", sErrno);
@@ -104,6 +106,41 @@ int main()
                     });
                 });
             }
+#else
+            for (int i = 0; i < client_num; i++)
+            {
+                /*int client = ox_socket_connect("180.97.33.107", port_num);*/
+                int client = ox_socket_connect("127.0.0.1", port_num);
+                if (client == SOCKET_ERROR)
+                {
+                    printf("error : %d \n", sErrno);
+                }
+                printf("connect fd: %d\n", client);
+                int flag = 1;
+                int setret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+                std::cout << setret << std::endl;
+
+                DataSocket* pClient = new DataSocket(client);
+
+                clientEventLoop.addChannel(client, pClient, [&](Channel* arg){
+                    DataSocket* ds = static_cast<DataSocket*>(arg);
+                    if (senddata != nullptr)
+                    {
+                        ds->send(senddata, packet_len);
+                    }
+
+                    /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
+                    ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
+                        ds->send(buffer, len);
+                        return len;
+                    });
+
+                    ds->setDisConnectHandle([](DataSocket* arg){
+                        delete arg;
+                    });
+                });
+            }
+#endif
 
             while (true)
             {

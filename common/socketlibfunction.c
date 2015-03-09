@@ -99,6 +99,29 @@ ox_socket_connect(const char* server_ip, int port)
 }
 
 sock
+ox_socket_nonblockconnect(const char* server_ip, int port)
+{
+    struct sockaddr_in server_addr;
+    sock clientfd = SOCKET_ERROR;
+
+    ox_socket_init();
+
+    clientfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (clientfd != SOCKET_ERROR)
+    {
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = inet_addr(server_ip);
+        server_addr.sin_port = htons(port);
+
+        ox_socket_nonblock(clientfd);
+        connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+    }
+
+    return clientfd;
+}
+
+sock
 ox_socket_listen(int port, int back_num)
 {
     sock socketfd = SOCKET_ERROR;

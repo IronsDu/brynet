@@ -259,7 +259,7 @@ void EventLoop::linkChannel(int fd, Channel* ptr)
     HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
 #else
     struct epoll_event ev = { 0, { 0 } };
-    ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
+    ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
     ev.data.ptr = ptr;
     int ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev);
 #endif
@@ -306,6 +306,11 @@ void EventLoop::restoreThreadID()
 HANDLE EventLoop::getIOCPHandle() const
 {
     return mIOCP;
+}
+#else
+int EventLoop::getEpollHandle() const
+{
+    return mEpollFd;
 }
 #endif
 

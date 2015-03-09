@@ -120,6 +120,8 @@ void DataSocket::canSend()
 {
 #ifdef PLATFORM_WINDOWS
     mPostWriteCheck = false;
+#else
+    removeCheckWrite();
 #endif
     mCanWrite = true;
     runAfterFlush();
@@ -174,30 +176,16 @@ void DataSocket::recv()
 
         if (retlen < 0)
         {
-            if (mSSL != nullptr)
+            if ((mSSL != nullptr && SSL_get_error(mSSL, retlen) == SSL_ERROR_WANT_READ) ||
+                (sErrno == S_EWOULDBLOCK))
             {
-                int error = SSL_get_error(mSSL, retlen);
-                if (SSL_ERROR_WANT_READ == error)
-                {
-                    must_close = !checkRead();
-                }
-                else
-                {
-                    must_close = true;
-                }
+                must_close = !checkRead();
             }
             else
             {
-                if (sErrno == S_EWOULDBLOCK)
-                {
-                    must_close = !checkRead();
-                }
-                else
-                {
-                    must_close = true;
-                }
+                must_close = true;
             }
-
+            
             break;
         }
         else if (retlen == 0)
@@ -329,38 +317,20 @@ SEND_PROC:
             else
             {
                 mCanWrite = false;
-                must_close = checkWrite();
+                must_close = !checkWrite();
             }
-        }
-        else if (send_retlen == 0)
-        {
-            must_close = true;
         }
         else
         {
-            if (mSSL != nullptr)
+            if ((mSSL != nullptr && SSL_get_error(mSSL, send_retlen) == SSL_ERROR_WANT_WRITE) ||
+                (sErrno == S_EWOULDBLOCK))
             {
-                int error = SSL_get_error(mSSL, send_retlen);
-                if (SSL_ERROR_WANT_WRITE == error)
-                {
-                    must_close = !checkWrite();
-                }
-                else
-                {
-                    must_close = true;
-                }
+                mCanWrite = false;
+                must_close = !checkWrite();
             }
             else
             {
-                if (sErrno != S_EWOULDBLOCK)
-                {
-                    must_close = true;
-                }
-                else
-                {
-                    mCanWrite = false;
-                    must_close = checkWrite();
-                }
+                must_close = true;
             }
         }
     }
@@ -419,14 +389,27 @@ SEND_PROC:
                 }
             }
 
-            if (!mSendList.empty())
+            if(send_len == ready_send_len)
             {
-                goto SEND_PROC;
+                if (!mSendList.empty())
+                {
+                    goto SEND_PROC;
+                }
+            }
+            else
+            {
+                mCanWrite = false;
+                must_close = !checkWrite();
             }
         }
         else
         {
             if (sErrno == S_EWOULDBLOCK)
+            {
+                mCanWrite = false;
+                must_close = !checkWrite();
+            }
+            else
             {
                 must_close = true;
             }
@@ -538,10 +521,25 @@ bool    DataSocket::checkWrite()
             mPostWriteCheck = true;
         }
     }
+#else
+    struct epoll_event ev = { 0, { 0 } };
+    ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
+    ev.data.ptr = ptr;
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
 #endif
 
     return check_ret;
 }
+
+#ifdef PLATFORM_LINUX
+void    DataSocket::removeCheckWrite()
+{
+    struct epoll_event ev = { 0, { 0 } };
+    ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
+    ev.data.ptr = ptr;
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
+}
+#endif
 
 void DataSocket::setDataHandle(DATA_HANDLE proc)
 {

@@ -46,6 +46,8 @@ public:
 
 #ifdef PLATFORM_WINDOWS
     HANDLE                          getIOCPHandle() const;
+#else
+    int                             getEpollHandle() const;
 #endif
 
 private:

@@ -30,6 +30,9 @@ public:
 
     /*主动断开此id链接，但仍然可能收到此id的断开回调，需要上层逻辑自己处理这个"问题"*/
     void                                disConnect(int64_t id);
+    
+    /*  关闭服务 TODO::提供开启服务接口 */
+    void                                closeService();
 
 private:
     void                                RunListen(int port);
@@ -67,6 +70,9 @@ private:
     
     std::string                         mCertificate;
     std::string                         mPrivatekey;
+
+    int                                 mPort;
+    bool                                mRunService;
 };
 
 #endif
