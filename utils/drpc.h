@@ -281,6 +281,11 @@ namespace dodo
     class BaseFunctorMgr
     {
     public:
+        BaseFunctorMgr()
+        {
+            mRequestID = -1;
+        }
+
         virtual ~BaseFunctorMgr()
         {
             for (auto& p : mRealFunctionPtr)
@@ -304,6 +309,26 @@ namespace dodo
             mWrapFunctions[name] = INVOKE_TYPE::Invoke<Args...>::invoke;
             mRealFunctionPtr[name] = pbase;
         }
+
+        void    del(const string& name)
+        {
+            mWrapFunctions.erase(name);
+            auto it = mRealFunctionPtr.find(name);
+            if (it != mRealFunctionPtr.end())
+            {
+                delete (*it).second;
+            }
+        }
+
+        void    setRequestID(int id)
+        {
+            mRequestID = id;
+        }
+
+        int     getRequestID() const
+        {
+            return mRequestID;
+        }
     private:
         template<typename LAMBDA_OBJ_TYPE, typename ...Args>
         void _insertLambda(string name, LAMBDA_OBJ_TYPE obj, void(LAMBDA_OBJ_TYPE::*func)(Args...) const)
@@ -317,6 +342,7 @@ namespace dodo
     protected:
         map<string, typename CALLBACK_TYPE>         mWrapFunctions;
         map<string, void*>                          mRealFunctionPtr;
+        int                                         mRequestID;
     };
 
     class BaseCaller
@@ -388,6 +414,7 @@ namespace dodo
                 mDoc.Parse(str);
 
                 string name = mDoc["name"].GetString();
+                setRequestID(mDoc["req_id"].GetInt());
                 const Value& parmObject = mDoc["parm"];
 
                 auto it = mWrapFunctions.find(name);
@@ -497,7 +524,9 @@ namespace dodo
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
-                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
+                /*  msgpack协议的call是逆序写入参数，所以这里逆序读取参数    */
+                int sss = sizeof...(LeftArgs);
+                auto& value = std::get<sizeof...(LeftArgs)>(pThis->mTuple);
                 clear(value);
 
                 msgpack::unpacked result;
@@ -515,7 +544,43 @@ namespace dodo
             template<typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
-                (pThis->mf)(args...);
+                /*  因为实际参数是逆序的，所以要经过反转之后再回调处理函数 */
+                revertArgsCallback(pThis, args...);
+            }
+
+            /*  http://stackoverflow.com/questions/15904288/how-to-reverse-the-order-of-arguments-of-a-variadic-template-function   */
+            template<class ...Tn>
+            struct revert;
+
+            template<>
+            struct revert<>
+            {
+                template<class ...Un>
+                static void apply(VariadicArgFunctor<Args...>* pThis, Un const&... un)
+                {
+                    (pThis->mf)(un...);
+                }
+            };
+            // recursion
+            template<class T, class ...Tn>
+            struct revert<T, Tn...>
+            {
+                template<class ...Un>
+                static void apply(VariadicArgFunctor<Args...>* pThis, T const& t, Tn const&... tn, Un const&... un)
+                {
+                    revert<Tn...>::apply(pThis, tn..., t, un...);
+                }
+            };
+
+            template<class A, class ...An>
+            static void revertArgsCallback(VariadicArgFunctor<Args...>* pThis, A const& a, An const&... an)
+            {
+                revert<An...>::apply(pThis, an..., a);
+            }
+
+            static void revertArgsCallback(VariadicArgFunctor<Args...>* pThis)
+            {
+                (pThis->mf)();
             }
         };
 
@@ -531,6 +596,15 @@ namespace dodo
                 msgpack::object o = result.get();
                 string name;
                 o.convert(&name);
+
+                {
+                    int req_id;
+                    msgpack::unpacked result;
+                    unpack(result, str, size, off);
+                    const msgpack::object& o = result.get();
+                    o.convert(&req_id);
+                    setRequestID(req_id);
+                }
 
                 auto it = mWrapFunctions.find(name);
                 assert(it != mWrapFunctions.end());
@@ -550,13 +624,7 @@ namespace dodo
                 msgpack::sbuffer sbuf;
                 msgpack::pack(&sbuf, funname);
 
-                int old_req_id = getNowID();
-
                 writeCallArg(msgpackFunctionResponseMgr, sbuf, args...);
-
-                int now_req_id = getNowID();
-                /*req_id表示调用方的请求id，服务器(rpc被调用方)通过此id返回消息(返回值)给调用方*/
-                msgpack::pack(&sbuf, old_req_id == now_req_id ? -1 : now_req_id);
 
                 return string(sbuf.data(), sbuf.size());
             }
@@ -573,8 +641,13 @@ namespace dodo
             template<typename Arg1, typename... Args>
             void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, const Arg1& arg1, const Args&... args)
             {
-                msgpack::pack(&sbuf, arg1);
                 writeCallArg(msgpackFunctionResponseMgr, sbuf, args...);
+                msgpack::pack(&sbuf, arg1);
+            }
+
+            void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf)
+            {
+                msgpack::pack(&sbuf, -1);
             }
 
             template<bool>
@@ -588,6 +661,7 @@ namespace dodo
                 {
                     int id = mc.makeNextID();
                     functionMgr.insertLambda(std::to_string(id), arg);
+                    msgpack::pack(&sbuf, id);
                 }
             };
 
@@ -597,6 +671,7 @@ namespace dodo
                 template<typename ARGTYPE>
                 static  void    Write(Caller& mc, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, const ARGTYPE& arg)
                 {
+                    msgpack::pack(&sbuf, -1);
                     msgpack::pack(&sbuf, arg);
                 }
             };
@@ -610,8 +685,9 @@ namespace dodo
         rpc()
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
-            def("rpc_reply", [this](const string& response){
+            def("rpc_reply", [this](int req_id, const string& response){
                 handleResponse(response);
+                mResponseCallbacks.del(std::to_string(req_id));
             });
         }
 
@@ -643,7 +719,7 @@ namespace dodo
         string    reply(int reqid, const Args&... args)
         {
             /*  把实际返回值打包作为参数,调用对端的rpc_reply 函数*/
-            return call("rpc_reply", call(std::to_string(reqid).c_str(), args...));
+            return call("rpc_reply", reqid, call(std::to_string(reqid).c_str(), args...));
         }
 
         /*  调用方处理收到的rpc返回值(消息)*/
@@ -654,6 +730,11 @@ namespace dodo
         void    handleResponse(const string&& str)
         {
             handleResponse(str);
+        }
+
+        int     getRequestID()
+        {
+            return mRpcFunctions.getRequestID();
         }
     private:
         template<typename ...Args>
@@ -672,190 +753,4 @@ namespace dodo
         typename PROTOCOL_TYPE::FunctionMgr      mRpcFunctions;
         typename PROTOCOL_TYPE::Caller           mCaller;
     };
-}
-
-class Player : public dodo::rpc<>
-{
-public:
-    Player()
-    {
-        registerHandle("player_attack", &Player::attack);
-        registerHandle("player_hi", &Player::hi);
-    }
-
-private:
-    template<typename... Args>
-    void        registerHandle(string name, void (Player::*callback)(Args...))
-    {
-        def(name.c_str(), [this, callback](Args... args){
-            (this->*callback)(args...);
-        });
-    }
-
-private:
-    void    attack(string target)
-    {
-        cout << "attack:" << target << endl;
-    }
-
-    void    hi(string i, string j)
-    {
-        cout << i << j << endl;
-    }
-};
-
-void test1(int a, int b)
-{
-    cout << "in test1" << endl;
-    cout << a << ", " << b << endl;
-}
-
-void test2(int a, int b, string c)
-{
-    cout << "in test2" << endl;
-    cout << a << ", " << b << ", " << c << endl;
-}
-
-void test3(string a, int b, string c)
-{
-    cout << "in test3" << endl;
-    cout << a << ", " << b << ", " << c << endl;
-}
-
-void test4(const string a, int b)
-{
-    cout << "in test4" << endl;
-    cout << a << "," << b << endl;
-}
-
-void test5(const string a, int& b, const map<string, map<int, string>>& vlist)
-{
-}
-
-void test6(string a, int b, map<string, int> vlist)
-{
-}
-
-void test7(vector<map<int, string>>& vlist, vector<int>& vec)
-{
-}
-#include <utility>
-#ifdef _MSC_VER
-#include <Windows.h>
-#endif
-int main()
-{
-    int upvalue = 10;
-    using namespace dodo;
-
-    Player rpc_server; /*rpc服务器*/
-    Player rpc_client; /*rpc客户端*/
-
-    string rpc_request_msg; /*  rpc消息   */
-    string rpc_response_str;       /*  rpc返回值  */
-
-    rpc_server.def("test4", test4);
-    rpc_server.def("test5", test5);
-    rpc_server.def("test7", test7);
-
-    std::function<void(int)> functor = [](int i){
-        //cout << "i is " << i << endl;
-    };
-    rpc_server.def("test_functor", functor);
-    rpc_server.def("test_lambda", [](int j){
-        cout << "j is " << j << endl;
-    });
-
-    int count = 0;
-#ifdef _MSC_VER
-#include <Windows.h>
-    DWORD starttime = GetTickCount();
-    while (count++ <= 100000)
-    {
-        rpc_request_msg = rpc_client.call("test_functor", 1);
-        rpc_server.handleRpc(rpc_request_msg);
-    }
-
-    cout << "cost :" << GetTickCount() - starttime << endl;
-#endif
-
-    rpc_request_msg = rpc_client.call("test_lambda", 2);
-    rpc_server.handleRpc(rpc_request_msg);
-
-    rpc_request_msg = rpc_client.call("player_attack", "Li Lei");
-    rpc_server.handleRpc(rpc_request_msg);
-    rpc_request_msg = rpc_client.call("player_hi", "Hello", "World");
-    rpc_server.handleRpc(rpc_request_msg);
-
-    {
-        vector<map<int, string>> vlist;
-        map<int, string> a = { { 1, "dzw" } };
-        map<int, string> b = { { 2, "haha" } };
-        vlist.push_back(a);
-        vlist.push_back(b);
-
-        vector<int> vec;
-        vec.push_back(1);
-        vec.push_back(2);
-        vec.push_back(3);
-
-        int count = 0;
-#ifdef _MSC_VER
-#include <Windows.h>
-        DWORD starttime = GetTickCount();
-        while (count++ <= 100000)
-        {
-            rpc_request_msg = rpc_client.call("test7", vlist, vec);
-            rpc_server.handleRpc(rpc_request_msg);
-        }
-
-        cout << "cost :" << GetTickCount() - starttime << endl;
-#endif
-    }
-
-    map<int, string> m1;
-    m1[1] = "Li";
-    map<int, string> m2;
-    m2[2] = "Deng";
-    map<string, map<int, string>> mlist;
-    mlist["100"] = m1;
-    mlist["200"] = m2;
-
-    {
-        rpc_request_msg = rpc_client.call("test5", "a", 1, mlist, [&upvalue](int a, int b){
-            upvalue++;
-            cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << endl;
-        });
-
-        rpc_server.handleRpc(rpc_request_msg);
-    }
-
-    {
-        rpc_request_msg = rpc_client.call("test5", "a", 1, mlist, [&upvalue](string a, string b, int c){
-            upvalue++;
-            cout << "upvalue:" << upvalue << ", a:" << a << ", b:" << b << ", c:" << c << endl;
-        });
-
-        rpc_server.handleRpc(rpc_request_msg);
-    }
-
-    {
-        rpc_request_msg = rpc_client.call("test4", "a", 1);
-        rpc_server.handleRpc(rpc_request_msg);
-    }
-
-    /*  模拟服务器通过reply返回数据给rpc client,然后rpc client处理收到的rpc返回值 */
-    {
-        rpc_response_str = rpc_server.reply(1, 1, 2);   /* (1,1,2)中的1为调用方的req_id, (1,2)为返回值 */
-        rpc_client.handleRpc(rpc_response_str);
-    }
-
-    {
-        rpc_response_str = rpc_server.reply(2, "hello", "world", 3);
-        rpc_client.handleRpc(rpc_response_str);
-    }
-
-    cin.get();
-
-    return 0;
 }
