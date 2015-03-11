@@ -84,10 +84,26 @@ EventLoop::EventLoop()
 
 EventLoop::~EventLoop()
 {
+    delete mWakeupChannel;
+    mWakeupChannel = nullptr;
+#ifdef PLATFORM_WINDOWS
+    CloseHandle(mIOCP);
+    mIOCP = INVALID_HANDLE_VALUE;
+#else
+    close(mWakeupFd);
+    mWakeupFd = -1;
+    close(mEpollFd);
+    mEpollFd = -1;
+#endif
+    delete[] mEventEntries;
+    mEventEntries = nullptr;
 }
 
 void EventLoop::loop(int64_t timeout)
 {
+#ifndef NDEBUG
+    assert(mSelfThreadid == std::this_thread::get_id());
+#endif
     /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调），将timeout改为0，表示不阻塞iocp/epoll wait   */
     if (!mAfterLoopProcs.empty())
     {

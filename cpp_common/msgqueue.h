@@ -123,7 +123,7 @@ public:
             if (waitMicroSecond > 0)
             {
                 std::unique_lock<std::mutex>    tmp(mMutex);
-                mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond), [](){return false; });
+                mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond), [](){return true; });
             }
 
             mMutex.lock();
