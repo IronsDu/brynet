@@ -39,7 +39,7 @@ public:
     void                            setDisConnectHandle(DISCONNECT_HANDLE proc);
 
     /*主动(请求)断开连接*/
-    void                            postDisConnect() override;
+    void                            postDisConnect();
 
     void                            setUserData(int64_t value);
     int64_t                         getUserData() const;

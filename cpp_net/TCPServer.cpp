@@ -15,66 +15,20 @@
 
 #include "TCPServer.h"
 
-TcpServer::TcpServer(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback)
+TcpServer::TcpServer()
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
-
-    mPort = port;
-    mRunService = true;
-
-    mLoops = new EventLoop[threadNum];
-    mIOThreads = new std::thread*[threadNum];
-    mLoopNum = threadNum;
-    mIds = new TypeIDS<DataSocket>[threadNum];
-    mIncIds = new int[threadNum];
-    memset(mIncIds, 0, sizeof(mIncIds[0])*threadNum);
-
-    for (int i = 0; i < mLoopNum; ++i)
-    {
-        EventLoop& l = mLoops[i];
-        mIOThreads[i] = new std::thread([this, &l, callback](){
-            l.restoreThreadID();
-            while (mRunService)
-            {
-                l.loop(-1);
-                if (callback != nullptr)
-                {
-                    callback(l);
-                }
-            }
-        });
-    }
-    
-    if (certificate != nullptr)
-    {
-        mCertificate = certificate;
-    }
-    if (privatekey != nullptr)
-    {
-        mPrivatekey = privatekey;
-    }
-
-    mListenThread = new std::thread([this, port](){
-        RunListen(port);
-    });
+    mRunService = false;
+    mLoops = nullptr;
+    mIOThreads = nullptr;
+    mListenThread = nullptr;
+    mIds = nullptr;
+    mIncIds = nullptr;
 }
 
 TcpServer::~TcpServer()
 {
-    for (int i = 0; i < mLoopNum; ++i)
-    {
-        mIOThreads[i]->join();
-        delete mIOThreads[i];
-    }
-
-    delete[] mIOThreads;
-
-    mListenThread->join();
-    delete mListenThread;
-    mListenThread = NULL;
-
-    delete[] mLoops;
-    mLoops = NULL;
+    closeService();
 }
 
 void TcpServer::setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle)
@@ -102,27 +56,15 @@ void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)
     union  SessionId sid;
     sid.id = id;
 
-    if (mIOThreads[sid.data.loopIndex]->get_id() != std::this_thread::get_id())
-    {
-        /*TODO::pushAsyncProc有效率问题。未知 */
-        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
+    mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
 
-            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
-            if (ds != nullptr && ds->getUserData() == sid.id)
-            {
-                ds->sendPacket(packet);
-            }
-
-        });
-    }
-    else
-    {
         DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
         if (ds != nullptr && ds->getUserData() == sid.id)
         {
             ds->sendPacket(packet);
         }
-    }
+
+    });
 }
 
 void TcpServer::disConnect(int64_t id)
@@ -130,39 +72,94 @@ void TcpServer::disConnect(int64_t id)
     union  SessionId sid;
     sid.id = id;
 
-    if (mIOThreads[sid.data.loopIndex]->get_id() != std::this_thread::get_id())
-    {
-        /*TODO::pushAsyncProc有效率问题。未知 */
-        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
+    mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
 
-            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
-            if (ds != nullptr && ds->getUserData() == sid.id)
-            {
-                ds->postDisConnect();
-            }
-
-        });
-    }
-    else
-    {
         DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
         if (ds != nullptr && ds->getUserData() == sid.id)
         {
             ds->postDisConnect();
         }
-    }
+    });
 }
 
 void TcpServer::closeService()
 {
-    mRunService = false;
-
-    sock tmp = ox_socket_connect("127.0.0.1", mPort);
-    ox_socket_close(tmp);
-
-    for (int i = 0; i < mLoopNum; ++i)
+    if (mRunService)
     {
-        mLoops[i].wakeup();
+        mRunService = false;
+
+        sock tmp = ox_socket_connect("127.0.0.1", mPort);
+        ox_socket_close(tmp);
+        tmp = SOCKET_ERROR;
+
+        mListenThread->join();
+        delete mListenThread;
+        mListenThread = NULL;
+
+        for (int i = 0; i < mLoopNum; ++i)
+        {
+            mLoops[i].wakeup();
+        }
+
+        for (int i = 0; i < mLoopNum; ++i)
+        {
+            mIOThreads[i]->join();
+            delete mIOThreads[i];
+        }
+
+        delete[] mIOThreads;
+        mIOThreads = nullptr;
+        delete[] mLoops;
+        mLoops = nullptr;
+        delete[] mIncIds;
+        mIncIds = nullptr;
+        delete[] mIds;
+        mIds = nullptr;
+    }
+}
+
+void TcpServer::startService(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback /* = nullptr */)
+{
+    if (!mRunService)
+    {
+        mRunService = true;
+
+        mPort = port;
+        mLoops = new EventLoop[threadNum];
+        mIOThreads = new std::thread*[threadNum];
+        mLoopNum = threadNum;
+        mIds = new TypeIDS<DataSocket>[threadNum];
+        mIncIds = new int[threadNum];
+        memset(mIncIds, 0, sizeof(mIncIds[0])*threadNum);
+
+        for (int i = 0; i < mLoopNum; ++i)
+        {
+            EventLoop& l = mLoops[i];
+            mIOThreads[i] = new std::thread([this, &l, callback](){
+                l.restoreThreadID();
+                while (mRunService)
+                {
+                    l.loop(-1);
+                    if (callback != nullptr)
+                    {
+                        callback(l);
+                    }
+                }
+            });
+        }
+
+        if (certificate != nullptr)
+        {
+            mCertificate = certificate;
+        }
+        if (privatekey != nullptr)
+        {
+            mPrivatekey = privatekey;
+        }
+
+        mListenThread = new std::thread([this, port](){
+            RunListen(port);
+        });
     }
 }
 

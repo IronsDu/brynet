@@ -38,9 +38,9 @@ public:
     void                            addChannel(int fd, Channel*, CHANNEL_ENTER_HANDLE f);
 
     /*  投递一个异步回调，在EventLoop::loop被唤醒后执行 */
-    void                            pushAsyncProc(USER_PROC f);
+    void                            pushAsyncProc(const USER_PROC& f);
     /*  非线程安全:投递回调放置在单次loop结尾时执行   */
-    void                            pushAfterLoopProc(USER_PROC f);
+    void                            pushAfterLoopProc(const USER_PROC& f);
 
     void                            restoreThreadID();
 

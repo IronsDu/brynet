@@ -11,6 +11,7 @@
 #include "eventloop.h"
 #include "datasocket.h"
 #include "httprequest.h"
+#include "timer.h"
 
 void SSL_init()
 {
@@ -20,6 +21,12 @@ void SSL_init()
     OpenSSL_add_all_algorithms();
     /* 载入所有 SSL 错误消息 */
     SSL_load_error_strings();
+}
+
+static void fuck_send(TimerMgr* tm, DataSocket* ds, const char* buffer, int len)
+{
+    ds->send(buffer, len);
+    tm->AddTimer(200, fuck_send, tm, ds, buffer, len);
 }
 
 int main()
@@ -69,6 +76,8 @@ int main()
                 senddata[packet_len - 1] = 0;
             }
 
+            int64_t total_recv = 0;
+            TimerMgr tm;
 #if 0
             for (int i = 0; i < client_num; i++)
             {
@@ -126,12 +135,13 @@ int main()
                     DataSocket* ds = static_cast<DataSocket*>(arg);
                     if (senddata != nullptr)
                     {
-                        ds->send(senddata, packet_len);
+                        fuck_send(&tm, ds, senddata, packet_len);
                     }
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                    ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
-                        ds->send(buffer, len);
+                    ds->setDataHandle([&total_recv](DataSocket* ds, const char* buffer, int len){
+                        //ds->send(buffer, len);
+                        total_recv += len;
                         return len;
                     });
 
@@ -142,9 +152,17 @@ int main()
             }
 #endif
 
+            int64_t now = ox_getnowtime();
             while (true)
             {
-                clientEventLoop.loop(-1);
+                clientEventLoop.loop(tm.NearEndMs());
+                tm.Schedule();
+                if ((ox_getnowtime() - now) >= 1000)
+                {
+                    cout << "total recv:" << (total_recv / 1024) / 1024 << " M /s" << endl;
+                    now = ox_getnowtime();
+                    total_recv = 0;
+                }
             }
         });
     }

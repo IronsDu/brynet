@@ -5,6 +5,7 @@
 #include <iostream>
 #include <assert.h>
 #include <chrono>
+#include <vector>
 
 #include "systemlib.h"
 #include "socketlibfunction.h"
@@ -72,7 +73,9 @@ int main()
     MsgQueue<NetMsg*>  msgList;
     EventLoop       mainLoop;
 
-    TcpServer t(port_num, nullptr, nullptr, thread_num, [&](EventLoop& l){
+    TcpServer t;
+
+    t.startService(port_num, nullptr, nullptr, thread_num, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         if (true)
         {
@@ -86,6 +89,7 @@ int main()
             }
         }
     });
+
     t.setEnterHandle([&](int64_t id){
         if (true)
         {
@@ -148,6 +152,9 @@ int main()
 
     /*  主线程处理msgList消息队列    */
     int64_t lasttime = ox_getnowtime();
+    int total_count = 0;
+
+    std::vector<int64_t> sessions;
 
     while (true)
     {
@@ -164,6 +171,7 @@ int main()
                 {
                     printf("client %lld enter \n", msg->mID);
                     total_client_num++;
+                    sessions.push_back(msg->mID);
                 }
                 else if (msg->mType == NMT_CLOSE)
                 {
@@ -172,9 +180,13 @@ int main()
                 }
                 else if (msg->mType == NMT_RECV_DATA)
                 {
-                    t.send(msg->mID, DataSocket::makePacket(msg->mData.c_str(), msg->mData.size()));
-                    total_recv_len += msg->mData.size();
-                    packet_num++;
+                    DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
+                    for (int i = 0; i < sessions.size(); ++i)
+                    {
+                        t.send(sessions[i], packet);
+                        total_recv_len += msg->mData.size();
+                        packet_num++;
+                    }
                 }
                 else
                 {
@@ -198,4 +210,6 @@ int main()
             packet_num = 0;
         }
     }
+
+    t.closeService();
 }

@@ -56,6 +56,7 @@ time_t TimerMgr::NearEndMs()
     }
     else
     {
-        return mTimers.top()->GetEndMs();
+        time_t tmp = mTimers.top()->GetEndMs() - ox_getnowtime();
+        return (tmp < 0 ? 0 : tmp);
     }
 }

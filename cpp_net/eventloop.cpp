@@ -39,10 +39,6 @@ private:
     {
     }
 
-    void    postDisConnect() override
-    {
-    }
-
     void    onClose() override
     {
     }
@@ -291,7 +287,7 @@ void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
     });
 }
 
-void EventLoop::pushAsyncProc(std::function<void(void)> f)
+void EventLoop::pushAsyncProc(const USER_PROC& f)
 {
     if (mSelfThreadid != std::this_thread::get_id())
     {
@@ -308,7 +304,7 @@ void EventLoop::pushAsyncProc(std::function<void(void)> f)
     }
 }
 
-void EventLoop::pushAfterLoopProc(USER_PROC f)
+void EventLoop::pushAfterLoopProc(const USER_PROC& f)
 {
     mAfterLoopProcs.push_back(f);
 }

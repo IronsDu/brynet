@@ -18,7 +18,7 @@ class TcpServer
     typedef std::function<int (int64_t, const char* buffer, int len)>    DATA_HANDLE;
 
 public:
-    TcpServer(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback = nullptr);  /*callback为IO线程每个loop循环都会执行的回调函数，可以为null*/
+    TcpServer();
     ~TcpServer();
 
     void                                setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle);
@@ -31,9 +31,10 @@ public:
     /*主动断开此id链接，但仍然可能收到此id的断开回调，需要上层逻辑自己处理这个"问题"*/
     void                                disConnect(int64_t id);
     
-    /*  关闭服务 TODO::提供开启服务接口 */
+    void                                startService(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback = nullptr);
+    /*  关闭服务    */
     void                                closeService();
-
+    
 private:
     void                                RunListen(int port);
     int64_t                             MakeID(int loopIndex);
