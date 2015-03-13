@@ -28,9 +28,10 @@ public:
     void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
     void                                send(int64_t id, DataSocket::PACKET_PTR& packet);
 
-    /*主动断开此id链接，但仍然可能收到此id的断开回调，需要上层逻辑自己处理这个"问题"*/
+    /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
     void                                disConnect(int64_t id);
     
+    /*  开启服务    */
     void                                startService(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback = nullptr);
     /*  关闭服务    */
     void                                closeService();

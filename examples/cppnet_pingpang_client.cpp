@@ -23,10 +23,20 @@ void SSL_init()
     SSL_load_error_strings();
 }
 
-static void fuck_send(TimerMgr* tm, DataSocket* ds, const char* buffer, int len)
+typedef shared_ptr<DataSocket> SHARED_DATASOCKET;
+
+static void fuck_send(TimerMgr* tm, std::weak_ptr<SHARED_DATASOCKET> ds, const char* buffer, int len)
 {
-    ds->send(buffer, len);
-    tm->AddTimer(200, fuck_send, tm, ds, buffer, len);
+    std::shared_ptr<SHARED_DATASOCKET> tmp = ds.lock();
+    if (tmp)
+    {
+        tmp->get()->send(buffer, len);
+        tm->AddTimer(200, fuck_send, tm, ds, buffer, len);
+    }
+    else
+    {
+        cout << "haha" << endl;
+    }
 }
 
 int main()
@@ -133,9 +143,12 @@ int main()
 
                 clientEventLoop.addChannel(client, pClient, [&](Channel* arg){
                     DataSocket* ds = static_cast<DataSocket*>(arg);
+                    
+                    shared_ptr<SHARED_DATASOCKET> tmp = std::make_shared<SHARED_DATASOCKET>();
+                    tmp->reset(ds);
                     if (senddata != nullptr)
                     {
-                        fuck_send(&tm, ds, senddata, packet_len);
+                        fuck_send(&tm, tmp, senddata, packet_len);
                     }
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
@@ -145,8 +158,8 @@ int main()
                         return len;
                     });
 
-                    ds->setDisConnectHandle([](DataSocket* arg){
-                        delete arg;
+                    ds->setDisConnectHandle([tmp](DataSocket* arg){
+                        tmp->reset();
                     });
                 });
             }

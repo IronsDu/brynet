@@ -304,9 +304,31 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
     }
 }
 
+void EventLoop::pushAsyncProc(USER_PROC&& f)
+{
+    if (mSelfThreadid != std::this_thread::get_id())
+    {
+        /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
+        mAsyncProcsMutex.lock();
+        mAsyncProcs.push_back(std::move(f));
+        mAsyncProcsMutex.unlock();
+
+        wakeup();
+    }
+    else
+    {
+        f();
+    }
+}
+
 void EventLoop::pushAfterLoopProc(const USER_PROC& f)
 {
     mAfterLoopProcs.push_back(f);
+}
+
+void EventLoop::pushAfterLoopProc(USER_PROC&& f)
+{
+    mAfterLoopProcs.push_back(std::move(f));
 }
 
 void EventLoop::restoreThreadID()
