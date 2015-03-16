@@ -3,8 +3,12 @@
 
 #include <vector>
 #include <string>
+#include <functional>
+#include <thread>
 #include <assert.h>
+#include <stdint.h>
 
+#include "datasocket.h"
 #include "typeids.h"
 
 class EventLoop;

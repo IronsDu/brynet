@@ -191,6 +191,7 @@ void TcpServer::RunListen(int port)
     socklen_t size = sizeof(struct sockaddr);
 
     sock listen_fd = ox_socket_listen(port, 25);
+#ifdef USE_OPENSSL
     SSL_CTX *ctx = nullptr;
 
     if (!mCertificate.empty() && !mPrivatekey.empty())
@@ -211,6 +212,7 @@ void TcpServer::RunListen(int port)
             ctx = nullptr;
         }
     }
+#endif
 
     if (SOCKET_ERROR != listen_fd)
     {
@@ -238,11 +240,12 @@ void TcpServer::RunListen(int port)
                 }
 
                 DataSocket* channel = new DataSocket(client_fd);
+#ifdef USE_OPENSSL
                 if (ctx != nullptr)
                 {
                     channel->setupAcceptSSL(ctx);
                 }
-
+#endif
                 int loopIndex = rand() % mLoopNum;
                 EventLoop& loop = mLoops[loopIndex];
                 /*  随机为此链接分配一个eventloop */

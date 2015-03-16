@@ -7,12 +7,16 @@
 
 #include "channel.h"
 
+#ifdef USE_OPENSSL
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
 #include "openssl/ssl.h"
 #ifdef  __cplusplus
 }
+#endif
+
 #endif
 
 class EventLoop;
@@ -44,8 +48,10 @@ public:
     void                            setUserData(int64_t value);
     int64_t                         getUserData() const;
 
+#ifdef USE_OPENSSL
     void                            setupAcceptSSL(SSL_CTX*);
     void                            setupConnectSSL();
+#endif
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
@@ -115,8 +121,10 @@ private:
 
     int64_t                         mUserData;          /*  链接的用户自定义数据  */
 
+#ifdef USE_OPENSSL
     SSL_CTX*                        mSSLCtx;
     SSL*                            mSSL;
+#endif
 };
 
 #endif

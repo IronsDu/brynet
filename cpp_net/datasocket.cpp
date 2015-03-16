@@ -34,8 +34,10 @@ DataSocket::DataSocket(int fd)
 
     mRecvBuffer = ox_buffer_new(1024);
 
+#ifdef USE_OPENSSL
     mSSLCtx = nullptr;
     mSSL = nullptr;
+#endif
 }
 
 DataSocket::~DataSocket()
@@ -45,6 +47,8 @@ DataSocket::~DataSocket()
         ox_buffer_delete(mRecvBuffer);
         mRecvBuffer = nullptr;
     }
+
+#ifdef USE_OPENSSL
     if (mSSLCtx != nullptr)
     {
         SSL_CTX_free(mSSLCtx);
@@ -55,7 +59,9 @@ DataSocket::~DataSocket()
         SSL_free(mSSL);
         mSSL = nullptr;
     }
+#endif
 }
+    
 
 void DataSocket::setNoBlock()
 {
@@ -165,6 +171,7 @@ void DataSocket::recv()
     while (mFD != SOCKET_ERROR)
     {
         int retlen = 0;
+#ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
             retlen = SSL_read(mSSL, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos);
@@ -173,9 +180,13 @@ void DataSocket::recv()
         {
             retlen = ::recv(mFD, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos, 0);
         }
+#else
+        retlen = ::recv(mFD, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos, 0);
+#endif
 
         if (retlen < 0)
         {
+#ifdef USE_OPENSSL
             if ((mSSL != nullptr && SSL_get_error(mSSL, retlen) == SSL_ERROR_WANT_READ) ||
                 (sErrno == S_EWOULDBLOCK))
             {
@@ -185,7 +196,16 @@ void DataSocket::recv()
             {
                 must_close = true;
             }
-            
+#else
+            if (sErrno == S_EWOULDBLOCK)
+            {
+                must_close = !checkRead();
+            }
+            else
+            {
+                must_close = true;
+            }
+#endif
             break;
         }
         else if (retlen == 0)
@@ -280,6 +300,7 @@ SEND_PROC:
     if (wait_send_size > 0)
     {
         int send_retlen = 0;
+#ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
             send_retlen = SSL_write(mSSL, sendbuf, wait_send_size);
@@ -288,6 +309,9 @@ SEND_PROC:
         {
             send_retlen = ::send(mFD, sendbuf, wait_send_size, 0);
         }
+#else
+        send_retlen = ::send(mFD, sendbuf, wait_send_size, 0);
+#endif
 
         if (send_retlen > 0)
         {
@@ -322,6 +346,7 @@ SEND_PROC:
         }
         else
         {
+#ifdef USE_OPENSSL
             if ((mSSL != nullptr && SSL_get_error(mSSL, send_retlen) == SSL_ERROR_WANT_WRITE) ||
                 (sErrno == S_EWOULDBLOCK))
             {
@@ -332,6 +357,17 @@ SEND_PROC:
             {
                 must_close = true;
             }
+#else
+            if (sErrno == S_EWOULDBLOCK)
+            {
+                mCanWrite = false;
+                must_close = !checkWrite();
+            }
+            else
+            {
+                must_close = true;
+            }
+#endif
         }
     }
 
@@ -582,6 +618,7 @@ int64_t DataSocket::getUserData() const
     return mUserData;
 }
 
+#ifdef USE_OPENSSL
 void DataSocket::setupAcceptSSL(SSL_CTX* ctx)
 {
     mSSL = SSL_new(ctx);
@@ -596,6 +633,7 @@ void DataSocket::setupConnectSSL()
     SSL_set_fd(mSSL, mFD);
     SSL_connect(mSSL);
 }
+#endif
 
 DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, int len)
 {
