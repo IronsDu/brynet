@@ -15,12 +15,14 @@
 
 void SSL_init()
 {
+#ifdef USE_OPENSSL
     /* SSL 库初始化 */
     SSL_library_init();
     /* 载入所有 SSL 算法 */
     OpenSSL_add_all_algorithms();
     /* 载入所有 SSL 错误消息 */
     SSL_load_error_strings();
+#endif
 }
 
 typedef shared_ptr<DataSocket> SHARED_DATASOCKET;

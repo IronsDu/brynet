@@ -34,7 +34,7 @@ public:
 
     bool                            wakeup();
 
-    /*  投递一个链接，跟此eventloopEventLoop绑定，当被eventloop处理时会触发f回调  */
+    /*  投递一个链接，跟此eventloopEventLoop绑定，当被eventloop处理时会触发f回调, TODO::Channel*的生命周期管理问题(不管是此处处理失败，以及后续Channel close之后)  */
     void                            addChannel(int fd, Channel*, CHANNEL_ENTER_HANDLE f);
 
     /*  投递一个异步回调，在EventLoop::loop被唤醒后执行 */

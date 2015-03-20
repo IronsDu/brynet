@@ -112,6 +112,8 @@ void DataSocket::sendPacket(PACKET_PTR&& packet)
     sendPacket(packet);
 }
 
+/*  TODO::此类中pushAfterLoopProc的调用是否可以换为立即处理,这样或许也能让EventLoop的loop编写更简单    */
+
 void    DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
@@ -474,19 +476,17 @@ void DataSocket::tryOnClose()
 
 void DataSocket::onClose()
 {
-    if (mFD != SOCKET_ERROR)
-    {
-        _procCloseSocket();
+    _procCloseSocket();
 
-        if (mDisConnectHandle != nullptr)
-        {
-            /*  投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
-                mDisConnectHandle析构，然后闭包变量就失效的宕机问题  */
-            DISCONNECT_HANDLE temp = mDisConnectHandle;
-            mEventLoop->pushAfterLoopProc([temp, this](){
-                temp(this);
-            });
-        }
+    if (mDisConnectHandle != nullptr)
+    {
+        /*  投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
+        mDisConnectHandle析构，然后闭包变量就失效的宕机问题  */
+        DISCONNECT_HANDLE temp = mDisConnectHandle;
+        mDisConnectHandle = nullptr;
+        mEventLoop->pushAfterLoopProc([temp, this](){
+            temp(this);
+        });
     }
 }
 
@@ -621,17 +621,23 @@ int64_t DataSocket::getUserData() const
 #ifdef USE_OPENSSL
 void DataSocket::setupAcceptSSL(SSL_CTX* ctx)
 {
-    mSSL = SSL_new(ctx);
-    SSL_set_fd(mSSL, mFD);
-    SSL_accept(mSSL);
+    if(mSSL == nullptr)
+    {
+        mSSL = SSL_new(ctx);
+        SSL_set_fd(mSSL, mFD);
+        SSL_accept(mSSL);
+    }
 }
 
 void DataSocket::setupConnectSSL()
 {
-    mSSLCtx = SSL_CTX_new(SSLv23_client_method());
-    mSSL = SSL_new(mSSLCtx);
-    SSL_set_fd(mSSL, mFD);
-    SSL_connect(mSSL);
+    if(mSSLCtx == nullptr)
+    {
+        mSSLCtx = SSL_CTX_new(SSLv23_client_method());
+        mSSL = SSL_new(mSSLCtx);
+        SSL_set_fd(mSSL, mFD);
+        SSL_connect(mSSL);
+    }
 }
 #endif
 

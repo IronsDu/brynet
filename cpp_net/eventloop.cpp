@@ -279,6 +279,7 @@ void EventLoop::linkChannel(int fd, Channel* ptr)
 
 void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
 {
+    /*  TODO::此处相关处理以及Channel接口设计太麻烦,不够简洁   */
     pushAsyncProc([fd, c, this, f] () {
         c->setNoBlock();
         linkChannel(fd, c);

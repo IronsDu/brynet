@@ -74,8 +74,8 @@ int main()
     EventLoop       mainLoop;
 
     TcpServer t;
-
-    t.startService(port_num, nullptr, nullptr, thread_num, [&](EventLoop& l){
+    t.startListen(port_num, nullptr, nullptr);
+    t.startWorkerThread(thread_num, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         if (true)
         {
@@ -90,7 +90,7 @@ int main()
         }
     });
 
-    t.setEnterHandle([&](int64_t id){
+    t.setEnterHandle([&](int64_t id, std::string ip){
         if (true)
         {
             NetMsg* msg = new NetMsg(NMT_ENTER, id);

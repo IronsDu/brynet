@@ -14,34 +14,78 @@
 class EventLoop;
 class DataSocket;
 
+class ListenThread
+{
+public:
+    typedef std::function<void(int fd)> ACCEPT_CALLBACK;
+    ListenThread();
+    ~ListenThread();
+
+    /*  开启监听线程  */
+    void                                startListen(int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
+    void                                closeListenThread();
+#ifdef USE_OPENSSL
+    SSL_CTX*                            getOpenSSLCTX();
+#endif
+private:
+    void                                RunListen();
+    void                                initSSL();
+    void                                destroySSL();
+private:
+    ACCEPT_CALLBACK                     mAcceptCallback;
+    int                                 mPort;
+    bool                                mRunListen;
+    std::thread*                        mListenThread;
+    std::string                         mCertificate;
+    std::string                         mPrivatekey;
+#ifdef USE_OPENSSL
+    SSL_CTX*                            mOpenSSLCTX;
+#endif
+};
+
 class TcpServer
 {
-    typedef std::function<void (EventLoop&)> FRAME_CALLBACK;
-    typedef std::function<void(int64_t)>    CONNECTION_ENTER_HANDLE;
-    typedef std::function<void(int64_t)>    DISCONNECT_HANDLE;
-    typedef std::function<int (int64_t, const char* buffer, int len)>    DATA_HANDLE;
+    typedef std::function<void (EventLoop&)>                            FRAME_CALLBACK;
+    typedef std::function<void(int64_t, std::string)>                   CONNECTION_ENTER_HANDLE;
+    typedef std::function<void(int64_t)>                                DISCONNECT_HANDLE;
+    typedef std::function<int (int64_t, const char* buffer, int len)>   DATA_HANDLE;
 
 public:
     TcpServer();
     ~TcpServer();
 
+    /*  设置默认事件回调    */
     void                                setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle);
     void                                setDisconnectHandle(TcpServer::DISCONNECT_HANDLE handle);
     void                                setMsgHandle(TcpServer::DATA_HANDLE handle);
+
+    TcpServer::CONNECTION_ENTER_HANDLE  getEnterHandle();
+    TcpServer::DISCONNECT_HANDLE        getDisConnectHandle();
+    TcpServer::DATA_HANDLE              getDataHandle();
 
     void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
     void                                send(int64_t id, DataSocket::PACKET_PTR& packet);
 
     /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
     void                                disConnect(int64_t id);
-    
-    /*  开启服务    */
-    void                                startService(int port, const char *certificate, const char *privatekey, int threadNum, FRAME_CALLBACK callback = nullptr);
+
+    /*  主动添加一个连接到任意IOLoop并指定事件回调, TODO::DataSocket* channel的生命周期管理   */
+    void                                addDataSocket(int fd, DataSocket* channel, 
+                                                        TcpServer::CONNECTION_ENTER_HANDLE enterHandle,
+                                                        TcpServer::DISCONNECT_HANDLE disHandle,
+                                                        TcpServer::DATA_HANDLE msgHandle);
+
+    /*  开启监听线程  */
+    void                                startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
+    /*  开启IO工作线程    */
+    void                                startWorkerThread(int threadNum, FRAME_CALLBACK callback = nullptr);
+
     /*  关闭服务    */
     void                                closeService();
+    void                                closeListenThread();
+    void                                closeWorkerThread();
     
 private:
-    void                                RunListen(int port);
     int64_t                             MakeID(int loopIndex);
 
     void                                _procDataSocketClose(DataSocket*);
@@ -50,7 +94,9 @@ private:
     EventLoop*                          mLoops;
     std::thread**                       mIOThreads;
     int                                 mLoopNum;
-    std::thread*                        mListenThread;
+    bool                                mRunIOLoop;
+
+    ListenThread                        mListenThread;
 
     TypeIDS<DataSocket>*                mIds;
     int*                                mIncIds;
@@ -73,12 +119,6 @@ private:
 
         int64_t id;
     };
-    
-    std::string                         mCertificate;
-    std::string                         mPrivatekey;
-
-    int                                 mPort;
-    bool                                mRunService;
 };
 
 #endif

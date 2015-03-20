@@ -5,6 +5,7 @@
 #include <functional>
 #include <deque>
 
+#include "socketlibtypes.h"
 #include "channel.h"
 
 #ifdef USE_OPENSSL
