@@ -22,7 +22,7 @@ public:
 
     void    Push(T&& t)
     {
-        mWriteList.push_back(t);
+        mWriteList.push_back(std::move(t));
     }
 
     /*  同步写缓冲到共享队列(共享队列必须为空)    */
@@ -123,7 +123,7 @@ public:
             if (waitMicroSecond > 0)
             {
                 std::unique_lock<std::mutex>    tmp(mMutex);
-                mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond), [](){return true; });
+                mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond));
             }
 
             mMutex.lock();
