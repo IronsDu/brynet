@@ -325,6 +325,33 @@ void TcpServer::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
     }
 }
 
+void TcpServer::wakeup(int64_t id)
+{
+    union  SessionId sid;
+    sid.id = id;
+
+    mLoops[sid.data.loopIndex].wakeup();
+}
+
+void TcpServer::wakeupAll()
+{
+    for (int i = 0; i < mLoopNum; ++i)
+    {
+        mLoops[i].wakeup();
+    }
+}
+
+EventLoop* TcpServer::getRandomEventLoop()
+{
+    EventLoop* ret = nullptr;
+    if (mLoopNum > 0)
+    {
+        ret = &mLoops[rand() % mLoopNum];
+    }
+
+    return ret;
+}
+
 int64_t TcpServer::MakeID(int loopIndex)
 {
     union SessionId sid;

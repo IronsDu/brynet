@@ -84,6 +84,13 @@ public:
     void                                closeService();
     void                                closeListenThread();
     void                                closeWorkerThread();
+
+    /*wakeup某id所在的网络工作线程*/
+    void                                wakeup(int64_t id);
+    /*wakeup 所有的网络工作线程*/
+    void                                wakeupAll();
+
+    EventLoop*                          getRandomEventLoop();
     
 private:
     int64_t                             MakeID(int loopIndex);

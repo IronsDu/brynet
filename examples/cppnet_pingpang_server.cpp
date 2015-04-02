@@ -127,27 +127,51 @@ int main()
     });
 
     t.setMsgHandle([&](int64_t id, const char* buffer, int len){
-        if (true)
-        {
-            NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
-            msg->setData(buffer, len);
-            lockStatistics();
-            msgList.Push(msg);
-            unLockStatistics();
+        const char* parse_str = buffer;
+        int total_proc_len = 0;
+        int left_len = len;
 
-            mainLoop.wakeup();
-        }
-        else
+        while (true)
         {
-            t.send(id, DataSocket::makePacket(buffer, len));
-            lockStatistics();
-            total_recv_len += len;
-            packet_num++;
-            unLockStatistics();
-            
+            bool flag = false;
+            if (left_len >= sizeof(sizeof(uint16_t) + sizeof(uint16_t)))
+            {
+                uint16_t packet_len = (*(uint16_t*)parse_str);
+                if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
+                {
+                    if (true)
+                    {
+                        NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
+                        msg->setData(parse_str, packet_len);
+                        lockStatistics();
+                        msgList.Push(msg);
+                        unLockStatistics();
+
+                        mainLoop.wakeup();
+                    }
+                    else
+                    {
+                        t.send(id, DataSocket::makePacket(parse_str, packet_len));
+                        lockStatistics();
+                        total_recv_len += packet_len;
+                        packet_num++;
+                        unLockStatistics();
+                    }
+
+                    total_proc_len += packet_len;
+                    parse_str += packet_len;
+                    left_len -= packet_len;
+                    flag = true;
+                }
+            }
+
+            if (!flag)
+            {
+                break;
+            }
         }
 
-		return len;
+        return total_proc_len;
     });
 
     /*  主线程处理msgList消息队列    */
@@ -180,10 +204,20 @@ int main()
                 }
                 else if (msg->mType == NMT_RECV_DATA)
                 {
-                    DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
-                    for (int i = 0; i < sessions.size(); ++i)
+                    if (false)
                     {
-                        t.send(sessions[i], packet);
+                        DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
+                        for (int i = 0; i < sessions.size(); ++i)
+                        {
+                            t.send(sessions[i], packet);
+                            total_recv_len += msg->mData.size();
+                            packet_num++;
+                        }
+                    }
+                    else
+                    {
+                        DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
+                        t.send(msg->mID, packet);
                         total_recv_len += msg->mData.size();
                         packet_num++;
                     }

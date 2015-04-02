@@ -60,6 +60,8 @@ DataSocket::~DataSocket()
         mSSL = nullptr;
     }
 #endif
+
+    _procCloseSocket();
 }
     
 
@@ -225,6 +227,7 @@ void DataSocket::recv()
 
                 if (recvBufferWritePos == sizeof(tmpRecvBuffer))
                 {
+                    memmove(tmpRecvBuffer, tmpRecvBuffer + bufferParseStart, recvBufferWritePos - bufferParseStart);
                     recvBufferWritePos -= bufferParseStart;
                     bufferParseStart = 0;
                 }

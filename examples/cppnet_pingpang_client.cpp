@@ -60,6 +60,10 @@ int main()
 
     std::cout << "enter packet len:";
     std::cin >> packet_len;
+    if (packet_len <= sizeof(int16_t))
+    {
+        packet_len = 2;
+    }
 
     int port_num;
     std::cout << "enter port:";
@@ -85,7 +89,7 @@ int main()
             if (packet_len > 0)
             {
                 senddata = (char*)malloc(packet_len);
-                senddata[packet_len - 1] = 0;
+                ((int16_t*)senddata)[0] = packet_len;
             }
 
             int64_t total_recv = 0;
@@ -150,14 +154,43 @@ int main()
                     tmp->reset(ds);
                     if (senddata != nullptr)
                     {
-                        fuck_send(&tm, tmp, senddata, packet_len);
+                        for (int i = 0; i < 1; ++i)
+                        {
+                            ds->send(senddata, packet_len);
+                        }
+                        //fuck_send(&tm, tmp, senddata, packet_len);
                     }
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
                     ds->setDataHandle([&total_recv](DataSocket* ds, const char* buffer, int len){
-                        //ds->send(buffer, len);
-                        total_recv += len;
-                        return len;
+                        const char* parse_str = buffer;
+                        int total_proc_len = 0;
+                        int left_len = len;
+
+                        while (true)
+                        {
+                            bool flag = false;
+                            if (left_len >= sizeof(sizeof(uint16_t) + sizeof(uint16_t)))
+                            {
+                                uint16_t packet_len = (*(uint16_t*)parse_str);
+                                if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
+                                {
+                                    ds->send(parse_str, packet_len);
+
+                                    total_proc_len += packet_len;
+                                    parse_str += packet_len;
+                                    left_len -= packet_len;
+                                    flag = true;
+                                }
+                            }
+
+                            if (!flag)
+                            {
+                                break;
+                            }
+                        }
+
+                        return total_proc_len;
                     });
 
                     ds->setDisConnectHandle([tmp](DataSocket* arg){
