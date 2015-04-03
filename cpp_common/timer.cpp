@@ -1,5 +1,3 @@
-#include <Windows.h>
-
 #include "timer.h"
 
 time_t Timer::GetEndMs() const

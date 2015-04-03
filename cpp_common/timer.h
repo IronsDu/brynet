@@ -20,7 +20,6 @@ public:
     time_t                                  GetEndMs() const;
     void                                    Cancel();
 
-private:
     Timer(time_t ms, Callback f);
 
     void operator()                         ();
@@ -29,24 +28,13 @@ private:
     bool                                    mActive;
     Callback                                mCallback;
     time_t                                  mEndMs;
-
-
-private:
-    friend class TimerMgr;
-
-    template<typename _T, class... _Types>
-    friend std::shared_ptr<_T>              std::make_shared(_Types&&...);
-
-    friend class std::_Ref_count_obj<Timer>;
-
-    friend class std::shared_ptr<Timer>;
 };
 
 class TimerMgr
 {
 public:
     template<typename F, typename ...TArgs>
-    Timer::WeakPtr                          AddTimer(time_t delayMs, F callback, typename TArgs&& ...args)
+    Timer::WeakPtr                          AddTimer(time_t delayMs, F callback, TArgs&& ...args)
     {
         auto t = std::make_shared<Timer>(delayMs + static_cast<time_t>(ox_getnowtime()),
                                             std::bind(callback, std::forward<TArgs>(args)...));
