@@ -67,11 +67,11 @@ DataSocket::~DataSocket()
 
 void DataSocket::setNoBlock()
 {
-#ifdef PLATFORM_WINDOWS
     unsigned long ul = true;
+#ifdef PLATFORM_WINDOWS
     ioctlsocket(mFD, FIONBIO, &ul);
 #else
-    ioctl(fd, FIONBIO, &ul);
+    ioctl(mFD, FIONBIO, &ul);
 #endif
 }
 
@@ -263,6 +263,7 @@ void DataSocket::flush()
 #ifdef PLATFORM_WINDOWS
         normalFlush();
 #else
+        #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
             normalFlush();
@@ -271,6 +272,9 @@ void DataSocket::flush()
         {
             quickFlush();
         }
+        #else
+        quickFlush();
+        #endif
 #endif
     }
 }
@@ -563,7 +567,7 @@ bool    DataSocket::checkWrite()
 #else
     struct epoll_event ev = { 0, { 0 } };
     ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
-    ev.data.ptr = ptr;
+    ev.data.ptr = (Channel*)(this);
     epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
 #endif
 
@@ -575,7 +579,7 @@ void    DataSocket::removeCheckWrite()
 {
     struct epoll_event ev = { 0, { 0 } };
     ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
-    ev.data.ptr = ptr;
+    ev.data.ptr = (Channel*)(this);
     epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
 }
 #endif

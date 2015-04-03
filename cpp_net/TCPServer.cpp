@@ -255,6 +255,18 @@ void TcpServer::closeListenThread()
 
 void TcpServer::closeWorkerThread()
 {
+    stopWorkerThread();
+
+    delete[] mLoops;
+    mLoops = nullptr;
+    delete[] mIncIds;
+    mIncIds = nullptr;
+    delete[] mIds;
+    mIds = nullptr;
+}
+
+void TcpServer::stopWorkerThread()
+{
     if (mLoops != nullptr)
     {
         mRunIOLoop = false;
@@ -263,7 +275,10 @@ void TcpServer::closeWorkerThread()
         {
             mLoops[i].wakeup();
         }
+    }
 
+    if (mIOThreads != nullptr)
+    {
         for (int i = 0; i < mLoopNum; ++i)
         {
             mIOThreads[i]->join();
@@ -272,12 +287,6 @@ void TcpServer::closeWorkerThread()
 
         delete[] mIOThreads;
         mIOThreads = nullptr;
-        delete[] mLoops;
-        mLoops = nullptr;
-        delete[] mIncIds;
-        mIncIds = nullptr;
-        delete[] mIds;
-        mIds = nullptr;
     }
 }
 

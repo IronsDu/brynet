@@ -80,16 +80,19 @@ public:
     /*  开启IO工作线程    */
     void                                startWorkerThread(int threadNum, FRAME_CALLBACK callback = nullptr);
 
-    /*  关闭服务    */
+    /*  关闭服务(且清理内存):非线程安全    */
     void                                closeService();
     void                                closeListenThread();
     void                                closeWorkerThread();
 
-    /*wakeup某id所在的网络工作线程*/
-    void                                wakeup(int64_t id);
-    /*wakeup 所有的网络工作线程*/
-    void                                wakeupAll();
+    /*  仅仅是停止工作线程以及让每个EventLoop退出循环，但不释放EventLoop内存 */
+    void                                stopWorkerThread();
 
+    /*  wakeup某id所在的网络工作线程:非线程安全    */
+    void                                wakeup(int64_t id);
+    /*  wakeup 所有的网络工作线程:非线程安全  */
+    void                                wakeupAll();
+    /*  随机获取一个EventLoop:非线程安全   */
     EventLoop*                          getRandomEventLoop();
     
 private:

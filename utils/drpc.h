@@ -1,4 +1,7 @@
-﻿#include <stdio.h>
+﻿#ifndef _DRPC_H
+#define _DRPC_H
+
+#include <stdio.h>
 #include <assert.h>
 #include <string>
 #include <iostream>
@@ -754,3 +757,5 @@ namespace dodo
         typename PROTOCOL_TYPE::Caller           mCaller;
     };
 }
+
+#endif
