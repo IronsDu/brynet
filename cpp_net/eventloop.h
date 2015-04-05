@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "socketlibtypes.h"
+#include "currentthread.h"
 
 class Channel;
 
@@ -89,7 +90,7 @@ private:
     std::mutex                      mAsyncProcsMutex;
 
     /*调用loop函数所在thread的id*/
-    std::thread::id                 mSelfThreadid;
+    CurrentThread::THREAD_ID_TYPE   mSelfThreadid;
 };
 
 #endif

@@ -179,7 +179,7 @@ int main()
     int total_count = 0;
 
     std::vector<int64_t> sessions;
-
+    mainLoop.restoreThreadID();
     while (true)
     {
         mainLoop.loop(10);

@@ -49,7 +49,6 @@ private:
 
 EventLoop::EventLoop()
 {
-    mSelfThreadid = std::this_thread::get_id();
 #ifdef PLATFORM_WINDOWS
     mPGetQueuedCompletionStatusEx = NULL;
     HMODULE kernel32_module = GetModuleHandleA("kernel32.dll");
@@ -60,7 +59,7 @@ EventLoop::EventLoop()
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
     memset(&mWakeupOvl, sizeof(mWakeupOvl), 0);
-    mWakeupOvl.Offset = EventLoop::OVL_RECV;
+    mWakeupOvl.Offset = EventLoop::OVL_RECV; 
     mWakeupChannel = new WakeupChannel(-1);
 #else
     mEpollFd = epoll_create(1);
@@ -98,7 +97,7 @@ EventLoop::~EventLoop()
 void EventLoop::loop(int64_t timeout)
 {
 #ifndef NDEBUG
-    assert(mSelfThreadid == std::this_thread::get_id());
+    assert(mSelfThreadid == CurrentThread::tid());
 #endif
     /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调），将timeout改为0，表示不阻塞iocp/epoll wait   */
     if (!mAfterLoopProcs.empty())
@@ -220,7 +219,7 @@ bool EventLoop::wakeup()
 {
     bool ret = false;
     /*  TODO::1、保证线程安全；2、保证io线程处于wait状态时，外界尽可能少发送wakeup；3、是否io线程有必要自己向自身投递一个wakeup来唤醒下一次wait？ */
-    if (mSelfThreadid != std::this_thread::get_id())
+    if (mSelfThreadid != CurrentThread::tid())
     {
         if (mInWaitIOEvent)
         {
@@ -290,7 +289,7 @@ void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
 
 void EventLoop::pushAsyncProc(const USER_PROC& f)
 {
-    if (mSelfThreadid != std::this_thread::get_id())
+    if (mSelfThreadid != CurrentThread::tid())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mAsyncProcsMutex.lock();
@@ -307,7 +306,8 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
 
 void EventLoop::pushAsyncProc(USER_PROC&& f)
 {
-    if (mSelfThreadid != std::this_thread::get_id())
+    CurrentThread::THREAD_ID_TYPE fuck = CurrentThread::tid();
+    if (mSelfThreadid != CurrentThread::tid())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mAsyncProcsMutex.lock();
@@ -334,7 +334,7 @@ void EventLoop::pushAfterLoopProc(USER_PROC&& f)
 
 void EventLoop::restoreThreadID()
 {
-    mSelfThreadid = std::this_thread::get_id();
+    mSelfThreadid = CurrentThread::tid();
 }
 
 #ifdef PLATFORM_WINDOWS

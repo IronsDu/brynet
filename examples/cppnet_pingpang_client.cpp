@@ -5,13 +5,17 @@
 #include <iostream>
 #include <assert.h>
 #include <chrono>
+#include <memory>
+#include <thread>
+
 
 #include "socketlibfunction.h"
 
 #include "eventloop.h"
 #include "datasocket.h"
-#include "httprequest.h"
 #include "timer.h"
+
+using namespace std;
 
 void SSL_init()
 {
@@ -25,7 +29,7 @@ void SSL_init()
 #endif
 }
 
-typedef shared_ptr<DataSocket> SHARED_DATASOCKET;
+typedef std::shared_ptr<DataSocket> SHARED_DATASOCKET;
 
 static void fuck_send(TimerMgr* tm, std::weak_ptr<SHARED_DATASOCKET> ds, const char* buffer, int len)
 {
@@ -33,13 +37,15 @@ static void fuck_send(TimerMgr* tm, std::weak_ptr<SHARED_DATASOCKET> ds, const c
     if (tmp)
     {
         tmp->get()->send(buffer, len);
-        tm->AddTimer(200, fuck_send, tm, ds, buffer, len);
+        tm->AddTimer(60, fuck_send, tm, ds, buffer, len);
     }
     else
     {
         cout << "haha" << endl;
     }
 }
+
+__declspec(thread) int tls_i = 1;
 
 int main()
 {
@@ -60,9 +66,9 @@ int main()
 
     std::cout << "enter packet len:";
     std::cin >> packet_len;
-    if (packet_len <= sizeof(int16_t))
+    if (packet_len <= (sizeof(int16_t) + sizeof(int16_t)))
     {
-        packet_len = 2;
+        packet_len = 4;
     }
 
     int port_num;
@@ -83,6 +89,7 @@ int main()
             printf("start one client thread \n");
             /*  客户端eventloop*/
             EventLoop clientEventLoop;
+            clientEventLoop.restoreThreadID();
 
             /*  消息包大小定义 */
             char* senddata = nullptr;
@@ -154,7 +161,7 @@ int main()
                     tmp->reset(ds);
                     if (senddata != nullptr)
                     {
-                        for (int i = 0; i < 1; ++i)
+                        for (int i = 0; i < 100; ++i)
                         {
                             ds->send(senddata, packet_len);
                         }
