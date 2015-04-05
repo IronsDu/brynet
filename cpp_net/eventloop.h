@@ -59,7 +59,7 @@ private:
     void                            linkChannel(int fd, Channel* ptr);
     void                            processAfterLoopProcs();
     void                            processAsyncProcs();
-
+    bool                            isInLoopThread();
 private:
     int                             mEventEntriesNum;
 #ifdef PLATFORM_WINDOWS

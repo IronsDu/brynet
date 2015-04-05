@@ -75,6 +75,7 @@ EventLoop::EventLoop()
     mEventEntriesNum = 0;
 
     recalocEventSize(1024);
+    mSelfThreadid = 0;
 }
 
 EventLoop::~EventLoop()
@@ -97,7 +98,7 @@ EventLoop::~EventLoop()
 void EventLoop::loop(int64_t timeout)
 {
 #ifndef NDEBUG
-    assert(mSelfThreadid == CurrentThread::tid());
+    assert(isInLoopThread());
 #endif
     /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调），将timeout改为0，表示不阻塞iocp/epoll wait   */
     if (!mAfterLoopProcs.empty())
@@ -215,11 +216,16 @@ void EventLoop::processAsyncProcs()
     }
 }
 
+bool EventLoop::isInLoopThread()
+{
+    return mSelfThreadid == CurrentThread::tid();
+}
+
 bool EventLoop::wakeup()
 {
     bool ret = false;
     /*  TODO::1、保证线程安全；2、保证io线程处于wait状态时，外界尽可能少发送wakeup；3、是否io线程有必要自己向自身投递一个wakeup来唤醒下一次wait？ */
-    if (mSelfThreadid != CurrentThread::tid())
+    if (!isInLoopThread())
     {
         if (mInWaitIOEvent)
         {
@@ -289,7 +295,7 @@ void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
 
 void EventLoop::pushAsyncProc(const USER_PROC& f)
 {
-    if (mSelfThreadid != CurrentThread::tid())
+    if (!isInLoopThread())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mAsyncProcsMutex.lock();
@@ -307,7 +313,7 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
 void EventLoop::pushAsyncProc(USER_PROC&& f)
 {
     CurrentThread::THREAD_ID_TYPE fuck = CurrentThread::tid();
-    if (mSelfThreadid != CurrentThread::tid())
+    if (!isInLoopThread())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mAsyncProcsMutex.lock();

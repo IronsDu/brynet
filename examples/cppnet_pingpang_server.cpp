@@ -7,6 +7,7 @@
 #include <chrono>
 #include <vector>
 
+#include "packet.h"
 #include "systemlib.h"
 #include "socketlibfunction.h"
 
@@ -136,7 +137,8 @@ int main()
             bool flag = false;
             if (left_len >= sizeof(sizeof(uint16_t) + sizeof(uint16_t)))
             {
-                uint16_t packet_len = (*(uint16_t*)parse_str);
+                ReadPacket rp(parse_str, left_len);
+                uint16_t packet_len = rp.readINT16();
                 if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
                 {
                     if (true)
@@ -204,7 +206,7 @@ int main()
                 }
                 else if (msg->mType == NMT_RECV_DATA)
                 {
-                    if (false)
+                    if (true)
                     {
                         DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
                         for (int i = 0; i < sessions.size(); ++i)

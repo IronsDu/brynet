@@ -7,7 +7,7 @@
 #include <chrono>
 #include <memory>
 #include <thread>
-
+#include "packet.h"
 
 #include "socketlibfunction.h"
 
@@ -45,7 +45,19 @@ static void fuck_send(TimerMgr* tm, std::weak_ptr<SHARED_DATASOCKET> ds, const c
     }
 }
 
-__declspec(thread) int tls_i = 1;
+
+void sendpacket(DataSocket* ds, const char* value, int len)
+{
+    FixedPacket<128> packet;
+    packet.setOP(1);
+    packet.writeINT64((int64_t)ds);
+    if (value != nullptr)
+    {
+        packet.writeBuffer(value, len);
+    }
+    packet.end();
+    ds->send(packet.getData(), packet.getLen());
+}
 
 int main()
 {
@@ -159,13 +171,21 @@ int main()
                     
                     shared_ptr<SHARED_DATASOCKET> tmp = std::make_shared<SHARED_DATASOCKET>();
                     tmp->reset(ds);
-                    if (senddata != nullptr)
+                    
+                    if (true)
                     {
-                        for (int i = 0; i < 100; ++i)
+                        sendpacket(ds, senddata, packet_len);
+                    }
+                    else
+                    {
+                        if (senddata != nullptr)
                         {
-                            ds->send(senddata, packet_len);
+                            for (int i = 0; i < 1000; ++i)
+                            {
+                                ds->send(senddata, packet_len);
+                            }
+                            //fuck_send(&tm, tmp, senddata, packet_len);
                         }
-                        //fuck_send(&tm, tmp, senddata, packet_len);
                     }
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
@@ -179,10 +199,19 @@ int main()
                             bool flag = false;
                             if (left_len >= sizeof(sizeof(uint16_t) + sizeof(uint16_t)))
                             {
-                                uint16_t packet_len = (*(uint16_t*)parse_str);
+                                ReadPacket rp(parse_str, left_len);
+                                uint16_t packet_len = rp.readINT16();
                                 if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
                                 {
-                                    ds->send(parse_str, packet_len);
+                                    ReadPacket rp(parse_str, packet_len);
+                                    rp.readINT16();
+                                    rp.readINT16();
+                                    int64_t addr = rp.readINT64();
+
+                                    if (addr == (int64_t)ds)
+                                    {
+                                        ds->send(parse_str, packet_len);
+                                    }
 
                                     total_proc_len += packet_len;
                                     parse_str += packet_len;

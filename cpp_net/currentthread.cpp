@@ -5,14 +5,17 @@
 namespace CurrentThread
 {
 #ifdef PLATFORM_WINDOWS
-    __declspec(thread) THREAD_ID_TYPE* cachedTid = nullptr;
+    __declspec(thread) THREAD_ID_TYPE cachedTid = 0;
 #else
-    extern __thread THREAD_ID_TYPE* cachedTid = nullptr;
+    extern __thread THREAD_ID_TYPE cachedTid = 0;
 #endif
 
     void cacheTid()
     {
-        cachedTid = new std::thread::id();
-        *cachedTid = std::this_thread::get_id();
+#ifdef PLATFORM_WINDOWS
+        cachedTid = GetCurrentThreadId();
+#else
+        cachedTid = static_cast<pid_t>(::syscall(SYS_gettid));
+#endif
     }
 }
