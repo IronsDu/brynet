@@ -274,10 +274,22 @@ namespace dodo
         VariadicArgFunctor(std::function<void(Args...)> f)
         {
             mf = f;
+            mRequestID = -1;
+        }
+
+        void    setRequestID(int id)
+        {
+            mRequestID = id;
+        }
+
+        int     getRequestID() const
+        {
+            return mRequestID;
         }
 
         std::function<void(Args...)>   mf;
         std::tuple<typename std::remove_const<typename std::remove_reference<Args>::type>::type...>  mTuple;    /*回调函数所需要的参数列表*/
+        int     mRequestID;
     };
 
     template<typename CALLBACK_TYPE, typename INVOKE_TYPE>
@@ -366,6 +378,27 @@ namespace dodo
         int         mNextID;
     };
 
+    class RpcRequestInfo
+    {
+    public:
+        RpcRequestInfo()
+        {
+            mRequestID = -1;
+        }
+
+        void    setRequestID(int id)
+        {
+            mRequestID = id;
+        }
+
+        int     getRequestID() const
+        {
+            return mRequestID;
+        }
+    private:
+        int     mRequestID;
+    };
+
     struct JsonProtocol
     {
         struct Decode
@@ -374,9 +407,10 @@ namespace dodo
             struct Invoke
             {
             public:
-                static void invoke(void* pvoid, const Value& msg)
+                static void invoke(int id, void* pvoid, const Value& msg)
                 {
                     auto pThis = (VariadicArgFunctor<Args...>*)pvoid;
+                    pThis->setRequestID(id);
                     int parmIndex = 0;
                     Eval<sizeof...(Args), Args...>::eval<Args...>(pThis, msg, parmIndex);
                 }
@@ -386,16 +420,38 @@ namespace dodo
         template<int SIZE, typename ...Args>
         struct Eval
         {
+            template<typename T>
+            struct HelpEval
+            {
+                template<typename ...LeftArgs, typename ...NowArgs>
+                static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+                {
+                    const Value& element = msg[std::to_string(parmIndex++).c_str()];
+
+                    auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
+                    clear(value);
+                    Utils::readJson(element, value);
+
+                    Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
+                }
+            };
+
+            template<>
+            struct HelpEval < RpcRequestInfo >
+            {
+                template<typename ...LeftArgs, typename ...NowArgs>
+                static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
+                {
+                    RpcRequestInfo value;
+                    value.setRequestID(pThis->getRequestID());
+                    Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
+                }
+            };
+
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
             {
-                const Value& element = msg[std::to_string(parmIndex++).c_str()];
-
-                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
-                clear(value);
-                Utils::readJson(element, value);
-
-                Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
+                HelpEval<T>::eval<LeftArgs...>(pThis, msg, parmIndex, args...);
             }
         };
 
@@ -424,7 +480,7 @@ namespace dodo
                 assert(it != mWrapFunctions.end());
                 if (it != mWrapFunctions.end())
                 {
-                    ((*it).second)(mRealFunctionPtr[name], parmObject);
+                    ((*it).second)(getRequestID(), mRealFunctionPtr[name], parmObject);
                 }
             }
         private:
@@ -513,9 +569,10 @@ namespace dodo
             struct Invoke
             {
             public:
-                static void invoke(void* pvoid, const char* buffer, size_t len, size_t& off)
+                static void invoke(int id, void* pvoid, const char* buffer, size_t len, size_t& off)
                 {
                     auto pThis = (VariadicArgFunctor<Args...>*)pvoid;
+                    pThis->setRequestID(id);
                     Eval<sizeof...(Args), Args...>::eval<Args...>(pThis, buffer, len, off);
                 }
             };
@@ -524,20 +581,41 @@ namespace dodo
         template<int SIZE, typename ...Args>
         struct Eval
         {
+            template<typename T>
+            struct HelpEval
+            {
+                template<typename ...LeftArgs, typename ...NowArgs>
+                static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
+                {
+                    /*  msgpack协议的call是逆序写入参数，所以这里逆序读取参数    */
+                    auto& value = std::get<sizeof...(LeftArgs)>(pThis->mTuple);
+                    clear(value);
+
+                    msgpack::unpacked result;
+                    unpack(result, buffer, size, off);
+                    const msgpack::object& o = result.get();
+                    o.convert(&value);
+
+                    Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
+                }
+            };
+
+            template<>
+            struct HelpEval < RpcRequestInfo >
+            {
+                template<typename ...LeftArgs, typename ...NowArgs>
+                static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
+                {
+                    RpcRequestInfo value;
+                    value.setRequestID(pThis->getRequestID());
+                    Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
+                }
+            };
+
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
-                /*  msgpack协议的call是逆序写入参数，所以这里逆序读取参数    */
-                int sss = sizeof...(LeftArgs);
-                auto& value = std::get<sizeof...(LeftArgs)>(pThis->mTuple);
-                clear(value);
-
-                msgpack::unpacked result;
-                unpack(result, buffer, size, off);
-                const msgpack::object& o = result.get();
-                o.convert(&value);
-
-                Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
+                HelpEval<std::tuple_element<sizeof...(LeftArgs), decltype(pThis->mTuple)>::type>::eval<LeftArgs...>(pThis, buffer, size, off, args...);
             }
         };
 
@@ -613,7 +691,7 @@ namespace dodo
                 assert(it != mWrapFunctions.end());
                 if (it != mWrapFunctions.end())
                 {
-                    ((*it).second)(mRealFunctionPtr[name], str, size, off);
+                    ((*it).second)(getRequestID(), mRealFunctionPtr[name], str, size, off);
                 }
             }
         };
@@ -733,11 +811,6 @@ namespace dodo
         void    handleResponse(const string&& str)
         {
             handleResponse(str);
-        }
-
-        int     getRequestID()
-        {
-            return mRpcFunctions.getRequestID();
         }
     private:
         template<typename ...Args>
