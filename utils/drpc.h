@@ -128,6 +128,37 @@ namespace dodo
             }
         }
 
+        template<class Tuple, std::size_t N>
+        struct TupleReader {
+            static void read(const Value& msg, Tuple& t)
+            {
+                TupleReader<Tuple, N - 1>::read(msg, t);
+                if (msg.IsObject())
+                {
+                    Value::ConstMemberIterator itr = msg.FindMember(std::to_string(N - 1).c_str());
+                    readJson((*itr).value, std::get<N - 1>(t));
+                }
+            }
+        };
+
+        template<class Tuple>
+        struct TupleReader < Tuple, 1 > {
+            static void read(const Value& msg, Tuple& t)
+            {
+                if (msg.IsObject())
+                {
+                    Value::ConstMemberIterator itr = msg.FindMember("0");
+                    readJson((*itr).value, std::get<0>(t));
+                }
+            }
+        };
+
+        template<class... Args>
+        static  void    readJson(const Value& msg, std::tuple<Args...>& value)
+        {
+            TupleReader<decltype(value), sizeof...(Args)>::read(msg, value);
+        }
+
         /*  序列化-把数据转换为Json对象  */
         static  Value    writeJson(Document& doc, const int& value)
         {
@@ -238,6 +269,32 @@ namespace dodo
             return mapObject;
         }
 
+        template<class Tuple, std::size_t N>
+        struct TupleWriter {
+            static void write(Document& doc, Value& mapObject, const Tuple& t)
+            {
+                TupleWriter<Tuple, N - 1>::write(doc, mapObject, t);
+                mapObject.AddMember(GenericValue<UTF8<>>(std::to_string(N - 1).c_str(), doc.GetAllocator()), writeJson(doc, std::get<N - 1>(t)), doc.GetAllocator());
+            }
+        };
+
+        template<class Tuple>
+        struct TupleWriter < Tuple, 1 > {
+            static void write(Document& doc, Value& mapObject, const Tuple& t)
+            {
+                mapObject.AddMember(GenericValue<UTF8<>>(std::to_string(0).c_str(), doc.GetAllocator()), writeJson(doc, std::get<0>(t)), doc.GetAllocator());
+            }
+        };
+
+
+        template<class... Args>
+        static  Value   writeJson(Document& doc, const std::tuple<Args...>& value)
+        {
+            Value mapObject(kObjectType);
+            TupleWriter<decltype(value), sizeof...(Args)>::write(doc, mapObject, value);
+            return mapObject;
+        }
+
         template<typename T>
         static  void    writeJsonByIndex(Document& doc, Value& msg, const T& t, int index)
         {
@@ -266,6 +323,29 @@ namespace dodo
     template<typename ...Args>
     static void    clear(Args&... args)
     {
+    }
+
+    template<class Tuple, std::size_t N>
+    struct TupleClear {
+        static void sclear(Tuple& t)
+        {
+            TupleClear<Tuple, N - 1>::sclear(t);
+            clear(std::get<N - 1>(t));
+        }
+    };
+
+    template<class Tuple>
+    struct TupleClear < Tuple, 1 > {
+        static void sclear(Tuple& t)
+        {
+            clear(std::get<0>(t));
+        }
+    };
+
+    template<typename ...Args>
+    static void    clear(std::tuple<Args...>& v)
+    {
+        TupleClear<decltype(v), sizeof...(Args)>::sclear(v);
     }
 
     template<typename ...Args>
@@ -401,6 +481,16 @@ namespace dodo
 
     struct JsonProtocol
     {
+        template<class... Args>
+        using tuple = std::tuple <Args...>;
+
+        template<class... _Types> inline
+            tuple<_Types...>
+            static make_tuple(_Types&&... _Args)
+        {
+            return std::make_tuple(std::forward<_Types>(_Args)...);
+        }
+
         struct Decode
         {
             template<typename ...Args>
@@ -426,10 +516,10 @@ namespace dodo
                 template<typename ...LeftArgs, typename ...NowArgs>
                 static  void    eval(VariadicArgFunctor<Args...>* pThis, const Value& msg, int& parmIndex, NowArgs&&... args)
                 {
-                    const Value& element = msg[std::to_string(parmIndex++).c_str()];
-
                     auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
                     clear(value);
+                    Value::ConstMemberIterator it = msg.FindMember(std::to_string(parmIndex++).c_str());
+                    const Value& element = (*it).value;
                     Utils::readJson(element, value);
 
                     Eval<sizeof...(LeftArgs), Args...>::eval<LeftArgs...>(pThis, msg, parmIndex, args..., value);
@@ -563,6 +653,16 @@ namespace dodo
 
     struct MsgpackProtocol
     {
+        template<class... Args>
+        using tuple = msgpack::type::tuple <Args...>;
+
+        template<class... _Types> inline
+            tuple<_Types...>
+            static make_tuple(_Types&&... _Args)
+        {
+            return msgpack::type::make_tuple<_Types...>(std::forward<_Types>(_Args)...);
+        }
+
         struct Decode
         {
             template<typename ...Args>
@@ -670,28 +770,37 @@ namespace dodo
         public:
             void    execute(const char* str, size_t size)
             {
-                msgpack::unpacked result;
-                std::size_t off = 0;
-
-                unpack(result, str, size, off);
-                msgpack::object o = result.get();
-                string name;
-                o.convert(&name);
-
+                try
                 {
-                    int req_id;
                     msgpack::unpacked result;
-                    unpack(result, str, size, off);
-                    const msgpack::object& o = result.get();
-                    o.convert(&req_id);
-                    setRequestID(req_id);
-                }
+                    std::size_t off = 0;
 
-                auto it = mWrapFunctions.find(name);
-                assert(it != mWrapFunctions.end());
-                if (it != mWrapFunctions.end())
+                    unpack(result, str, size, off);
+                    msgpack::object o = result.get();
+                    string name;
+                    o.convert(&name);
+
+                    {
+                        int req_id;
+                        msgpack::unpacked result;
+                        unpack(result, str, size, off);
+                        const msgpack::object& o = result.get();
+                        o.convert(&req_id);
+                        setRequestID(req_id);
+                    }
+
+                    auto it = mWrapFunctions.find(name);
+                    assert(it != mWrapFunctions.end());
+                    if (it != mWrapFunctions.end())
+                    {
+                        ((*it).second)(getRequestID(), mRealFunctionPtr[name], str, size, off);
+                    }
+                }
+                catch (msgpack::type_error)
                 {
-                    ((*it).second)(getRequestID(), mRealFunctionPtr[name], str, size, off);
+                }
+                catch (...)
+                {
                 }
             }
         };
@@ -763,6 +872,9 @@ namespace dodo
     class rpc
     {
     public:
+        template<class... Args>
+        using tuple = typename PROTOCOL_TYPE::template tuple < Args... >;
+
         rpc()
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
@@ -770,6 +882,13 @@ namespace dodo
                 handleResponse(response);
                 mResponseCallbacks.del(std::to_string(req_id));
             });
+        }
+
+        template<class... _Types> inline
+            tuple<_Types...>
+            make_tuple(_Types&&... _Args)
+        {
+            return PROTOCOL_TYPE::make_tuple(std::forward<_Types>(_Args)...);
         }
 
         template<typename F>
