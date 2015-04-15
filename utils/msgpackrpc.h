@@ -28,11 +28,13 @@ namespace dodo
         template<typename ...Args>
         struct Fuck
         {
-            template<typename ...LeftArgs, typename ...NowArgs>
+            template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
-                /*  msgpack协议的call是逆序写入参数，所以这里逆序读取参数    */
-                auto& value = std::get<sizeof...(LeftArgs)>(pThis->mTuple);
+                typedef typename std::tuple_element<sizeof...(Args)-sizeof...(LeftArgs)-1, decltype(pThis->mTuple)>::type ARGTYPE;
+                //static_assert(std::is_same<T, ARGTYPE>::value, "");
+
+                auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
                 clear(value);
                 
                 msgpack::unpacked result;
@@ -51,9 +53,11 @@ namespace dodo
         template<typename ...Args>
         struct Fuck
         {
-            template<typename ...LeftArgs, typename ...NowArgs>
+            template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
+                static_assert(std::is_same<T, RpcRequestInfo>::value, "");
+
                 RpcRequestInfo value;
                 value.setRequestID(pThis->getRequestID());
                 Eval<sizeof...(LeftArgs), Args...>::template eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
@@ -64,45 +68,13 @@ namespace dodo
     template<int SIZE, typename ...Args>
     struct Eval
     {
-        template<typename T, typename ...LeftArgs, typename ...NowArgs>
+        template<typename ...LeftArgs, typename ...NowArgs>
         static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
         {
-            typedef HelpEval<typename std::tuple_element<sizeof...(LeftArgs), decltype(pThis->mTuple)>::type> TMP1;
+            typedef HelpEval<typename std::tuple_element<sizeof...(Args)-sizeof...(LeftArgs), decltype(pThis->mTuple)>::type> TMP1;
             typedef typename TMP1::template Fuck<Args...> TMP;
             TMP::template eval<LeftArgs...>(pThis, buffer, size, off, args...);
         }
-    };
-    
-    /*  http://stackoverflow.com/questions/15904288/how-to-reverse-the-order-of-arguments-of-a-variadic-template-function   */
-    template<class ...Tn>
-    struct revert;
-    
-    template<>
-    struct revert <>
-    {
-        template<typename ...Args>
-        struct Fuck
-        {
-            template<class ...Un>
-            static void apply(VariadicArgFunctor<Args...>* pThis, Un const&... un)
-            {
-                (pThis->mf)(un...);
-            }
-        };
-    };
-    // recursion
-    template<class T, class ...Tn>
-    struct revert < T, Tn... >
-    {
-        template<typename ...Args>
-        struct Fuck
-        {
-            template<class ...Un>
-            static void apply(VariadicArgFunctor<Args...>* pThis, T const& t, Tn const&... tn, Un const&... un)
-            {
-                revert<Tn...>::template Fuck<Args...>::apply(pThis, tn..., t, un...);
-            }
-        };
     };
     
     template<typename ...Args>
@@ -111,19 +83,7 @@ namespace dodo
         template<typename ...NowArgs>
         static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
         {
-            /*  因为实际参数是逆序的，所以要经过反转之后再回调处理函数 */
-            revertArgsCallback(pThis, args...);
-        }
-        
-        template<class A, class ...An>
-        static void revertArgsCallback(VariadicArgFunctor<Args...>* pThis, A const& a, An const&... an)
-        {
-            revert<An...>::template Fuck<Args...>::apply(pThis, an..., a);
-        }
-        
-        static void revertArgsCallback(VariadicArgFunctor<Args...>* pThis)
-        {
-            (pThis->mf)();
+            (pThis->mf)(args...);
         }
     };
     
@@ -149,13 +109,8 @@ namespace dodo
         {
             try
             {
-                msgpack::unpacked result;
-                std::size_t off = 0;
-                
-                unpack(result, str, size, off);
-                msgpack::object o = result.get();
                 string name;
-                o.convert(&name);
+                std::size_t off = 0;
                 
                 {
                     int req_id;
@@ -164,6 +119,13 @@ namespace dodo
                     const msgpack::object& o = result.get();
                     o.convert(&req_id);
                     setRequestID(req_id);
+                }
+
+                {
+                    msgpack::unpacked result;
+                    unpack(result, str, size, off);
+                    msgpack::object o = result.get();
+                    o.convert(&name);
                 }
                 
                 auto it = mWrapFunctions.find(name);
@@ -181,16 +143,16 @@ namespace dodo
             }
         }
     };
-    
+
     template<bool>
     struct SelectWriteArgMsgpack
     {
         template<typename ARGTYPE>
-        static  void    Write(BaseCaller& caller, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, const ARGTYPE& arg)
+        static  void    Write(BaseCaller& caller, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const ARGTYPE& arg)
         {
             int id = caller.makeNextID();
             functionMgr.insertLambda(std::to_string(id), arg);
-            msgpack::pack(&sbuf, id);
+            msgpack::pack(&lambdabuf, id);
         }
     };
     
@@ -198,46 +160,45 @@ namespace dodo
     struct SelectWriteArgMsgpack < false >
     {
         template<typename ARGTYPE>
-        static  void    Write(BaseCaller& caller, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, const ARGTYPE& arg)
+        static  void    Write(BaseCaller& caller, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const ARGTYPE& arg)
         {
-            msgpack::pack(&sbuf, -1);
+            msgpack::pack(&lambdabuf, -1);
             msgpack::pack(&sbuf, arg);
         }
     };
-    
+
     class Caller : public BaseCaller
     {
     public:
         template<typename... Args>
         string    call(FunctionMgr& msgpackFunctionResponseMgr, const char* funname, const Args&... args)
         {
+            msgpack::sbuffer lambdabuf;
             msgpack::sbuffer sbuf;
             msgpack::pack(&sbuf, funname);
             
-            writeCallArg(msgpackFunctionResponseMgr, sbuf, args...);
+            writeCallArg(msgpackFunctionResponseMgr, sbuf, lambdabuf, args...);
             
-            return string(sbuf.data(), sbuf.size());
+            return string(lambdabuf.data(), lambdabuf.size()) + string(sbuf.data(), sbuf.size());
         }
     private:
-        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, int& index){}
-        
         template<typename Arg>
-        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, const Arg& arg)
+        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const Arg& arg)
         {
             /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-            SelectWriteArgMsgpack<HasCallOperator<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, arg);
+            SelectWriteArgMsgpack<HasCallOperator<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, lambdabuf, arg);
         }
-        
+
         template<typename Arg1, typename... Args>
-        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, const Arg1& arg1, const Args&... args)
+        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const Arg1& arg1, const Args&... args)
         {
-            writeCallArg(msgpackFunctionResponseMgr, sbuf, args...);
             msgpack::pack(&sbuf, arg1);
+            writeCallArg(msgpackFunctionResponseMgr, sbuf, lambdabuf, args...);
         }
-        
-        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf)
+
+        void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf)
         {
-            msgpack::pack(&sbuf, -1);
+            msgpack::pack(&lambdabuf, -1);
         }
     };
     
