@@ -202,9 +202,9 @@ namespace dodo
         }
         
     protected:
-        map<string, CALLBACK_TYPE>         mWrapFunctions;
-        map<string, void*>                          mRealFunctionPtr;
-        int                                         mRequestID;
+        map<string, CALLBACK_TYPE>          mWrapFunctions;
+        map<string, void*>                  mRealFunctionPtr;
+        int                                 mRequestID;
     };
 }
 

@@ -19,9 +19,6 @@ namespace dodo
     class rpc
     {
     public:
-        template<class... Args>
-        using tuple = typename PROTOCOL_TYPE::template tuple < Args... >;
-        
         rpc()
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
@@ -29,13 +26,6 @@ namespace dodo
                 handleResponse(response);
                 mResponseCallbacks.del(std::to_string(req_id));
             });
-        }
-        
-        template<class... _Types> inline
-        tuple<_Types...>
-        make_tuple(_Types&&... _Args)
-        {
-            return PROTOCOL_TYPE::make_tuple(std::forward<_Types>(_Args)...);
         }
         
         template<typename F>

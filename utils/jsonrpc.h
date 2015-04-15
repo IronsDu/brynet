@@ -24,20 +24,25 @@ namespace dodo
 
     struct JsonProtocol
     {
-        template<class... Args>
-        using tuple = std::tuple < Args... > ;
-
-        template<class... _Types> inline
-            tuple<_Types...>
-            static make_tuple(_Types&&... _Args)
-        {
-            return std::make_tuple(std::forward<_Types>(_Args)...);
-        }
-
         class Utils
         {
         public:
             /*  反序列化    */
+            static  void    readJson(const rapidjson::Value& msg, int8_t& ret)
+            {
+                ret = msg.GetInt64();
+            }
+
+            static  void    readJson(const rapidjson::Value& msg, int16_t& ret)
+            {
+                ret = msg.GetInt();
+            }
+
+            static  void    readJson(const rapidjson::Value& msg, int64_t& ret)
+            {
+                ret = msg.GetInt64();
+            }
+
             static  void    readJson(const rapidjson::Value& msg, char& ret)
             {
                 ret = msg.GetInt();
@@ -158,7 +163,22 @@ namespace dodo
             }
 
             /*  序列化-把数据转换为Json对象  */
+            static  rapidjson::Value    writeJson(rapidjson::Document& doc, const int8_t& value)
+            {
+                return rapidjson::Value(value);
+            }
+
+            static  rapidjson::Value    writeJson(rapidjson::Document& doc, const int16_t& value)
+            {
+                return rapidjson::Value(value);
+            }
+
             static  rapidjson::Value    writeJson(rapidjson::Document& doc, const int& value)
+            {
+                return rapidjson::Value(value);
+            }
+
+            static  rapidjson::Value    writeJson(rapidjson::Document& doc, const int64_t& value)
             {
                 return rapidjson::Value(value);
             }

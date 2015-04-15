@@ -19,6 +19,43 @@ namespace dodo
     using namespace std;
     using namespace msgpack;
     
+    template<class Tuple, std::size_t N>
+    struct TupleRead
+    {
+        static void read(const char* buffer, size_t size, size_t& off, Tuple& t)
+        {
+            TupleRead<Tuple, N - 1>::read(buffer, size, off, t);
+            ValueRead::read(buffer, size, off, std::get<N - 1>(t));
+        }
+    };
+
+    template<class Tuple>
+    struct TupleRead < Tuple, 1 >
+    {
+        static void read(const char* buffer, size_t size, size_t& off, Tuple& t)
+        {
+            ValueRead::read(buffer, size, off, std::get<0>(t));
+        }
+    };
+
+    struct ValueRead
+    {
+        template<class... Args>
+        static  void    read(const char* buffer, size_t size, size_t& off, std::tuple<Args...>& value)
+        {
+            TupleRead<decltype(value), sizeof...(Args)>::read(buffer, size, off, value);
+        }
+
+        template<typename T>
+        static  void    read(const char* buffer, size_t size, size_t& off, T& value)
+        {
+            msgpack::unpacked result;
+            msgpack::unpack(result, buffer, size, off);
+            const msgpack::object& o = result.get();
+            o.convert(&value);
+        }
+    };
+
     template<int SIZE, typename ...Args>
     struct Eval;
     
@@ -37,10 +74,7 @@ namespace dodo
                 auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
                 clear(value);
                 
-                msgpack::unpacked result;
-                unpack(result, buffer, size, off);
-                const msgpack::object& o = result.get();
-                o.convert(&value);
+                ValueRead::read(buffer, size, off, value);
                 
                 Eval<sizeof...(LeftArgs), Args...>::template eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
             }
@@ -137,10 +171,46 @@ namespace dodo
             }
             catch (msgpack::type_error)
             {
+                cout << "parse error" << endl;
             }
             catch (...)
             {
+                cout << "parse error" << endl;
             }
+        }
+    };
+
+    template<class Tuple, std::size_t N>
+    struct TupleWrite
+    {
+        static void write(msgpack::sbuffer& sbuf, const Tuple& value)
+        {
+            TupleWrite<Tuple, N - 1>::write(sbuf, value);
+            ValueWrite::write(sbuf, std::get<N - 1>(value));
+        }
+    };
+
+    template<class Tuple>
+    struct TupleWrite < Tuple, 1 >
+    {
+        static void write(msgpack::sbuffer& sbuf, const Tuple& value)
+        {
+            ValueWrite::write(sbuf, std::get<0>(value));
+        }
+    };
+
+    struct ValueWrite
+    {
+        template<typename T>
+        static  void    write(msgpack::sbuffer& sbuf, const T& value)
+        {
+            msgpack::pack(&sbuf, value);
+        }
+
+        template<class... Args>
+        static  void    write(msgpack::sbuffer& sbuf, const std::tuple<Args...>& value)
+        {
+            TupleWrite<decltype(value), sizeof...(Args)>::write(sbuf, value);
         }
     };
 
@@ -163,7 +233,7 @@ namespace dodo
         static  void    Write(BaseCaller& caller, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const ARGTYPE& arg)
         {
             msgpack::pack(&lambdabuf, -1);
-            msgpack::pack(&sbuf, arg);
+            ValueWrite::write(sbuf, arg);
         }
     };
 
@@ -192,7 +262,7 @@ namespace dodo
         template<typename Arg1, typename... Args>
         void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const Arg1& arg1, const Args&... args)
         {
-            msgpack::pack(&sbuf, arg1);
+            ValueWrite::write(sbuf, arg1);
             writeCallArg(msgpackFunctionResponseMgr, sbuf, lambdabuf, args...);
         }
 
@@ -206,16 +276,6 @@ namespace dodo
     {
         typedef FunctionMgr FunctionMgr;
         typedef Caller Caller;
-        
-        template<class... Args>
-        using tuple = msgpack::type::tuple < Args... > ;
-        
-        template<class... _Types> inline
-        tuple<_Types...>
-        static make_tuple(_Types&&... _Args)
-        {
-            return msgpack::type::make_tuple<_Types...>(std::forward<_Types>(_Args)...);
-        }
     };
 }
 
