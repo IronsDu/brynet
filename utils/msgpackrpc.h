@@ -32,7 +32,7 @@ namespace dodo
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
                 typedef typename std::tuple_element<sizeof...(Args)-sizeof...(LeftArgs)-1, decltype(pThis->mTuple)>::type ARGTYPE;
-                //static_assert(std::is_same<T, ARGTYPE>::value, "");
+                static_assert(std::is_same<std::remove_const<std::remove_reference<T>::type>::type, ARGTYPE>::value, "");
 
                 auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
                 clear(value);
@@ -56,7 +56,7 @@ namespace dodo
             template<typename T, typename ...LeftArgs, typename ...NowArgs>
             static  void    eval(VariadicArgFunctor<Args...>* pThis, const char* buffer, size_t size, size_t& off, NowArgs&&... args)
             {
-                static_assert(std::is_same<T, RpcRequestInfo>::value, "");
+                static_assert(std::is_same<std::remove_const<std::remove_reference<T>::type>::type, RpcRequestInfo>::value, "");
 
                 RpcRequestInfo value;
                 value.setRequestID(pThis->getRequestID());
