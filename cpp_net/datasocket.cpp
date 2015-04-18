@@ -1,4 +1,5 @@
 #include <iostream>
+#include <assert.h>
 
 #include "socketlibtypes.h"
 #include "eventloop.h"
@@ -160,32 +161,49 @@ void DataSocket::recv()
     static  const   int RECVBUFFER_SIZE = 1024 * 16;
 
     bool must_close = false;
+    static_assert(sizeof(char) == 1, "");
     char tmpRecvBuffer[RECVBUFFER_SIZE];    /*  临时读缓冲区  */
-    int recvBufferWritePos = 0;             /*  当前临时读缓冲区的写入位置   */
-    int bufferParseStart = 0;               /*  当前消息包解析起始点  */
+    const char* recvEndPos = tmpRecvBuffer + sizeof(tmpRecvBuffer); /*缓冲区结束位置*/
+    char* writePos = tmpRecvBuffer;         /*  当前写起始点  */
+    char* parsePos = tmpRecvBuffer;         /*  当前解析消息包起始点  */
 
     {
         /*  先把内置缓冲区的数据拷贝到读缓冲区,然后置空内置缓冲区 */
-        memcpy(tmpRecvBuffer, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
-        recvBufferWritePos += ox_buffer_getreadvalidcount(mRecvBuffer);
-        ox_buffer_addreadpos(mRecvBuffer, ox_buffer_getreadvalidcount(mRecvBuffer));
+        const int oldDataLen = ox_buffer_getreadvalidcount(mRecvBuffer);
+        if (sizeof(tmpRecvBuffer) >= oldDataLen && oldDataLen > 0)
+        {
+            memcpy(tmpRecvBuffer, ox_buffer_getreadptr(mRecvBuffer), oldDataLen);
+            writePos += oldDataLen;
+        }
+
+        ox_buffer_addreadpos(mRecvBuffer, oldDataLen);
         ox_buffer_adjustto_head(mRecvBuffer);
+
+        assert(ox_buffer_getreadpos(mRecvBuffer) == 0);
+        assert(ox_buffer_getwritepos(mRecvBuffer) == 0);
     }
 
     while (mFD != SOCKET_ERROR)
     {
+        const int tryRecvLen = recvEndPos - writePos;
+        assert(tryRecvLen > 0);
+        if (tryRecvLen <= 0)
+        {
+            break;
+        }
+
         int retlen = 0;
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
-            retlen = SSL_read(mSSL, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos);
+            retlen = SSL_read(mSSL, writePoss, tryRecvLen);
         }
         else
         {
-            retlen = ::recv(mFD, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos, 0);
+            retlen = ::recv(mFD, writePos, tryRecvLen, 0);
         }
 #else
-        retlen = ::recv(mFD, tmpRecvBuffer + recvBufferWritePos, sizeof(tmpRecvBuffer)-recvBufferWritePos, 0);
+        retlen = ::recv(mFD, writePos, tryRecvLen, 0);
 #endif
 
         if (retlen < 0)
@@ -221,32 +239,47 @@ void DataSocket::recv()
         {
             if (mDataHandle != nullptr)
             {
-                recvBufferWritePos += retlen;
-                int proclen = mDataHandle(this, tmpRecvBuffer + bufferParseStart, recvBufferWritePos-bufferParseStart);
-                bufferParseStart += proclen;
-
-                if (recvBufferWritePos == sizeof(tmpRecvBuffer))
+                writePos += retlen;
+                int proclen = mDataHandle(this, parsePos, writePos - parsePos);
+                assert(proclen >= 0);
+                if (proclen >= 0 && proclen <= (writePos - parsePos))
                 {
-                    memmove(tmpRecvBuffer, tmpRecvBuffer + bufferParseStart, recvBufferWritePos - bufferParseStart);
-                    recvBufferWritePos -= bufferParseStart;
-                    bufferParseStart = 0;
+                    parsePos += proclen;
+
+                    if (writePos == recvEndPos)
+                    {
+                        const int validLen = writePos - parsePos;
+                        if (validLen > 0)
+                        {
+                            memmove(tmpRecvBuffer, parsePos, validLen);
+                        }
+
+                        writePos = tmpRecvBuffer + validLen;
+                        parsePos = tmpRecvBuffer;
+                    }
+                }
+                else
+                {
+                    break;
                 }
             }
         }
     }
 
-    int leftlen = recvBufferWritePos - bufferParseStart;
+    /*剩余未解析的数据大小*/
+    const int leftlen = writePos - parsePos;
     if (leftlen > 0)
     {
-        /*  表示有剩余未解析数据,需要拷贝到内置缓冲区   */
-        if (leftlen > ox_buffer_getsize(mRecvBuffer))
+        if ((leftlen > ox_buffer_getwritevalidcount(mRecvBuffer)) && (leftlen + ox_buffer_getreadvalidcount(mRecvBuffer)) <= RECVBUFFER_SIZE)
         {
-            struct buffer_s* newbuffer = ox_buffer_new(leftlen);
+            /*如果此次需要拷贝的数据大于剩余内置缓冲区大小，（且新分配大小在16k以内,避免而已客户端发送错误packet，导致服务器分配超大内存)则重新分配内置缓冲区*/
+            struct buffer_s* newbuffer = ox_buffer_new(leftlen + ox_buffer_getreadvalidcount(mRecvBuffer));
+            ox_buffer_write(newbuffer, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
             ox_buffer_delete(mRecvBuffer);
             mRecvBuffer = newbuffer;
         }
 
-        ox_buffer_write(mRecvBuffer, tmpRecvBuffer + bufferParseStart, leftlen);
+        ox_buffer_write(mRecvBuffer, parsePos, leftlen);
     }
 
     if (must_close)
@@ -254,6 +287,10 @@ void DataSocket::recv()
         /*  回调到用户层  */
         tryOnClose();
     }
+    
+    assert(leftlen >= 0);
+    assert(parsePos <= recvEndPos);
+    assert(writePos <= recvEndPos);
 }
 
 void DataSocket::flush()
@@ -532,6 +569,11 @@ bool    DataSocket::checkRead()
         if (ret == -1)
         {
             check_ret = GetLastError() == WSA_IO_PENDING;
+            if (!check_ret)
+            {
+                DWORD er = GetLastError();
+                std::cout << "Error : " << GetLastError() << std::endl;
+            }
         }
 
         if (check_ret)

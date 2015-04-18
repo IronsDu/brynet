@@ -215,31 +215,37 @@ void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)
 {
     union  SessionId sid;
     sid.id = id;
+    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    {
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
 
-    mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
+            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
+            if (ds != nullptr && ds->getUserData() == sid.id)
+            {
+                ds->sendPacket(packet);
+            }
 
-        DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
-        if (ds != nullptr && ds->getUserData() == sid.id)
-        {
-            ds->sendPacket(packet);
-        }
-
-    });
+        });
+    }
 }
 
 void TcpServer::disConnect(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
+    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    {
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
 
-    mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
-
-        DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
-        if (ds != nullptr && ds->getUserData() == sid.id)
-        {
-            ds->postDisConnect();
-        }
-    });
+            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
+            if (ds != nullptr && ds->getUserData() == sid.id)
+            {
+                ds->postDisConnect();
+            }
+        });
+    }
 }
 
 void TcpServer::closeService()
@@ -338,8 +344,11 @@ void TcpServer::wakeup(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
-
-    mLoops[sid.data.loopIndex].wakeup();
+    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    {
+        mLoops[sid.data.loopIndex].wakeup();
+    }
 }
 
 void TcpServer::wakeupAll()
