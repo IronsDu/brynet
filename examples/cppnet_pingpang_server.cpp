@@ -13,7 +13,7 @@
 
 #include "eventloop.h"
 #include "datasocket.h"
-#include "TCPServer.h"
+#include "TCPService.h"
 #include "msgqueue.h"
 
 enum NetMsgType

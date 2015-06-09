@@ -33,12 +33,12 @@ void SSL_init()
 
 void sendpacket(DataSocket::PTR ds, const char* value, int len)
 {
-    FixedPacket<16*1024> packet;
+    FixedPacket<16 * 1024> packet;
     packet.setOP(1);
     packet.writeINT64((int64_t)ds.get());
     if (value != nullptr)
     {
-        packet.writeBuffer(value, len);
+        packet.writeBinary(value, len);
     }
     packet.end();
     ds->send(packet.getData(), packet.getLen());

@@ -14,7 +14,7 @@
 #include "eventloop.h"
 #include "datasocket.h"
 
-#include "TCPServer.h"
+#include "TCPService.h"
 
 static int sDefaultLoopTimeOutMS = 100;
 
