@@ -1,6 +1,7 @@
 #include <iostream>
 #include <assert.h>
 
+#include "socketlibfunction.h"
 #include "socketlibtypes.h"
 #include "eventloop.h"
 #include "buffer.h"
@@ -16,9 +17,9 @@ DataSocket::DataSocket(int fd)
     mCanWrite = true;
 
 #ifdef PLATFORM_WINDOWS
-    memset(&mOvlRecv, sizeof(mOvlRecv), 0);
-    memset(&mOvlSend, sizeof(mOvlSend), 0);
-    memset(&mOvlClose, sizeof(mOvlClose), 0);
+    memset(&mOvlRecv, 0, sizeof(mOvlRecv));
+    memset(&mOvlSend, 0, sizeof(mOvlSend));
+    memset(&mOvlClose, 0, sizeof(mOvlClose));
 
     mOvlRecv.base.Offset = EventLoop::OVL_RECV;
     mOvlSend.base.Offset = EventLoop::OVL_SEND;
@@ -29,8 +30,9 @@ DataSocket::DataSocket(int fd)
     mPostClose = false;
 #endif
 
-    mDisConnectHandle = nullptr;
-    mDataHandle = nullptr;
+    mEnterCallback = nullptr;
+    mDisConnectCallback = nullptr;
+    mDataCallback = nullptr;
     mUserData = -1;
 
     mRecvBuffer = ox_buffer_new(1024);
@@ -64,26 +66,25 @@ DataSocket::~DataSocket()
 
     _procCloseSocket();
 }
-    
 
-void DataSocket::setNoBlock()
-{
-    unsigned long ul = true;
-#ifdef PLATFORM_WINDOWS
-    ioctlsocket(mFD, FIONBIO, &ul);
-#else
-    ioctl(mFD, FIONBIO, &ul);
-#endif
-}
-
-void DataSocket::setEventLoop(EventLoop* el)
+void DataSocket::onEnterEventLoop(EventLoop* el)
 {
     if (mEventLoop == nullptr)
     {
         mEventLoop = el;
-        if (!checkRead())
+
+        ox_socket_nonblock(mFD);
+        mEventLoop->addChannel(mFD, shared_from_this());
+        mEventLoop->linkChannel(mFD, this);
+        
+        if (checkRead())
         {
-            tryOnClose();
+            mEnterCallback(shared_from_this());
+        }
+        else
+        {
+            mEventLoop->removeChannel(mFD);
+            onClose();
         }
     }
 }
@@ -102,20 +103,10 @@ void DataSocket::sendPacket(const PACKET_PTR& packet)
     });
 }
 
-void DataSocket::sendPacket(PACKET_PTR& packet)
-{
-    mEventLoop->pushAsyncProc([this, packet](){
-        mSendList.push_back({ packet, packet->size()});
-        runAfterFlush();
-    });
-}
-
 void DataSocket::sendPacket(PACKET_PTR&& packet)
 {
     sendPacket(packet);
 }
-
-/*  TODO::此类中pushAfterLoopProc的调用是否可以换为立即处理,这样或许也能让EventLoop的loop编写更简单    */
 
 void    DataSocket::canRecv()
 {
@@ -149,6 +140,27 @@ void DataSocket::runAfterFlush()
 
         mIsPostFlush = true;
     }
+}
+
+void DataSocket::procCloseInLoop()
+{
+#ifdef PLATFORM_WINDOWS
+    if (mPostWriteCheck || mPostRecvCheck)
+    {
+        if (!mPostClose)
+        {
+            _procCloseSocket();
+            PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
+            mPostClose = true;
+        }
+    }
+    else
+    {
+        onClose();
+    }
+#else
+    onClose();
+#endif
 }
 
 void DataSocket::freeSendPacketList()
@@ -237,10 +249,10 @@ void DataSocket::recv()
         }
         else
         {
-            if (mDataHandle != nullptr)
+            if (mDataCallback != nullptr)
             {
                 writePos += retlen;
-                int proclen = mDataHandle(this, parsePos, writePos - parsePos);
+                int proclen = mDataCallback(shared_from_this(), parsePos, writePos - parsePos);
                 assert(proclen >= 0);
                 if (proclen >= 0 && proclen <= (writePos - parsePos))
                 {
@@ -285,7 +297,7 @@ void DataSocket::recv()
     if (must_close)
     {
         /*  回调到用户层  */
-        tryOnClose();
+        procCloseInLoop();
     }
     
     assert(leftlen >= 0);
@@ -419,7 +431,7 @@ SEND_PROC:
 
     if (must_close)
     {
-        tryOnClose();
+        procCloseInLoop();
     }
 }
 
@@ -500,36 +512,24 @@ SEND_PROC:
 
     if (must_close)
     {
-        tryOnClose();
+        procCloseInLoop();
     }
-#endif
-}
-
-void DataSocket::tryOnClose()
-{
-#ifdef PLATFORM_WINDOWS
-    /*  windows下需要没有投递过任何IOCP请求才能真正处理close,否则等待所有通知到达*/
-    if (!mPostWriteCheck && !mPostRecvCheck && !mPostClose)
-    {
-        onClose();
-    }
-#else
-    onClose();
 #endif
 }
 
 void DataSocket::onClose()
 {
+    int tmpFD = mFD;
     _procCloseSocket();
 
-    if (mDisConnectHandle != nullptr)
+    if (mDisConnectCallback != nullptr)
     {
-        /*  投递的lambda函数绑定的是一个mDisConnectHandle的拷贝，它的闭包值也会拷贝，避免了lambda执行时删除DataSocket*后则造成
-        mDisConnectHandle析构，然后闭包变量就失效的宕机问题  */
-        DISCONNECT_HANDLE temp = mDisConnectHandle;
-        mDisConnectHandle = nullptr;
-        mEventLoop->pushAfterLoopProc([temp, this](){
-            temp(this);
+        DISCONNECT_CALLBACK temp = mDisConnectCallback;
+        DataSocket::PTR thisPtr = shared_from_this();
+        mDisConnectCallback = nullptr;
+        mEventLoop->pushAfterLoopProc([=](){
+            temp(thisPtr);
+            mEventLoop->removeChannel(tmpFD);
         });
     }
 }
@@ -541,13 +541,7 @@ void DataSocket::_procCloseSocket()
         freeSendPacketList();
 
         mCanWrite = false;
-
-        #ifdef PLATFORM_WINDOWS
-        closesocket(mFD);
-        #else
-        close(mFD);
-        #endif
-
+        ox_socket_close(mFD);
         mFD = SOCKET_ERROR;
     }
 }
@@ -626,35 +620,30 @@ void    DataSocket::removeCheckWrite()
 }
 #endif
 
-void DataSocket::setDataHandle(DATA_HANDLE proc)
+void DataSocket::setEnterCallback(ENTER_CALLBACK cb)
 {
-    mDataHandle = proc;
+    mEnterCallback = cb;
 }
 
-void DataSocket::setDisConnectHandle(DISCONNECT_HANDLE proc)
+void DataSocket::setDataCallback(DATA_CALLBACK cb)
 {
-    mDisConnectHandle = proc;
+    mDataCallback = cb;
+}
+
+void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
+{
+    mDisConnectCallback = cb;
 }
 
 void DataSocket::postDisConnect()
 {
-#ifdef PLATFORM_WINDOWS
-    if (mPostWriteCheck || mPostRecvCheck)
+    if (mEventLoop != nullptr)
     {
-        if (!mPostClose)
-        {
-            _procCloseSocket();
-            PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
-            mPostClose = true;
-        }
+        DataSocket::PTR tmp = shared_from_this();
+        mEventLoop->pushAsyncProc([=](){
+            tmp->procCloseInLoop();
+        });
     }
-    else
-    {
-        onClose();
-    }
-#else
-    onClose();
-#endif
 }
 
 void DataSocket::setUserData(int64_t value)

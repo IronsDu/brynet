@@ -43,37 +43,33 @@ private:
 #endif
 };
 
-class TcpServer
+//TODO::基于id的回调，是否让用户写逻辑时，比较麻烦，因为用户很可能会再构建一个对象管理器
+class TcpService
 {
     typedef std::function<void (EventLoop&)>                            FRAME_CALLBACK;
-    typedef std::function<void(int64_t, std::string)>                   CONNECTION_ENTER_HANDLE;
-    typedef std::function<void(int64_t)>                                DISCONNECT_HANDLE;
-    typedef std::function<int (int64_t, const char* buffer, int len)>   DATA_HANDLE;
+    typedef std::function<void(int64_t, std::string)>                   ENTER_CALLBACK;
+    typedef std::function<void(int64_t)>                                DISCONNECT_CALLBACK;
+    typedef std::function<int (int64_t, const char* buffer, int len)>   DATA_CALLBACK;
 
 public:
-    TcpServer();
-    ~TcpServer();
+    TcpService();
+    ~TcpService();
 
     /*  设置默认事件回调    */
-    void                                setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle);
-    void                                setDisconnectHandle(TcpServer::DISCONNECT_HANDLE handle);
-    void                                setMsgHandle(TcpServer::DATA_HANDLE handle);
-
-    TcpServer::CONNECTION_ENTER_HANDLE  getEnterHandle();
-    TcpServer::DISCONNECT_HANDLE        getDisConnectHandle();
-    TcpServer::DATA_HANDLE              getDataHandle();
+    void                                setEnterCallback(TcpService::ENTER_CALLBACK callback);
+    void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
+    void                                setDataCallback(TcpService::DATA_CALLBACK callback);
 
     void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
-    void                                send(int64_t id, DataSocket::PACKET_PTR& packet);
+    void                                send(int64_t id, const DataSocket::PACKET_PTR& packet);
 
     /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
     void                                disConnect(int64_t id);
 
-    /*  主动添加一个连接到任意IOLoop并指定事件回调, TODO::DataSocket* channel的生命周期管理   */
-    void                                addDataSocket(int fd, DataSocket* channel, 
-                                                        TcpServer::CONNECTION_ENTER_HANDLE enterHandle,
-                                                        TcpServer::DISCONNECT_HANDLE disHandle,
-                                                        TcpServer::DATA_HANDLE msgHandle);
+    void                                addDataSocket(int fd, DataSocket::PTR datasocket,
+                                                        TcpService::ENTER_CALLBACK enterCallback,
+                                                        TcpService::DISCONNECT_CALLBACK disConnectCallback,
+                                                        TcpService::DATA_CALLBACK dataCallback);
 
     /*  开启监听线程  */
     void                                startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
@@ -98,7 +94,7 @@ public:
 private:
     int64_t                             MakeID(int loopIndex);
 
-    void                                _procDataSocketClose(DataSocket*);
+    void                                procDataSocketClose(DataSocket::PTR);
 
 private:
     EventLoop*                          mLoops;
@@ -108,13 +104,13 @@ private:
 
     ListenThread                        mListenThread;
 
-    TypeIDS<DataSocket>*                mIds;
+    TypeIDS<DataSocket::PTR>*           mIds;
     int*                                mIncIds;
 
     /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
-    TcpServer::CONNECTION_ENTER_HANDLE  mEnterHandle;
-    TcpServer::DISCONNECT_HANDLE        mDisConnectHandle;
-    TcpServer::DATA_HANDLE              mDataHandle;
+    TcpService::ENTER_CALLBACK           mEnterCallback;
+    TcpService::DISCONNECT_CALLBACK      mDisConnectCallback;
+    TcpService::DATA_CALLBACK            mDataCallback;
 
     /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
     

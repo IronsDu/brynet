@@ -14,6 +14,7 @@
 #include "eventloop.h"
 #include "datasocket.h"
 #include "timer.h"
+#include "httprequest.h"
 
 using namespace std;
 
@@ -29,28 +30,12 @@ void SSL_init()
 #endif
 }
 
-typedef std::shared_ptr<DataSocket> SHARED_DATASOCKET;
 
-static void fuck_send(TimerMgr* tm, std::weak_ptr<SHARED_DATASOCKET> ds, const char* buffer, int len)
+void sendpacket(DataSocket::PTR ds, const char* value, int len)
 {
-    std::shared_ptr<SHARED_DATASOCKET> tmp = ds.lock();
-    if (tmp)
-    {
-        tmp->get()->send(buffer, len);
-        tm->AddTimer(60, fuck_send, tm, ds, buffer, len);
-    }
-    else
-    {
-        cout << "haha" << endl;
-    }
-}
-
-
-void sendpacket(DataSocket* ds, const char* value, int len)
-{
-    FixedPacket<128> packet;
+    FixedPacket<16*1024> packet;
     packet.setOP(1);
-    packet.writeINT64((int64_t)ds);
+    packet.writeINT64((int64_t)ds.get());
     if (value != nullptr)
     {
         packet.writeBuffer(value, len);
@@ -117,7 +102,7 @@ int main()
             for (int i = 0; i < client_num; i++)
             {
                 /*int client = ox_socket_connect("180.97.33.107", port_num);*/
-                int client = ox_socket_nonblockconnect("180.97.33.107", port_num);
+                int client = ox_socket_connect("180.97.33.107", port_num);
                 if (client == SOCKET_ERROR)
                 {
                     printf("error : %d \n", sErrno);
@@ -127,11 +112,10 @@ int main()
                 int setret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
                 std::cout << setret << std::endl;
 
-                DataSocket* pClient = new DataSocket(client);
-                pClient->setupConnectSSL();
+                DataSocket::PTR pClient = std::make_shared<DataSocket>(client);
+                pClient->setEnterCallback([&](DataSocket::PTR ds){
+                    cout << " on enter " << endl;
 
-                clientEventLoop.addChannel(client, pClient, [&](Channel* arg){
-                    DataSocket* ds = static_cast<DataSocket*>(arg);
                     /*  发送消息    */
                     HttpRequest hr;
                     hr.setHost("www.baidu.com");
@@ -140,15 +124,18 @@ int main()
                     ds->send(hr.getResult().c_str(), hr.getResult().size());
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                    ds->setDataHandle([](DataSocket* ds, const char* buffer, int len){
+                    ds->setDataCallback([](DataSocket::PTR ds, const char* buffer, int len){
+                        cout << "recv data" << endl;
                         ds->send(buffer, len);
                         return len;
                     });
 
-                    ds->setDisConnectHandle([](DataSocket* arg){
-                        delete arg;
+                    ds->setDisConnectCallback([](DataSocket::PTR arg){
+                        cout << "on close" << endl;
                     });
                 });
+
+                clientEventLoop.pushAsyncChannel(pClient);
             }
 #else
             for (int i = 0; i < client_num; i++)
@@ -164,14 +151,9 @@ int main()
                 int setret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
                 std::cout << setret << std::endl;
 
-                DataSocket* pClient = new DataSocket(client);
+                DataSocket::PTR pClient = std::make_shared<DataSocket>(client);
+                pClient->setEnterCallback([&](DataSocket::PTR ds){
 
-                clientEventLoop.addChannel(client, pClient, [&](Channel* arg){
-                    DataSocket* ds = static_cast<DataSocket*>(arg);
-                    
-                    shared_ptr<SHARED_DATASOCKET> tmp = std::make_shared<SHARED_DATASOCKET>();
-                    tmp->reset(ds);
-                    
                     if (true)
                     {
                         sendpacket(ds, senddata, packet_len);
@@ -184,12 +166,11 @@ int main()
                             {
                                 ds->send(senddata, packet_len);
                             }
-                            //fuck_send(&tm, tmp, senddata, packet_len);
                         }
                     }
 
                     /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                    ds->setDataHandle([&total_recv](DataSocket* ds, const char* buffer, int len){
+                    ds->setDataCallback([&total_recv](DataSocket::PTR ds, const char* buffer, int len){
                         const char* parse_str = buffer;
                         int total_proc_len = 0;
                         int left_len = len;
@@ -203,12 +184,14 @@ int main()
                                 uint16_t packet_len = rp.readINT16();
                                 if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
                                 {
+                                    total_recv += packet_len;
+
                                     ReadPacket rp(parse_str, packet_len);
                                     rp.readINT16();
                                     rp.readINT16();
                                     int64_t addr = rp.readINT64();
 
-                                    if (addr == (int64_t)ds)
+                                    if (addr == (int64_t)(ds.get()))
                                     {
                                         ds->send(parse_str, packet_len);
                                     }
@@ -229,10 +212,11 @@ int main()
                         return total_proc_len;
                     });
 
-                    ds->setDisConnectHandle([tmp](DataSocket* arg){
-                        tmp->reset();
+                    ds->setDisConnectCallback([](DataSocket::PTR arg){
                     });
                 });
+
+                clientEventLoop.pushAsyncChannel(pClient);
             }
 #endif
 

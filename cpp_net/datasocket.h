@@ -23,25 +23,29 @@ extern "C" {
 class EventLoop;
 struct buffer_s;
 
-class DataSocket : public Channel
+class DataSocket : public Channel, public std::enable_shared_from_this<DataSocket>
 {
 public:
-    typedef std::function<int (DataSocket*, const char* buffer, int len)>    DATA_HANDLE;
-    typedef std::function<void(DataSocket*)>                                 DISCONNECT_HANDLE;
-    typedef std::shared_ptr<std::string>                                     PACKET_PTR;
+    typedef std::shared_ptr<DataSocket>                                         PTR;
+
+    typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
+    typedef std::function<int(PTR, const char* buffer, int len)>                DATA_CALLBACK;
+    typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
+
+    typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
 public:
-    DataSocket(int fd);
+    explicit DataSocket(int fd);
     ~DataSocket();
 
     void                            send(const char* buffer, int len);
 
     void                            sendPacket(const PACKET_PTR&);
-    void                            sendPacket(PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&&);
 
-    void                            setDataHandle(DATA_HANDLE proc);
-    void                            setDisConnectHandle(DISCONNECT_HANDLE proc);
+    void                            setEnterCallback(ENTER_CALLBACK cb);
+    void                            setDataCallback(DATA_CALLBACK cb);
+    void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
     /*主动(请求)断开连接*/
     void                            postDisConnect();
@@ -56,8 +60,7 @@ public:
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
-    void                            setNoBlock() override;
-    void                            setEventLoop(EventLoop* el) override;
+    void                            onEnterEventLoop(EventLoop* el) override;
 
     void                            canRecv() override;
     void                            canSend() override;
@@ -70,10 +73,9 @@ private:
     void                            normalFlush();
     void                            quickFlush();
 
-    /*此函数主要为了在windows下尝试调用onClose*/
-    void                            tryOnClose();
     void                            onClose() override;
     void                            _procCloseSocket();
+    void                            procCloseInLoop();
 
     void                            runAfterFlush();
 
@@ -115,8 +117,9 @@ private:
 
     bool                            mCanWrite;          /*  socket是否可写  */
 
-    DATA_HANDLE                     mDataHandle;
-    DISCONNECT_HANDLE               mDisConnectHandle;
+    ENTER_CALLBACK                  mEnterCallback;
+    DATA_CALLBACK                   mDataCallback;
+    DISCONNECT_CALLBACK             mDisConnectCallback;
 
     bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
 

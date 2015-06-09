@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <thread>
 
+#include "socketlibfunction.h"
 #include "channel.h"
 #include "eventloop.h"
 
@@ -35,7 +36,7 @@ private:
     {
     }
 
-    void    setEventLoop(EventLoop*) override
+    void    onEnterEventLoop(EventLoop*) override
     {
     }
 
@@ -58,7 +59,7 @@ EventLoop::EventLoop()
             "GetQueuedCompletionStatusEx");
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
-    memset(&mWakeupOvl, sizeof(mWakeupOvl), 0);
+    memset(&mWakeupOvl, 0, sizeof(mWakeupOvl));
     mWakeupOvl.Offset = EventLoop::OVL_RECV; 
     mWakeupChannel = new WakeupChannel(-1);
 #else
@@ -248,11 +249,18 @@ bool EventLoop::wakeup()
             /*多个线程使用互斥锁判断mIsAlreadyPostedWakeUp标志，以保证不重复投递*/
             if (!mIsAlreadyPostedWakeUp)
             {
-                mFlagMutex.lock();
+                bool tmp = false;
 
+                mFlagMutex.lock();
                 if (!mIsAlreadyPostedWakeUp)
                 {
                     mIsAlreadyPostedWakeUp = true;
+                    tmp = true;
+                }
+                mFlagMutex.unlock();
+
+                if (tmp)
+                {
 #ifdef PLATFORM_WINDOWS
                     PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, &mWakeupOvl);
 #else
@@ -261,8 +269,6 @@ bool EventLoop::wakeup()
 #endif
                     ret = true;
                 }
-
-                mFlagMutex.unlock();
             }
         }
     }
@@ -282,14 +288,10 @@ void EventLoop::linkChannel(int fd, Channel* ptr)
 #endif
 }
 
-void EventLoop::addChannel(int fd, Channel* c, CHANNEL_ENTER_HANDLE f)
+void EventLoop::pushAsyncChannel(CHANNEL_PTR channel)
 {
-    /*  TODO::此处相关处理以及Channel接口设计太麻烦,不够简洁   */
-    pushAsyncProc([fd, c, this, f] () {
-        c->setNoBlock();
-        linkChannel(fd, c);
-        c->setEventLoop(this);
-        f(c);
+    pushAsyncProc([channel, this]() {
+        channel->onEnterEventLoop(this);
     });
 }
 
@@ -312,7 +314,6 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
 
 void EventLoop::pushAsyncProc(USER_PROC&& f)
 {
-    CurrentThread::THREAD_ID_TYPE fuck = CurrentThread::tid();
     if (!isInLoopThread())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
@@ -341,6 +342,17 @@ void EventLoop::pushAfterLoopProc(USER_PROC&& f)
 void EventLoop::restoreThreadID()
 {
     mSelfThreadid = CurrentThread::tid();
+}
+
+void EventLoop::addChannel(int fd, CHANNEL_PTR channel)
+{
+    assert(mChannels.find(fd) == mChannels.end());
+    mChannels[fd] = channel;
+}
+
+void EventLoop::removeChannel(int fd)
+{
+    mChannels.erase(fd);
 }
 
 #ifdef PLATFORM_WINDOWS

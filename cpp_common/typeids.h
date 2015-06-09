@@ -33,25 +33,32 @@ public:
         mIds.push_back(id);
     }
 
-    void        set(T* t, size_t id)
+    bool        set(T t, size_t id)
     {
         assert(id >= 0 && id < mValues.size());
         if (id >= 0 && id < mValues.size())
         {
             mValues[id] = t;
+            return true;
+        }
+        else
+        {
+            return false; 
         }
     }
 
-    T*          get(size_t id)
+    bool          get(size_t id, T& out)
     {
-        T* ret = nullptr;
         assert(id >= 0 && id < mValues.size());
         if (id >= 0 && id < mValues.size())
         {
-            ret = mValues[id];
+            out = mValues[id];
+            return true;
         }
-
-        return ret;
+        else
+        {
+            return false;
+        }
     }
 
 private:
@@ -79,7 +86,7 @@ private:
     }
 
 private:
-    std::vector<T*>     mValues;
+    std::vector<T>      mValues;
     std::vector<size_t> mIds;
 };
 

@@ -16,6 +16,8 @@
 
 #include "TCPServer.h"
 
+static int sDefaultLoopTimeOutMS = 100;
+
 ListenThread::ListenThread()
 {
     mAcceptCallback = nullptr;
@@ -156,7 +158,7 @@ void ListenThread::RunListen()
     }
 }
 
-TcpServer::TcpServer()
+TcpService::TcpService()
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
     mLoops = nullptr;
@@ -164,54 +166,39 @@ TcpServer::TcpServer()
     mIds = nullptr;
     mIncIds = nullptr;
 
-    mEnterHandle = nullptr;
-    mDisConnectHandle = nullptr;
-    mDataHandle = nullptr;
+    mEnterCallback = nullptr;
+    mDisConnectCallback = nullptr;
+    mDataCallback = nullptr;
 
     mRunIOLoop = false;
 }
 
-TcpServer::~TcpServer()
+TcpService::~TcpService()
 {
     closeService();
 }
 
-void TcpServer::setEnterHandle(TcpServer::CONNECTION_ENTER_HANDLE handle)
+void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK callback)
 {
-    mEnterHandle = handle;
+    mEnterCallback = callback;
 }
 
-void TcpServer::setDisconnectHandle(TcpServer::DISCONNECT_HANDLE handle)
+void TcpService::setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback)
 {
-    mDisConnectHandle = handle;
+    mDisConnectCallback = callback;
 }
 
-void TcpServer::setMsgHandle(TcpServer::DATA_HANDLE handle)
+void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
 {
-    mDataHandle = handle;
+    mDataCallback = callback;
 }
 
-TcpServer::CONNECTION_ENTER_HANDLE TcpServer::getEnterHandle()
-{
-    return mEnterHandle;
-}
-
-TcpServer::DISCONNECT_HANDLE TcpServer::getDisConnectHandle()
-{
-    return mDisConnectHandle;
-}
-
-TcpServer::DATA_HANDLE TcpServer::getDataHandle()
-{
-    return mDataHandle;
-}
-
-void TcpServer::send(int64_t id, DataSocket::PACKET_PTR&& packet)
+void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet)
 {
     send(id, packet);
 }
 
-void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)
+void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet)
 {
     union  SessionId sid;
     sid.id = id;
@@ -219,18 +206,19 @@ void TcpServer::send(int64_t id, DataSocket::PACKET_PTR& packet)
     if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
     {
         mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
-
-            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
-            if (ds != nullptr && ds->getUserData() == sid.id)
+            DataSocket::PTR tmp = nullptr;
+            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
             {
-                ds->sendPacket(packet);
+                if (tmp != nullptr && tmp->getUserData() == sid.id)
+                {
+                    tmp->sendPacket(packet);
+                }
             }
-
         });
     }
 }
 
-void TcpServer::disConnect(int64_t id)
+void TcpService::disConnect(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
@@ -238,28 +226,30 @@ void TcpServer::disConnect(int64_t id)
     if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
     {
         mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
-
-            DataSocket* ds = mIds[sid.data.loopIndex].get(sid.data.index);
-            if (ds != nullptr && ds->getUserData() == sid.id)
+            DataSocket::PTR tmp = nullptr;
+            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
             {
-                ds->postDisConnect();
+                if (tmp != nullptr && tmp->getUserData() == sid.id)
+                {
+                    tmp->postDisConnect();
+                }
             }
         });
     }
 }
 
-void TcpServer::closeService()
+void TcpService::closeService()
 {
     closeListenThread();
     closeWorkerThread();
 }
 
-void TcpServer::closeListenThread()
+void TcpService::closeListenThread()
 {
     mListenThread.closeListenThread();
 }
 
-void TcpServer::closeWorkerThread()
+void TcpService::closeWorkerThread()
 {
     stopWorkerThread();
 
@@ -271,7 +261,7 @@ void TcpServer::closeWorkerThread()
     mIds = nullptr;
 }
 
-void TcpServer::stopWorkerThread()
+void TcpService::stopWorkerThread()
 {
     if (mLoops != nullptr)
     {
@@ -296,21 +286,21 @@ void TcpServer::stopWorkerThread()
     }
 }
 
-void TcpServer::startListen(int port, const char *certificate, const char *privatekey)
+void TcpService::startListen(int port, const char *certificate, const char *privatekey)
 {
     mListenThread.startListen(port, certificate, privatekey, [this](int fd){
-        DataSocket* channel = new DataSocket(fd);
+        DataSocket::PTR channel = std::make_shared<DataSocket>(fd);
 #ifdef USE_OPENSSL
         if (mListenThread.getOpenSSLCTX() != nullptr)
         {
             channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
         }
 #endif
-        addDataSocket(fd, channel, mEnterHandle, mDisConnectHandle, mDataHandle);
+        addDataSocket(fd, channel, mEnterCallback, mDisConnectCallback, mDataCallback);
     });
 }
 
-void TcpServer::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
+void TcpService::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
 {
     if (mLoops == nullptr)
     {
@@ -318,9 +308,12 @@ void TcpServer::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
         mLoops = new EventLoop[threadNum];
         mIOThreads = new std::thread*[threadNum];
         mLoopNum = threadNum;
-        mIds = new TypeIDS<DataSocket>[threadNum];
+        mIds = new TypeIDS<DataSocket::PTR>[threadNum];
         mIncIds = new int[threadNum];
-        memset(mIncIds, 0, sizeof(mIncIds[0])*threadNum);
+        for (int i = 0; i < threadNum; ++i)
+        {
+            mIncIds[i] = 0;
+        }
 
         for (int i = 0; i < mLoopNum; ++i)
         {
@@ -329,7 +322,7 @@ void TcpServer::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
                 l.restoreThreadID();
                 while (mRunIOLoop)
                 {
-                    l.loop(100);
+                    l.loop(sDefaultLoopTimeOutMS);
                     if (callback != nullptr)
                     {
                         callback(l);
@@ -340,7 +333,7 @@ void TcpServer::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
     }
 }
 
-void TcpServer::wakeup(int64_t id)
+void TcpService::wakeup(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
@@ -351,7 +344,7 @@ void TcpServer::wakeup(int64_t id)
     }
 }
 
-void TcpServer::wakeupAll()
+void TcpService::wakeupAll()
 {
     for (int i = 0; i < mLoopNum; ++i)
     {
@@ -359,7 +352,7 @@ void TcpServer::wakeupAll()
     }
 }
 
-EventLoop* TcpServer::getRandomEventLoop()
+EventLoop* TcpService::getRandomEventLoop()
 {
     EventLoop* ret = nullptr;
     if (mLoopNum > 0)
@@ -370,7 +363,7 @@ EventLoop* TcpServer::getRandomEventLoop()
     return ret;
 }
 
-int64_t TcpServer::MakeID(int loopIndex)
+int64_t TcpService::MakeID(int loopIndex)
 {
     union SessionId sid;
     sid.data.loopIndex = loopIndex;
@@ -380,7 +373,7 @@ int64_t TcpServer::MakeID(int loopIndex)
     return sid.id;
 }
 
-void TcpServer::_procDataSocketClose(DataSocket* ds)
+void TcpService::procDataSocketClose(DataSocket::PTR ds)
 {
     int64_t id = ds->getUserData();
     union SessionId sid;
@@ -388,43 +381,40 @@ void TcpServer::_procDataSocketClose(DataSocket* ds)
 
     mIds[sid.data.loopIndex].set(nullptr, sid.data.index);
     mIds[sid.data.loopIndex].reclaimID(sid.data.index);
-    delete ds;
 }
 
-void TcpServer::addDataSocket(int fd, DataSocket* channel, 
-                                TcpServer::CONNECTION_ENTER_HANDLE enterHandle,
-                                TcpServer::DISCONNECT_HANDLE disHandle,
-                                TcpServer::DATA_HANDLE msgHandle)
+void TcpService::addDataSocket(int fd, DataSocket::PTR channel,
+                                TcpService::ENTER_CALLBACK enterCallback,
+                                TcpService::DISCONNECT_CALLBACK disConnectCallback,
+                                TcpService::DATA_CALLBACK dataCallback)
 {
+    /*  随机为此链接分配一个eventloop */
     int loopIndex = rand() % mLoopNum;
     EventLoop& loop = mLoops[loopIndex];
-    /*  随机为此链接分配一个eventloop */
-    std::string ip = ox_socket_getipoffd(fd);
-    loop.addChannel(fd, channel, [this, loopIndex, enterHandle, disHandle, msgHandle, ip](Channel* arg){
-        /*  当eventloop接管此链接后，执行此lambda回调    */
-        DataSocket* ds = static_cast<DataSocket*>(arg);
 
+    std::string ip = ox_socket_getipoffd(fd);
+
+    channel->setEnterCallback([this, loopIndex, enterCallback, disConnectCallback, dataCallback, ip](DataSocket::PTR dataSocket){
         int64_t id = MakeID(loopIndex);
         union SessionId sid;
         sid.id = id;
-        mIds[loopIndex].set(ds, sid.data.index);
-        ds->setUserData(id);
-        ds->setDataHandle([this, msgHandle](DataSocket* ds, const char* buffer, int len){
-            return msgHandle(ds->getUserData(), buffer, len);
+        mIds[loopIndex].set(dataSocket, sid.data.index);
+        dataSocket->setUserData(id);
+        dataSocket->setDataCallback([this, dataCallback](DataSocket::PTR ds, const char* buffer, int len){
+            return dataCallback(ds->getUserData(), buffer, len);
         });
 
-        ds->setDisConnectHandle([this, disHandle](DataSocket* arg){
-            /*TODO::这里也需要一开始就保存this指针， delete datasocket之后，此lambda析构，绑定变量失效，所以最后继续访问this就会宕机*/
-            TcpServer::DISCONNECT_HANDLE tmp = disHandle;
-            TcpServer* p = this;
+        dataSocket->setDisConnectCallback([this, disConnectCallback](DataSocket::PTR arg){
             int64_t id = arg->getUserData();
-            p->_procDataSocketClose(arg);
-            tmp(id);
+            procDataSocketClose(arg);
+            disConnectCallback(id);
         });
-        
-        if (enterHandle != nullptr)
+
+        if (enterCallback != nullptr)
         {
-            enterHandle(id, ip);
+            enterCallback(id, ip);
         }
     });
+
+    loop.pushAsyncChannel(channel);
 }

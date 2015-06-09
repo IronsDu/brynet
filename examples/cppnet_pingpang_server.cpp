@@ -74,7 +74,7 @@ int main()
     MsgQueue<NetMsg*>  msgList;
     EventLoop       mainLoop;
 
-    TcpServer t;
+    TcpService t;
     t.startListen(port_num, nullptr, nullptr);
     t.startWorkerThread(thread_num, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
@@ -91,7 +91,7 @@ int main()
         }
     });
 
-    t.setEnterHandle([&](int64_t id, std::string ip){
+    t.setEnterCallback([&](int64_t id, std::string ip){
         if (true)
         {
             NetMsg* msg = new NetMsg(NMT_ENTER, id);
@@ -109,7 +109,7 @@ int main()
         }
     });
 
-    t.setDisconnectHandle([&](int64_t id){
+    t.setDisconnectCallback([&](int64_t id){
         if (true)
         {
             NetMsg* msg = new NetMsg(NMT_CLOSE, id);
@@ -127,7 +127,7 @@ int main()
         }
     });
 
-    t.setMsgHandle([&](int64_t id, const char* buffer, int len){
+    t.setDataCallback([&](int64_t id, const char* buffer, int len){
         const char* parse_str = buffer;
         int total_proc_len = 0;
         int left_len = len;

@@ -6,6 +6,8 @@
 #include <vector>
 #include <mutex>
 #include <thread>
+#include <memory>
+#include <unordered_map>
 
 #include "socketlibtypes.h"
 #include "currentthread.h"
@@ -15,8 +17,9 @@ class Channel;
 class EventLoop
 {
 public:
-    typedef std::function<void(void)>       USER_PROC;
-    typedef std::function<void(Channel*)>   CHANNEL_ENTER_HANDLE;
+    typedef std::shared_ptr<Channel> CHANNEL_PTR;
+
+    typedef std::function<void(void)>           USER_PROC;
 
 #ifdef PLATFORM_WINDOWS
     enum OLV_VALUE
@@ -35,8 +38,7 @@ public:
 
     bool                            wakeup();
 
-    /*  投递一个链接，跟此eventloopEventLoop绑定，当被eventloop处理时会触发f回调, TODO::Channel*的生命周期管理问题(不管是此处处理失败，以及后续Channel close之后)  */
-    void                            addChannel(int fd, Channel*, CHANNEL_ENTER_HANDLE f);
+    void                            pushAsyncChannel(CHANNEL_PTR);
 
     /*  投递一个异步回调，在EventLoop::loop被唤醒后执行 */
     void                            pushAsyncProc(const USER_PROC& f);
@@ -48,6 +50,12 @@ public:
 
     void                            restoreThreadID();
 
+    /*  非线程安全 */
+    void                            addChannel(int fd, CHANNEL_PTR channel);
+    void                            removeChannel(int fd);
+
+    void                            linkChannel(int fd, Channel* ptr);
+
 #ifdef PLATFORM_WINDOWS
     HANDLE                          getIOCPHandle() const;
 #else
@@ -56,7 +64,6 @@ public:
 
 private:
     void                            recalocEventSize(int size);
-    void                            linkChannel(int fd, Channel* ptr);
     void                            processAfterLoopProcs();
     void                            processAsyncProcs();
     bool                            isInLoopThread();
@@ -90,7 +97,8 @@ private:
     std::mutex                      mAsyncProcsMutex;
 
     /*调用loop函数所在thread的id*/
-    CurrentThread::THREAD_ID_TYPE   mSelfThreadid;
+    CurrentThread::THREAD_ID_TYPE           mSelfThreadid;
+    std::unordered_map<int, CHANNEL_PTR>    mChannels;
 };
 
 #endif

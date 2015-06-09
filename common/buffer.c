@@ -35,11 +35,8 @@ ox_buffer_new(int buffer_size)
 
     if(ret != NULL)
     {
-        memset(ret, 0, sizeof(*ret));
-
         if((ret->data = (char*)malloc(sizeof(char)*buffer_size)) != NULL)
         {
-            memset(ret->data, 0, sizeof(char)*buffer_size);
             ret->data_len = buffer_size;
             ret->read_pos = 0;
             ret->write_pos = 0;
@@ -77,7 +74,6 @@ ox_buffer_init(struct buffer_s* self)
 {
     self->read_pos = 0;
     self->write_pos = 0;
-    memset(self->data, 0, self->data_len);
 }
 
 int 
