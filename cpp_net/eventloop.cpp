@@ -58,7 +58,7 @@ EventLoop::EventLoop()
             "GetQueuedCompletionStatusEx");
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
-    memset(&mWakeupOvl, sizeof(mWakeupOvl), 0);
+    memset(&mWakeupOvl, 0, sizeof(mWakeupOvl));
     mWakeupOvl.Offset = EventLoop::OVL_RECV; 
     mWakeupChannel = new WakeupChannel(-1);
 #else
@@ -312,7 +312,6 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
 
 void EventLoop::pushAsyncProc(USER_PROC&& f)
 {
-    CurrentThread::THREAD_ID_TYPE fuck = CurrentThread::tid();
     if (!isInLoopThread())
     {
         /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/

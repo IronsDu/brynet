@@ -16,9 +16,9 @@ DataSocket::DataSocket(int fd)
     mCanWrite = true;
 
 #ifdef PLATFORM_WINDOWS
-    memset(&mOvlRecv, sizeof(mOvlRecv), 0);
-    memset(&mOvlSend, sizeof(mOvlSend), 0);
-    memset(&mOvlClose, sizeof(mOvlClose), 0);
+    memset(&mOvlRecv, 0, sizeof(mOvlRecv));
+    memset(&mOvlSend, 0, sizeof(mOvlSend));
+    memset(&mOvlClose, 0, sizeof(mOvlClose));
 
     mOvlRecv.base.Offset = EventLoop::OVL_RECV;
     mOvlSend.base.Offset = EventLoop::OVL_SEND;
@@ -186,7 +186,6 @@ void DataSocket::recv()
     while (mFD != SOCKET_ERROR)
     {
         const int tryRecvLen = recvEndPos - writePos;
-        assert(tryRecvLen > 0);
         if (tryRecvLen <= 0)
         {
             break;
