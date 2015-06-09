@@ -198,7 +198,6 @@ void DataSocket::recv()
     while (mFD != SOCKET_ERROR)
     {
         const int tryRecvLen = recvEndPos - writePos;
-        assert(tryRecvLen > 0);
         if (tryRecvLen <= 0)
         {
             break;
