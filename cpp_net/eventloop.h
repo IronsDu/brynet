@@ -50,8 +50,9 @@ public:
 
     void                            restoreThreadID();
 
-    /*  非线程安全 */
+    /*  非线程安全,将channel放入容器  */
     void                            addChannel(int fd, CHANNEL_PTR channel);
+    /*  非线程安全,从容器里移除fd对应的channel  */
     void                            removeChannel(int fd);
 
     void                            linkChannel(int fd, Channel* ptr);
@@ -63,9 +64,10 @@ public:
 #endif
 
 private:
-    void                            recalocEventSize(int size);
+    void                            reallocEventSize(int size);
     void                            processAfterLoopProcs();
     void                            processAsyncProcs();
+
     bool                            isInLoopThread();
 private:
     int                             mEventEntriesNum;

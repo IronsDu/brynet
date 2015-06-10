@@ -75,7 +75,7 @@ EventLoop::EventLoop()
     mEventEntries = NULL;
     mEventEntriesNum = 0;
 
-    recalocEventSize(1024);
+    reallocEventSize(1024);
     mSelfThreadid = 0;
 }
 
@@ -190,7 +190,7 @@ void EventLoop::loop(int64_t timeout)
     if (numComplete == mEventEntriesNum)
     {
         /*  如果事件被填充满了，则扩大事件结果队列大小，可以让一次epoll/iocp wait获得尽可能更多的通知 */
-        recalocEventSize(mEventEntriesNum + 128);
+        reallocEventSize(mEventEntriesNum + 128);
     }
 }
 
@@ -367,7 +367,7 @@ int EventLoop::getEpollHandle() const
 }
 #endif
 
-void EventLoop::recalocEventSize(int size)
+void EventLoop::reallocEventSize(int size)
 {
     if (mEventEntries != NULL)
     {

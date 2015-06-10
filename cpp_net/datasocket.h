@@ -47,7 +47,7 @@ public:
     void                            setDataCallback(DATA_CALLBACK cb);
     void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
-    /*主动(请求)断开连接*/
+    /*主动(投递)断开连接,会触发断开回调*/
     void                            postDisConnect();
 
     void                            setUserData(int64_t value);
@@ -74,12 +74,10 @@ private:
     void                            quickFlush();
 
     void                            onClose() override;
-    void                            _procCloseSocket();
+    void                            closeSocket();
     void                            procCloseInLoop();
 
     void                            runAfterFlush();
-
-    void                            freeSendPacketList();
 #ifdef PLATFORM_LINUX
     void                            removeCheckWrite();
 #endif
@@ -98,12 +96,11 @@ private:
 
     bool                            mPostRecvCheck;     /*  是否投递了可读检测   */
     bool                            mPostWriteCheck;    /*  是否投递了可写检测   */
-    bool                            mPostClose;         /*  是否投递了断开socket的(模拟)完成通知  */
 #endif
 
     int                             mFD;
     EventLoop*                      mEventLoop;
-
+    bool                            mIsClose;           /*  此会话是否已经断开连接 */
     buffer_s*                       mRecvBuffer;
 
     struct pending_packet

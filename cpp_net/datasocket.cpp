@@ -8,8 +8,11 @@
 
 #include "datasocket.h"
 
+static int sDefaultRecvBufferSize = 1024;
+
 DataSocket::DataSocket(int fd)
 {
+    mIsClose = false;
     mEventLoop = nullptr;
     mIsPostFlush = false;
     mFD = fd;
@@ -27,7 +30,6 @@ DataSocket::DataSocket(int fd)
 
     mPostRecvCheck = false;
     mPostWriteCheck = false;
-    mPostClose = false;
 #endif
 
     mEnterCallback = nullptr;
@@ -35,7 +37,7 @@ DataSocket::DataSocket(int fd)
     mDataCallback = nullptr;
     mUserData = -1;
 
-    mRecvBuffer = ox_buffer_new(1024);
+    mRecvBuffer = ox_buffer_new(sDefaultRecvBufferSize);
 
 #ifdef USE_OPENSSL
     mSSLCtx = nullptr;
@@ -64,7 +66,7 @@ DataSocket::~DataSocket()
     }
 #endif
 
-    _procCloseSocket();
+    closeSocket();
 }
 
 void DataSocket::onEnterEventLoop(EventLoop* el)
@@ -74,17 +76,12 @@ void DataSocket::onEnterEventLoop(EventLoop* el)
         mEventLoop = el;
 
         ox_socket_nonblock(mFD);
-        mEventLoop->addChannel(mFD, shared_from_this());
         mEventLoop->linkChannel(mFD, this);
         
         if (checkRead())
         {
+            mEventLoop->addChannel(mFD, shared_from_this());
             mEnterCallback(shared_from_this());
-        }
-        else
-        {
-            mEventLoop->removeChannel(mFD);
-            onClose();
         }
     }
 }
@@ -131,7 +128,7 @@ void DataSocket::canSend()
 
 void DataSocket::runAfterFlush()
 {
-    if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
+    if (!mIsPostFlush && !mSendList.empty() && !mIsClose)
     {
         mEventLoop->pushAfterLoopProc([this](){
             mIsPostFlush = false;
@@ -144,28 +141,23 @@ void DataSocket::runAfterFlush()
 
 void DataSocket::procCloseInLoop()
 {
-#ifdef PLATFORM_WINDOWS
-    if (mPostWriteCheck || mPostRecvCheck)
+    if (!mIsClose)
     {
-        if (!mPostClose)
-        {
-            _procCloseSocket();
-            PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
-            mPostClose = true;
-        }
-    }
-    else
-    {
-        onClose();
-    }
-#else
-    onClose();
-#endif
-}
+        mIsClose = true;
 
-void DataSocket::freeSendPacketList()
-{
-    mSendList.clear();
+#ifdef PLATFORM_WINDOWS
+        if (mPostWriteCheck || mPostRecvCheck)  //如果投递了IOCP请求，那么需要投递close，而不能直接调用onClose
+        {
+            PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
+        }
+        else
+        {
+            onClose();
+        }
+#else
+        onClose();
+#endif
+    }
 }
 
 void DataSocket::recv()
@@ -195,7 +187,7 @@ void DataSocket::recv()
         assert(ox_buffer_getwritepos(mRecvBuffer) == 0);
     }
 
-    while (mFD != SOCKET_ERROR)
+    while (!mIsClose)
     {
         const int tryRecvLen = recvEndPos - writePos;
         if (tryRecvLen <= 0)
@@ -306,7 +298,7 @@ void DataSocket::recv()
 
 void DataSocket::flush()
 {
-    if (mCanWrite && mFD != SOCKET_ERROR)
+    if (mCanWrite && !mIsClose)
     {
 #ifdef PLATFORM_WINDOWS
         normalFlush();
@@ -518,27 +510,26 @@ SEND_PROC:
 
 void DataSocket::onClose()
 {
-    int tmpFD = mFD;
-    _procCloseSocket();
-
-    if (mDisConnectCallback != nullptr)
+    if (mFD != SOCKET_ERROR)
     {
-        DISCONNECT_CALLBACK temp = mDisConnectCallback;
+        int tmpFD = mFD;
         DataSocket::PTR thisPtr = shared_from_this();
-        mDisConnectCallback = nullptr;
         mEventLoop->pushAfterLoopProc([=](){
-            temp(thisPtr);
+            if (mDisConnectCallback != nullptr)
+            {
+                mDisConnectCallback(thisPtr);
+            }
             mEventLoop->removeChannel(tmpFD);
         });
+
+        closeSocket();
     }
 }
 
-void DataSocket::_procCloseSocket()
+void DataSocket::closeSocket()
 {
     if (mFD != SOCKET_ERROR)
     {
-        freeSendPacketList();
-
         mCanWrite = false;
         ox_socket_close(mFD);
         mFD = SOCKET_ERROR;
