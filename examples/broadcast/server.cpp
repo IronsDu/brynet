@@ -51,19 +51,12 @@ void    unLockStatistics()
     gTatisticsCppMutex.unlock();
 }
 
-int main()
+int main(int argc, char** argv)
 {
     double total_recv_len = 0;
     double  packet_num = 0;
 
-    int thread_num;
-
-    std::cout << "enter tcp server eventloop thread num:";
-    std::cin >> thread_num;
-
-    int port_num;
-    std::cout << "enter port:";
-    std::cin >> port_num;
+    int port_num = atoi(argv[1]);
 
     ox_socket_init();
     
@@ -76,55 +69,34 @@ int main()
 
     TcpService t;
     t.startListen(port_num, nullptr, nullptr);
-    t.startWorkerThread(thread_num, [&](EventLoop& l){
+    t.startWorkerThread(1, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
-        if (true)
-        {
-            lockStatistics();
-            msgList.ForceSyncWrite();
-            unLockStatistics();
+        lockStatistics();
+        msgList.ForceSyncWrite();
+        unLockStatistics();
 
-            if (msgList.SharedListSize() > 0)
-            {
-                mainLoop.wakeup();
-            }
+        if (msgList.SharedListSize() > 0)
+        {
+            mainLoop.wakeup();
         }
     });
 
     t.setEnterCallback([&](int64_t id, std::string ip){
-        if (true)
-        {
-            NetMsg* msg = new NetMsg(NMT_ENTER, id);
-            lockStatistics();
-            msgList.Push(msg);
-            unLockStatistics();
+        NetMsg* msg = new NetMsg(NMT_ENTER, id);
+        lockStatistics();
+        msgList.Push(msg);
+        unLockStatistics();
 
-            mainLoop.wakeup();
-        }
-        else
-        {
-            lockStatistics();
-            total_client_num++;
-            unLockStatistics();
-        }
+        mainLoop.wakeup();
     });
 
     t.setDisconnectCallback([&](int64_t id){
-        if (true)
-        {
-            NetMsg* msg = new NetMsg(NMT_CLOSE, id);
-            lockStatistics();
-            msgList.Push(msg);
-            unLockStatistics();
+        NetMsg* msg = new NetMsg(NMT_CLOSE, id);
+        lockStatistics();
+        msgList.Push(msg);
+        unLockStatistics();
 
-            mainLoop.wakeup();
-        }
-        else
-        {
-            lockStatistics();
-            total_client_num--;
-            unLockStatistics();
-        }
+        mainLoop.wakeup();
     });
 
     t.setDataCallback([&](int64_t id, const char* buffer, int len){
@@ -141,24 +113,11 @@ int main()
                 uint16_t packet_len = rp.readINT16();
                 if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
                 {
-                    if (true)
-                    {
-                        NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
-                        msg->setData(parse_str, packet_len);
-                        lockStatistics();
-                        msgList.Push(msg);
-                        unLockStatistics();
-
-                        mainLoop.wakeup();
-                    }
-                    else
-                    {
-                        t.send(id, DataSocket::makePacket(parse_str, packet_len));
-                        lockStatistics();
-                        total_recv_len += packet_len;
-                        packet_num++;
-                        unLockStatistics();
-                    }
+                    NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
+                    msg->setData(parse_str, packet_len);
+                    lockStatistics();
+                    msgList.Push(msg);
+                    unLockStatistics();
 
                     total_proc_len += packet_len;
                     parse_str += packet_len;
@@ -206,20 +165,10 @@ int main()
                 }
                 else if (msg->mType == NMT_RECV_DATA)
                 {
-                    if (true)
+                    DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
+                    for (int i = 0; i < sessions.size(); ++i)
                     {
-                        DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
-                        for (int i = 0; i < sessions.size(); ++i)
-                        {
-                            t.send(sessions[i], packet);
-                            total_recv_len += msg->mData.size();
-                            packet_num++;
-                        }
-                    }
-                    else
-                    {
-                        DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
-                        t.send(msg->mID, packet);
+                        t.send(sessions[i], packet);
                         total_recv_len += msg->mData.size();
                         packet_num++;
                     }
