@@ -46,6 +46,9 @@ private:
 //TODO::基于id的回调，是否让用户写逻辑时，比较麻烦，因为用户很可能会再构建一个对象管理器
 class TcpService
 {
+public:
+    typedef std::shared_ptr<TcpService>                                 PTR;
+
     typedef std::function<void (EventLoop&)>                            FRAME_CALLBACK;
     typedef std::function<void(int64_t, std::string)>                   ENTER_CALLBACK;
     typedef std::function<void(int64_t)>                                DISCONNECT_CALLBACK;
