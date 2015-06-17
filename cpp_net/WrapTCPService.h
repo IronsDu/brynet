@@ -1,6 +1,9 @@
 #ifndef _WRAP_TCP_SERVICE_H
 #define _WRAP_TCP_SERVICE_H
 
+#include <string>
+using namespace std;
+
 #include "TCPService.h"
 
 class WrapServer;
@@ -8,7 +11,9 @@ class WrapServer;
 class TCPSession
 {
 public:
-    typedef std::shared_ptr<TCPSession>    PTR;
+    typedef std::shared_ptr<TCPSession>     PTR;
+    typedef std::weak_ptr<TCPSession>       WEAK_PTR;
+
     typedef std::function<void(TCPSession::PTR)>   CLOSE_CALLBACK;
     typedef std::function<int(TCPSession::PTR, const char*, int)>   DATA_CALLBACK;
 
@@ -18,14 +23,20 @@ public:
     int64_t                 getUD();
     void                    setUD(int64_t ud);
 
-    void                    send(const char* buffer, int len);
+    string                  getIP() const;
+    int64_t                 getSocketID() const;
 
+    void                    send(const char* buffer, int len);
+    void                    send(const DataSocket::PACKET_PTR& packet);
+
+    void                    postClose();
     void                    setCloseCallback(const CLOSE_CALLBACK& callback);
 
     void                    setDataCallback(const DATA_CALLBACK& callback);
 
 private:
     void                    setSocketID(int64_t id);
+    void                    setIP(const string& ip);
 
     void                    setService(TcpService::PTR service);
 
@@ -36,6 +47,7 @@ private:
 private:
     TcpService::PTR         mService;
     int64_t                 mSocketID;
+    string                  mIP;
     int64_t                 mUserData;
 
     CLOSE_CALLBACK          mCloseCallback;
@@ -55,7 +67,7 @@ public:
 
     void                    setDefaultEnterCallback(SESSION_ENTER_CALLBACK callback);
 
-    TcpService::PTR         getService();
+    TcpService::PTR&        getService();
 
     void                    startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 

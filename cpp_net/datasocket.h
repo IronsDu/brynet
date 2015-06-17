@@ -99,8 +99,12 @@ private:
 #endif
 
     int                             mFD;
+    int                             mCopyFD;
+
+    bool                            mIsClose;           /*  此会话的网络是否已经断开连接 */
+    bool                            mCanWrite;          /*  socket是否可写  */
+
     EventLoop*                      mEventLoop;
-    bool                            mIsClose;           /*  此会话是否已经断开连接 */
     buffer_s*                       mRecvBuffer;
 
     struct pending_packet
@@ -111,8 +115,6 @@ private:
 
     typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
     PACKET_LIST_TYPE                mSendList;          /*  发送消息列表  */
-
-    bool                            mCanWrite;          /*  socket是否可写  */
 
     ENTER_CALLBACK                  mEnterCallback;
     DATA_CALLBACK                   mDataCallback;

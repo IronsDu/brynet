@@ -43,7 +43,6 @@ private:
 #endif
 };
 
-//TODO::基于id的回调，是否让用户写逻辑时，比较麻烦，因为用户很可能会再构建一个对象管理器
 class TcpService
 {
 public:

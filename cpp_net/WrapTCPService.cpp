@@ -5,7 +5,8 @@ using namespace std;
 
 TCPSession::TCPSession()
 {
-    cout << "WrapSession::WrapSession() " << endl;
+    cout << "TCPSession :: TCPSession() " << endl;
+    cout << this << endl;
     mSocketID = -1;
     mUserData = -1;
     mCloseCallback = nullptr;
@@ -15,7 +16,8 @@ TCPSession::TCPSession()
 
 TCPSession::~TCPSession()
 {
-    cout << "WrapSession::~WrapSession()" << endl;
+    cout << "TCPSession :: ~ TCPSession()" << endl;
+    cout << this << endl;
 }
 
 int64_t TCPSession::getUD()
@@ -28,9 +30,29 @@ void    TCPSession::setUD(int64_t ud)
     mUserData = ud;
 }
 
+string TCPSession::getIP() const
+{
+    return mIP;
+}
+
+int64_t TCPSession::getSocketID() const
+{
+    return mSocketID;
+}
+
 void    TCPSession::send(const char* buffer, int len)
 {
     mService->send(mSocketID, DataSocket::makePacket(buffer, len));
+}
+
+void TCPSession::send(const DataSocket::PACKET_PTR& packet)
+{
+    mService->send(mSocketID, packet);
+}
+
+void TCPSession::postClose()
+{
+    mService->disConnect(mSocketID);
 }
 
 void    TCPSession::setCloseCallback(const CLOSE_CALLBACK& callback)
@@ -46,6 +68,11 @@ void    TCPSession::setDataCallback(const DATA_CALLBACK& callback)
 void    TCPSession::setSocketID(int64_t id)
 {
     mSocketID = id;
+}
+
+void TCPSession::setIP(const string& ip)
+{
+    mIP = ip;
 }
 
 void    TCPSession::setService(TcpService::PTR service)
@@ -78,7 +105,7 @@ void        WrapServer::setDefaultEnterCallback(SESSION_ENTER_CALLBACK callback)
     mSessionDefaultEnterCallback = callback;
 }
 
-TcpService::PTR WrapServer::getService()
+TcpService::PTR& WrapServer::getService()
 {
     return mTCPService;
 }
@@ -105,8 +132,11 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback)
 #endif
 
     TCPSession::PTR tmpSession = std::make_shared<TCPSession>();
-    auto enterCallback = [tmpSession, userEnterCallback](int64_t id, std::string){
+    tmpSession->setService(mTCPService);
+
+    auto enterCallback = [tmpSession, userEnterCallback](int64_t id, std::string ip){
         tmpSession->setSocketID(id);
+        tmpSession->setIP(ip);
         if (userEnterCallback != nullptr)
         {
             userEnterCallback(tmpSession);
