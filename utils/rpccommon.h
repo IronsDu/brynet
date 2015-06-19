@@ -178,6 +178,7 @@ namespace dodo
             if (it != mRealFunctionPtr.end())
             {
                 delete (*it).second;
+                mRealFunctionPtr.erase(it);
             }
         }
         
