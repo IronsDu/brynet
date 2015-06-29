@@ -51,9 +51,9 @@ public:
     void                            restoreThreadID();
 
     /*  非线程安全,将channel放入容器  */
-    void                            addChannel(int fd, CHANNEL_PTR channel);
+    void                            addChannel(int64_t id, CHANNEL_PTR channel);
     /*  非线程安全,从容器里移除fd对应的channel  */
-    void                            removeChannel(int fd);
+    void                            removeChannel(int64_t id);
 
     void                            linkChannel(int fd, Channel* ptr);
 
@@ -100,7 +100,7 @@ private:
 
     /*调用loop函数所在thread的id*/
     CurrentThread::THREAD_ID_TYPE           mSelfThreadid;
-    std::unordered_map<int, CHANNEL_PTR>    mChannels;
+    std::unordered_map<int64_t, CHANNEL_PTR>    mChannels;
 };
 
 #endif

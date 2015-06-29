@@ -14,11 +14,10 @@ static int sDefaultRecvBufferSize = 1024;
 
 DataSocket::DataSocket(int fd)
 {
-    mIsClose = false;
+    mIsPostFinalClose = false;
     mEventLoop = nullptr;
     mIsPostFlush = false;
     mFD = fd;
-    mCopyFD = mFD;
 
     /*  默认可写    */
     mCanWrite = true;
@@ -54,6 +53,8 @@ DataSocket::DataSocket(int fd)
 
 DataSocket::~DataSocket()
 {
+    assert(mFD == SOCKET_ERROR);
+
     if (mRecvBuffer != nullptr)
     {
         ox_buffer_delete(mRecvBuffer);
@@ -90,8 +91,12 @@ void DataSocket::onEnterEventLoop(EventLoop* el)
         
         if (checkRead())
         {
-            mEventLoop->addChannel(mFD, shared_from_this());
+            mEventLoop->addChannel(reinterpret_cast<int64_t>(this), shared_from_this());
             mEnterCallback(shared_from_this());
+        }
+        else
+        {
+            closeSocket();
         }
     }
 }
@@ -120,9 +125,7 @@ void    DataSocket::canRecv()
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
 #endif
-    mEventLoop->pushAfterLoopProc([this](){
-        recv();
-    });
+    recv();
 }
 
 void DataSocket::canSend()
@@ -138,7 +141,7 @@ void DataSocket::canSend()
 
 void DataSocket::runAfterFlush()
 {
-    if (!mIsPostFlush && !mSendList.empty() && !mIsClose)
+    if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
     {
         mEventLoop->pushAfterLoopProc([this](){
             mIsPostFlush = false;
@@ -176,7 +179,7 @@ void DataSocket::recv()
         assert(ox_buffer_getwritepos(mRecvBuffer) == 0);
     }
 
-    while (!mIsClose)
+    while (mFD != SOCKET_ERROR)
     {
         const int tryRecvLen = recvEndPos - writePos;
         if (tryRecvLen <= 0)
@@ -287,7 +290,7 @@ void DataSocket::recv()
 
 void DataSocket::flush()
 {
-    if (mCanWrite && !mIsClose)
+    if (mCanWrite && mFD != SOCKET_ERROR)
     {
 #ifdef PLATFORM_WINDOWS
         normalFlush();
@@ -497,16 +500,15 @@ SEND_PROC:
 #endif
 }
 
-/*处理网络断开或者强制断开网络*/
+/*处理读写时得到网络断开(以及强制断开网络)*/
 void DataSocket::procCloseInLoop()
 {
-    if (!mIsClose)
+    if (mFD != SOCKET_ERROR)
     {
-        closeSocket();
-
 #ifdef PLATFORM_WINDOWS
         if (mPostWriteCheck || mPostRecvCheck)  //如果投递了IOCP请求，那么需要投递close，而不能直接调用onClose
         {
+            closeSocket();
             PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
         }
         else
@@ -519,26 +521,30 @@ void DataSocket::procCloseInLoop()
     }
 }
 
-/*当收到网络断开(或者IOCP下收到模拟的断开通知)后的处理*/
+/*当收到网络断开(或者IOCP下收到模拟的断开通知)后的处理(此函数里的主体逻辑只能被执行一次)*/
 void DataSocket::onClose()
 {
-    DataSocket::PTR thisPtr = shared_from_this();
-    mEventLoop->pushAfterLoopProc([=](){
-        if (mDisConnectCallback != nullptr)
-        {
-            mDisConnectCallback(thisPtr);
-        }
-        mEventLoop->removeChannel(mCopyFD);
-    });
+    if (!mIsPostFinalClose)
+    {
+        DataSocket::PTR thisPtr = shared_from_this();
+        mEventLoop->pushAfterLoopProc([=](){
+            if (mDisConnectCallback != nullptr)
+            {
+                mDisConnectCallback(thisPtr);
+            }
+            mEventLoop->removeChannel(reinterpret_cast<int64_t>(thisPtr.get()));
+            /*close socket之后，可能给新连接分配fd值，其onenter时被添加到管理器,(最后IOCP下,见procCloseInLoop)这里remove时可能错误的移除新链接，所以链接管理不能用fd作为key*/
+        });
 
-    closeSocket();
+        closeSocket();
+        mIsPostFinalClose = true;
+    }
 }
 
 void DataSocket::closeSocket()
 {
     if (mFD != SOCKET_ERROR)
     {
-        mIsClose = true;
         mCanWrite = false;
         ox_socket_close(mFD);
         mFD = SOCKET_ERROR;
@@ -612,10 +618,13 @@ bool    DataSocket::checkWrite()
 #ifdef PLATFORM_LINUX
 void    DataSocket::removeCheckWrite()
 {
-    struct epoll_event ev = { 0, { 0 } };
-    ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
-    ev.data.ptr = (Channel*)(this);
-    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
+    if(mFD != SOCKET_ERROR)
+    {
+        struct epoll_event ev = { 0, { 0 } };
+        ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
+        ev.data.ptr = (Channel*)(this);
+        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
+    }
 }
 #endif
 

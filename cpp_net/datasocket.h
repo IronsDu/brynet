@@ -99,9 +99,8 @@ private:
 #endif
 
     int                             mFD;
-    int                             mCopyFD;
+    int                             mIsPostFinalClose;  /*  是否投递了最终的close处理    */
 
-    bool                            mIsClose;           /*  此会话的网络是否已经断开连接 */
     bool                            mCanWrite;          /*  socket是否可写  */
 
     EventLoop*                      mEventLoop;

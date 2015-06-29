@@ -168,21 +168,7 @@ void EventLoop::loop(int64_t timeout)
     }
 #endif
 
-    /*
-    warn::  此时mAfterLoopProcs里面可能包括了断开回调，而mAsyncProcs里也可能有异步断开请求。
-    在处理mAsyncProcs的断开请求中会释放Channel。因此必须先处理mAfterLoopProcs，以执行断开回调，如果在mAsyncProcs之后处理mAfterLoopProcs，
-    就会出现段错误。
-    */
-    processAfterLoopProcs();
-
-    /*  执行异步请求  */
     processAsyncProcs();
-
-    /*  warn::  理论上可以不做下面的两次mAfterLoopProcs遍历，因为loop函数之前会判断mAfterLoopProcs是否为空。如果不为空，则不会阻塞epoll或iocp，但这样直接让epoll/iocp返回可能会浪费一些CPU（需要具体测试）    */
-
-    /*  warn::  继续处理mAfterLoopProcs，是因为在执行异步请求队列时可能会向mAfterLoopProcs添加flush send等回调  */
-    processAfterLoopProcs();
-    /*  warn::  继续处理mAfterLoopProcs，是因为在上面的遍历(执行回调）中可能会收集到socket 断开，则又向mAfterLoopProcs添加了断开回调函数*/
     processAfterLoopProcs();
 
     assert(mAfterLoopProcs.empty());
@@ -344,15 +330,15 @@ void EventLoop::restoreThreadID()
     mSelfThreadid = CurrentThread::tid();
 }
 
-void EventLoop::addChannel(int fd, CHANNEL_PTR channel)
+void EventLoop::addChannel(int64_t id, CHANNEL_PTR channel)
 {
-    assert(mChannels.find(fd) == mChannels.end());
-    mChannels[fd] = channel;
+    assert(mChannels.find(id) == mChannels.end());
+    mChannels[id] = channel;
 }
 
-void EventLoop::removeChannel(int fd)
+void EventLoop::removeChannel(int64_t id)
 {
-    mChannels.erase(fd);
+    mChannels.erase(id);
 }
 
 #ifdef PLATFORM_WINDOWS
