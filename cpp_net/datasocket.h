@@ -99,7 +99,7 @@ private:
 #endif
 
     int                             mFD;
-    int                             mIsPostFinalClose;  /*  是否投递了最终的close处理    */
+    bool                            mIsPostFinalClose;  /*  是否投递了最终的close处理    */
 
     bool                            mCanWrite;          /*  socket是否可写  */
 

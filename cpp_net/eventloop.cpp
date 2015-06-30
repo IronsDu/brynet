@@ -101,7 +101,7 @@ void EventLoop::loop(int64_t timeout)
 #ifndef NDEBUG
     assert(isInLoopThread());
 #endif
-    /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调），将timeout改为0，表示不阻塞iocp/epoll wait   */
+    /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调或者某会话断开处理中又向其他会话发送消息而新产生callback），将timeout改为0，表示不阻塞iocp/epoll wait   */
     if (!mAfterLoopProcs.empty())
     {
         timeout = 0;
@@ -171,7 +171,7 @@ void EventLoop::loop(int64_t timeout)
     processAsyncProcs();
     processAfterLoopProcs();
 
-    assert(mAfterLoopProcs.empty());
+    //  assert(mAfterLoopProcs.empty()) //去掉断言检测，因为可能在处理某会话连接断开时，onClose函数中可能会对另外一个会话进行发送消息，则会产生callback，所以mAfterLoopProcs并非一定为空;
 
     if (numComplete == mEventEntriesNum)
     {
