@@ -1,4 +1,6 @@
 #include <iostream>
+#include <string>
+
 #include "socketlibfunction.h"
 #include "WrapTCPService.h"
 
@@ -19,7 +21,7 @@ int main(int argc, char **argv)
     int num = atoi(argv[3]);
     int packet_len = atoi(argv[4]);
 
-    string tmp(packet_len, 'a');
+    std::string tmp(packet_len, 'a');
 
     WrapServer::PTR server = std::make_shared<WrapServer>();
 

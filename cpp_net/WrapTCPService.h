@@ -2,7 +2,7 @@
 #define _WRAP_TCP_SERVICE_H
 
 #include <string>
-using namespace std;
+#include <stdint.h>
 
 #include "TCPService.h"
 
@@ -23,7 +23,7 @@ public:
     int64_t                 getUD();
     void                    setUD(int64_t ud);
 
-    string                  getIP() const;
+    std::string             getIP() const;
     int64_t                 getSocketID() const;
 
     void                    send(const char* buffer, int len);
@@ -36,7 +36,7 @@ public:
 
 private:
     void                    setSocketID(int64_t id);
-    void                    setIP(const string& ip);
+    void                    setIP(const std::string& ip);
 
     void                    setService(TcpService::PTR service);
 
@@ -47,7 +47,7 @@ private:
 private:
     TcpService::PTR         mService;
     int64_t                 mSocketID;
-    string                  mIP;
+    std::string             mIP;
     int64_t                 mUserData;
 
     CLOSE_CALLBACK          mCloseCallback;
@@ -60,6 +60,8 @@ class WrapServer
 {
 public:
     typedef std::shared_ptr<WrapServer> PTR;
+    typedef std::weak_ptr<WrapServer>   WEAK_PTR;
+
     typedef std::function<void(TCPSession::PTR)>   SESSION_ENTER_CALLBACK;
 
     WrapServer();
@@ -68,6 +70,8 @@ public:
     void                    setDefaultEnterCallback(SESSION_ENTER_CALLBACK callback);
 
     TcpService::PTR&        getService();
+
+    ListenThread&           getListenThread();
 
     void                    startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 

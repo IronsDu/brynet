@@ -46,9 +46,6 @@ DataSocket::DataSocket(int fd)
     mSSLCtx = nullptr;
     mSSL = nullptr;
 #endif
-
-    cout << "DataSocket :: DataScket" << endl;
-    cout << this << endl;
 }
 
 DataSocket::~DataSocket()
@@ -75,9 +72,6 @@ DataSocket::~DataSocket()
 #endif
 
     closeSocket();
-
-    cout << "DataSocket :: ~ DataScket" << endl;
-    cout << this << endl;
 }
 
 void DataSocket::onEnterEventLoop(EventLoop* el)

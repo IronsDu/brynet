@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     {
         mainLoop.loop(1000);
         g_mutex.lock();
-        cout << "total recv : " << (total_recv / 1024) / 1024 << " M /s, of client num:" << total_client_num << endl;
+        std::cout << "total recv : " << (total_recv / 1024) / 1024 << " M /s, of client num:" << total_client_num << std::endl;
         total_recv = 0;
         g_mutex.unlock();
     }

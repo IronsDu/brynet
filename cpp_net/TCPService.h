@@ -7,6 +7,7 @@
 #include <thread>
 #include <assert.h>
 #include <stdint.h>
+#include <memory>
 
 #include "datasocket.h"
 #include "typeids.h"
@@ -17,6 +18,8 @@ class DataSocket;
 class ListenThread
 {
 public:
+    typedef std::shared_ptr<ListenThread>   PTR;
+
     typedef std::function<void(int fd)> ACCEPT_CALLBACK;
     ListenThread();
     ~ListenThread();

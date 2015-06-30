@@ -5,8 +5,6 @@ using namespace std;
 
 TCPSession::TCPSession()
 {
-    cout << "TCPSession :: TCPSession() " << endl;
-    cout << this << endl;
     mSocketID = -1;
     mUserData = -1;
     mCloseCallback = nullptr;
@@ -16,8 +14,6 @@ TCPSession::TCPSession()
 
 TCPSession::~TCPSession()
 {
-    cout << "TCPSession :: ~ TCPSession()" << endl;
-    cout << this << endl;
 }
 
 int64_t TCPSession::getUD()
@@ -108,6 +104,11 @@ void        WrapServer::setDefaultEnterCallback(SESSION_ENTER_CALLBACK callback)
 TcpService::PTR& WrapServer::getService()
 {
     return mTCPService;
+}
+
+ListenThread&   WrapServer::getListenThread()
+{
+    return mListenThread;
 }
 
 void WrapServer::startListen(int port, const char *certificate, const char *privatekey)
