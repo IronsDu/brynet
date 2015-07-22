@@ -110,32 +110,67 @@ void EventLoop::loop(int64_t timeout)
     mInWaitIOEvent = true;
 
 #ifdef PLATFORM_WINDOWS
+
     ULONG numComplete = 0;
-    BOOL rc = mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, mEventEntriesNum, &numComplete, static_cast<DWORD>(timeout), false);
+    if (mPGetQueuedCompletionStatusEx != nullptr)
+    {
+        bool rc = mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, mEventEntriesNum, &numComplete, static_cast<DWORD>(timeout), false);
+        if (!rc)
+        {
+            numComplete = 0;
+        }
+    }
+    else
+    {
+        bool rc = GetQueuedCompletionStatus(mIOCP,
+                                            &mEventEntries[numComplete].dwNumberOfBytesTransferred,
+                                            &mEventEntries[numComplete].lpCompletionKey,
+                                            &mEventEntries[numComplete].lpOverlapped,
+                                            timeout);
+
+        if (rc && mEventEntries[numComplete].lpOverlapped != nullptr)
+        {
+            numComplete++;
+            while (numComplete < mEventEntriesNum)
+            {
+                rc = GetQueuedCompletionStatus(mIOCP,
+                                               &mEventEntries[numComplete].dwNumberOfBytesTransferred,
+                                               &mEventEntries[numComplete].lpCompletionKey,
+                                               &mEventEntries[numComplete].lpOverlapped,
+                                               0);
+                if (rc && mEventEntries[numComplete].lpOverlapped != nullptr)
+                {
+                    numComplete++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+    }
+
     mIsAlreadyPostedWakeUp = false;
     mInWaitIOEvent = false;
 
-    if (rc)
+    for (ULONG i = 0; i < numComplete; ++i)
     {
-        for (ULONG i = 0; i < numComplete; ++i)
+        Channel* ds = (Channel*)mEventEntries[i].lpCompletionKey;
+        if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_RECV)
         {
-            Channel* ds = (Channel*)mEventEntries[i].lpCompletionKey;
-            if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_RECV)
-            {
-                ds->canRecv();
-            }
-            else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_SEND)
-            {
-                ds->canSend();
-            }
-            else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_CLOSE)
-            {
-                ds->onClose();
-            }
-            else
-            {
-                assert(false);
-            }
+            ds->canRecv();
+        }
+        else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_SEND)
+        {
+            ds->canSend();
+        }
+        else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_CLOSE)
+        {
+            ds->onClose();
+        }
+        else
+        {
+            assert(false);
         }
     }
 #else
