@@ -54,6 +54,31 @@ namespace dodo
             const msgpack::object& o = result.get();
             o.convert(&value);
         }
+
+        template<typename T>
+        static void     read(const char* buffer, size_t size, size_t& off, std::vector<T>& value)
+        {
+            while (off != size)
+            {
+                T t;
+                read(buffer, size, off, t);
+                value.push_back(std::move(t));
+            }
+        }
+
+        template<typename K, typename T>
+        static void     read(const char* buffer, size_t size, size_t& off, std::map<K , T>& value)
+        {
+            while (off != size)
+            {
+                K key;
+                read(buffer, size, off, key);
+                T t;
+                read(buffer, size, off, t);
+                value.insert(std::make_pair(key, std::move(t)));
+            }
+        }
+
     };
 
     template<int SIZE, typename ...Args>
@@ -211,6 +236,25 @@ namespace dodo
         static  void    write(msgpack::sbuffer& sbuf, const std::tuple<Args...>& value)
         {
             TupleWrite<decltype(value), sizeof...(Args)>::write(sbuf, value);
+        }
+
+        template<typename T>
+        static  void    write(msgpack::sbuffer& sbuf, const vector<T>& value)
+        {
+            for (auto& v : value)
+            {
+                write(sbuf, v);
+            }
+        }
+
+        template<typename K, typename T>
+        static  void    write(msgpack::sbuffer& sbuf, const map<K, T>& value)
+        {
+            for (auto& v : value)
+            {
+                write(sbuf, v.first);
+                write(sbuf, v.second);
+            }
         }
     };
 
