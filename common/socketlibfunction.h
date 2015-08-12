@@ -16,7 +16,7 @@ DLL_CONF    bool ox_socket_nonblock(sock fd);
 DLL_CONF    int  ox_socket_setsdsize(sock fd, int sd_size);
 DLL_CONF    int  ox_socket_setrdsize(sock fd, int rd_size);
 DLL_CONF    sock ox_socket_connect(const char* server_ip, int port);
-DLL_CONF    sock ox_socket_nonblockconnect(const char* server_ip, int port);
+DLL_CONF    sock ox_socket_nonblockconnect(const char* server_ip, int port, int timeout);
 DLL_CONF    sock ox_socket_listen(int port, int back_num);
 DLL_CONF    void ox_socket_close(sock fd);
 DLL_CONF    const char* ox_socket_getipoffd(sock fd);

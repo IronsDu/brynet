@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#include "fdset.h"
 #include "socketlibfunction.h"
 
 #if defined PLATFORM_WINDOWS
@@ -88,9 +87,16 @@ ox_socket_connect(const char* server_ip, int port)
 
         while(connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) < 0)
         {
+            int e = sErrno;
             if(EINTR == sErrno)
             {
                 continue;
+            }
+            else
+            {
+                ox_socket_close(clientfd);
+                clientfd = SOCKET_ERROR;
+                break;
             }
         }
     }
@@ -99,23 +105,41 @@ ox_socket_connect(const char* server_ip, int port)
 }
 
 sock
-ox_socket_nonblockconnect(const char* server_ip, int port)
+ox_socket_nonblockconnect(const char* server_ip, int port, int timeout)
 {
-    struct sockaddr_in server_addr;
-    sock clientfd = SOCKET_ERROR;
-
     ox_socket_init();
 
-    clientfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in server_addr;
+    sock  clientfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if (clientfd != SOCKET_ERROR)
     {
         server_addr.sin_family = AF_INET;
         server_addr.sin_addr.s_addr = inet_addr(server_ip);
         server_addr.sin_port = htons(port);
-
         ox_socket_nonblock(clientfd);
         connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+
+#ifdef PLATFORM_WINDOWS
+        WSAPOLLFD pfd;
+        pfd.fd = clientfd;
+        pfd.events = POLLOUT;
+        if (WSAPoll(&pfd, 1, timeout) != 1 || pfd.revents != POLLOUT)
+        {
+            ox_socket_close(clientfd);
+            clientfd = SOCKET_ERROR;
+        }
+#else
+        struct pollfd pfd;
+        memset(&pfd, 0, sizeof(pfd));
+        pfd.fd = clientfd;
+        pfd.events = POLLOUT;
+        if (poll(&pfd, 1, timeout) != 1 || pfd.revents != POLLOUT)
+        {
+            ox_socket_close(clientfd);
+            clientfd = SOCKET_ERROR;
+        }
+#endif
     }
 
     return clientfd;
@@ -138,10 +162,17 @@ ox_socket_listen(int port, int back_num)
         server_addr.sin_port = htons(port);
         server_addr.sin_addr.s_addr = INADDR_ANY;
 
-        setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value , sizeof(int));
-
-        if( bind(socketfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) == SOCKET_ERROR||
-            listen(socketfd, back_num) == SOCKET_ERROR)
+        if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value, sizeof(int)) >= 0)
+        {
+            int bindRet = bind(socketfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+            if (bindRet == SOCKET_ERROR ||
+                listen(socketfd, back_num) == SOCKET_ERROR)
+            {
+                ox_socket_close(socketfd);
+                socketfd = SOCKET_ERROR;
+            }
+        }
+        else
         {
             ox_socket_close(socketfd);
             socketfd = SOCKET_ERROR;
