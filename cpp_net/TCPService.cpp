@@ -238,6 +238,26 @@ void TcpService::disConnect(int64_t id)
     }
 }
 
+void TcpService::setPingCheckTime(int64_t id, int checktime)
+{
+    union  SessionId sid;
+    sid.id = id;
+    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    {
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, checktime](){
+            DataSocket::PTR tmp = nullptr;
+            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
+            {
+                if (tmp != nullptr && tmp->getUserData() == sid.id)
+                {
+                    tmp->setCheckTime(checktime);
+                }
+            }
+        });
+    }
+}
+
 void TcpService::closeService()
 {
     closeListenThread();

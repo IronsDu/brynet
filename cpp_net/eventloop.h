@@ -11,6 +11,7 @@
 
 #include "socketlibtypes.h"
 #include "currentthread.h"
+#include "timer.h"
 
 class Channel;
 
@@ -57,6 +58,7 @@ public:
 
     void                            linkChannel(int fd, Channel* ptr);
 
+    TimerMgr&                       getTimerMgr();
 #ifdef PLATFORM_WINDOWS
     HANDLE                          getIOCPHandle() const;
 #else
@@ -101,6 +103,8 @@ private:
     /*调用loop函数所在thread的id*/
     CurrentThread::THREAD_ID_TYPE           mSelfThreadid;
     std::unordered_map<int64_t, CHANNEL_PTR>    mChannels;      /*  存放当前所有会话链接，保证其智能指针(内存在其链接期间)不被销毁(引用计数大于1) */
+
+    TimerMgr                                    mTimer;
 };
 
 #endif

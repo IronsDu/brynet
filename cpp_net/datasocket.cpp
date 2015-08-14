@@ -14,6 +14,8 @@ static int sDefaultRecvBufferSize = 1024;
 
 DataSocket::DataSocket(int fd)
 {
+    mRecvData = false;
+    mCheckTime = -1;
     mIsPostFinalClose = false;
     mEventLoop = nullptr;
     mIsPostFlush = false;
@@ -72,6 +74,11 @@ DataSocket::~DataSocket()
 #endif
 
     closeSocket();
+
+    if (mTimer.lock())
+    {
+        mTimer.lock()->Cancel();
+    }
 }
 
 void DataSocket::onEnterEventLoop(EventLoop* el)
@@ -228,6 +235,7 @@ void DataSocket::recv()
         {
             if (mDataCallback != nullptr)
             {
+                mRecvData = true;
                 writePos += retlen;
                 int proclen = mDataCallback(shared_from_this(), parsePos, writePos - parsePos);
                 assert(proclen >= 0);
@@ -635,6 +643,47 @@ void DataSocket::setDataCallback(DATA_CALLBACK cb)
 void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
 {
     mDisConnectCallback = cb;
+}
+
+void DataSocket::PingCheck()
+{
+    if (mRecvData)
+    {
+        mRecvData = false;
+        startPingCheckTimer();
+    }
+    else
+    {
+        procCloseInLoop();
+    }
+}
+
+void DataSocket::startPingCheckTimer()
+{
+    if (!mTimer.lock() && mCheckTime > 0)
+    {
+        mTimer = mEventLoop->getTimerMgr().AddTimer(mCheckTime, [this](){
+            this->PingCheck();
+        });
+    }
+}
+
+void DataSocket::setCheckTime(int overtime)
+{
+    if (overtime > 0)
+    {
+        mCheckTime = overtime;
+        startPingCheckTimer();
+    }
+    else if (overtime == -1)
+    {
+        if (mTimer.lock())
+        {
+            mTimer.lock()->Cancel();
+        }
+
+        mCheckTime = -1;
+    }
 }
 
 void DataSocket::postDisConnect()

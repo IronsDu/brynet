@@ -7,6 +7,7 @@
 
 #include "socketlibtypes.h"
 #include "channel.h"
+#include "timer.h"
 
 #ifdef USE_OPENSSL
 
@@ -47,6 +48,7 @@ public:
     void                            setDataCallback(DATA_CALLBACK cb);
     void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
+    void                            setCheckTime(int overtime);
     /*主动(投递)断开连接,会触发断开回调*/
     void                            postDisConnect();
 
@@ -61,6 +63,9 @@ public:
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
     void                            onEnterEventLoop(EventLoop* el) override;
+
+    void                            PingCheck();
+    void                            startPingCheckTimer();
 
     void                            canRecv() override;
     void                            canSend() override;
@@ -127,6 +132,10 @@ private:
     SSL_CTX*                        mSSLCtx;
     SSL*                            mSSL;
 #endif
+
+    bool                            mRecvData;
+    int                             mCheckTime;
+    Timer::WeakPtr                  mTimer;
 };
 
 #endif

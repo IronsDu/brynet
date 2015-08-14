@@ -96,6 +96,11 @@ EventLoop::~EventLoop()
     mEventEntries = nullptr;
 }
 
+TimerMgr& EventLoop::getTimerMgr()
+{
+    return mTimer;
+}
+
 void EventLoop::loop(int64_t timeout)
 {
 #ifndef NDEBUG
@@ -213,6 +218,8 @@ void EventLoop::loop(int64_t timeout)
         /*  如果事件被填充满了，则扩大事件结果队列大小，可以让一次epoll/iocp wait获得尽可能更多的通知 */
         reallocEventSize(mEventEntriesNum + 128);
     }
+
+    mTimer.Schedule();
 }
 
 void EventLoop::processAfterLoopProcs()

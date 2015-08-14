@@ -71,6 +71,8 @@ public:
     /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
     void                                disConnect(int64_t id);
 
+    void                                setPingCheckTime(int64_t id, int checktime);
+
     void                                addDataSocket(int fd, DataSocket::PTR datasocket,
                                                         TcpService::ENTER_CALLBACK enterCallback,
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
