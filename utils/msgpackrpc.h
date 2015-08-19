@@ -58,24 +58,30 @@ namespace dodo
         template<typename T>
         static void     read(const char* buffer, size_t size, size_t& off, std::vector<T>& value)
         {
-            while (off != size)
+            int32_t len;
+            read(buffer, size, off, len);
+            while (off != size && len > 0)
             {
                 T t;
                 read(buffer, size, off, t);
                 value.push_back(std::move(t));
+                len--;
             }
         }
 
         template<typename K, typename T>
         static void     read(const char* buffer, size_t size, size_t& off, std::map<K , T>& value)
         {
-            while (off != size)
+            int32_t len;
+            read(buffer, size, off, len);
+            while (off != size && len > 0)
             {
                 K key;
                 read(buffer, size, off, key);
                 T t;
                 read(buffer, size, off, t);
                 value.insert(std::make_pair(key, std::move(t)));
+                len--;
             }
         }
 
@@ -241,6 +247,7 @@ namespace dodo
         template<typename T>
         static  void    write(msgpack::sbuffer& sbuf, const vector<T>& value)
         {
+            write(sbuf, (int32_t)value.size());
             for (auto& v : value)
             {
                 write(sbuf, v);
@@ -250,6 +257,7 @@ namespace dodo
         template<typename K, typename T>
         static  void    write(msgpack::sbuffer& sbuf, const map<K, T>& value)
         {
+            write(sbuf, (int32_t)value.size());
             for (auto& v : value)
             {
                 write(sbuf, v.first);
