@@ -10,7 +10,6 @@ public:
     virtual ~Channel(){}
     virtual void    canSend() = 0;
     virtual void    canRecv() = 0;
-    virtual void    onEnterEventLoop(EventLoop*) = 0;
     virtual void    onClose() = 0;
 };
 

@@ -15,7 +15,7 @@ public:
     {
     }
 
-    void    Push(T& t)
+    void    Push(const T& t)
     {
         mWriteList.push_back(t);
     }
@@ -61,9 +61,9 @@ public:
                     /*  Ç¿ÖÆÐ´Èë    */
                     if (mWriteList.size() > mSharedList.size())
                     {
-                        for (auto x : mSharedList)
+                        for (auto& x : mSharedList)
                         {
-                            mWriteList.push_front(x);
+                            mWriteList.push_front(std::move(x));
                         }
 
                         mSharedList.clear();
@@ -71,9 +71,9 @@ public:
                     }
                     else
                     {
-                        for (auto x : mWriteList)
+                        for (auto& x : mWriteList)
                         {
-                            mSharedList.push_back(x);
+                            mSharedList.push_back(std::move(x));
                         }
 
                         mWriteList.clear();
@@ -93,7 +93,8 @@ public:
 
         if (!mReadList.empty())
         {
-            *data = mReadList.front();
+            T& tmp = mReadList.front();
+            *data = std::move(tmp);
             mReadList.pop_front();
             ret = true;
         }
@@ -107,7 +108,8 @@ public:
 
         if (!mReadList.empty())
         {
-            *data = mReadList.back();
+            T& tmp = mReadList.back();
+            *data = std::move(tmp);
             mReadList.pop_back();
             ret = true;
         }

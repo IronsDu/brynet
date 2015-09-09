@@ -124,14 +124,6 @@ void    WrapServer::startWorkThread(int threadNum, TcpService::FRAME_CALLBACK ca
 
 void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback)
 {
-    DataSocket::PTR channel = std::make_shared<DataSocket>(fd);
-#ifdef USE_OPENSSL
-    if (mListenThread.getOpenSSLCTX() != nullptr)
-    {
-        channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
-    }
-#endif
-
     TCPSession::PTR tmpSession = std::make_shared<TCPSession>();
     tmpSession->setService(mTCPService);
 
@@ -145,7 +137,7 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback)
     };
 
     auto closeCallback = [tmpSession](int64_t id){
-        auto callback = tmpSession->getCloseCallback();
+        auto& callback = tmpSession->getCloseCallback();
         if (callback != nullptr)
         {
             callback(tmpSession);
@@ -153,7 +145,7 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback)
     };
 
     auto msgCallback = [tmpSession](int64_t id, const char* buffer, int len){
-        auto callback = tmpSession->getDataCallback();
+        auto& callback = tmpSession->getDataCallback();
         if (callback != nullptr)
         {
             return callback(tmpSession, buffer, len);
@@ -164,7 +156,7 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback)
         }
     };
 
-    mTCPService->addDataSocket(fd, channel, enterCallback, closeCallback, msgCallback);
+    mTCPService->addDataSocket(fd, enterCallback, closeCallback, msgCallback);
 }
 void    WrapServer::onAccept(int fd)
 {

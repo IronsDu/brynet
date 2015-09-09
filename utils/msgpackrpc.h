@@ -80,7 +80,7 @@ namespace dodo
                 read(buffer, size, off, key);
                 T t;
                 read(buffer, size, off, t);
-                value.insert(std::make_pair(key, std::move(t)));
+                value.insert(std::make_pair(std::move(key), std::move(t)));
                 len--;
             }
         }

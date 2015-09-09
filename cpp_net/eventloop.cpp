@@ -36,10 +36,6 @@ private:
     {
     }
 
-    void    onEnterEventLoop(EventLoop*) override
-    {
-    }
-
     void    onClose() override
     {
     }
@@ -60,7 +56,7 @@ EventLoop::EventLoop()
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
     memset(&mWakeupOvl, 0, sizeof(mWakeupOvl));
-    mWakeupOvl.Offset = EventLoop::OVL_RECV; 
+    mWakeupOvl.OP = EventLoop::OVL_RECV; 
     mWakeupChannel = new WakeupChannel(-1);
 #else
     mEpollFd = epoll_create(1);
@@ -76,7 +72,8 @@ EventLoop::EventLoop()
     mEventEntriesNum = 0;
 
     reallocEventSize(1024);
-    mSelfThreadid = 0;
+    mSelfThreadid = -1;
+    mIsInitThreadID = false;
 }
 
 EventLoop::~EventLoop()
@@ -103,6 +100,12 @@ TimerMgr& EventLoop::getTimerMgr()
 
 void EventLoop::loop(int64_t timeout)
 {
+    if (!mIsInitThreadID)
+    {
+        mSelfThreadid = CurrentThread::tid();
+        mIsInitThreadID = true;
+    }
+
 #ifndef NDEBUG
     assert(isInLoopThread());
 #endif
@@ -161,15 +164,16 @@ void EventLoop::loop(int64_t timeout)
     for (ULONG i = 0; i < numComplete; ++i)
     {
         Channel* ds = (Channel*)mEventEntries[i].lpCompletionKey;
-        if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_RECV)
+        EventLoop::ovl_ext_s* ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
+        if (ovl->OP == EventLoop::OVL_RECV)
         {
             ds->canRecv();
         }
-        else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_SEND)
+        else if (ovl->OP == EventLoop::OVL_SEND)
         {
             ds->canSend();
         }
-        else if (mEventEntries[i].lpOverlapped->Offset == EventLoop::OVL_CLOSE)
+        else if (ovl->OP == EventLoop::OVL_CLOSE)
         {
             ds->onClose();
         }
@@ -263,7 +267,7 @@ bool EventLoop::wakeup()
             /*如果iocp已经wakeup，然而这里不投递的话，有可能无法唤醒下一次iocp (这不像epoll lt模式下的eventfd，只要有数据没读，则epoll总会wakeup)*/
             mIsAlreadyPostedWakeUp = true;
 #ifdef PLATFORM_WINDOWS
-            PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, &mWakeupOvl);
+            PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, (OVERLAPPED*)&mWakeupOvl);
 #else
             uint64_t one = 1;
             ssize_t n = write(mWakeupFd, &one, sizeof one);
@@ -290,7 +294,7 @@ bool EventLoop::wakeup()
                 if (tmp)
                 {
 #ifdef PLATFORM_WINDOWS
-                    PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, &mWakeupOvl);
+                    PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, (OVERLAPPED*)&mWakeupOvl);
 #else
                     uint64_t one = 1;
                     ssize_t n = write(mWakeupFd, &one, sizeof one);
@@ -304,23 +308,18 @@ bool EventLoop::wakeup()
     return ret;
 }
 
-void EventLoop::linkChannel(int fd, Channel* ptr)
+bool EventLoop::linkChannel(int fd, Channel* ptr)
 {
 #ifdef PLATFORM_WINDOWS
     HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
+    return ret != nullptr;
 #else
     struct epoll_event ev = { 0, { 0 } };
     ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
     ev.data.ptr = ptr;
     int ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev);
+    return ret != 0;
 #endif
-}
-
-void EventLoop::pushAsyncChannel(CHANNEL_PTR channel)
-{
-    pushAsyncProc([channel, this]() {
-        channel->onEnterEventLoop(this);
-    });
 }
 
 void EventLoop::pushAsyncProc(const USER_PROC& f)
@@ -365,22 +364,6 @@ void EventLoop::pushAfterLoopProc(const USER_PROC& f)
 void EventLoop::pushAfterLoopProc(USER_PROC&& f)
 {
     mAfterLoopProcs.push_back(std::move(f));
-}
-
-void EventLoop::restoreThreadID()
-{
-    mSelfThreadid = CurrentThread::tid();
-}
-
-void EventLoop::addChannel(int64_t id, CHANNEL_PTR channel)
-{
-    assert(mChannels.find(id) == mChannels.end());
-    mChannels[id] = channel;
-}
-
-void EventLoop::removeChannel(int64_t id)
-{
-    mChannels.erase(id);
 }
 
 #ifdef PLATFORM_WINDOWS

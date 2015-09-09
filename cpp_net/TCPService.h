@@ -73,7 +73,7 @@ public:
 
     void                                setPingCheckTime(int64_t id, int checktime);
 
-    void                                addDataSocket(int fd, DataSocket::PTR datasocket,
+    void                                addDataSocket(  int fd,
                                                         TcpService::ENTER_CALLBACK enterCallback,
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                                         TcpService::DATA_CALLBACK dataCallback);

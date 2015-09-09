@@ -309,14 +309,7 @@ void TcpService::stopWorkerThread()
 void TcpService::startListen(int port, const char *certificate, const char *privatekey)
 {
     mListenThread.startListen(port, certificate, privatekey, [this](int fd){
-        DataSocket::PTR channel = std::make_shared<DataSocket>(fd);
-#ifdef USE_OPENSSL
-        if (mListenThread.getOpenSSLCTX() != nullptr)
-        {
-            channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
-        }
-#endif
-        addDataSocket(fd, channel, mEnterCallback, mDisConnectCallback, mDataCallback);
+        addDataSocket(fd, mEnterCallback, mDisConnectCallback, mDataCallback);
     });
 }
 
@@ -339,7 +332,6 @@ void TcpService::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
         {
             EventLoop& l = mLoops[i];
             mIOThreads[i] = new std::thread([this, &l, callback](){
-                l.restoreThreadID();
                 while (mRunIOLoop)
                 {
                     l.loop(sDefaultLoopTimeOutMS);
@@ -403,11 +395,20 @@ void TcpService::procDataSocketClose(DataSocket::PTR ds)
     mIds[sid.data.loopIndex].reclaimID(sid.data.index);
 }
 
-void TcpService::addDataSocket(int fd, DataSocket::PTR channel,
+void TcpService::addDataSocket(int fd,
                                 TcpService::ENTER_CALLBACK enterCallback,
                                 TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                 TcpService::DATA_CALLBACK dataCallback)
 {
+    DataSocket::PTR channel = new DataSocket(fd);
+
+#ifdef USE_OPENSSL
+    if (mListenThread.getOpenSSLCTX() != nullptr)
+    {
+        channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
+    }
+#endif
+
     /*  随机为此链接分配一个eventloop */
     int loopIndex = rand() % mLoopNum;
     EventLoop& loop = mLoops[loopIndex];
@@ -428,6 +429,7 @@ void TcpService::addDataSocket(int fd, DataSocket::PTR channel,
             int64_t id = arg->getUserData();
             procDataSocketClose(arg);
             disConnectCallback(id);
+            delete arg;
         });
 
         if (enterCallback != nullptr)
@@ -436,5 +438,10 @@ void TcpService::addDataSocket(int fd, DataSocket::PTR channel,
         }
     });
 
-    loop.pushAsyncChannel(channel);
+    loop.pushAsyncProc([&, channel](){
+        if (!channel->onEnterEventLoop(&loop))
+        {
+            delete channel;
+        }
+    });
 }

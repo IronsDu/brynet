@@ -8,6 +8,7 @@
 #include "socketlibtypes.h"
 #include "channel.h"
 #include "timer.h"
+#include "eventloop.h"
 
 #ifdef USE_OPENSSL
 
@@ -24,10 +25,10 @@ extern "C" {
 class EventLoop;
 struct buffer_s;
 
-class DataSocket : public Channel, public std::enable_shared_from_this<DataSocket>
+class DataSocket : public Channel
 {
 public:
-    typedef std::shared_ptr<DataSocket>                                         PTR;
+    typedef DataSocket*                                                         PTR;
 
     typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
     typedef std::function<int(PTR, const char* buffer, int len)>                DATA_CALLBACK;
@@ -38,6 +39,8 @@ public:
 public:
     explicit DataSocket(int fd);
     ~DataSocket();
+
+    bool                            onEnterEventLoop(EventLoop* el);
 
     void                            send(const char* buffer, int len);
 
@@ -62,7 +65,6 @@ public:
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
-    void                            onEnterEventLoop(EventLoop* el) override;
 
     void                            PingCheck();
     void                            startPingCheckTimer();
@@ -91,13 +93,9 @@ private:
 
 #ifdef PLATFORM_WINDOWS
     #include <windows.h>
-    struct ovl_ext_s
-    {
-        OVERLAPPED  base;
-    };
-    struct ovl_ext_s                mOvlRecv;
-    struct ovl_ext_s                mOvlSend;
-    struct ovl_ext_s                mOvlClose;
+    struct EventLoop::ovl_ext_s     mOvlRecv;
+    struct EventLoop::ovl_ext_s     mOvlSend;
+    struct EventLoop::ovl_ext_s     mOvlClose;
 
     bool                            mPostRecvCheck;     /*  是否投递了可读检测   */
     bool                            mPostWriteCheck;    /*  是否投递了可写检测   */

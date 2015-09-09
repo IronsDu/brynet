@@ -33,6 +33,8 @@ private:
 class TimerMgr
 {
 public:
+    typedef std::shared_ptr<TimerMgr>   PTR;
+
     template<typename F, typename ...TArgs>
     Timer::WeakPtr                          AddTimer(time_t delayMs, F callback, TArgs&& ...args)
     {

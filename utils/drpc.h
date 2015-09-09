@@ -46,10 +46,6 @@ namespace dodo
         {
             mRpcFunctions.execute(str.c_str(), str.size());
         }
-        void    handleRpc(const string&& str)
-        {
-            handleRpc(str);
-        }
         
         /*  返回数据给RPC调用端    */
         template<typename... Args>
@@ -59,16 +55,15 @@ namespace dodo
             return call("rpc_reply", reqid, call(std::to_string(reqid).c_str(), args...));
         }
         
+    private:
         /*  调用方处理收到的rpc返回值(消息)*/
         void    handleResponse(const string& str)
         {
             mResponseCallbacks.execute(str.c_str(), str.size());
         }
-        void    handleResponse(const string&& str)
-        {
-            handleResponse(str);
-        }
+
     private:
+
         template<typename ...Args>
         void regFunctor(const char* funname, void(*func)(Args...))
         {

@@ -18,16 +18,20 @@ class Channel;
 class EventLoop
 {
 public:
-    typedef std::shared_ptr<Channel> CHANNEL_PTR;
-
     typedef std::function<void(void)>           USER_PROC;
 
 #ifdef PLATFORM_WINDOWS
     enum OLV_VALUE
     {
-        OVL_RECV,
+        OVL_RECV = 1,
         OVL_SEND,
         OVL_CLOSE,
+    };
+
+    struct ovl_ext_s
+    {
+        OVERLAPPED  base;
+        int         OP;
     };
 #endif
 
@@ -39,8 +43,6 @@ public:
 
     bool                            wakeup();
 
-    void                            pushAsyncChannel(CHANNEL_PTR);
-
     /*  投递一个异步回调，在EventLoop::loop被唤醒后执行 */
     void                            pushAsyncProc(const USER_PROC& f);
     void                            pushAsyncProc(USER_PROC&& f);
@@ -49,16 +51,10 @@ public:
     void                            pushAfterLoopProc(const USER_PROC& f);
     void                            pushAfterLoopProc(USER_PROC&& f);
 
-    void                            restoreThreadID();
-
-    /*  非线程安全,将channel放入容器  */
-    void                            addChannel(int64_t id, CHANNEL_PTR channel);
-    /*  非线程安全,从容器里移除fd对应的channel  */
-    void                            removeChannel(int64_t id);
-
-    void                            linkChannel(int fd, Channel* ptr);
-
     TimerMgr&                       getTimerMgr();
+
+    bool                            linkChannel(int fd, Channel* ptr);
+
 #ifdef PLATFORM_WINDOWS
     HANDLE                          getIOCPHandle() const;
 #else
@@ -71,6 +67,7 @@ private:
     void                            processAsyncProcs();
 
     bool                            isInLoopThread();
+
 private:
     int                             mEventEntriesNum;
 #ifdef PLATFORM_WINDOWS
@@ -79,7 +76,7 @@ private:
     OVERLAPPED_ENTRY*               mEventEntries;
     sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
     HANDLE                          mIOCP;
-    OVERLAPPED                      mWakeupOvl;
+    ovl_ext_s                       mWakeupOvl;
     Channel*                        mWakeupChannel;
 #else
     int                             mEpollFd;
@@ -100,11 +97,10 @@ private:
 
     std::mutex                      mAsyncProcsMutex;
 
-    /*调用loop函数所在thread的id*/
-    CurrentThread::THREAD_ID_TYPE           mSelfThreadid;
-    std::unordered_map<int64_t, CHANNEL_PTR>    mChannels;      /*  存放当前所有会话链接，保证其智能指针(内存在其链接期间)不被销毁(引用计数大于1) */
+    bool                            mIsInitThreadID;
+    CurrentThread::THREAD_ID_TYPE   mSelfThreadid;              /*  调用loop函数所在thread的id */
 
-    TimerMgr                                    mTimer;
+    TimerMgr                        mTimer;
 };
 
 #endif

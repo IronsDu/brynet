@@ -29,9 +29,9 @@ DataSocket::DataSocket(int fd)
     memset(&mOvlSend, 0, sizeof(mOvlSend));
     memset(&mOvlClose, 0, sizeof(mOvlClose));
 
-    mOvlRecv.base.Offset = EventLoop::OVL_RECV;
-    mOvlSend.base.Offset = EventLoop::OVL_SEND;
-    mOvlClose.base.Offset = EventLoop::OVL_CLOSE;
+    mOvlRecv.OP = EventLoop::OVL_RECV;
+    mOvlSend.OP = EventLoop::OVL_SEND;
+    mOvlClose.OP = EventLoop::OVL_CLOSE;
 
     mPostRecvCheck = false;
     mPostWriteCheck = false;
@@ -81,8 +81,10 @@ DataSocket::~DataSocket()
     }
 }
 
-void DataSocket::onEnterEventLoop(EventLoop* el)
+bool DataSocket::onEnterEventLoop(EventLoop* el)
 {
+    bool ret = false;
+
     if (mEventLoop == nullptr)
     {
         mEventLoop = el;
@@ -92,14 +94,16 @@ void DataSocket::onEnterEventLoop(EventLoop* el)
         
         if (checkRead())
         {
-            mEventLoop->addChannel(reinterpret_cast<int64_t>(this), shared_from_this());
-            mEnterCallback(shared_from_this());
+            mEnterCallback(this);
+            ret = true;
         }
         else
         {
             closeSocket();
         }
     }
+
+    return ret;
 }
 
 /*  添加发送数据队列    */
@@ -237,8 +241,8 @@ void DataSocket::recv()
             {
                 mRecvData = true;
                 writePos += retlen;
-                int proclen = mDataCallback(shared_from_this(), parsePos, writePos - parsePos);
-                assert(proclen >= 0);
+                int proclen = mDataCallback(this, parsePos, writePos - parsePos);
+                assert(proclen >= 0 && proclen <= (writePos - parsePos));
                 if (proclen >= 0 && proclen <= (writePos - parsePos))
                 {
                     parsePos += proclen;
@@ -528,14 +532,12 @@ void DataSocket::onClose()
 {
     if (!mIsPostFinalClose)
     {
-        DataSocket::PTR thisPtr = shared_from_this();
+        DataSocket::PTR thisPtr = this;
         mEventLoop->pushAfterLoopProc([=](){
             if (mDisConnectCallback != nullptr)
             {
                 mDisConnectCallback(thisPtr);
             }
-            mEventLoop->removeChannel(reinterpret_cast<int64_t>(thisPtr.get()));
-            /*close socket之后，可能给新连接分配fd值，其onenter时被添加到管理器,(最后IOCP下,见procCloseInLoop)这里remove时可能错误的移除新链接，所以链接管理不能用fd作为key*/
         });
 
         closeSocket();
@@ -569,12 +571,7 @@ bool    DataSocket::checkRead()
         int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
         if (ret == -1)
         {
-            check_ret = GetLastError() == WSA_IO_PENDING;
-            if (!check_ret)
-            {
-                DWORD er = GetLastError();
-                std::cout << "Error : " << GetLastError() << std::endl;
-            }
+            check_ret = (sErrno == WSA_IO_PENDING);
         }
 
         if (check_ret)
@@ -599,7 +596,7 @@ bool    DataSocket::checkWrite()
         int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
         if (ret == -1)
         {
-            check_ret = GetLastError() == WSA_IO_PENDING;
+            check_ret = (sErrno == WSA_IO_PENDING);
         }
 
         if (check_ret)
@@ -690,7 +687,7 @@ void DataSocket::postDisConnect()
 {
     if (mEventLoop != nullptr)
     {
-        DataSocket::PTR tmp = shared_from_this();
+        DataSocket::PTR tmp = this;
         mEventLoop->pushAsyncProc([=](){
             tmp->procCloseInLoop();
         });
