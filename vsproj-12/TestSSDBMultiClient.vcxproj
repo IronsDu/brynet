@@ -11,8 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{92850F11-2E93-41D8-95B7-864DF71D7082}</ProjectGuid>
-    <RootNamespace>PingPongServer</RootNamespace>
+    <ProjectGuid>{8A6DD330-EB83-4794-8697-E1C72E228D5E}</ProjectGuid>
+    <RootNamespace>TestSSDBMultiClient</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -49,8 +49,8 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\src\net;..\src\utils;..\src\timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\src\net;..\src\utils;..\src\timer;..\src\ssdb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -64,8 +64,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\src\net;..\src\utils;..\src\timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\src\net;..\src\utils;..\src\timer;..\src\ssdb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -75,13 +75,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\examples\PingPongServer.cpp" />
+    <ClCompile Include="..\src\examples\TestMultiSSDBClient.cpp" />
     <ClCompile Include="..\src\net\CurrentThread.cpp" />
     <ClCompile Include="..\src\net\DataSocket.cpp" />
     <ClCompile Include="..\src\net\EventLoop.cpp" />
     <ClCompile Include="..\src\net\SocketLibFunction.c" />
     <ClCompile Include="..\src\net\TCPService.cpp" />
     <ClCompile Include="..\src\net\WrapTCPService.cpp" />
+    <ClCompile Include="..\src\ssdb\RedisSSDBCovert.cpp" />
+    <ClCompile Include="..\src\ssdb\SSDBMultiClient.cpp" />
+    <ClCompile Include="..\src\ssdb\SSDBProtocol.cpp" />
     <ClCompile Include="..\src\timer\timer.cpp" />
     <ClCompile Include="..\src\utils\buffer.c" />
     <ClCompile Include="..\src\utils\systemlib.c" />
@@ -97,6 +100,11 @@
     <ClInclude Include="..\src\net\SocketLibTypes.h" />
     <ClInclude Include="..\src\net\TCPService.h" />
     <ClInclude Include="..\src\net\WrapTCPService.h" />
+    <ClInclude Include="..\src\ssdb\RedisParse.h" />
+    <ClInclude Include="..\src\ssdb\RedisRequest.h" />
+    <ClInclude Include="..\src\ssdb\RedisSSDBCovert.h" />
+    <ClInclude Include="..\src\ssdb\SSDBMultiClient.h" />
+    <ClInclude Include="..\src\ssdb\SSDBProtocol.h" />
     <ClInclude Include="..\src\timer\timer.h" />
     <ClInclude Include="..\src\utils\buffer.h" />
     <ClInclude Include="..\src\utils\systemlib.h" />
