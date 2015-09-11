@@ -5,6 +5,8 @@
     * 跨平台网络库
 * src\rpc:
     * 只提供序列化和反序列化的rpc api（支持异步回调）
+* src\ssdb:
+    * 支持多个链接的redis和ssdb客户端，使用异步回调方式的接口
 * src\timer:
     * 简易定时器(使用weak_tr)
 * src\utils:
