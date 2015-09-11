@@ -1,17 +1,15 @@
 ##跨平台游戏开发组件
 
 
-* C语言部分(common和net目录):
-    * 网络库
-    * 基础数据结构
-    * 定时器(使用id)
-    * 线程相关(线程池,线程间消息队列)
-    * 协程
-* C++部分(cpp_common和cpp_net目录):
-    * 网络库
-    * 定时器(使用weak_tr)
-* 其他(utils目录)
-    * C++版本RPC
-    * 动态序列化Protocol Buffer
-    * 读取lua table.
-    * AOI模块
+* src\net:
+    * 跨平台网络库
+* src\rpc:
+    * 只提供序列化和反序列化的rpc api（支持异步回调）
+* src\timer:
+    * 简易定时器(使用weak_tr)
+* src\utils:
+    * 线程间消息队列
+    * 一些没咋使用的C库譬如：线程池，协成，定时器之类的
+* src\examples:
+    * 网络库的pingpang及广播测试
+    * protobuf消息的反射测试
