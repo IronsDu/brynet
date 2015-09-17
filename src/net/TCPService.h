@@ -76,7 +76,8 @@ public:
     void                                addDataSocket(  int fd,
                                                         TcpService::ENTER_CALLBACK enterCallback,
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
-                                                        TcpService::DATA_CALLBACK dataCallback);
+                                                        TcpService::DATA_CALLBACK dataCallback,
+                                                        bool isUseSSL);
 
     /*  开启监听线程  */
     void                                startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
@@ -98,6 +99,12 @@ public:
     /*  随机获取一个EventLoop:非线程安全   */
     EventLoop*                          getRandomEventLoop();
     
+private:
+    void                                helpAddChannel(DataSocket::PTR channel, 
+                                                    const std::string& ip,
+                                                    TcpService::ENTER_CALLBACK enterCallback,
+                                                    TcpService::DISCONNECT_CALLBACK disConnectCallback,
+                                                    TcpService::DATA_CALLBACK dataCallback);
 private:
     int64_t                             MakeID(int loopIndex);
 

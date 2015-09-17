@@ -77,7 +77,7 @@ public:
 
     void                    startWorkThread(int threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
-    void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback);
+    void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL);
 private:
     void                    onAccept(int fd);
 

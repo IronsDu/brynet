@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PingPongServer", "vsproj-12
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestSSDBMultiClient", "vsproj-12\TestSSDBMultiClient.vcxproj", "{8A6DD330-EB83-4794-8697-E1C72E228D5E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestHttp", "vsproj-12\TestHttp.vcxproj", "{52C469DD-F089-44A2-89A6-DB678FD662BE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -39,6 +41,10 @@ Global
 		{8A6DD330-EB83-4794-8697-E1C72E228D5E}.Debug|Win32.Build.0 = Debug|Win32
 		{8A6DD330-EB83-4794-8697-E1C72E228D5E}.Release|Win32.ActiveCfg = Release|Win32
 		{8A6DD330-EB83-4794-8697-E1C72E228D5E}.Release|Win32.Build.0 = Release|Win32
+		{52C469DD-F089-44A2-89A6-DB678FD662BE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{52C469DD-F089-44A2-89A6-DB678FD662BE}.Debug|Win32.Build.0 = Debug|Win32
+		{52C469DD-F089-44A2-89A6-DB678FD662BE}.Release|Win32.ActiveCfg = Release|Win32
+		{52C469DD-F089-44A2-89A6-DB678FD662BE}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

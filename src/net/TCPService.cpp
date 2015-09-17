@@ -308,7 +308,15 @@ void TcpService::stopWorkerThread()
 void TcpService::startListen(int port, const char *certificate, const char *privatekey)
 {
     mListenThread.startListen(port, certificate, privatekey, [this](int fd){
-        addDataSocket(fd, mEnterCallback, mDisConnectCallback, mDataCallback);
+        std::string ip = ox_socket_getipoffd(fd);
+        DataSocket::PTR channel = new DataSocket(fd);
+#ifdef USE_OPENSSL
+        if (mListenThread.getOpenSSLCTX() != nullptr)
+        {
+            channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
+        }
+#endif
+        helpAddChannel(channel, ip, mEnterCallback, mDisConnectCallback, mDataCallback);
     });
 }
 
@@ -394,25 +402,11 @@ void TcpService::procDataSocketClose(DataSocket::PTR ds)
     mIds[sid.data.loopIndex].reclaimID(sid.data.index);
 }
 
-void TcpService::addDataSocket(int fd,
-                                TcpService::ENTER_CALLBACK enterCallback,
-                                TcpService::DISCONNECT_CALLBACK disConnectCallback,
-                                TcpService::DATA_CALLBACK dataCallback)
+void TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, TcpService::ENTER_CALLBACK enterCallback, TcpService::DISCONNECT_CALLBACK disConnectCallback, TcpService::DATA_CALLBACK dataCallback)
 {
-    DataSocket::PTR channel = new DataSocket(fd);
-
-#ifdef USE_OPENSSL
-    if (mListenThread.getOpenSSLCTX() != nullptr)
-    {
-        channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
-    }
-#endif
-
     /*  随机为此链接分配一个eventloop */
     int loopIndex = rand() % mLoopNum;
     EventLoop& loop = mLoops[loopIndex];
-
-    std::string ip = ox_socket_getipoffd(fd);
 
     channel->setEnterCallback([this, loopIndex, enterCallback, disConnectCallback, dataCallback, ip](DataSocket::PTR dataSocket){
         int64_t id = MakeID(loopIndex);
@@ -443,4 +437,21 @@ void TcpService::addDataSocket(int fd,
             delete channel;
         }
     });
+}
+
+void TcpService::addDataSocket(int fd,
+                                TcpService::ENTER_CALLBACK enterCallback,
+                                TcpService::DISCONNECT_CALLBACK disConnectCallback,
+                                TcpService::DATA_CALLBACK dataCallback,
+                                bool isUseSSL)
+{
+    std::string ip = ox_socket_getipoffd(fd);
+    DataSocket::PTR channel = new DataSocket(fd);
+#ifdef USE_OPENSSL
+    if (isUseSSL)
+    {
+        channel->setupConnectSSL();
+    }
+#endif
+    helpAddChannel(channel, ip, enterCallback, disConnectCallback, dataCallback);
 }
