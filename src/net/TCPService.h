@@ -68,6 +68,12 @@ public:
     void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
     void                                send(int64_t id, const DataSocket::PACKET_PTR& packet);
 
+    /*  逻辑线程调用，将要发送的消息包缓存起来，再一次性通过flushCachePackectList放入到网络线程    */
+    void                                cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet);
+    void                                cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet);
+
+    void                                flushCachePackectList();
+
     /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
     void                                disConnect(int64_t id);
 
@@ -111,6 +117,8 @@ private:
     void                                procDataSocketClose(DataSocket::PTR);
 
 private:
+    typedef std::vector<std::pair<int64_t, DataSocket::PACKET_PTR>> MSG_LIST;
+    std::shared_ptr<MSG_LIST>*          mCachePacketList;
     EventLoop*                          mLoops;
     std::thread**                       mIOThreads;
     int                                 mLoopNum;

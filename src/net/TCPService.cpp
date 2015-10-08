@@ -217,6 +217,50 @@ void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet)
     }
 }
 
+void TcpService::cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet)
+{
+    cacheSend(id, packet);
+}
+
+void TcpService::cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet)
+{
+    union  SessionId sid;
+    sid.id = id;
+    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    {
+        mCachePacketList[sid.data.loopIndex]->push_back(std::make_pair(id, packet));
+    }
+}
+
+void TcpService::flushCachePackectList()
+{
+    for (int i = 0; i < mLoopNum; ++i)
+    {
+        if (!mCachePacketList[i]->empty())
+        {
+            auto msgList = mCachePacketList[i];
+            mLoops[i].pushAsyncProc([this, msgList](){
+                for (auto& v : *msgList)
+                {
+                    union  SessionId sid;
+                    sid.id = v.first;
+                    DataSocket::PTR tmp = nullptr;
+                    if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
+                    {
+                        if (tmp != nullptr && tmp->getUserData() == sid.id)
+                        {
+                            tmp->sendPacket(v.second);
+                        }
+                    }
+                }
+                
+            });
+            mCachePacketList[i] = std::make_shared<MSG_LIST>();
+        }
+    }
+}
+
 void TcpService::disConnect(int64_t id)
 {
     union  SessionId sid;
@@ -278,6 +322,7 @@ void TcpService::closeWorkerThread()
     mIncIds = nullptr;
     delete[] mIds;
     mIds = nullptr;
+    delete[] mCachePacketList;
 }
 
 void TcpService::stopWorkerThread()
@@ -325,6 +370,12 @@ void TcpService::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
     if (mLoops == nullptr)
     {
         mRunIOLoop = true;
+        mCachePacketList = new std::shared_ptr<MSG_LIST>[threadNum];
+        for (int i = 0; i < threadNum; ++i)
+        {
+            mCachePacketList[i] = std::make_shared<MSG_LIST>();
+        }
+
         mLoops = new EventLoop[threadNum];
         mIOThreads = new std::thread*[threadNum];
         mLoopNum = threadNum;
