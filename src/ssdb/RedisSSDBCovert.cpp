@@ -9,7 +9,7 @@ using namespace std;
 RedisProtocolRequest   ssdbRequestCovertToRedis(const char* buffer, int len)
 {
     SSDBProtocolResponse ssdbRequest;
-    ssdbRequest.parse(buffer, len);
+    ssdbRequest.parse(buffer);
 
     RedisProtocolRequest ret;
 

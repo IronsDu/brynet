@@ -49,6 +49,10 @@ public:
     void                                                            redisSet(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback);
     void                                                            redisGet(const std::string& key, const ONE_STRING_CALLBACK& callback);
 
+    void                                                            multiSet(const std::unordered_map<std::string, std::string> &kvs, const NONE_VALUE_CALLBACK& callback);
+    void                                                            multiGet(const std::vector<std::string> &keys, const STRING_LIST_CALLBACK& callback);
+    void                                                            multiDel(const std::vector<std::string> &keys, const NONE_VALUE_CALLBACK& callback);
+
     void                                                            set(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback);
     void                                                            get(const string& k, const ONE_STRING_CALLBACK& callback);
 

@@ -37,6 +37,11 @@ public:
         mResult = tmp;
     }
 
+    void            appendBinary(const char* buffer, size_t len)
+    {
+        addStr(buffer, len);
+    }
+
     void            writev()
     {
 
@@ -98,7 +103,7 @@ private:
         mResult.push_back('$');
         mResult += (std::to_string(len));
         mResult += "\r\n";
-        mResult += buffer;
+        mResult.append(buffer, len);
         mResult += "\r\n";
         mArgc += 1;
     }

@@ -10,9 +10,15 @@
 
 struct buffer_s;
 
-/*  ssdb请求结果的状态    */
 class Status
 {
+    enum STATUS_TYPE
+    {
+        STATUS_NONE,
+        STATUS_OK,
+        STATUS_NOTFOUND,
+        STATUS_ERROR,
+    };
 public:
     Status();
     Status(std::string&&);
@@ -21,14 +27,15 @@ public:
 
     Status& operator =(Status&&);
 
-    int             not_found() const;
-    int             ok() const;
-    int             error() const;
+    bool                not_found();
+    bool                ok();
+    bool                error();
 
-    std::string     code() const;
+    const std::string&  code() const;
 
 private:
     std::string     mCode;
+    STATUS_TYPE     mCacheStatus;
 };
 
 /*  ssdb协议的请求格式 */
@@ -40,14 +47,13 @@ public:
     ~SSDBProtocolRequest();
 
     void            appendStr(const char* str);
+    void            appendStr(const char* str, size_t len);
 
     void            appendInt64(int64_t val);
 
     void            appendStr(const std::string& str);
 
     void            endl();
-
-    void            appendBlock(const char* data, int len);
 
     const char*     getResult();
     int             getResultLen();
@@ -66,6 +72,7 @@ public:
     }
 
 private:
+    void            appendBlock(const char* data, int len);
 
     SSDBProtocolRequest & operator << (const std::vector<std::string> &keys)
     {
@@ -121,7 +128,7 @@ public:
 
     void                init();
 
-    void                parse(const char* buffer, int len);
+    void                parse(const char* buffer);
     Bytes*              getByIndex(size_t index);
     void                pushByte(const char* buffer, int len);
 
@@ -135,8 +142,10 @@ private:
     std::vector<Bytes>   mBuffers;
 };
 
+Status read_bytes(SSDBProtocolResponse *response, std::vector<Bytes> *ret);
 Status read_list(SSDBProtocolResponse *response, std::vector<std::string> *ret);
 Status read_int64(SSDBProtocolResponse *response, int64_t *ret);
+Status read_byte(SSDBProtocolResponse *response, Bytes *ret);
 Status read_str(SSDBProtocolResponse *response, std::string *ret);
 
 

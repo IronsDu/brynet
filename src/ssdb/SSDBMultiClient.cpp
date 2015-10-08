@@ -216,7 +216,7 @@ parse_tree* SSDBMultiClient::processResponse(const string& response)
     }
     else
     {
-        mResponseProtocol->parse(response.c_str(), response.size());
+        mResponseProtocol->parse(response.c_str());
     }
 
     return nullptr;
@@ -225,12 +225,16 @@ parse_tree* SSDBMultiClient::processResponse(const string& response)
 void SSDBMultiClient::pushNoneValueRequest(const char* request, int len, const NONE_VALUE_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
-        parse_tree* p = processResponse(response);
-        callback(mResponseProtocol->getStatus());
-        if (p != nullptr)
+        if (callback != nullptr)
         {
-            parse_tree_del(p);
+            parse_tree* p = processResponse(response);
+            callback(mResponseProtocol->getStatus());
+            if (p != nullptr)
+            {
+                parse_tree_del(p);
+            }
         }
+        
     }, std::string(request, len) );
 
     mRequestList.Push(std::move(msg));
@@ -239,13 +243,16 @@ void SSDBMultiClient::pushNoneValueRequest(const char* request, int len, const N
 void SSDBMultiClient::pushStringValueRequest(const char* request, int len, const ONE_STRING_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
-        parse_tree* p = processResponse(response);
-        string ret;
-        Status s = read_str(mResponseProtocol, &ret);
-        callback(ret, s);
-        if (p != nullptr)
+        if (callback != nullptr)
         {
-            parse_tree_del(p);
+            parse_tree* p = processResponse(response);
+            string ret;
+            Status s = read_str(mResponseProtocol, &ret);
+            callback(ret, s);
+            if (p != nullptr)
+            {
+                parse_tree_del(p);
+            }
         }
     }, std::string(request, len));
 
@@ -255,13 +262,16 @@ void SSDBMultiClient::pushStringValueRequest(const char* request, int len, const
 void SSDBMultiClient::pushStringListRequest(const char* request, int len, const STRING_LIST_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
-        parse_tree* p = processResponse(response);
-        std::vector<string> ret;
-        Status s = read_list(mResponseProtocol, &ret);
-        callback(ret, s);
-        if (p != nullptr)
+        if (callback != nullptr)
         {
-            parse_tree_del(p);
+            parse_tree* p = processResponse(response);
+            std::vector<string> ret;
+            Status s = read_list(mResponseProtocol, &ret);
+            callback(ret, s);
+            if (p != nullptr)
+            {
+                parse_tree_del(p);
+            }
         }
     }, std::string(request, len));
 
@@ -271,13 +281,16 @@ void SSDBMultiClient::pushStringListRequest(const char* request, int len, const 
 void SSDBMultiClient::pushIntValueRequest(const char* request, int len, const ONE_INT64_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
-        parse_tree* p = processResponse(response);
-        int64_t ret;
-        Status s = read_int64(mResponseProtocol, &ret);
-        callback(ret, s);
-        if (p != nullptr)
+        if (callback != nullptr)
         {
-            parse_tree_del(p);
+            parse_tree* p = processResponse(response);
+            int64_t ret;
+            Status s = read_int64(mResponseProtocol, &ret);
+            callback(ret, s);
+            if (p != nullptr)
+            {
+                parse_tree_del(p);
+            }
         }
     }, std::string(request, len));
 
@@ -309,6 +322,32 @@ void SSDBMultiClient::redisGet(const std::string& key, const ONE_STRING_CALLBACK
 #endif
 }
 
+void SSDBMultiClient::multiSet(const std::unordered_map<std::string, std::string> &kvs, const NONE_VALUE_CALLBACK& callback)
+{
+    mRequestProtocol->init();
+    mRequestProtocol->writev("multi_set", kvs);
+    mRequestProtocol->endl();
+
+    pushNoneValueRequest(mRequestProtocol->getResult(), mRequestProtocol->getResultLen(), callback);
+}
+
+void SSDBMultiClient::multiGet(const std::vector<std::string> &keys, const STRING_LIST_CALLBACK& callback)
+{
+    mRequestProtocol->init();
+    mRequestProtocol->writev("multi_get", keys);
+    mRequestProtocol->endl();
+
+    pushStringListRequest(mRequestProtocol->getResult(), mRequestProtocol->getResultLen(), callback);
+}
+
+void SSDBMultiClient::multiDel(const std::vector<std::string> &keys, const NONE_VALUE_CALLBACK& callback)
+{
+    mRequestProtocol->init();
+    mRequestProtocol->writev("multi_del", keys);
+    mRequestProtocol->endl();
+
+    pushNoneValueRequest(mRequestProtocol->getResult(), mRequestProtocol->getResultLen(), callback);
+}
 
 void SSDBMultiClient::set(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback)
 {
