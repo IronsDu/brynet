@@ -159,7 +159,8 @@ void DataSocket::runAfterFlush()
 
 void DataSocket::recv()
 {
-    static  const   int RECVBUFFER_SIZE = 1024 * 16;
+    /*由应用层设置会话的最大读缓冲区*/
+    static  const   int RECVBUFFER_SIZE = 1024 * 32;
 
     bool must_close = false;
     static_assert(sizeof(char) == 1, "");
@@ -323,23 +324,30 @@ void DataSocket::normalFlush()
 
     static  const   int SENDBUF_SIZE = 1024 * 16;
     char    sendbuf[SENDBUF_SIZE];
+    
+SEND_PROC:
+    char* sendptr = sendbuf;
     int     wait_send_size = 0;
 
-SEND_PROC:
-
-    wait_send_size = 0;
-
-    for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+    for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end(); ++it)
     {
         pending_packet& b = *it;
-        if ((wait_send_size + b.left) <= sizeof(sendbuf))
+        char* packetLeftBuf = (char*)(b.packet->c_str() + (b.packet->size() - b.left));
+        int packetLeftLen = b.left;
+
+        if ((wait_send_size + packetLeftLen) <= sizeof(sendbuf))
         {
-            memcpy(sendbuf + wait_send_size, b.packet->c_str() + (b.packet->size() - b.left), b.left);
-            wait_send_size += b.left;
-            ++it;
+            memcpy(sendptr + wait_send_size, packetLeftBuf, packetLeftLen);
+            wait_send_size += packetLeftLen;
         }
         else
         {
+            /*如果无法装入合并缓冲区，则单独发送此消息包*/
+            if (it == mSendList.begin())
+            {
+                sendptr = packetLeftBuf;
+                wait_send_size = packetLeftLen;
+            }
             break;
         }
     }
@@ -350,14 +358,14 @@ SEND_PROC:
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
-            send_retlen = SSL_write(mSSL, sendbuf, wait_send_size);
+            send_retlen = SSL_write(mSSL, sendptr, wait_send_size);
         }
         else
         {
-            send_retlen = ::send(mFD, sendbuf, wait_send_size, 0);
+            send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
         }
 #else
-        send_retlen = ::send(mFD, sendbuf, wait_send_size, 0);
+        send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
 #endif
 
         if (send_retlen > 0)
