@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <memory>
 
-#include "datasocket.h"
+#include "DataSocket.h"
 #include "typeids.h"
 
 class EventLoop;

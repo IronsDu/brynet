@@ -139,7 +139,7 @@ void ListenThread::RunListen()
 
             printf("accept fd : %d \n", client_fd);
 
-            if (SOCKET_ERROR != client_fd)
+            if (SOCKET_ERROR != client_fd && mRunListen)
             {
                 ox_socket_nodelay(client_fd);
                 ox_socket_setsdsize(client_fd, 32 * 1024);
@@ -170,6 +170,7 @@ TcpService::TcpService()
     mDataCallback = nullptr;
 
     mRunIOLoop = false;
+    mCachePacketList = nullptr;
 }
 
 TcpService::~TcpService()
@@ -323,6 +324,7 @@ void TcpService::closeWorkerThread()
     delete[] mIds;
     mIds = nullptr;
     delete[] mCachePacketList;
+    mCachePacketList = nullptr;
 }
 
 void TcpService::stopWorkerThread()

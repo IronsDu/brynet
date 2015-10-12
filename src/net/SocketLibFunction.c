@@ -1,9 +1,12 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "SocketLibFunction.h"
 
 #if defined PLATFORM_WINDOWS
 static WSADATA g_WSAData;
+#else
+#include <linux/poll.h>
 #endif
 
 bool
@@ -23,6 +26,8 @@ ox_socket_init(void)
             ret = false;
         }
     }
+    #else
+    signal(SIGPIPE, SIG_IGN);
     #endif
 
     return ret;
@@ -130,15 +135,6 @@ ox_socket_nonblockconnect(const char* server_ip, int port, int timeout)
             clientfd = SOCKET_ERROR;
         }
 #else
-        struct pollfd pfd;
-        memset(&pfd, 0, sizeof(pfd));
-        pfd.fd = clientfd;
-        pfd.events = POLLOUT;
-        if (poll(&pfd, 1, timeout) != 1 || pfd.revents != POLLOUT)
-        {
-            ox_socket_close(clientfd);
-            clientfd = SOCKET_ERROR;
-        }
 #endif
     }
 
