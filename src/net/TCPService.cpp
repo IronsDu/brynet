@@ -205,16 +205,30 @@ void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet)
     assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
     {
-        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
+        if (mLoops[sid.data.loopIndex].isInLoopThread())
+        {
             DataSocket::PTR tmp = nullptr;
             if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
             {
                 if (tmp != nullptr && tmp->getUserData() == sid.id)
                 {
-                    tmp->sendPacket(packet);
+                    tmp->sendPacketInLoop(packet);
                 }
             }
-        });
+        }
+        else
+        {
+            mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
+                DataSocket::PTR tmp = nullptr;
+                if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
+                {
+                    if (tmp != nullptr && tmp->getUserData() == sid.id)
+                    {
+                        tmp->sendPacketInLoop(packet);
+                    }
+                }
+            });
+        }
     }
 }
 

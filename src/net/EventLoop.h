@@ -61,12 +61,12 @@ public:
     int                             getEpollHandle() const;
 #endif
 
+    bool                            isInLoopThread();
 private:
     void                            reallocEventSize(int size);
     void                            processAfterLoopProcs();
     void                            processAsyncProcs();
 
-    bool                            isInLoopThread();
 
 private:
     size_t                          mEventEntriesNum;

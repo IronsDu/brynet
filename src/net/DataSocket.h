@@ -44,6 +44,9 @@ public:
 
     void                            send(const char* buffer, int len);
 
+    void                            sendPacketInLoop(const PACKET_PTR&);
+    void                            sendPacketInLoop(PACKET_PTR&&);
+
     void                            sendPacket(const PACKET_PTR&);
     void                            sendPacket(PACKET_PTR&&);
 

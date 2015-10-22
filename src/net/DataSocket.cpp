@@ -112,6 +112,19 @@ void    DataSocket::send(const char* buffer, int len)
     sendPacket(makePacket(buffer, len));
 }
 
+void DataSocket::sendPacketInLoop(const PACKET_PTR& packet)
+{
+    assert(mEventLoop->isInLoopThread());
+    mSendList.push_back({ packet, packet->size() });
+    runAfterFlush();
+}
+
+void DataSocket::sendPacketInLoop(PACKET_PTR&& packet)
+{
+    assert(mEventLoop->isInLoopThread());
+    sendPacketInLoop(packet);
+}
+
 void DataSocket::sendPacket(const PACKET_PTR& packet)
 {
     mEventLoop->pushAsyncProc([this, packet](){
@@ -162,6 +175,7 @@ void DataSocket::recv()
     /*由应用层设置会话的最大读缓冲区*/
     static  const   int RECVBUFFER_SIZE = 1024 * 32;
 
+    /*todo::将tmpRecvBuffer改为每一个loop单独一个内存区域，不适用栈内存，这样就可以随意提升此内存空间大小，提高吞吐*/
     bool must_close = false;
     static_assert(sizeof(char) == 1, "");
     char tmpRecvBuffer[RECVBUFFER_SIZE];    /*  临时读缓冲区  */
@@ -322,8 +336,9 @@ void DataSocket::normalFlush()
 {
     bool must_close = false;
 
-    static  const   int SENDBUF_SIZE = 1024 * 16;
+    static  const   int SENDBUF_SIZE = 1024 * 32;
     char    sendbuf[SENDBUF_SIZE];
+    /*TODO::将sendbuf改为堆内存或线程私有数据， 提高此内存区域大小，提高吞吐*/
     
 SEND_PROC:
     char* sendptr = sendbuf;
