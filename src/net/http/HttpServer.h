@@ -27,6 +27,7 @@ private:
 private:
     HTTPPROTOCOL_CALLBACK   mOnRequestCallback;
     WrapServer::PTR         mServer;
+    ListenThread::PTR       mListenThread;
 };
 
 #endif

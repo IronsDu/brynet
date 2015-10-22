@@ -30,17 +30,19 @@ int main(int argc, char **argv)
     int port_num = atoi(argv[2]);
 
     WrapServer::PTR server = std::make_shared<WrapServer>();
+    ListenThread::PTR listenThread = std::make_shared<ListenThread>();
 
-    server->setDefaultEnterCallback([](TCPSession::PTR session){
-        session->setCloseCallback(onSessionClose);
-        session->setDataCallback(onSessionMsg);
+    listenThread->startListen(port_num, nullptr, nullptr, [=](int fd){
+        server->addSession(fd, [](TCPSession::PTR session){
+            session->setCloseCallback(onSessionClose);
+            session->setDataCallback(onSessionMsg);
 
-        g_mutex.lock();
-        total_client_num++;
-        g_mutex.unlock();
+            g_mutex.lock();
+            total_client_num++;
+            g_mutex.unlock();
+        }, false);
     });
 
-    server->startListen(port_num);
     server->startWorkThread(thread_num);
 
     EventLoop mainLoop;

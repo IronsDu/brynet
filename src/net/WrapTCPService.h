@@ -67,24 +67,13 @@ public:
     WrapServer();
     virtual ~WrapServer();
 
-    void                    setDefaultEnterCallback(SESSION_ENTER_CALLBACK callback);
-
     TcpService::PTR&        getService();
-
-    ListenThread&           getListenThread();
-
-    void                    startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 
     void                    startWorkThread(int threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
     void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL);
 private:
-    void                    onAccept(int fd);
-
-private:
     TcpService::PTR         mTCPService;
-    ListenThread            mListenThread;
-    SESSION_ENTER_CALLBACK  mSessionDefaultEnterCallback;
 };
 
 #endif

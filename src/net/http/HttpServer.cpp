@@ -4,9 +4,6 @@
 HttpServer::HttpServer()
 {
     mServer = std::make_shared<WrapServer>();
-    mServer->setDefaultEnterCallback([this](TCPSession::PTR session){
-        setSessionCallback(session, mOnRequestCallback);
-    });
 }
 
 void HttpServer::setRequestHandle(HTTPPROTOCOL_CALLBACK requestCallback)
@@ -24,7 +21,11 @@ void HttpServer::addConnection(int fd, ENTER_CALLBACK enterCallback, HTTPPROTOCO
 
 void HttpServer::start(int port, int workthreadnum)
 {
-    mServer->startListen(port);
+    mListenThread->startListen(port, nullptr, nullptr, [this](int fd){
+        mServer->addSession(fd, [this](TCPSession::PTR session){
+            setSessionCallback(session, mOnRequestCallback);
+        }, false);
+    });
     mServer->startWorkThread(workthreadnum);
 }
 
