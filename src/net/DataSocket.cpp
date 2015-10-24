@@ -595,17 +595,11 @@ bool    DataSocket::checkRead()
         if (ret == -1)
         {
             check_ret = (sErrno == WSA_IO_PENDING);
-            if (check_ret)
-            {
-                mPostRecvCheck = true;
-            }
         }
-        else
+
+        if (check_ret)
         {
-            check_ret = true;
-            mEventLoop->pushAfterLoopProc([=](){
-                recv();
-            });
+            mPostRecvCheck = true;
         }
     }
 #endif
@@ -626,16 +620,11 @@ bool    DataSocket::checkWrite()
         if (ret == -1)
         {
             check_ret = (sErrno == WSA_IO_PENDING);
-            if (check_ret)
-            {
-                mPostWriteCheck = true;
-            }
         }
-        else
+
+        if (check_ret)
         {
-            check_ret = true;
-            mCanWrite = true;
-            runAfterFlush();
+            mPostWriteCheck = true;
         }
     }
 #else
