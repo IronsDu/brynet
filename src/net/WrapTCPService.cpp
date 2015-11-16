@@ -14,6 +14,8 @@ TCPSession::TCPSession()
 
 TCPSession::~TCPSession()
 {
+    mSocketID = -1;
+    mUserData = -1;
 }
 
 int64_t TCPSession::getUD()

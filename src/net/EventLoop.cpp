@@ -173,10 +173,6 @@ void EventLoop::loop(int64_t timeout)
         {
             ds->canSend();
         }
-        else if (ovl->OP == EventLoop::OVL_CLOSE)
-        {
-            ds->onClose();
-        }
         else
         {
             assert(false);

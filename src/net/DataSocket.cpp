@@ -27,11 +27,9 @@ DataSocket::DataSocket(int fd)
 #ifdef PLATFORM_WINDOWS
     memset(&mOvlRecv, 0, sizeof(mOvlRecv));
     memset(&mOvlSend, 0, sizeof(mOvlSend));
-    memset(&mOvlClose, 0, sizeof(mOvlClose));
 
     mOvlRecv.OP = EventLoop::OVL_RECV;
     mOvlSend.OP = EventLoop::OVL_SEND;
-    mOvlClose.OP = EventLoop::OVL_CLOSE;
 
     mPostRecvCheck = false;
     mPostWriteCheck = false;
@@ -142,6 +140,11 @@ void    DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
+    if (mFD == SOCKET_ERROR && !mPostWriteCheck && !mPostRecvCheck)
+    {
+        onClose();
+        return;
+    }
 #endif
     recv();
 }
@@ -150,6 +153,11 @@ void DataSocket::canSend()
 {
 #ifdef PLATFORM_WINDOWS
     mPostWriteCheck = false;
+    if (mFD == SOCKET_ERROR && !mPostWriteCheck && !mPostRecvCheck)
+    {
+        onClose();
+        return;
+    }
 #else
     removeCheckWrite();
 #endif
@@ -538,7 +546,6 @@ void DataSocket::procCloseInLoop()
         if (mPostWriteCheck || mPostRecvCheck)  //如果投递了IOCP请求，那么需要投递close，而不能直接调用onClose
         {
             closeSocket();
-            PostQueuedCompletionStatus(mEventLoop->getIOCPHandle(), 0, (ULONG_PTR)((Channel*)this), &(mOvlClose.base));
         }
         else
         {

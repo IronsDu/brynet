@@ -98,7 +98,6 @@ private:
     #include <windows.h>
     struct EventLoop::ovl_ext_s     mOvlRecv;
     struct EventLoop::ovl_ext_s     mOvlSend;
-    struct EventLoop::ovl_ext_s     mOvlClose;
 
     bool                            mPostRecvCheck;     /*  是否投递了可读检测   */
     bool                            mPostWriteCheck;    /*  是否投递了可写检测   */

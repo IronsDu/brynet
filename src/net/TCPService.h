@@ -104,7 +104,7 @@ public:
     void                                wakeupAll();
     /*  随机获取一个EventLoop:非线程安全   */
     EventLoop*                          getRandomEventLoop();
-    
+    EventLoop*                          getEventLoopBySocketID(int64_t id);
 private:
     void                                helpAddChannel(DataSocket::PTR channel, 
                                                     const std::string& ip,

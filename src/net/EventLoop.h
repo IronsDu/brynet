@@ -25,7 +25,6 @@ public:
     {
         OVL_RECV = 1,
         OVL_SEND,
-        OVL_CLOSE,
     };
 
     struct ovl_ext_s

@@ -449,6 +449,21 @@ EventLoop* TcpService::getRandomEventLoop()
     return ret;
 }
 
+EventLoop* TcpService::getEventLoopBySocketID(int64_t id)
+{
+    union  SessionId sid;
+    sid.id = id;
+    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    {
+        return &mLoops[sid.data.loopIndex];
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
 int64_t TcpService::MakeID(int loopIndex)
 {
     union SessionId sid;
@@ -473,7 +488,7 @@ void TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
 {
     /*  随机为此链接分配一个eventloop */
     int loopIndex = rand() % mLoopNum;
-    EventLoop& loop = mLoops[loopIndex];
+    EventLoop* loop = mLoops+loopIndex;
 
     channel->setEnterCallback([this, loopIndex, enterCallback, disConnectCallback, dataCallback, ip](DataSocket::PTR dataSocket){
         int64_t id = MakeID(loopIndex);
@@ -498,8 +513,8 @@ void TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
         }
     });
 
-    loop.pushAsyncProc([&, channel](){
-        if (!channel->onEnterEventLoop(&loop))
+    loop->pushAsyncProc([loop, channel](){
+        if (!channel->onEnterEventLoop(loop))
         {
             delete channel;
         }
