@@ -1,7 +1,7 @@
 #ifndef _SOCKETLIBTYPES_H_INCLUDED_
 #define _SOCKETLIBTYPES_H_INCLUDED_
 
-#include "platform.h"
+#include "Platform.h"
 
 #if defined PLATFORM_WINDOWS
 #include <WinError.h>

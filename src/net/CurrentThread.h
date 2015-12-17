@@ -2,7 +2,7 @@
 #define CURRENT_THREAD_H
 
 #include <thread>
-#include "platform.h"
+#include "Platform.h"
 
 #ifdef PLATFORM_WINDOWS
 #include <Windows.h>

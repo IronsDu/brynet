@@ -1,5 +1,5 @@
 #include "systemlib.h"
-#include "platform.h"
+#include "Platform.h"
 /*  thanks eathena  */
 
 #if defined PLATFORM_WINDOWS

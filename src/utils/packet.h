@@ -4,7 +4,10 @@
 #include <stdint.h>
 #include <assert.h>
 #include <string>
+#include <string.h>
 #include <stdbool.h>
+#include <endian.h>
+#include <stdlib.h>
 
 #include "SocketLibTypes.h"
 
@@ -44,31 +47,31 @@ namespace socketendian
 #else
     inline uint64_t hostToNetwork64(uint64_t host64)
     {
-        return IS_ENDIAN ? htonll(host64) : host64;
+        return IS_ENDIAN ? htobe64(host64) : host64;
     }
     inline uint32_t hostToNetwork32(uint32_t host32)
     {
-        return IS_ENDIAN ? htonl(host32) : host32;
+        return IS_ENDIAN ? htobe32(host32) : host32;
     }
 
     inline uint16_t hostToNetwork16(uint16_t host16)
     {
-        return IS_ENDIAN ? htons(host16) : host16;
+        return IS_ENDIAN ? htobe16(host16) : host16;
     }
 
     inline uint64_t networkToHost64(uint64_t net64)
     {
-        return IS_ENDIAN ? ntohll(net64) : net64;
+        return IS_ENDIAN ? be64toh(net64) : net64;
     }
 
     inline uint32_t networkToHost32(uint32_t net32)
     {
-        return IS_ENDIAN ? ntohl(net32) : net32;
+        return IS_ENDIAN ? be32toh(net32) : net32;
     }
 
     inline uint16_t networkToHost16(uint16_t net16)
     {
-        return IS_ENDIAN ? ntohs(net16) : net16;
+        return IS_ENDIAN ? be16toh(net16) : net16;
     }
 #endif
 }
@@ -200,7 +203,7 @@ public:
     template<typename T>
     Packet & operator << (const T& v)
     {
-        static_assert(std::is_same < T, std::remove_pointer<T>::type>::value, "T must a nomal type");
+        static_assert(std::is_same < T, typename std::remove_pointer<T>::type>::value, "T must a nomal type");
         static_assert(std::is_pod <T>::value, "T must a pod type");
         writeBuffer((const char*)&v, sizeof(v));
         return *this;
@@ -259,7 +262,7 @@ public:
     {
         if (mPos != mMaxLen)
         {
-            assert(mPos == mMaxLen);
+            //assert(mPos == mMaxLen);
         }
     }
     
@@ -329,7 +332,7 @@ public:
     template<typename T>
     void           read(T& value)
     {
-        static_assert(std::is_same < T, std::remove_pointer<T>::type>::value, "T must a nomal type");
+        static_assert(std::is_same < T, typename std::remove_pointer<T>::type>::value, "T must a nomal type");
         static_assert(std::is_pod <T>::value, "T must a pod type");
         
         if ((mPos + sizeof(value) <= mMaxLen))
