@@ -6,10 +6,13 @@
 #include <string>
 #include <string.h>
 #include <stdbool.h>
-#include <endian.h>
 #include <stdlib.h>
 
 #include "SocketLibTypes.h"
+
+#ifndef PLATFORM_WINDOWS
+#include <endian.h>
+#endif
 
 namespace socketendian
 {
