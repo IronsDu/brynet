@@ -21,6 +21,11 @@ void HttpServer::addConnection(int fd, ENTER_CALLBACK enterCallback, HTTPPROTOCO
 
 void HttpServer::start(int port, int workthreadnum)
 {
+    if (mListenThread == nullptr)
+    {
+        mListenThread = std::make_shared<ListenThread>();
+    }
+
     mListenThread->startListen(port, nullptr, nullptr, [this](int fd){
         mServer->addSession(fd, [this](TCPSession::PTR session){
             setSessionCallback(session, mOnRequestCallback);
@@ -39,11 +44,20 @@ void HttpServer::setSessionCallback(TCPSession::PTR session, HTTPPROTOCOL_CALLBA
     });
     session->setDataCallback([this, callback](TCPSession::PTR session, const char* buffer, int len){
         HTTPProtocol* httpProtocol = (HTTPProtocol*)session->getUD();
-        int retlen = httpProtocol->appendAndParse(buffer, len);
         if (httpProtocol->isCompleted())
         {
-            callback(*httpProtocol, session);
+            callback(*httpProtocol, session, buffer, len);
+            return len;
         }
-        return retlen;
+        else
+        {
+            int retlen = httpProtocol->appendAndParse(buffer, len);
+            if (httpProtocol->isCompleted())
+            {
+                callback(*httpProtocol, session, nullptr, 0);
+            }
+            return retlen;
+        }
+        return 0;
     });
 }

@@ -26,8 +26,8 @@ public:
     std::string             getIP() const;
     int64_t                 getSocketID() const;
 
-    void                    send(const char* buffer, int len);
-    void                    send(const DataSocket::PACKET_PTR& packet);
+    void                    send(const char* buffer, int len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                    postClose();
     void                    setCloseCallback(const CLOSE_CALLBACK& callback);

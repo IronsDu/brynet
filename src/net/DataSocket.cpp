@@ -10,10 +10,10 @@
 
 using namespace std;
 
-static int sDefaultRecvBufferSize = 1024;
 
-DataSocket::DataSocket(int fd)
+DataSocket::DataSocket(int fd, int maxRecvBufferSize)
 {
+    mMaxRecvBufferSize = maxRecvBufferSize;
     mRecvData = false;
     mCheckTime = -1;
     mIsPostFinalClose = false;
@@ -39,8 +39,8 @@ DataSocket::DataSocket(int fd)
     mDisConnectCallback = nullptr;
     mDataCallback = nullptr;
     mUserData = -1;
-
-    mRecvBuffer = ox_buffer_new(sDefaultRecvBufferSize);
+    mRecvBuffer = nullptr;
+    growRecvBuffer();
 
 #ifdef USE_OPENSSL
     mSSLCtx = nullptr;
@@ -92,7 +92,11 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
         
         if (checkRead())
         {
-            mEnterCallback(this);
+            if (mEnterCallback != nullptr)
+            {
+                mEnterCallback(this);
+                mEnterCallback = nullptr;
+            }
             ret = true;
         }
         else
@@ -105,35 +109,35 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
 }
 
 /*  添加发送数据队列    */
-void    DataSocket::send(const char* buffer, int len)
+void    DataSocket::send(const char* buffer, int len, const PACKED_SENDED_CALLBACK& callback)
 {
-    sendPacket(makePacket(buffer, len));
+    sendPacket(makePacket(buffer, len), callback);
 }
 
-void DataSocket::sendPacketInLoop(const PACKET_PTR& packet)
+void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
-    mSendList.push_back({ packet, packet->size() });
+    mSendList.push_back({ packet, packet->size(), callback });
     runAfterFlush();
 }
 
-void DataSocket::sendPacketInLoop(PACKET_PTR&& packet)
+void DataSocket::sendPacketInLoop(PACKET_PTR&& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
-    sendPacketInLoop(packet);
+    sendPacketInLoop(packet, callback);
 }
 
-void DataSocket::sendPacket(const PACKET_PTR& packet)
+void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
-    mEventLoop->pushAsyncProc([this, packet](){
-        mSendList.push_back({ packet, packet->size() });
+    mEventLoop->pushAsyncProc([this, packet, callback](){
+        mSendList.push_back({ packet, packet->size(), callback });
         runAfterFlush();
     });
 }
 
-void DataSocket::sendPacket(PACKET_PTR&& packet)
+void DataSocket::sendPacket(PACKET_PTR&& packet, const PACKED_SENDED_CALLBACK& callback)
 {
-    sendPacket(packet);
+    sendPacket(packet, callback);
 }
 
 void    DataSocket::canRecv()
@@ -180,36 +184,11 @@ void DataSocket::runAfterFlush()
 
 void DataSocket::recv()
 {
-    /*由应用层设置会话的最大读缓冲区*/
-    static  const   int RECVBUFFER_SIZE = 1024 * 32;
-
-    /*todo::将tmpRecvBuffer改为每一个loop单独一个内存区域，不适用栈内存，这样就可以随意提升此内存空间大小，提高吞吐*/
     bool must_close = false;
-    static_assert(sizeof(char) == 1, "");
-    char tmpRecvBuffer[RECVBUFFER_SIZE];    /*  临时读缓冲区  */
-    const char* recvEndPos = tmpRecvBuffer + sizeof(tmpRecvBuffer); /*缓冲区结束位置*/
-    char* writePos = tmpRecvBuffer;         /*  当前写起始点  */
-    char* parsePos = tmpRecvBuffer;         /*  当前解析消息包起始点  */
-
-    {
-        /*  先把内置缓冲区的数据拷贝到读缓冲区,然后置空内置缓冲区 */
-        const int oldDataLen = ox_buffer_getreadvalidcount(mRecvBuffer);
-        if (sizeof(tmpRecvBuffer) >= oldDataLen && oldDataLen > 0)
-        {
-            memcpy(tmpRecvBuffer, ox_buffer_getreadptr(mRecvBuffer), oldDataLen);
-            writePos += oldDataLen;
-        }
-
-        ox_buffer_addreadpos(mRecvBuffer, oldDataLen);
-        ox_buffer_adjustto_head(mRecvBuffer);
-
-        assert(ox_buffer_getreadpos(mRecvBuffer) == 0);
-        assert(ox_buffer_getwritepos(mRecvBuffer) == 0);
-    }
 
     while (mFD != SOCKET_ERROR)
     {
-        const int tryRecvLen = recvEndPos - writePos;
+        const int tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
         if (tryRecvLen <= 0)
         {
             break;
@@ -219,14 +198,14 @@ void DataSocket::recv()
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
-            retlen = SSL_read(mSSL, writePoss, tryRecvLen);
+            retlen = SSL_read(mSSL, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen);
         }
         else
         {
-            retlen = ::recv(mFD, writePos, tryRecvLen, 0);
+            retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
         }
 #else
-        retlen = ::recv(mFD, writePos, tryRecvLen, 0);
+        retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
 #endif
 
         if (retlen < 0)
@@ -260,27 +239,16 @@ void DataSocket::recv()
         }
         else
         {
+            ox_buffer_addwritepos(mRecvBuffer, retlen);
+
             if (mDataCallback != nullptr)
             {
                 mRecvData = true;
-                writePos += retlen;
-                int proclen = mDataCallback(this, parsePos, writePos - parsePos);
-                assert(proclen >= 0 && proclen <= (writePos - parsePos));
-                if (proclen >= 0 && proclen <= (writePos - parsePos))
+                int proclen = mDataCallback(this, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
+                assert(proclen >= 0 && proclen <= ox_buffer_getreadvalidcount(mRecvBuffer));
+                if (proclen >= 0 && proclen <= ox_buffer_getreadvalidcount(mRecvBuffer))
                 {
-                    parsePos += proclen;
-
-                    if (writePos == recvEndPos)
-                    {
-                        const int validLen = writePos - parsePos;
-                        if (validLen > 0)
-                        {
-                            memmove(tmpRecvBuffer, parsePos, validLen);
-                        }
-
-                        writePos = tmpRecvBuffer + validLen;
-                        parsePos = tmpRecvBuffer;
-                    }
+                    ox_buffer_addreadpos(mRecvBuffer, proclen);
                 }
                 else
                 {
@@ -288,22 +256,16 @@ void DataSocket::recv()
                 }
             }
         }
-    }
 
-    /*剩余未解析的数据大小*/
-    const int leftlen = writePos - parsePos;
-    if (leftlen > 0)
-    {
-        if ((leftlen > ox_buffer_getwritevalidcount(mRecvBuffer)) && (leftlen + ox_buffer_getreadvalidcount(mRecvBuffer)) <= RECVBUFFER_SIZE)
+        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0)
         {
-            /*如果此次需要拷贝的数据大于剩余内置缓冲区大小，（且新分配大小在16k以内,避免而已客户端发送错误packet，导致服务器分配超大内存)则重新分配内置缓冲区*/
-            struct buffer_s* newbuffer = ox_buffer_new(leftlen + ox_buffer_getreadvalidcount(mRecvBuffer));
-            ox_buffer_write(newbuffer, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
-            ox_buffer_delete(mRecvBuffer);
-            mRecvBuffer = newbuffer;
+            ox_buffer_adjustto_head(mRecvBuffer);
         }
 
-        ox_buffer_write(mRecvBuffer, parsePos, leftlen);
+        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0 || retlen == ox_buffer_getsize(mRecvBuffer))
+        {
+            growRecvBuffer();
+        }
     }
 
     if (must_close)
@@ -311,10 +273,6 @@ void DataSocket::recv()
         /*  回调到用户层  */
         procCloseInLoop();
     }
-    
-    assert(leftlen >= 0);
-    assert(parsePos <= recvEndPos);
-    assert(writePos <= recvEndPos);
 }
 
 void DataSocket::flush()
@@ -400,6 +358,10 @@ SEND_PROC:
                 if (b.left <= tmp_len)
                 {
                     tmp_len -= b.left;
+                    if (b.mCompleteCallback != nullptr)
+                    {
+                        (*b.mCompleteCallback)();
+                    }
                     it = mSendList.erase(it);
                 }
                 else
@@ -494,6 +456,10 @@ SEND_PROC:
                 if (b.left <= tmp_len)
                 {
                     tmp_len -= b.left;
+                    if(b.mCompleteCallback != nullptr)
+                    {
+                        (*b.mCompleteCallback)();
+                    }
                     it = mSendList.erase(it);
                 }
                 else
@@ -672,6 +638,22 @@ void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
     mDisConnectCallback = cb;
 }
 
+const static int GROW_BUFFER_SIZE = 1024;
+
+void DataSocket::growRecvBuffer()
+{
+    if (mRecvBuffer == nullptr)
+    {
+        mRecvBuffer = ox_buffer_new(GROW_BUFFER_SIZE);
+    }
+    else if ((ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE) <= mMaxRecvBufferSize)
+    {
+        buffer_s* newBuffer = ox_buffer_new(ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE);
+        ox_buffer_write(newBuffer, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
+        ox_buffer_delete(mRecvBuffer);
+        mRecvBuffer = newBuffer;
+    }
+}
 void DataSocket::PingCheck()
 {
     if (mRecvData)

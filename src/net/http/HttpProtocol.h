@@ -20,6 +20,8 @@ public:
 
     bool                                    isCompleted() const;
 
+    std::string                             getValue(const std::string& key) const;
+
 private:
     static int                              sChunkHeader(http_parser* hp);
     static int                              sChunkComplete(http_parser* hp);

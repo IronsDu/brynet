@@ -12,7 +12,7 @@
 class HttpServer
 {
 public:
-    typedef std::function < void(const HTTPProtocol&, TCPSession::PTR) > HTTPPROTOCOL_CALLBACK;
+    typedef std::function < void(const HTTPProtocol&, TCPSession::PTR, const char* extdata, int len) > HTTPPROTOCOL_CALLBACK;
     typedef std::function < void(TCPSession::PTR) > ENTER_CALLBACK;
 
     HttpServer();

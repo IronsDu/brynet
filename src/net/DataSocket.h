@@ -33,22 +33,23 @@ public:
     typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
     typedef std::function<int(PTR, const char* buffer, int len)>                DATA_CALLBACK;
     typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
+    typedef std::shared_ptr<std::function<void(void)>>                          PACKED_SENDED_CALLBACK;
 
     typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
 public:
-    explicit DataSocket(int fd);
+    explicit DataSocket(int fd, int maxRecvBufferSize = 16*1024);
     ~DataSocket();
 
     bool                            onEnterEventLoop(EventLoop* el);
 
-    void                            send(const char* buffer, int len);
+    void                            send(const char* buffer, int len, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-    void                            sendPacketInLoop(const PACKET_PTR&);
-    void                            sendPacketInLoop(PACKET_PTR&&);
+    void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                            sendPacketInLoop(PACKET_PTR&&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-    void                            sendPacket(const PACKET_PTR&);
-    void                            sendPacket(PACKET_PTR&&);
+    void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                            sendPacket(PACKET_PTR&&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                            setEnterCallback(ENTER_CALLBACK cb);
     void                            setDataCallback(DATA_CALLBACK cb);
@@ -68,6 +69,7 @@ public:
 
     static  PACKET_PTR              makePacket(const char* buffer, int len);
 private:
+    void                            growRecvBuffer();
 
     void                            PingCheck();
     void                            startPingCheckTimer();
@@ -110,11 +112,13 @@ private:
 
     EventLoop*                      mEventLoop;
     buffer_s*                       mRecvBuffer;
+    int                             mMaxRecvBufferSize;
 
     struct pending_packet
     {
         PACKET_PTR  packet;
         size_t      left;
+        PACKED_SENDED_CALLBACK  mCompleteCallback;
     };
 
     typedef std::deque<pending_packet>   PACKET_LIST_TYPE;

@@ -38,14 +38,14 @@ int64_t TCPSession::getSocketID() const
     return mSocketID;
 }
 
-void    TCPSession::send(const char* buffer, int len)
+void    TCPSession::send(const char* buffer, int len, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
-    mService->send(mSocketID, DataSocket::makePacket(buffer, len));
+    mService->send(mSocketID, DataSocket::makePacket(buffer, len), callback);
 }
 
-void TCPSession::send(const DataSocket::PACKET_PTR& packet)
+void TCPSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
-    mService->send(mSocketID, packet);
+    mService->send(mSocketID, packet, callback);
 }
 
 void TCPSession::postClose()

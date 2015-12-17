@@ -184,6 +184,19 @@ bool HTTPProtocol::isCompleted() const
     return mISCompleted;
 }
 
+std::string HTTPProtocol::getValue(const std::string& key) const
+{
+    auto it = mHeadValues.find(key);
+    if (it != mHeadValues.end())
+    {
+        return (*it).second;
+    }
+    else
+    {
+        return "";
+    }
+}
+
 int HTTPProtocol::sChunkHeader(http_parser* hp)
 {
     return 0;
@@ -233,16 +246,17 @@ int HTTPProtocol::sUrlHandle(http_parser* hp, const char *url, size_t length)
 
 int HTTPProtocol::sHeadValue(http_parser* hp, const char *at, size_t length)
 {
-    sTmpHeadStr = at;
-    sTmpHeadLen = length;
-    printf("Header value: %.*s\n", (int)length, at);
-    return 0;
-}
-int HTTPProtocol::sHeadField(http_parser* hp, const char *at, size_t length)
-{
     HTTPProtocol* httpProtocol = (HTTPProtocol*)hp->data;
     httpProtocol->mHeadValues[string(sTmpHeadStr, sTmpHeadLen)] = string(at, length);
     printf("Header field: %.*s\n", (int)length, at);
+    return 0;
+}
+
+int HTTPProtocol::sHeadField(http_parser* hp, const char *at, size_t length)
+{
+    sTmpHeadStr = at;
+    sTmpHeadLen = length;
+    printf("Header value: %.*s\n", (int)length, at);
     return 0;
 }
 

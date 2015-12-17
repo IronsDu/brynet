@@ -65,12 +65,12 @@ public:
     void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
     void                                setDataCallback(TcpService::DATA_CALLBACK callback);
 
-    void                                send(int64_t id, DataSocket::PACKET_PTR&& packet);
-    void                                send(int64_t id, const DataSocket::PACKET_PTR& packet);
+    void                                send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                                send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
     /*  逻辑线程调用，将要发送的消息包缓存起来，再一次性通过flushCachePackectList放入到网络线程    */
-    void                                cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet);
-    void                                cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet);
+    void                                cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                                cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                                flushCachePackectList();
 
@@ -117,7 +117,7 @@ private:
     void                                procDataSocketClose(DataSocket::PTR);
 
 private:
-    typedef std::vector<std::pair<int64_t, DataSocket::PACKET_PTR>> MSG_LIST;
+    typedef std::vector<std::tuple<int64_t, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
     std::shared_ptr<MSG_LIST>*          mCachePacketList;
     EventLoop*                          mLoops;
     std::thread**                       mIOThreads;

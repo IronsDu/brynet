@@ -193,12 +193,12 @@ void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
     mDataCallback = callback;
 }
 
-void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet)
+void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
-    send(id, packet);
+    send(id, packet, callback);
 }
 
-void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet)
+void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     union  SessionId sid;
     sid.id = id;
@@ -212,19 +212,19 @@ void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet)
             {
                 if (tmp != nullptr && tmp->getUserData() == sid.id)
                 {
-                    tmp->sendPacketInLoop(packet);
+                    tmp->sendPacketInLoop(packet, callback);
                 }
             }
         }
         else
         {
-            mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet](){
+            mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, packet, callback](){
                 DataSocket::PTR tmp = nullptr;
                 if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
                 {
                     if (tmp != nullptr && tmp->getUserData() == sid.id)
                     {
-                        tmp->sendPacketInLoop(packet);
+                        tmp->sendPacketInLoop(packet, callback);
                     }
                 }
             });
@@ -232,19 +232,19 @@ void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet)
     }
 }
 
-void TcpService::cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet)
+void TcpService::cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
-    cacheSend(id, packet);
+    cacheSend(id, packet, callback);
 }
 
-void TcpService::cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet)
+void TcpService::cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     union  SessionId sid;
     sid.id = id;
     assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
     {
-        mCachePacketList[sid.data.loopIndex]->push_back(std::make_pair(id, packet));
+        mCachePacketList[sid.data.loopIndex]->push_back(std::make_tuple(id, packet, callback));
     }
 }
 
@@ -259,13 +259,13 @@ void TcpService::flushCachePackectList()
                 for (auto& v : *msgList)
                 {
                     union  SessionId sid;
-                    sid.id = v.first;
+                    sid.id = std::get<0>(v);
                     DataSocket::PTR tmp = nullptr;
                     if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
                     {
                         if (tmp != nullptr && tmp->getUserData() == sid.id)
                         {
-                            tmp->sendPacket(v.second);
+                            tmp->sendPacket(std::get<1>(v), std::get<2>(v));
                         }
                     }
                 }
