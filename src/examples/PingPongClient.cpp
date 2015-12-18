@@ -34,7 +34,7 @@ int main(int argc, char **argv)
             session->setCloseCallback(onSessionClose);
             session->setDataCallback(onSessionMsg);
             session->send(tmp.c_str(), tmp.size());
-        }, false);
+        }, false, 1024 * 1024);
     }
 
     std::cin.get();

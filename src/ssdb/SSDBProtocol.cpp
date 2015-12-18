@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <string.h>
+
 #include "SocketLibFunction.h"
 #include "buffer.h"
 #include "platform.h"
@@ -13,10 +16,12 @@ Status::Status() : mCacheStatus(STATUS_NONE)
 
 Status::Status(const std::string& code) : mCode(code), mCacheStatus(STATUS_NONE)
 {
+    cacheCodeType();
 }
 
 Status::Status(std::string&& code) : mCode(std::move(code)), mCacheStatus(STATUS_NONE)
 {
+    cacheCodeType();
 }
 
 Status::Status(Status&& s) : mCode(std::move(s.mCode)), mCacheStatus(s.mCacheStatus)
@@ -34,34 +39,37 @@ Status& Status::operator = (Status&& s)
     return *this;
 }
 
-
-bool Status::not_found()
+void Status::cacheCodeType()
 {
-    if (mCacheStatus == STATUS_NONE && mCode == "not_found")
+    if (mCacheStatus == STATUS_NONE)
     {
-        mCacheStatus = STATUS_NOTFOUND;
+        if (mCode == "ok")
+        {
+            mCacheStatus = STATUS_OK;
+        }
+        else if (mCode == "not_found")
+        {
+            mCacheStatus = STATUS_NOTFOUND;
+        }
+        else
+        {
+            mCacheStatus = STATUS_ERROR;
+        }
     }
+}
 
+bool Status::not_found() const
+{
     return mCacheStatus == STATUS_NOTFOUND;
 }
 
-bool Status::ok()
+bool Status::ok() const
 {
-    if (mCacheStatus == STATUS_NONE && mCode == "ok")
-    {
-        mCacheStatus = STATUS_OK;
-    }
-
     return mCacheStatus == STATUS_OK;
 }
 
-bool Status::error()
+bool Status::error() const
 {
-    if (mCacheStatus == STATUS_NONE && mCode != "ok")
-    {
-        mCacheStatus = STATUS_ERROR;
-    }
-
     return mCacheStatus == STATUS_ERROR;
 }
 

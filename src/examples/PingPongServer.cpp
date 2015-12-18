@@ -40,7 +40,7 @@ int main(int argc, char **argv)
             g_mutex.lock();
             total_client_num++;
             g_mutex.unlock();
-        }, false);
+        }, false, 1024*1024);
     });
 
     server->startWorkThread(thread_num);

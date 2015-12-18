@@ -27,11 +27,14 @@ public:
 
     Status& operator =(Status&&);
 
-    bool                not_found();
-    bool                ok();
-    bool                error();
+    bool                not_found() const;
+    bool                ok() const;
+    bool                error() const;
 
     const std::string&  code() const;
+
+private:
+    void            cacheCodeType();
 
 private:
     std::string     mCode;

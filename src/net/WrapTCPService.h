@@ -71,7 +71,7 @@ public:
 
     void                    startWorkThread(int threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
-    void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL);
+    void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize);
 private:
     TcpService::PTR         mTCPService;
 };

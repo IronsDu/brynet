@@ -366,11 +366,11 @@ void TcpService::stopWorkerThread()
     }
 }
 
-void TcpService::startListen(int port, const char *certificate, const char *privatekey)
+void TcpService::startListen(int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
 {
-    mListenThread.startListen(port, certificate, privatekey, [this](int fd){
+    mListenThread.startListen(port, certificate, privatekey, [this, maxSessionRecvBufferSize](int fd){
         std::string ip = ox_socket_getipoffd(fd);
-        DataSocket::PTR channel = new DataSocket(fd);
+        DataSocket::PTR channel = new DataSocket(fd, maxSessionRecvBufferSize);
 #ifdef USE_OPENSSL
         if (mListenThread.getOpenSSLCTX() != nullptr)
         {
@@ -525,10 +525,11 @@ void TcpService::addDataSocket(int fd,
                                 TcpService::ENTER_CALLBACK enterCallback,
                                 TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                 TcpService::DATA_CALLBACK dataCallback,
-                                bool isUseSSL)
+                                bool isUseSSL,
+                                int maxRecvBufferSize)
 {
     std::string ip = ox_socket_getipoffd(fd);
-    DataSocket::PTR channel = new DataSocket(fd);
+    DataSocket::PTR channel = new DataSocket(fd, maxRecvBufferSize);
 #ifdef USE_OPENSSL
     if (isUseSSL)
     {

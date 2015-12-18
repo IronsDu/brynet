@@ -1,6 +1,8 @@
 #ifndef _REDIS_PROTOCOL_H
 #define _REDIS_PROTOCOL_H
 
+#include <stdlib.h>
+#include <string.h>
 #include <string>
 #include <stdint.h>
 #include <vector>

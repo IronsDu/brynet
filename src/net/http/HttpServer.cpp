@@ -16,7 +16,7 @@ void HttpServer::addConnection(int fd, ENTER_CALLBACK enterCallback, HTTPPROTOCO
     mServer->addSession(fd, [this, enterCallback, responseCallback](TCPSession::PTR session){
         enterCallback(session);
         setSessionCallback(session, responseCallback);
-    }, false);
+    }, false, 32*1024 * 1024);
 }
 
 void HttpServer::start(int port, int workthreadnum)
@@ -29,7 +29,7 @@ void HttpServer::start(int port, int workthreadnum)
     mListenThread->startListen(port, nullptr, nullptr, [this](int fd){
         mServer->addSession(fd, [this](TCPSession::PTR session){
             setSessionCallback(session, mOnRequestCallback);
-        }, false);
+        }, false, 32*1024*1024);
     });
     mServer->startWorkThread(workthreadnum);
 }

@@ -83,10 +83,11 @@ public:
                                                         TcpService::ENTER_CALLBACK enterCallback,
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                                         TcpService::DATA_CALLBACK dataCallback,
-                                                        bool isUseSSL);
+                                                        bool isUseSSL,
+                                                        int maxRecvBufferSize);
 
     /*  开启监听线程  */
-    void                                startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
+    void                                startListen(int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
     /*  开启IO工作线程    */
     void                                startWorkerThread(int threadNum, FRAME_CALLBACK callback = nullptr);
 

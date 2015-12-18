@@ -89,7 +89,7 @@ void SSDBMultiClient::addProxyConnection(string ip, int port)
     ox_socket_nodelay(fd);
     SSDBMultiClient* pthis = this;
 
-    DataSocket::PTR ds = new DataSocket(fd);
+    DataSocket::PTR ds = new DataSocket(fd, 32*1024*1024);
 
     ds->setEnterCallback([this](DataSocket::PTR ds){
         mProxyClients.push_back(ds);
@@ -446,6 +446,7 @@ void SSDBMultiClient::zscan(const std::string& name, const std::string& key_star
 {
     mRequestProtocol->init();
     mRequestProtocol->writev("zscan", name, key_start, score_start, score_end, limit);
+    mRequestProtocol->endl();
 
     pushStringListRequest(mRequestProtocol->getResult(), mRequestProtocol->getResultLen(), callback);
 }

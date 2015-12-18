@@ -38,7 +38,7 @@ public:
     typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
 public:
-    explicit DataSocket(int fd, int maxRecvBufferSize = 16*1024);
+    explicit DataSocket(int fd, int maxRecvBufferSize);
     ~DataSocket();
 
     bool                            onEnterEventLoop(EventLoop* el);

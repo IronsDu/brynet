@@ -48,7 +48,7 @@ int main(int argc, char** argv)
             int client = ox_socket_connect("127.0.0.1", port_num);
             ox_socket_nodelay(client);
 
-            DataSocket::PTR pClient = new DataSocket(client);
+            DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);
             pClient->setEnterCallback([&](DataSocket::PTR ds){
 
                 LongPacket sp;
