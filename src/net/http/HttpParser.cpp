@@ -2,13 +2,15 @@
 
 using namespace std;
 
-#include "HttpProtocol.h"
+#include "HttpParser.h"
 
-const char* HTTPProtocol::sTmpHeadStr;
-size_t HTTPProtocol::sTmpHeadLen;
-
-HTTPProtocol::HTTPProtocol(http_parser_type parserType)
+HTTPParser::HTTPParser(http_parser_type parserType)
 {
+    mTmpHeadStr = nullptr;
+    mTmpHeadLen = 0;
+
+    mIsWebSocket = false;
+    mIsKeepAlive = false;
     mISCompleted = false;
     mParserType = parserType;
     mSettings.on_status = sStatusHandle;
@@ -26,7 +28,25 @@ HTTPProtocol::HTTPProtocol(http_parser_type parserType)
     http_parser_init(&mParser, mParserType);
 }
 
-bool HTTPProtocol::checkCompleted(const char* buffer, int len)
+void HTTPParser::clearParse()
+{
+    mISCompleted = false;
+    mHeadValues.clear();
+    mPath.clear();
+    mQuery.clear();
+}
+
+bool HTTPParser::isWebSocket() const
+{
+    return mIsWebSocket;
+}
+
+bool HTTPParser::isKeepAlive() const
+{
+    return mIsKeepAlive;
+}
+
+bool HTTPParser::checkCompleted(const char* buffer, int len)
 {
     const static char* RL = "\r\n";
     const static int RL_LEN = strlen(RL);
@@ -154,13 +174,18 @@ bool HTTPProtocol::checkCompleted(const char* buffer, int len)
     return false;
 }
 
-int HTTPProtocol::appendAndParse(const char* buffer, int len)
+int HTTPParser::tryParse(const char* buffer, int len)
 {
     if (!mISCompleted && checkCompleted(buffer, len))
     {
         mISCompleted = true;
+
         int nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
         http_parser_init(&mParser, mParserType);
+
+        mIsWebSocket = getValue("Upgrade") == "websocket";
+        mIsKeepAlive = !getValue("Keep-Alive").empty();
+
         return len;
     }
     else
@@ -169,22 +194,22 @@ int HTTPProtocol::appendAndParse(const char* buffer, int len)
     }
 }
 
-const std::string& HTTPProtocol::getPath() const
+const std::string& HTTPParser::getPath() const
 {
     return mPath;
 }
 
-const std::string& HTTPProtocol::getQuery() const
+const std::string& HTTPParser::getQuery() const
 {
     return mQuery;
 }
 
-bool HTTPProtocol::isCompleted() const
+bool HTTPParser::isCompleted() const
 {
     return mISCompleted;
 }
 
-std::string HTTPProtocol::getValue(const std::string& key) const
+std::string HTTPParser::getValue(const std::string& key) const
 {
     auto it = mHeadValues.find(key);
     if (it != mHeadValues.end())
@@ -197,31 +222,31 @@ std::string HTTPProtocol::getValue(const std::string& key) const
     }
 }
 
-int HTTPProtocol::sChunkHeader(http_parser* hp)
+int HTTPParser::sChunkHeader(http_parser* hp)
 {
     return 0;
 }
-int HTTPProtocol::sChunkComplete(http_parser* hp)
+int HTTPParser::sChunkComplete(http_parser* hp)
 {
     return 0;
 }
-int HTTPProtocol::sMessageBegin(http_parser* hp)
+int HTTPParser::sMessageBegin(http_parser* hp)
 {
     return 0;
 }
-int HTTPProtocol::sMessageEnd(http_parser* hp)
+int HTTPParser::sMessageEnd(http_parser* hp)
 {
     return 0;
 }
-int HTTPProtocol::sHeadComplete(http_parser* hp)
+int HTTPParser::sHeadComplete(http_parser* hp)
 {
     return 0;
 }
 
-int HTTPProtocol::sUrlHandle(http_parser* hp, const char *url, size_t length)
+int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
 {
     struct http_parser_url u;
-    HTTPProtocol* httpProtocol = (HTTPProtocol*)hp->data;
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
 
     int result = http_parser_parse_url(url, length, 0, &u);
     if (result) {
@@ -229,7 +254,7 @@ int HTTPProtocol::sUrlHandle(http_parser* hp, const char *url, size_t length)
     }
     else {
         if ((u.field_set & (1 << UF_PATH))) {
-            httpProtocol->mPath = std::string(url + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
+            httpParser->mPath = std::string(url + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
         }
         else {
             fprintf(stderr, "\n\n*** failed to parse PATH in URL %s ***\n\n", url);
@@ -237,35 +262,36 @@ int HTTPProtocol::sUrlHandle(http_parser* hp, const char *url, size_t length)
         }
 
         if ((u.field_set & (1 << UF_QUERY))) {
-            httpProtocol->mQuery = std::string(url + u.field_data[UF_QUERY].off, u.field_data[UF_QUERY].len);
+            httpParser->mQuery = std::string(url + u.field_data[UF_QUERY].off, u.field_data[UF_QUERY].len);
         }
     }
 
     return 0;
 }
 
-int HTTPProtocol::sHeadValue(http_parser* hp, const char *at, size_t length)
+int HTTPParser::sHeadValue(http_parser* hp, const char *at, size_t length)
 {
-    HTTPProtocol* httpProtocol = (HTTPProtocol*)hp->data;
-    httpProtocol->mHeadValues[string(sTmpHeadStr, sTmpHeadLen)] = string(at, length);
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mHeadValues[string(httpParser->mTmpHeadStr, httpParser->mTmpHeadLen)] = string(at, length);
     printf("Header field: %.*s\n", (int)length, at);
     return 0;
 }
 
-int HTTPProtocol::sHeadField(http_parser* hp, const char *at, size_t length)
+int HTTPParser::sHeadField(http_parser* hp, const char *at, size_t length)
 {
-    sTmpHeadStr = at;
-    sTmpHeadLen = length;
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mTmpHeadStr = at;
+    httpParser->mTmpHeadLen = length;
     printf("Header value: %.*s\n", (int)length, at);
     return 0;
 }
 
-int HTTPProtocol::sStatusHandle(http_parser* hp, const char *at, size_t length)
+int HTTPParser::sStatusHandle(http_parser* hp, const char *at, size_t length)
 {
     printf("Body: %.*s\n", (int)length, at);
     return 0;
 }
-int HTTPProtocol::sBodyHandle(http_parser* hp, const char *at, size_t length)
+int HTTPParser::sBodyHandle(http_parser* hp, const char *at, size_t length)
 {
     printf("Body: %.*s\n", (int)length, at);
     return 0;

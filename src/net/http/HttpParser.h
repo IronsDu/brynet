@@ -6,13 +6,18 @@
 
 #include "http_parser.h"
 
-class HTTPProtocol
+class HTTPParser
 {
 public:
-    HTTPProtocol(http_parser_type parserType);
+    HTTPParser(http_parser_type parserType);
+    void                                    clearParse();
+    bool                                    isWebSocket() const;
+    bool                                    isKeepAlive() const;
 
     bool                                    checkCompleted(const char* buffer, int len);
-    int                                     appendAndParse(const char* buffer, int len);
+
+    /*直接尝试解析http协议,如果完整则返回报文长度，否则返回0*/
+    int                                     tryParse(const char* buffer, int len);
 
     const std::string&                      getPath() const;
 
@@ -35,7 +40,10 @@ private:
     static int                              sBodyHandle(http_parser* hp, const char *at, size_t length);
 
 private:
+    bool                                    mIsWebSocket;
+    bool                                    mIsKeepAlive;
     bool                                    mISCompleted;
+
     http_parser_type                        mParserType;
     std::string                             mPath;
     std::string                             mQuery;
@@ -43,8 +51,9 @@ private:
     http_parser_settings                    mSettings;
     std::map<std::string, std::string>      mHeadValues;
 
-    static const char*                      sTmpHeadStr;
-    static size_t                           sTmpHeadLen;
+public:
+    const char*                             mTmpHeadStr;
+    size_t                                  mTmpHeadLen;
 };
 
 #endif
