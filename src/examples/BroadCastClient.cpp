@@ -39,8 +39,8 @@ int main(int argc, char** argv)
         char* senddata = (char*)malloc(packet_len);
 
         /*  消息包大小定义 */
-        atomic_int64_t  packet_num = ATOMIC_VAR_INIT(0);
-        atomic_int64_t total_recv = ATOMIC_VAR_INIT(0);
+        atomic_llong  packet_num = ATOMIC_VAR_INIT(0);
+        atomic_llong total_recv = ATOMIC_VAR_INIT(0);
         TimerMgr tm;
         for (int i = 0; i < client_num; i++)
         {
