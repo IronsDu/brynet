@@ -8,6 +8,7 @@
 #include <thread>
 #include <memory>
 #include <unordered_map>
+#include <atomic>
 
 #include "CurrentThread.h"
 #include "SocketLibFunction.h"
@@ -83,11 +84,8 @@ private:
     int                             mWakeupFd;
     Channel*                        mWakeupChannel;
 #endif
-
-    std::mutex                      mFlagMutex;
-
-    bool                            mInWaitIOEvent;             /*  如果为false表示肯定没有处于epoll/iocp wait，如果为true，表示即将或已经等待*/
-    bool                            mIsAlreadyPostedWakeUp;     /*  表示是否已经投递过wakeup(避免其他线程投递太多(不必要)的wakeup) */
+    std::atomic_bool                mIsInBlock;
+    std::atomic_bool                mIsAlreadyPostWakeup;
 
     std::vector<USER_PROC>          mAsyncProcs;                /*  投递到此eventloop的异步function队列    */
 

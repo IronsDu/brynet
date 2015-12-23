@@ -7,6 +7,8 @@
 #include <chrono>
 #include <memory>
 #include <thread>
+#include <atomic>
+
 #include "packet.h"
 
 #include "SocketLibFunction.h"
@@ -19,9 +21,6 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-    double total_recv_len = 0;
-    double  packet_num = 0;
-
     int client_num = atoi(argv[1]);
     int packet_len = atoi(argv[2]);
     int port_num = atoi(argv[3]);
@@ -40,8 +39,8 @@ int main(int argc, char** argv)
         char* senddata = (char*)malloc(packet_len);
 
         /*  消息包大小定义 */
-
-        int64_t total_recv = 0;
+        atomic_int64_t  packet_num = ATOMIC_VAR_INIT(0);
+        atomic_int64_t total_recv = ATOMIC_VAR_INIT(0);
         TimerMgr tm;
         for (int i = 0; i < client_num; i++)
         {
@@ -63,7 +62,7 @@ int main(int argc, char** argv)
                 }
 
                 /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                ds->setDataCallback([&total_recv](DataSocket::PTR ds, const char* buffer, int len){
+                ds->setDataCallback([&total_recv, &packet_num](DataSocket::PTR ds, const char* buffer, int len){
                     const char* parse_str = buffer;
                     int total_proc_len = 0;
                     int left_len = len;
@@ -78,6 +77,7 @@ int main(int argc, char** argv)
                             if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
                             {
                                 total_recv += packet_len;
+                                packet_num++;
 
                                 ReadPacket rp(parse_str, packet_len);
                                 rp.readINT16();
@@ -125,9 +125,10 @@ int main(int argc, char** argv)
             tm.Schedule();
             if ((ox_getnowtime() - now) >= 1000)
             {
-                cout << "total recv:" << (total_recv / 1024) / 1024 << " M /s" << endl;
+                cout << "total recv:" << (total_recv / 1024) / 1024 << " M /s" << " , num " << packet_num << endl;
                 now = ox_getnowtime();
                 total_recv = 0;
+                packet_num = 0;
             }
         }
     });

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <assert.h>
 #include <thread>
+#include <atomic>
 
 #include "SocketLibFunction.h"
 #include "Channel.h"
@@ -64,9 +65,8 @@ EventLoop::EventLoop()
     mWakeupChannel = new WakeupChannel(mWakeupFd);
     linkChannel(mWakeupFd, mWakeupChannel);
 #endif
-
-    mIsAlreadyPostedWakeUp = false;
-    mInWaitIOEvent = false;
+    mIsAlreadyPostWakeup = false;
+    mIsInBlock = true;
 
     mEventEntries = NULL;
     mEventEntriesNum = 0;
@@ -115,8 +115,6 @@ void EventLoop::loop(int64_t timeout)
         timeout = 0;
     }
 
-    mInWaitIOEvent = true;
-
 #ifdef PLATFORM_WINDOWS
 
     ULONG numComplete = 0;
@@ -158,8 +156,7 @@ void EventLoop::loop(int64_t timeout)
         }
     }
 
-    mIsAlreadyPostedWakeUp = false;
-    mInWaitIOEvent = false;
+    mIsInBlock = false;
 
     for (ULONG i = 0; i < numComplete; ++i)
     {
@@ -180,8 +177,8 @@ void EventLoop::loop(int64_t timeout)
     }
 #else
     int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, timeout);
-    mIsAlreadyPostedWakeUp = false;
-    mInWaitIOEvent = false;
+
+    mIsInBlock = false;
 
     for (int i = 0; i < numComplete; ++i)
     {
@@ -208,10 +205,11 @@ void EventLoop::loop(int64_t timeout)
     }
 #endif
 
+    mIsAlreadyPostWakeup = false;
+    mIsInBlock = true;
+
     processAsyncProcs();
     processAfterLoopProcs();
-
-    //  assert(mAfterLoopProcs.empty()) //去掉断言检测，因为可能在处理某会话连接断开时，onClose函数中可能会对另外一个会话进行发送消息，则会产生callback，所以mAfterLoopProcs并非一定为空;
 
     if (numComplete == mEventEntriesNum)
     {
@@ -253,52 +251,15 @@ bool EventLoop::isInLoopThread()
 bool EventLoop::wakeup()
 {
     bool ret = false;
-    /*  TODO::1、保证线程安全；2、保证io线程处于wait状态时，外界尽可能少发送wakeup；3、是否io线程有必要自己向自身投递一个wakeup来唤醒下一次wait？ */
-    if (!isInLoopThread())
+    if (!isInLoopThread() && mIsInBlock && !mIsAlreadyPostWakeup.exchange(true))
     {
-        if (mInWaitIOEvent)
-        {
-            /*如果可能处于iocp wait则直接投递wakeup(这里可能导致多个线程重复投递了很多wakeup*/
-            /*这里只能无条件投递，而不能根据mIsAlreadyPostedWakeUp标志判断，因为可能iocp wait并还没返回*/
-            /*如果iocp已经wakeup，然而这里不投递的话，有可能无法唤醒下一次iocp (这不像epoll lt模式下的eventfd，只要有数据没读，则epoll总会wakeup)*/
-            mIsAlreadyPostedWakeUp = true;
 #ifdef PLATFORM_WINDOWS
-            PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, (OVERLAPPED*)&mWakeupOvl);
+        PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, (OVERLAPPED*)&mWakeupOvl);
 #else
-            uint64_t one = 1;
-            ssize_t n = write(mWakeupFd, &one, sizeof one);
+        uint64_t one = 1;
+        ssize_t n = write(mWakeupFd, &one, sizeof one);
 #endif
-            ret = true;
-        }
-        else
-        {
-            /*如果一定没有处于epoll/iocp wait*/
-            /*进入此else，则mIsAlreadyPostedWakeUp一定为false*/
-            /*多个线程使用互斥锁判断mIsAlreadyPostedWakeUp标志，以保证不重复投递*/
-            if (!mIsAlreadyPostedWakeUp)
-            {
-                bool tmp = false;
-
-                mFlagMutex.lock();
-                if (!mIsAlreadyPostedWakeUp)
-                {
-                    mIsAlreadyPostedWakeUp = true;
-                    tmp = true;
-                }
-                mFlagMutex.unlock();
-
-                if (tmp)
-                {
-#ifdef PLATFORM_WINDOWS
-                    PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, (OVERLAPPED*)&mWakeupOvl);
-#else
-                    uint64_t one = 1;
-                    ssize_t n = write(mWakeupFd, &one, sizeof one);
-#endif
-                    ret = true;
-                }
-            }
-        }
+        ret = true;
     }
 
     return ret;

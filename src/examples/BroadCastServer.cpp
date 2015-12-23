@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <chrono>
 #include <vector>
+#include <atomic>
 
 #include "packet.h"
 #include "systemlib.h"
@@ -53,8 +54,11 @@ void    unLockStatistics()
 
 int main(int argc, char** argv)
 {
-    double total_recv_len = 0;
-    double  packet_num = 0;
+    std::atomic_int64_t total_send_len = ATOMIC_VAR_INIT(0);
+    std::atomic_int64_t total_recv_len = ATOMIC_VAR_INIT(0);
+
+    std::atomic_int64_t  send_packet_num = ATOMIC_VAR_INIT(0);
+    std::atomic_int64_t  recv_packet_num = ATOMIC_VAR_INIT(0);
 
     int port_num = atoi(argv[1]);
 
@@ -161,16 +165,27 @@ int main(int argc, char** argv)
                 else if (msg->mType == NMT_CLOSE)
                 {
                     printf("client %lld close \n", msg->mID);
+                    for (auto it = sessions.begin(); it != sessions.end(); ++it)
+                    {
+                        if (*it == msg->mID)
+                        {
+                            sessions.erase(it);
+                            break;
+                        }
+                    }
                     total_client_num--;
                 }
                 else if (msg->mType == NMT_RECV_DATA)
                 {
                     DataSocket::PACKET_PTR packet = DataSocket::makePacket(msg->mData.c_str(), msg->mData.size());
+                    recv_packet_num++;
+                    total_recv_len += msg->mData.size();
+
                     for (size_t i = 0; i < sessions.size(); ++i)
                     {
                         t.send(sessions[i], packet);
-                        total_recv_len += msg->mData.size();
-                        packet_num++;
+                        send_packet_num++;
+                        total_send_len += msg->mData.size();
                     }
                 }
                 else
@@ -189,10 +204,13 @@ int main(int argc, char** argv)
         int64_t now = ox_getnowtime();
         if ((now - lasttime) >= 1000)
         {
-            std::cout << "recv by clientnum:" << total_client_num << " of :" << (total_recv_len / 1024) / 1024 << " M / s, " << "packet num : " << packet_num << std::endl;
+            std::cout << "clientnum:" << total_client_num << ", recv" << (total_recv_len / 1024) << " K/s, " << "num : " << recv_packet_num << ", send " << 
+                (total_send_len / 1024) / 1024 << " M/s, " << " num: " << send_packet_num << std::endl;
             lasttime = now;
             total_recv_len = 0;
-            packet_num = 0;
+            total_send_len = 0;
+            recv_packet_num = 0;
+            send_packet_num = 0;
         }
     }
 
