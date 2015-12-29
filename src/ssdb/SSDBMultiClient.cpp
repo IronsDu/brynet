@@ -38,9 +38,19 @@ SSDBMultiClient::~SSDBMultiClient()
 
 struct DBServerUserData
 {
+    string ip;
+    int port;
+    int pingTime;   /*-1表示不进行ping check*/
+    bool isAutoConnection;/*是否开启自动重连*/
+    Timer::WeakPtr pingTimer;
     queue<std::function<void(const string& response)>>* callbacklist;
     parse_tree* p;
 };
+
+EventLoop& SSDBMultiClient::getEventLoop()
+{
+    return mNetService;
+}
 
 void SSDBMultiClient::startNetThread(std::function<void(void)> frameCallback)
 {
@@ -83,23 +93,68 @@ void SSDBMultiClient::startNetThread(std::function<void(void)> frameCallback)
     }
 }
 
-void SSDBMultiClient::addProxyConnection(string ip, int port)
+/*  TODO::此线程函数中SSDBMultiClient 的内存可能失效 */
+static void s_connectThreadFunction(SSDBMultiClient* mc, string ip, int port, int pingTime, bool isAutoConnection)
 {
     sock fd = ox_socket_connect(ip.c_str(), port);
-    ox_socket_nodelay(fd);
-    SSDBMultiClient* pthis = this;
+    if (fd != SOCKET_ERROR)
+    {
+        cout << "connect " << ip << " port " << port << " succed " << endl;
+        mc->addConnectionProxy(fd, ip, port, pingTime, isAutoConnection);
+    }
+    else if (isAutoConnection)
+    {
+        /*若失败，强行Sleep后继续开启线程*/
+        cout << "connect " << ip << " port " << port << " failed , sleep 10s, reconnect" << endl;
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+        mc->asyncConnectionProxy(ip, port, pingTime, isAutoConnection);
+    }
+}
 
-    DataSocket::PTR ds = new DataSocket(fd, 32*1024*1024);
+void SSDBMultiClient::sendPing(DataSocket::PTR ds)
+{
+    DBServerUserData* dbUserData = (DBServerUserData*)ds->getUserData();
+    if (dbUserData->pingTime > 0)
+    {
+        SSDBProtocolRequest sr;
+        sr.init();
+        sr.appendStr("ping");
+        sr.endl();
+
+        ds->send(sr.getResult(), sr.getResultLen());
+
+        /*自动发送的ping操作，也要模拟一个完成回调，不然会导致业务上的请求乱序*/
+        queue<std::function<void(const string& response)>>* callbacklist = dbUserData->callbacklist;
+        callbacklist->push(nullptr);
+
+        dbUserData->pingTimer = mNetService.getTimerMgr().AddTimer(dbUserData->pingTime, [this, ds](){
+            sendPing(ds);
+        });
+    }
+}
+
+void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingTime, bool isAutoConnection)
+{
+    ox_socket_nodelay(fd);
+
+    DataSocket::PTR ds = new DataSocket(fd, 32 * 1024 * 1024);
+    DBServerUserData* dbUserData = new DBServerUserData;
+    dbUserData->ip = ip;
+    dbUserData->port = port;
+    dbUserData->pingTime = pingTime;
+    dbUserData->isAutoConnection = isAutoConnection;
+    dbUserData->callbacklist = new queue<std::function<void(const string& response)>>();
+    dbUserData->p = parse_tree_new();
+    ds->setUserData((int64_t)dbUserData);
 
     ds->setEnterCallback([this](DataSocket::PTR ds){
+        DBServerUserData* dbUserData = (DBServerUserData*)ds->getUserData();
         mProxyClients.push_back(ds);
-        DBServerUserData* dbUserData = new DBServerUserData;
-        dbUserData->callbacklist = new queue<std::function<void(const string& response)>>();
-        dbUserData->p = parse_tree_new();
-        ds->setUserData((int64_t)dbUserData);
+        ds->setCheckTime(dbUserData->pingTime);
+        sendPing(ds);
     });
 
-    ds->setDataCallback([&, pthis](DataSocket::PTR ds, const char* buffer, int len){
+    ds->setDataCallback([&](DataSocket::PTR ds, const char* buffer, int len){
         const char* parse_str = buffer;
         DBServerUserData* dbUserData = (DBServerUserData*)ds->getUserData();
         while (parse_str < (buffer + len))
@@ -120,7 +175,7 @@ void SSDBMultiClient::addProxyConnection(string ip, int port)
                 }
 
                 char* parseEndPos = (char*)parse_str;
-                int parseRet = parse(dbUserData->p, &parseEndPos, (char*)buffer+len);
+                int parseRet = parse(dbUserData->p, &parseEndPos, (char*)buffer + len);
                 if (parseRet == REDIS_OK)
                 {
                     packet_len = (parseEndPos - parse_str);
@@ -150,10 +205,13 @@ void SSDBMultiClient::addProxyConnection(string ip, int port)
                 if (!callbacklist->empty())
                 {
                     auto& callback = callbacklist->front();
-                    std::shared_ptr<string > response = std::make_shared<string>(parse_str, packet_len);
-                    mLogicFunctorMQ.Push([callback, response](){
-                        callback(*response);
-                    });
+                    if (callback != nullptr)
+                    {
+                        std::shared_ptr<string > response = std::make_shared<string>(parse_str, packet_len);
+                        mLogicFunctorMQ.Push([callback, response](){
+                            callback(*response);
+                        });
+                    }
                     callbacklist->pop();
                 }
 
@@ -165,17 +223,29 @@ void SSDBMultiClient::addProxyConnection(string ip, int port)
             }
         }
 
-        return parse_str-buffer;
+        return parse_str - buffer;
     });
 
     ds->setDisConnectCallback([&](DataSocket::PTR arg){
         DBServerUserData* dbUserData = (DBServerUserData*)arg->getUserData();
+        cout << "disconnect of " << dbUserData->ip << " port " << dbUserData->port << endl;
+        if (dbUserData->isAutoConnection)
+        {
+            asyncConnectionProxy(dbUserData->ip, dbUserData->port, dbUserData->pingTime, dbUserData->isAutoConnection);
+        }
+
+        Timer::Ptr timer = dbUserData->pingTimer.lock();
+        if (timer != nullptr)
+        {
+            timer->Cancel();
+        }
         delete dbUserData->callbacklist;
         if (dbUserData->p != nullptr)
         {
             parse_tree_del(dbUserData->p);
         }
         delete dbUserData;
+
         /*  TODO::当服务器断开连接后，要处理pending在它上面的请求，要处理异步回调的失败情况   */
         for (size_t i = 0; i < mProxyClients.size(); ++i)
         {
@@ -194,6 +264,11 @@ void SSDBMultiClient::addProxyConnection(string ip, int port)
             delete ds;
         }
     });
+}
+
+void SSDBMultiClient::asyncConnectionProxy(string ip, int port, int pingTime, bool isAutoConnection)
+{
+    std::thread(s_connectThreadFunction, this, ip, port, pingTime, isAutoConnection).detach();
 }
 
 /*  逻辑线程里处理response，无论什么协议，都将数据转换到ssdb格式；如果是redis协议，则返回非空的parse_tree*,否则返回nullptr    */
