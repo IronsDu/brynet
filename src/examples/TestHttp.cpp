@@ -32,12 +32,19 @@ int main(int argc, char **argv)
         }
     });
 
-    sock fd = ox_socket_connect("180.87.33.107", 80);
+    sock fd = ox_socket_connect("127.0.0.1", 2379);
     server.addConnection(fd, [](TCPSession::PTR session){
-
-        /*∑¢ÀÕhttp request*/
+        HttpFormat request;
+        request.addHeadValue("Accept", "*/*");
+        request.setProtocol(HttpFormat::HRP_PUT);
+        request.setRequestUrl("/v2/keys/asea/aagee");
+        request.addParameter("value", "123456");
+        request.setContentType("application/x-www-form-urlencoded");
+        string requestStr = request.getResult();
+        session->send(requestStr.c_str(), requestStr.size());
 
     }, [](const HTTPParser& httpParser, TCPSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
+        return;
         /*¥¶¿Ìresponse*/
     });
 

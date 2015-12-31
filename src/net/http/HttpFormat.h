@@ -12,6 +12,7 @@ public:
         HRP_NONE,
         HRP_GET,
         HRP_POST,
+        HRP_PUT,
         HRP_RESPONSE,
         HRP_MAX
     };
@@ -24,12 +25,17 @@ public:
 
     void        setHost(const char* host)
     {
-        m_host = host;
+        addHeadValue("Host", host);
     }
 
     void        setCookie(const char* v)
     {
-        m_cookie = v;
+        addHeadValue("Cookie", v);
+    }
+
+    void        setContentType(const char* v)
+    {
+        addHeadValue("Content-Type", v);
     }
 
     void        setRequestUrl(const char* url)
@@ -54,6 +60,11 @@ public:
         m_parameter += v;
     }
 
+    void        addHeadValue(std::string field, std::string value)
+    {
+        mHeadField[field] = value;
+    }
+
     string      getResult()
     {
         string ret;
@@ -64,6 +75,10 @@ public:
         else if (m_eProtocol == HRP_POST)
         {
             ret += "POST";
+        }
+        else if (m_eProtocol == HRP_PUT)
+        {
+            ret += "PUT";
         }
 
         ret += " ";
@@ -77,17 +92,11 @@ public:
         ret += " HTTP/1.1";
         ret += "\r\n";
 
-        if (!m_host.empty())
+        for (auto& v : mHeadField)
         {
-            ret += "Host: ";
-            ret += m_host;
-            ret += "\r\n";
-        }
-
-        if(!m_cookie.empty())
-        {
-            ret += "Cookie: ";
-            ret += m_cookie;
+            ret += v.first;
+            ret += ": ";
+            ret += v.second;
             ret += "\r\n";
         }
 
@@ -98,8 +107,6 @@ public:
             sprintf(temp, "%d", m_parameter.size());
             ret += temp;
             ret += "\r\n";
-
-            //ret += "Content-Type: application/x-www-form-urlencoded\r\n";
         }
 
         ret += "\r\n";
@@ -107,18 +114,16 @@ public:
         if (m_eProtocol != HRP_GET && !m_parameter.empty())
         {
             ret += m_parameter;
-            ret += "\r\n";
         }
 
         return ret;
     }
 private:
 
-    string                  m_host;
     string                  m_url;
     HTTPREQUEST_PROTOCOL    m_eProtocol;
     string                  m_parameter;
-    string                  m_cookie;
+    std::map<string, string>    mHeadField;
 };
 
 #endif

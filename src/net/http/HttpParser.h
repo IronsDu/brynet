@@ -26,7 +26,7 @@ public:
     bool                                    isCompleted() const;
 
     std::string                             getValue(const std::string& key) const;
-
+    const std::string&                      getBody() const;
 private:
     static int                              sChunkHeader(http_parser* hp);
     static int                              sChunkComplete(http_parser* hp);
@@ -40,16 +40,19 @@ private:
     static int                              sBodyHandle(http_parser* hp, const char *at, size_t length);
 
 private:
+    http_parser_type                        mParserType;
+    http_parser                             mParser;
+    http_parser_settings                    mSettings;
+
     bool                                    mIsWebSocket;
     bool                                    mIsKeepAlive;
     bool                                    mISCompleted;
 
-    http_parser_type                        mParserType;
     std::string                             mPath;
     std::string                             mQuery;
-    http_parser                             mParser;
-    http_parser_settings                    mSettings;
     std::map<std::string, std::string>      mHeadValues;
+    std::string                             mStatus;
+    std::string                             mBody;
 
 public:
     const char*                             mTmpHeadStr;

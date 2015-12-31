@@ -222,6 +222,11 @@ std::string HTTPParser::getValue(const std::string& key) const
     }
 }
 
+const std::string& HTTPParser::getBody() const
+{
+    return mBody;
+}
+
 int HTTPParser::sChunkHeader(http_parser* hp)
 {
     return 0;
@@ -288,11 +293,15 @@ int HTTPParser::sHeadField(http_parser* hp, const char *at, size_t length)
 
 int HTTPParser::sStatusHandle(http_parser* hp, const char *at, size_t length)
 {
-    printf("Body: %.*s\n", (int)length, at);
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mStatus = string(at, length);
+    printf("Status: %.*s\n", (int)length, at);
     return 0;
 }
 int HTTPParser::sBodyHandle(http_parser* hp, const char *at, size_t length)
 {
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mBody = string(at, length);
     printf("Body: %.*s\n", (int)length, at);
     return 0;
 }
