@@ -185,7 +185,8 @@ int HTTPParser::tryParse(const char* buffer, int len)
 
         mIsWebSocket = getValue("Upgrade") == "websocket";
         mIsKeepAlive = !getValue("Keep-Alive").empty();
-
+        mTmpHeadStr = nullptr;
+        mTmpHeadLen = 0;
         return len;
     }
     else
