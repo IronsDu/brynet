@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="utils">
+      <UniqueIdentifier>{2a59e647-b7ac-4b79-b679-4d49836488a5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="net">
+      <UniqueIdentifier>{0aafd7b4-e506-4057-8a32-b309bbcd5fa4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="timer">
+      <UniqueIdentifier>{d8ed7c7e-06fa-4a64-b5a9-261440158856}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="http">
+      <UniqueIdentifier>{8700aaf1-f171-4e64-a794-95372ca361b9}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\utils\buffer.c">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\systemlib.c">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\CurrentThread.cpp">
+      <Filter>net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\DataSocket.cpp">
+      <Filter>net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\EventLoop.cpp">
+      <Filter>net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\SocketLibFunction.c">
+      <Filter>net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\TCPService.cpp">
+      <Filter>net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\WrapTCPService.cpp">
+      <Filter>net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\timer\timer.cpp">
+      <Filter>timer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\examples\TestHttp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\http\HttpServer.cpp">
+      <Filter>http</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\http\http_parser.c">
+      <Filter>http</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\base64.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\SHA1.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\net\http\HttpParser.cpp">
+      <Filter>http</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\utils\buffer.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\systemlib.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\Channel.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\CurrentThread.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\DataSocket.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\dllconf.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\EventLoop.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\Platform.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\SocketLibFunction.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\SocketLibTypes.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\TCPService.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\WrapTCPService.h">
+      <Filter>net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\timer\timer.h">
+      <Filter>timer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\http\HttpServer.h">
+      <Filter>http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\http\http_parser.h">
+      <Filter>http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\examples\base64.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\examples\SHA1.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\base64.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\SHA1.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\net\http\HttpParser.h">
+      <Filter>http</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
