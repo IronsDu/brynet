@@ -15,7 +15,7 @@
 
 #include "TCPService.h"
 
-static int sDefaultLoopTimeOutMS = 100;
+static unsigned int sDefaultLoopTimeOutMS = 100;
 
 ListenThread::ListenThread()
 {
@@ -202,8 +202,8 @@ void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet, const Da
 {
     union  SessionId sid;
     sid.id = id;
-    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
     {
         if (mLoops[sid.data.loopIndex].isInLoopThread())
         {
@@ -241,8 +241,8 @@ void TcpService::cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet, con
 {
     union  SessionId sid;
     sid.id = id;
-    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
     {
         mCachePacketList[sid.data.loopIndex]->push_back(std::make_tuple(id, packet, callback));
     }
@@ -250,7 +250,7 @@ void TcpService::cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet, con
 
 void TcpService::flushCachePackectList()
 {
-    for (int i = 0; i < mLoopNum; ++i)
+    for (size_t i = 0; i < mLoopNum; ++i)
     {
         if (!mCachePacketList[i]->empty())
         {
@@ -280,8 +280,8 @@ void TcpService::disConnect(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
-    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
     {
         mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
             DataSocket::PTR tmp = nullptr;
@@ -300,8 +300,8 @@ void TcpService::setPingCheckTime(int64_t id, int checktime)
 {
     union  SessionId sid;
     sid.id = id;
-    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
     {
         mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, checktime](){
             DataSocket::PTR tmp = nullptr;
@@ -347,7 +347,7 @@ void TcpService::stopWorkerThread()
     {
         mRunIOLoop = false;
 
-        for (int i = 0; i < mLoopNum; ++i)
+        for (size_t i = 0; i < mLoopNum; ++i)
         {
             mLoops[i].wakeup();
         }
@@ -355,7 +355,7 @@ void TcpService::stopWorkerThread()
 
     if (mIOThreads != nullptr)
     {
-        for (int i = 0; i < mLoopNum; ++i)
+        for (size_t i = 0; i < mLoopNum; ++i)
         {
             mIOThreads[i]->join();
             delete mIOThreads[i];
@@ -381,13 +381,13 @@ void TcpService::startListen(int port, int maxSessionRecvBufferSize, const char 
     });
 }
 
-void TcpService::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
+void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
 {
     if (mLoops == nullptr)
     {
         mRunIOLoop = true;
         mCachePacketList = new std::shared_ptr<MSG_LIST>[threadNum];
-        for (int i = 0; i < threadNum; ++i)
+        for (size_t i = 0; i < threadNum; ++i)
         {
             mCachePacketList[i] = std::make_shared<MSG_LIST>();
         }
@@ -397,12 +397,12 @@ void TcpService::startWorkerThread(int threadNum, FRAME_CALLBACK callback)
         mLoopNum = threadNum;
         mIds = new TypeIDS<DataSocket::PTR>[threadNum];
         mIncIds = new int[threadNum];
-        for (int i = 0; i < threadNum; ++i)
+        for (size_t i = 0; i < threadNum; ++i)
         {
             mIncIds[i] = 0;
         }
 
-        for (int i = 0; i < mLoopNum; ++i)
+        for (size_t i = 0; i < mLoopNum; ++i)
         {
             EventLoop& l = mLoops[i];
             mIOThreads[i] = new std::thread([this, &l, callback](){
@@ -423,8 +423,8 @@ void TcpService::wakeup(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
-    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
     {
         mLoops[sid.data.loopIndex].wakeup();
     }
@@ -432,7 +432,7 @@ void TcpService::wakeup(int64_t id)
 
 void TcpService::wakeupAll()
 {
-    for (int i = 0; i < mLoopNum; ++i)
+    for (size_t i = 0; i < mLoopNum; ++i)
     {
         mLoops[i].wakeup();
     }
@@ -453,8 +453,8 @@ EventLoop* TcpService::getEventLoopBySocketID(int64_t id)
 {
     union  SessionId sid;
     sid.id = id;
-    assert(sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex >= 0 && sid.data.loopIndex < mLoopNum)
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
     {
         return &mLoops[sid.data.loopIndex];
     }

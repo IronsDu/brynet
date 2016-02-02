@@ -109,7 +109,7 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
 }
 
 /*  添加发送数据队列    */
-void    DataSocket::send(const char* buffer, int len, const PACKED_SENDED_CALLBACK& callback)
+void    DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
 {
     sendPacket(makePacket(buffer, len), callback);
 }
@@ -244,9 +244,9 @@ void DataSocket::recv()
             if (mDataCallback != nullptr)
             {
                 mRecvData = true;
-                int proclen = mDataCallback(this, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
-                assert(proclen >= 0 && proclen <= ox_buffer_getreadvalidcount(mRecvBuffer));
-                if (proclen >= 0 && proclen <= ox_buffer_getreadvalidcount(mRecvBuffer))
+                size_t proclen = mDataCallback(this, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
+                assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer));
+                if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer))
                 {
                     ox_buffer_addreadpos(mRecvBuffer, proclen);
                 }
@@ -638,7 +638,7 @@ void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
     mDisConnectCallback = cb;
 }
 
-const static int GROW_BUFFER_SIZE = 1024;
+const static size_t GROW_BUFFER_SIZE = 1024;
 
 void DataSocket::growRecvBuffer()
 {
@@ -739,7 +739,7 @@ void DataSocket::setupConnectSSL()
 }
 #endif
 
-DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, int len)
+DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, size_t len)
 {
     return std::make_shared<std::string>(buffer, len);
 }

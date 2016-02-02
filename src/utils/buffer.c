@@ -6,10 +6,10 @@
 struct buffer_s
 {
     char*   data;
-    int data_len;
+    size_t data_len;
 
-    int write_pos;
-    int read_pos;
+    size_t write_pos;
+    size_t read_pos;
 };
 
 void 
@@ -29,7 +29,7 @@ ox_buffer_delete(struct buffer_s* self)
 }
 
 struct buffer_s* 
-ox_buffer_new(int buffer_size)
+ox_buffer_new(size_t buffer_size)
 {
     struct buffer_s* ret = (struct buffer_s*)malloc(sizeof(struct buffer_s));
 
@@ -54,7 +54,7 @@ ox_buffer_new(int buffer_size)
 void 
 ox_buffer_adjustto_head(struct buffer_s* self)
 {
-    int len = 0;
+    size_t len = 0;
 
     if(self->read_pos > 0)
     {
@@ -76,22 +76,22 @@ ox_buffer_init(struct buffer_s* self)
     self->write_pos = 0;
 }
 
-int 
+size_t
 ox_buffer_getwritepos(struct buffer_s* self)
 {
     return self->write_pos;
 }
 
-int 
+size_t
 ox_buffer_getreadpos(struct buffer_s* self)
 {
     return self->read_pos;
 }
 
 void 
-ox_buffer_addwritepos(struct buffer_s* self, int value)
+ox_buffer_addwritepos(struct buffer_s* self, size_t value)
 {
-    int temp = self->write_pos + value;
+    size_t temp = self->write_pos + value;
     if(temp <= self->data_len)
     {
         self->write_pos = temp;
@@ -99,28 +99,28 @@ ox_buffer_addwritepos(struct buffer_s* self, int value)
 }
 
 void 
-ox_buffer_addreadpos(struct buffer_s* self, int value)
+ox_buffer_addreadpos(struct buffer_s* self, size_t value)
 {
-    int temp = self->read_pos + value;
+    size_t temp = self->read_pos + value;
     if(temp <= self->data_len)
     {
         self->read_pos = temp;
     }
 }
 
-int 
+size_t
 ox_buffer_getreadvalidcount(struct buffer_s* self)
 {
     return self->write_pos - self->read_pos;
 }
 
-int 
+size_t
 ox_buffer_getwritevalidcount(struct buffer_s* self)
 {
     return self->data_len - self->write_pos;
 }
 
-int 
+size_t
 ox_buffer_getsize(struct buffer_s* self)
 {
     return self->data_len;
@@ -153,7 +153,7 @@ ox_buffer_getreadptr(struct buffer_s* self)
 }
 
 bool 
-ox_buffer_write(struct buffer_s* self, const char* data, int len)
+ox_buffer_write(struct buffer_s* self, const char* data, size_t len)
 {
     bool write_ret = true;
 
@@ -165,7 +165,7 @@ ox_buffer_write(struct buffer_s* self, const char* data, int len)
     }
     else
     {
-        int left_len = self->data_len-ox_buffer_getreadvalidcount(self);
+        size_t left_len = self->data_len - ox_buffer_getreadvalidcount(self);
         if(left_len >= len)
         {
             ox_buffer_adjustto_head(self);

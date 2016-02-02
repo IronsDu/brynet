@@ -31,7 +31,7 @@ public:
     typedef DataSocket*                                                         PTR;
 
     typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
-    typedef std::function<int(PTR, const char* buffer, int len)>                DATA_CALLBACK;
+    typedef std::function<int(PTR, const char* buffer, size_t len)>             DATA_CALLBACK;
     typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
     typedef std::shared_ptr<std::function<void(void)>>                          PACKED_SENDED_CALLBACK;
 
@@ -43,7 +43,7 @@ public:
 
     bool                            onEnterEventLoop(EventLoop* el);
 
-    void                            send(const char* buffer, int len, const PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
     void                            sendPacketInLoop(PACKET_PTR&&, const PACKED_SENDED_CALLBACK& callback = nullptr);
@@ -67,7 +67,7 @@ public:
     void                            setupConnectSSL();
 #endif
 
-    static  PACKET_PTR              makePacket(const char* buffer, int len);
+    static  PACKET_PTR              makePacket(const char* buffer, size_t len);
 private:
     void                            growRecvBuffer();
 
@@ -112,7 +112,7 @@ private:
 
     EventLoop*                      mEventLoop;
     buffer_s*                       mRecvBuffer;
-    int                             mMaxRecvBufferSize;
+    size_t                          mMaxRecvBufferSize;
 
     struct pending_packet
     {

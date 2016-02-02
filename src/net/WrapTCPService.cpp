@@ -102,7 +102,7 @@ TcpService::PTR& WrapServer::getService()
     return mTCPService;
 }
 
-void    WrapServer::startWorkThread(int threadNum, TcpService::FRAME_CALLBACK callback)
+void    WrapServer::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback)
 {
     mTCPService->startWorkerThread(threadNum, callback);
 }

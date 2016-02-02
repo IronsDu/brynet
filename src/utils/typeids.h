@@ -29,14 +29,14 @@ public:
 
     void        reclaimID(size_t id)
     {
-        assert(id >= 0 && id < mValues.size());
+        assert(id < mValues.size());
         mIds.push_back(id);
     }
 
     bool        set(T t, size_t id)
     {
-        assert(id >= 0 && id < mValues.size());
-        if (id >= 0 && id < mValues.size())
+        assert(id < mValues.size());
+        if (id < mValues.size())
         {
             mValues[id] = t;
             return true;
@@ -49,8 +49,8 @@ public:
 
     bool          get(size_t id, T& out)
     {
-        assert(id >= 0 && id < mValues.size());
-        if (id >= 0 && id < mValues.size())
+        assert(id < mValues.size());
+        if (id < mValues.size())
         {
             out = mValues[id];
             return true;

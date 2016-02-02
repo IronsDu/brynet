@@ -89,7 +89,7 @@ public:
     /*  开启监听线程  */
     void                                startListen(int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
     /*  开启IO工作线程    */
-    void                                startWorkerThread(int threadNum, FRAME_CALLBACK callback = nullptr);
+    void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
 
     /*  关闭服务(且清理内存):非线程安全    */
     void                                closeService();
@@ -122,7 +122,7 @@ private:
     std::shared_ptr<MSG_LIST>*          mCachePacketList;
     EventLoop*                          mLoops;
     std::thread**                       mIOThreads;
-    int                                 mLoopNum;
+    size_t                              mLoopNum;
     bool                                mRunIOLoop;
 
     ListenThread                        mListenThread;
@@ -131,9 +131,9 @@ private:
     int*                                mIncIds;
 
     /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
-    TcpService::ENTER_CALLBACK           mEnterCallback;
-    TcpService::DISCONNECT_CALLBACK      mDisConnectCallback;
-    TcpService::DATA_CALLBACK            mDataCallback;
+    TcpService::ENTER_CALLBACK          mEnterCallback;
+    TcpService::DISCONNECT_CALLBACK     mDisConnectCallback;
+    TcpService::DATA_CALLBACK           mDataCallback;
 
     /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
     

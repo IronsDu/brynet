@@ -15,7 +15,7 @@ public:
     typedef std::weak_ptr<TCPSession>       WEAK_PTR;
 
     typedef std::function<void(TCPSession::PTR)>   CLOSE_CALLBACK;
-    typedef std::function<int(TCPSession::PTR, const char*, int)>   DATA_CALLBACK;
+    typedef std::function<int(TCPSession::PTR, const char*, size_t)>   DATA_CALLBACK;
 
     TCPSession();
 
@@ -69,7 +69,7 @@ public:
 
     TcpService::PTR&        getService();
 
-    void                    startWorkThread(int threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
+    void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
     void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize);
 private:
