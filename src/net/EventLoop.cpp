@@ -24,7 +24,7 @@ private:
         char temp[1024 * 10];
         while (true)
         {
-            ssize_t n = recv(mFd, temp, 1024 * 10, 0);
+            ssize_t n = read(mFd, temp, 1024 * 10);
             if (n == -1)
             {
                 break;
@@ -276,7 +276,7 @@ bool EventLoop::linkChannel(int fd, Channel* ptr)
     ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
     ev.data.ptr = ptr;
     int ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev);
-    return ret != 0;
+    return ret == 0;
 #endif
 }
 
