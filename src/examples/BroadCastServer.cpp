@@ -54,13 +54,19 @@ void    unLockStatistics()
 
 int main(int argc, char** argv)
 {
+    if (argc != 2)
+    {
+        fprintf(stderr, "Usage : <listen port> \n");
+        exit(-1);
+    }
+
+    int port_num = atoi(argv[1]);
+
     std::atomic_llong total_send_len = ATOMIC_VAR_INIT(0);
     std::atomic_llong total_recv_len = ATOMIC_VAR_INIT(0);
 
     std::atomic_llong  send_packet_num = ATOMIC_VAR_INIT(0);
     std::atomic_llong  recv_packet_num = ATOMIC_VAR_INIT(0);
-
-    int port_num = atoi(argv[1]);
 
     ox_socket_init();
 

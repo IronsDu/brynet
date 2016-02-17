@@ -129,7 +129,7 @@ void SSDBProtocolRequest::endl()
     appendBlock("\n", 1);
 }
 
-void SSDBProtocolRequest::appendBlock(const char* data, int len)
+void SSDBProtocolRequest::appendBlock(const char* data, size_t len)
 {
     if (ox_buffer_getwritevalidcount(m_request) < len)
     {

@@ -23,6 +23,12 @@ int onSessionMsg(TCPSession::PTR session, const char* buffer, int len)
 
 int main(int argc, char **argv)
 {
+    if (argc != 3)
+    {
+        fprintf(stderr, "Usage: <net work thread num> <listen port> \n");
+        exit(-1);
+    }
+
     int thread_num = atoi(argv[1]);
     int port_num = atoi(argv[2]);
 

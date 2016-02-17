@@ -58,6 +58,8 @@ public:
     void                                                            multiGet(const std::vector<std::string> &keys, const STRING_LIST_CALLBACK& callback);
     void                                                            multiDel(const std::vector<std::string> &keys, const NONE_VALUE_CALLBACK& callback);
 
+    void                                                            getset(const std::string& key, const std::string& value, const ONE_STRING_CALLBACK& callback);
+
     void                                                            set(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback);
     void                                                            get(const string& k, const ONE_STRING_CALLBACK& callback);
 
@@ -102,6 +104,7 @@ private:
     void                                                            pushIntValueRequest(const char* request, int len, const ONE_INT64_CALLBACK& callback);
 
     parse_tree*                                                     processResponse(const string& response);
+    void                                                            forgeError(const string& error, std::function<void(const string&)>& callback);
 
     void                                                            sendPing(DataSocket::PTR ds);
 private:

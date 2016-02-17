@@ -75,7 +75,7 @@ public:
     }
 
 private:
-    void            appendBlock(const char* data, int len);
+    void            appendBlock(const char* data, size_t len);
 
     SSDBProtocolRequest & operator << (const std::vector<std::string> &keys)
     {

@@ -21,9 +21,17 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-    int client_num = atoi(argv[1]);
-    int packet_len = atoi(argv[2]);
-    int port_num = atoi(argv[3]);
+    if (argc != 5)
+    {
+        fprintf(stderr, "Usage: <server ip> <server port> <session num> <packet size>\n");
+
+        exit(-1);
+    }
+
+    std::string ip = argv[1];
+    int client_num = atoi(argv[2]);
+    int packet_len = atoi(argv[3]);
+    int port_num = atoi(argv[4]);
 
     ox_socket_init();
 
@@ -31,7 +39,7 @@ int main(int argc, char** argv)
 
     /*  客户端IO线程   */
 
-    std::thread* ts = new std::thread([&mainLoop, client_num, packet_len, port_num]{
+    std::thread* ts = new std::thread([&mainLoop, client_num, packet_len, port_num, ip]{
         printf("start one client thread \n");
         /*  客户端eventloop*/
         EventLoop clientEventLoop;
@@ -44,7 +52,7 @@ int main(int argc, char** argv)
         TimerMgr tm;
         for (int i = 0; i < client_num; i++)
         {
-            int client = ox_socket_connect("127.0.0.1", port_num);
+            int client = ox_socket_connect(ip.c_str(), port_num);
             ox_socket_nodelay(client);
 
             DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);

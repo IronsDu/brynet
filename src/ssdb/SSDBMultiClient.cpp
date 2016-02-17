@@ -78,7 +78,7 @@ void SSDBMultiClient::startNetThread(std::function<void(void)> frameCallback)
                     }
                     else
                     {
-                        /*  TODO::因为回调与请求的顺序是一一对应，所以如果遇到某个请求处理失败(包括超时，以及服务器断开连接的情况)，则需要模拟一个错误的反馈  */
+                        forgeError("no server", tmp.callback);
                     }
                 }
 
@@ -227,7 +227,17 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
     });
 
     ds->setDisConnectCallback([&](DataSocket::PTR arg){
+
         DBServerUserData* dbUserData = (DBServerUserData*)arg->getUserData();
+
+        queue<std::function<void(const string& response)>>* callbacklist = dbUserData->callbacklist;
+
+        while (!callbacklist->empty())
+        {
+            forgeError("server close", callbacklist->front());
+            callbacklist->pop();
+        }
+
         cout << "disconnect of " << dbUserData->ip << " port " << dbUserData->port << endl;
         if (dbUserData->isAutoConnection)
         {
@@ -246,7 +256,6 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
         }
         delete dbUserData;
 
-        /*  TODO::当服务器断开连接后，要处理pending在它上面的请求，要处理异步回调的失败情况   */
         for (size_t i = 0; i < mProxyClients.size(); ++i)
         {
             if (mProxyClients[i] == arg)
@@ -295,6 +304,21 @@ parse_tree* SSDBMultiClient::processResponse(const string& response)
     }
 
     return nullptr;
+}
+
+void SSDBMultiClient::forgeError(const string& error, std::function<void(const string&)>& callback)
+{
+    if (callback != nullptr)
+    {
+        SSDBProtocolRequest err;
+        err.appendStr(error);
+        err.endl();
+
+        std::shared_ptr<string > response = std::make_shared<string>(err.getResult(), err.getResultLen());
+        mLogicFunctorMQ.Push([callback, response](){
+            callback(*response);
+        });
+    }
 }
 
 void SSDBMultiClient::pushNoneValueRequest(const char* request, int len, const NONE_VALUE_CALLBACK& callback)
@@ -422,6 +446,15 @@ void SSDBMultiClient::multiDel(const std::vector<std::string> &keys, const NONE_
     mRequestProtocol->endl();
 
     pushNoneValueRequest(mRequestProtocol->getResult(), mRequestProtocol->getResultLen(), callback);
+}
+
+void SSDBMultiClient::getset(const std::string& key, const std::string& value, const ONE_STRING_CALLBACK& callback)
+{
+    mRequestProtocol->init();
+    mRequestProtocol->writev("getset", key, value);
+    mRequestProtocol->endl();
+
+    pushStringValueRequest(mRequestProtocol->getResult(), mRequestProtocol->getResultLen(), callback);
 }
 
 void SSDBMultiClient::set(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback)
