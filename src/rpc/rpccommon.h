@@ -156,13 +156,19 @@ namespace dodo
         }
         
         template<typename T>
-        void insertLambda(string name, T lambdaObj)
+        void insertLambda(const string& name, T lambdaObj)
         {
             _insertLambda<T>(name, lambdaObj, &T::operator());
         }
+
+        template<typename ...Args>
+        void insertLambda(const string& name, void(*func)(Args...))
+        {
+            insertStaticFunction(name, func);
+        }
         
         template<typename ...Args>
-        void insertStaticFunction(string name, void(*func)(Args...))
+        void insertStaticFunction(const string& name, void(*func)(Args...))
         {
             void* pbase = new VariadicArgFunctor<Args...>(func);
             assert(mWrapFunctions.find(name) == mWrapFunctions.end());

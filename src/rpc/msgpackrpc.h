@@ -14,6 +14,14 @@
 #include "msgpack.hpp"
 #include "rpccommon.h"
 
+namespace google
+{
+    namespace protobuf
+    {
+        class Message;
+    }
+}
+
 namespace dodo
 {
     using namespace std;
@@ -25,7 +33,7 @@ namespace dodo
         static void read(const char* buffer, size_t size, size_t& off, Tuple& t)
         {
             TupleRead<Tuple, N - 1>::read(buffer, size, off, t);
-            ValueRead::read(buffer, size, off, std::get<N - 1>(t));
+            ValueRead<std::is_base_of<::google::protobuf::Message, std::remove_reference<decltype(std::get<N - 1>(t))>::type>::value>::read(buffer, size, off, std::get<N - 1>(t));
         }
     };
 
@@ -34,10 +42,11 @@ namespace dodo
     {
         static void read(const char* buffer, size_t size, size_t& off, Tuple& t)
         {
-            ValueRead::read(buffer, size, off, std::get<0>(t));
+            ValueRead<std::is_base_of<::google::protobuf::Message, std::remove_reference<decltype(std::get<0>(t))>::type>::value>::read(buffer, size, off, std::get<0>(t));
         }
     };
 
+    template<bool isPB>
     struct ValueRead
     {
         template<class... Args>
@@ -87,6 +96,23 @@ namespace dodo
 
     };
 
+    template<>
+    struct ValueRead<true>
+    {
+        template<typename T>
+        static  void    read(const char* buffer, size_t size, size_t& off, T& value)
+        {
+            /*TODO::直接读取二进制流*/
+            string str;
+            msgpack::unpacked result;
+            msgpack::unpack(result, buffer, size, off);
+            const msgpack::object& o = result.get();
+            o.convert(&str);
+            value.ParseFromArray(str.c_str(), str.size());
+        }
+
+    };
+
     template<int SIZE, typename ...Args>
     struct Eval;
     
@@ -105,7 +131,7 @@ namespace dodo
                 auto& value = std::get<sizeof...(Args)-sizeof...(LeftArgs)-1>(pThis->mTuple);
                 clear(value);
                 
-                ValueRead::read(buffer, size, off, value);
+                ValueRead<std::is_base_of<::google::protobuf::Message, std::remove_reference<decltype(value)>::type>::value>::read(buffer, size, off, value);
                 
                 Eval<sizeof...(LeftArgs), Args...>::template eval<LeftArgs...>(pThis, buffer, size, off, args..., value);
             }
@@ -217,7 +243,7 @@ namespace dodo
         static void write(msgpack::sbuffer& sbuf, const Tuple& value)
         {
             TupleWrite<Tuple, N - 1>::write(sbuf, value);
-            ValueWrite::write(sbuf, std::get<N - 1>(value));
+            ValueWrite<std::is_base_of<::google::protobuf::Message, decltype(std::get<N - 1>(value))>::value>::write(sbuf, std::get<N - 1>(value));
         }
     };
 
@@ -226,10 +252,11 @@ namespace dodo
     {
         static void write(msgpack::sbuffer& sbuf, const Tuple& value)
         {
-            ValueWrite::write(sbuf, std::get<0>(value));
+            ValueWrite<std::is_base_of<::google::protobuf::Message, decltype(std::get<0>(value))>::value>::write(sbuf, std::get<0>(value));
         }
     };
 
+    template<bool isPB>
     struct ValueWrite
     {
         template<typename T>
@@ -266,6 +293,33 @@ namespace dodo
         }
     };
 
+    template<>
+    struct ValueWrite<true>
+    {
+        template<typename T>
+        static  void    write(msgpack::sbuffer& sbuf, const T& value)
+        {
+            char stackBuf[1024];
+            int pbByteSize = value.ByteSize();
+            if (pbByteSize <= sizeof(stackBuf))
+            {
+                value.SerializeToArray(stackBuf, pbByteSize);
+
+                msgpack::packer<msgpack::sbuffer>(sbuf).pack_str(pbByteSize);
+                msgpack::packer<msgpack::sbuffer>(sbuf).pack_str_body(stackBuf, pbByteSize);
+            }
+            else
+            {
+                string str;
+                str.resize(pbByteSize);
+                value.SerializeToArray((void*)str.c_str(), pbByteSize);
+
+                msgpack::packer<msgpack::sbuffer>(sbuf).pack_str(str.size());
+                msgpack::packer<msgpack::sbuffer>(sbuf).pack_str_body(str.c_str(), str.size());
+            }
+        }
+    };
+
     template<bool>
     struct SelectWriteArgMsgpack
     {
@@ -285,7 +339,7 @@ namespace dodo
         static  void    Write(BaseCaller& caller, FunctionMgr& functionMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const ARGTYPE& arg)
         {
             msgpack::pack(&lambdabuf, -1);
-            ValueWrite::write(sbuf, arg);
+            ValueWrite<std::is_base_of<::google::protobuf::Message, ARGTYPE>::value>::write(sbuf, arg);
         }
     };
 
@@ -308,13 +362,13 @@ namespace dodo
         void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const Arg& arg)
         {
             /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-            SelectWriteArgMsgpack<HasCallOperator<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, lambdabuf, arg);
+            SelectWriteArgMsgpack<std::is_function<Arg>::value || HasCallOperator<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, lambdabuf, arg);
         }
 
         template<typename Arg1, typename... Args>
         void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const Arg1& arg1, const Args&... args)
         {
-            ValueWrite::write(sbuf, arg1);
+            ValueWrite<std::is_base_of<::google::protobuf::Message, Arg1>::value>::write(sbuf, arg1);
             writeCallArg(msgpackFunctionResponseMgr, sbuf, lambdabuf, args...);
         }
 
