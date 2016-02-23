@@ -133,13 +133,13 @@ public:
 
     void                parse(const char* buffer);
     Bytes*              getByIndex(size_t index);
-    void                pushByte(const char* buffer, int len);
+    void                pushByte(const char* buffer, size_t len);
 
     size_t              getBuffersLen() const;
 
     Status              getStatus();
 
-    static int          check_ssdb_packet(const char* buffer, int len);
+    static int          check_ssdb_packet(const char* buffer, size_t len);
 
 private:
     std::vector<Bytes>   mBuffers;

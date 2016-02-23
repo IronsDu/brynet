@@ -30,7 +30,7 @@ struct NetMsg
     {
     }
 
-    void        setData(const char* data, int len)
+    void        setData(const char* data, size_t len)
     {
         mData = std::string(data, len);
     }
@@ -109,9 +109,9 @@ int main(int argc, char** argv)
         mainLoop.wakeup();
     });
 
-    t.setDataCallback([&](int64_t id, const char* buffer, int len){
+    t.setDataCallback([&](int64_t id, const char* buffer, size_t len){
         const char* parse_str = buffer;
-        int total_proc_len = 0;
+        size_t total_proc_len = 0;
         int left_len = len;
 
         while (true)

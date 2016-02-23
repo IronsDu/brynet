@@ -4,7 +4,7 @@
 #include "SocketLibFunction.h"
 #include "WrapTCPService.h"
 
-int onSessionMsg(TCPSession::PTR session, const char* buffer, int len)
+int onSessionMsg(TCPSession::PTR session, const char* buffer, size_t len)
 {
     session->send(buffer, len);
     return len;

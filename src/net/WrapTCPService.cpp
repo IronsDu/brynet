@@ -38,7 +38,7 @@ int64_t TCPSession::getSocketID() const
     return mSocketID;
 }
 
-void    TCPSession::send(const char* buffer, int len, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void    TCPSession::send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     mService->send(mSocketID, DataSocket::makePacket(buffer, len), callback);
 }
@@ -107,7 +107,7 @@ void    WrapServer::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK
     mTCPService->startWorkerThread(threadNum, callback);
 }
 
-void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize)
+void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop)
 {
     TCPSession::PTR tmpSession = std::make_shared<TCPSession>();
     tmpSession->setService(mTCPService);
@@ -129,7 +129,7 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback,
         }
     };
 
-    auto msgCallback = [tmpSession](int64_t id, const char* buffer, int len){
+    auto msgCallback = [tmpSession](int64_t id, const char* buffer, size_t len){
         auto& callback = tmpSession->getDataCallback();
         if (callback != nullptr)
         {
@@ -141,5 +141,5 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback,
         }
     };
 
-    mTCPService->addDataSocket(fd, enterCallback, closeCallback, msgCallback, isUseSSL, maxRecvBufferSize);
+    mTCPService->addDataSocket(fd, enterCallback, closeCallback, msgCallback, isUseSSL, maxRecvBufferSize, forceSameThreadLoop);
 }

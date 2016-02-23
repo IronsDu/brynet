@@ -46,7 +46,7 @@ bool HTTPParser::isKeepAlive() const
     return mIsKeepAlive;
 }
 
-bool HTTPParser::checkCompleted(const char* buffer, int len)
+bool HTTPParser::checkCompleted(const char* buffer, size_t len)
 {
     const static char* RL = "\r\n";
     const static int RL_LEN = strlen(RL);
@@ -174,13 +174,13 @@ bool HTTPParser::checkCompleted(const char* buffer, int len)
     return false;
 }
 
-int HTTPParser::tryParse(const char* buffer, int len)
+size_t HTTPParser::tryParse(const char* buffer, size_t len)
 {
     if (!mISCompleted && checkCompleted(buffer, len))
     {
         mISCompleted = true;
 
-        int nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
+        size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
         http_parser_init(&mParser, mParserType);
 
         mIsWebSocket = getValue("Upgrade") == "websocket";

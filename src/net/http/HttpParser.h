@@ -14,10 +14,10 @@ public:
     bool                                    isWebSocket() const;
     bool                                    isKeepAlive() const;
 
-    bool                                    checkCompleted(const char* buffer, int len);
+    bool                                    checkCompleted(const char* buffer, size_t len);
 
     /*直接尝试解析http协议,如果完整则返回报文长度，否则返回0*/
-    int                                     tryParse(const char* buffer, int len);
+    size_t                                  tryParse(const char* buffer, size_t len);
 
     const std::string&                      getPath() const;
 

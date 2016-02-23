@@ -91,7 +91,7 @@ SSDBProtocolRequest::~SSDBProtocolRequest()
 
 void SSDBProtocolRequest::appendStr(const char* str)
 {
-    int len = strlen(str);
+    size_t len = strlen(str);
     char lenstr[16];
     int num = snprintf(lenstr, sizeof(len), "%d\n", len);
     appendBlock(lenstr, num);
@@ -204,7 +204,7 @@ Bytes* SSDBProtocolResponse::getByIndex(size_t index)
     }
 }
 
-void SSDBProtocolResponse::pushByte(const char* buffer, int len)
+void SSDBProtocolResponse::pushByte(const char* buffer, size_t len)
 {
     Bytes tmp = { buffer, len };
     mBuffers.push_back(tmp);
@@ -225,7 +225,7 @@ Status SSDBProtocolResponse::getStatus()
     return std::string(mBuffers[0].buffer, mBuffers[0].len);
 }
 
-int SSDBProtocolResponse::check_ssdb_packet(const char* buffer, int len)
+int SSDBProtocolResponse::check_ssdb_packet(const char* buffer, size_t len)
 {
     const char* end = buffer + len; /*  无效内存地址  */
     const char* current = buffer;   /*  当前解析位置*/

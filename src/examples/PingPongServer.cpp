@@ -14,7 +14,7 @@ void onSessionClose(TCPSession::PTR session)
     total_client_num--;
 }
 
-int onSessionMsg(TCPSession::PTR session, const char* buffer, int len)
+int onSessionMsg(TCPSession::PTR session, const char* buffer, size_t len)
 {
     session->send(buffer, len);
     total_recv += len;

@@ -70,7 +70,7 @@ int main(int argc, char** argv)
                 }
 
                 /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                ds->setDataCallback([&total_recv, &packet_num](DataSocket::PTR ds, const char* buffer, int len){
+                ds->setDataCallback([&total_recv, &packet_num](DataSocket::PTR ds, const char* buffer, size_t len){
                     const char* parse_str = buffer;
                     int total_proc_len = 0;
                     int left_len = len;

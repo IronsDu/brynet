@@ -154,7 +154,7 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
         sendPing(ds);
     });
 
-    ds->setDataCallback([&](DataSocket::PTR ds, const char* buffer, int len){
+    ds->setDataCallback([&](DataSocket::PTR ds, const char* buffer, size_t len){
         const char* parse_str = buffer;
         DBServerUserData* dbUserData = (DBServerUserData*)ds->getUserData();
         while (parse_str < (buffer + len))
@@ -321,7 +321,7 @@ void SSDBMultiClient::forgeError(const string& error, std::function<void(const s
     }
 }
 
-void SSDBMultiClient::pushNoneValueRequest(const char* request, int len, const NONE_VALUE_CALLBACK& callback)
+void SSDBMultiClient::pushNoneValueRequest(const char* request, size_t len, const NONE_VALUE_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
         if (callback != nullptr)
@@ -339,7 +339,7 @@ void SSDBMultiClient::pushNoneValueRequest(const char* request, int len, const N
     mRequestList.Push(std::move(msg));
 }
 
-void SSDBMultiClient::pushStringValueRequest(const char* request, int len, const ONE_STRING_CALLBACK& callback)
+void SSDBMultiClient::pushStringValueRequest(const char* request, size_t len, const ONE_STRING_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
         if (callback != nullptr)
@@ -358,7 +358,7 @@ void SSDBMultiClient::pushStringValueRequest(const char* request, int len, const
     mRequestList.Push(std::move(msg));
 }
 
-void SSDBMultiClient::pushStringListRequest(const char* request, int len, const STRING_LIST_CALLBACK& callback)
+void SSDBMultiClient::pushStringListRequest(const char* request, size_t len, const STRING_LIST_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
         if (callback != nullptr)
@@ -377,7 +377,7 @@ void SSDBMultiClient::pushStringListRequest(const char* request, int len, const 
     mRequestList.Push(std::move(msg));
 }
 
-void SSDBMultiClient::pushIntValueRequest(const char* request, int len, const ONE_INT64_CALLBACK& callback)
+void SSDBMultiClient::pushIntValueRequest(const char* request, size_t len, const ONE_INT64_CALLBACK& callback)
 {
     RequestMsg msg([this, callback](const std::string& response){
         if (callback != nullptr)

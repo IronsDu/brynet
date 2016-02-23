@@ -95,13 +95,13 @@ public:
 
 private:
     /*投递没有返回值的db请求*/
-    void                                                            pushNoneValueRequest(const char* request, int len, const NONE_VALUE_CALLBACK& callback);
+    void                                                            pushNoneValueRequest(const char* request, size_t len, const NONE_VALUE_CALLBACK& callback);
     /*投递返回值为string的db请求*/
-    void                                                            pushStringValueRequest(const char* request, int len, const ONE_STRING_CALLBACK& callback);
+    void                                                            pushStringValueRequest(const char* request, size_t len, const ONE_STRING_CALLBACK& callback);
     /*投递返回值为string list的db请求*/
-    void                                                            pushStringListRequest(const char* request, int len, const STRING_LIST_CALLBACK& callback);
+    void                                                            pushStringListRequest(const char* request, size_t len, const STRING_LIST_CALLBACK& callback);
     /*投递返回值为int64_t的db请求*/
-    void                                                            pushIntValueRequest(const char* request, int len, const ONE_INT64_CALLBACK& callback);
+    void                                                            pushIntValueRequest(const char* request, size_t len, const ONE_INT64_CALLBACK& callback);
 
     parse_tree*                                                     processResponse(const string& response);
     void                                                            forgeError(const string& error, std::function<void(const string&)>& callback);

@@ -26,7 +26,7 @@ public:
     std::string             getIP() const;
     int64_t                 getSocketID() const;
 
-    void                    send(const char* buffer, int len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
     void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                    postClose();
@@ -71,7 +71,7 @@ public:
 
     void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
-    void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize);
+    void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop = false);
 private:
     TcpService::PTR         mTCPService;
 };

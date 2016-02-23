@@ -54,7 +54,7 @@ public:
     typedef std::function<void (EventLoop&)>                            FRAME_CALLBACK;
     typedef std::function<void(int64_t, std::string)>                   ENTER_CALLBACK;
     typedef std::function<void(int64_t)>                                DISCONNECT_CALLBACK;
-    typedef std::function<int (int64_t, const char* buffer, int len)>   DATA_CALLBACK;
+    typedef std::function<int (int64_t, const char* buffer, size_t len)>   DATA_CALLBACK;
 
 public:
     TcpService();
@@ -84,7 +84,8 @@ public:
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                                         TcpService::DATA_CALLBACK dataCallback,
                                                         bool isUseSSL,
-                                                        int maxRecvBufferSize);
+                                                        int maxRecvBufferSize,
+                                                        bool forceSameThreadLoop = false);
 
     /*  ¿ªÆô¼àÌýÏß³Ì  */
     void                                startListen(int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
@@ -111,7 +112,8 @@ private:
                                                     const std::string& ip,
                                                     TcpService::ENTER_CALLBACK enterCallback,
                                                     TcpService::DISCONNECT_CALLBACK disConnectCallback,
-                                                    TcpService::DATA_CALLBACK dataCallback);
+                                                    TcpService::DATA_CALLBACK dataCallback,
+                                                    bool forceSameThreadLoop = false);
 private:
     int64_t                             MakeID(int loopIndex);
 
