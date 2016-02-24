@@ -72,7 +72,7 @@ int main(int argc, char **argv)
                         bool flag = false;
                         if (left_len >= PACKET_HEAD_LEN)
                         {
-                            PACKET_LEN_TYPE packet_len = htonl(*(PACKET_LEN_TYPE*)parse_str);
+                            PACKET_LEN_TYPE packet_len = (*(PACKET_LEN_TYPE*)parse_str);
                             if (left_len >= packet_len && packet_len >= PACKET_HEAD_LEN)
                             {
                                 std::string sendPayload(parse_str, packet_len);

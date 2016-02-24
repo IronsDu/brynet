@@ -81,26 +81,27 @@ int main(int argc, char **argv)
 
     server.startListen(8088);
     server.startWorkThread(1);
+    server.setEnterCallback([](HttpSession::PTR session){
+        session->setRequestCallback([](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
+            if (websocketPacket != nullptr)
+            {
+                std::string sendPayload = "hello";
+                std::string sendFrame;
+                WebSocketFormat::wsFrameBuild(sendPayload, sendFrame);
 
-    server.setRequestHandle([](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
-        if (websocketPacket != nullptr)
-        {
-            std::string sendPayload = "hello";
-            std::string sendFrame;
-            WebSocketFormat::wsFrameBuild(sendPayload, sendFrame);
-
-            session->getSession()->send(sendFrame.c_str(), sendFrame.size());
-        }
-        else
-        {
-            //普通http协议
-            HttpFormat httpFormat;
-            httpFormat.setProtocol(HttpFormat::HRP_RESPONSE);
-            httpFormat.addParameter("<html>hello</html>");
-            std::string result = httpFormat.getResult();
-            session->getSession()->send(result.c_str(), result.size());
-        }
-    }, nullptr);
+                session->getSession()->send(sendFrame.c_str(), sendFrame.size());
+            }
+            else
+            {
+                //普通http协议
+                HttpFormat httpFormat;
+                httpFormat.setProtocol(HttpFormat::HRP_RESPONSE);
+                httpFormat.addParameter("<html>hello</html>");
+                std::string result = httpFormat.getResult();
+                session->getSession()->send(result.c_str(), result.size());
+            }
+        });
+    });
 
     HTTPParser result = etcdSet("127.0.0.1", 2379, "server/1", "ip:127.0.0.1, port:8888", 5000);
     result = etcdSet("127.0.0.1", 2379, "server/2", "ip:127.0.0.1, port:9999", 5000);

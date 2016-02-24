@@ -41,27 +41,22 @@ class HttpServer
 public:
     typedef std::shared_ptr<HttpServer> PTR;
 
-    typedef std::function < void(const HTTPParser&, HttpSession::PTR, const char* websocketPacket, size_t websocketPacketLen) > HTTPPARSER_CALLBACK;
     typedef std::function < void(HttpSession::PTR) > ENTER_CALLBACK;
-    typedef std::function < void(HttpSession::PTR) > CLOSE_CALLBACK;
 
     HttpServer();
     ~HttpServer();
     WrapServer::PTR         getServer();
 
     void                    setEnterCallback(ENTER_CALLBACK callback);
-    void                    setRequestHandle(HTTPPARSER_CALLBACK requestCallback, CLOSE_CALLBACK closeCallback);
 
-    void                    addConnection(int fd, ENTER_CALLBACK enterCallback, HTTPPARSER_CALLBACK responseCallback, CLOSE_CALLBACK closeCallback = nullptr);
+    void                    addConnection(int fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
 
     void                    startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
     void                    startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 private:
-    void                    setSessionCallback(HttpSession::PTR httpSession, HTTPPARSER_CALLBACK callback, CLOSE_CALLBACK closeCallback = nullptr);
+    void                    setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK callback, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
 private:
     ENTER_CALLBACK          mOnEnter;
-    HTTPPARSER_CALLBACK     mOnRequestCallback;
-    CLOSE_CALLBACK          mOnCloseCallback;
     WrapServer::PTR         mServer;
     ListenThread::PTR       mListenThread;
 };

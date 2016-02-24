@@ -75,13 +75,7 @@ void HttpServer::setEnterCallback(ENTER_CALLBACK callback)
     mOnEnter = callback;
 }
 
-void HttpServer::setRequestHandle(HTTPPARSER_CALLBACK requestCallback, CLOSE_CALLBACK closeCallback)
-{
-    mOnRequestCallback = requestCallback;
-    mOnCloseCallback = closeCallback;
-}
-
-void HttpServer::addConnection(int fd, ENTER_CALLBACK enterCallback, HTTPPARSER_CALLBACK responseCallback, CLOSE_CALLBACK closeCallback)
+void HttpServer::addConnection(int fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback)
 {
     mServer->addSession(fd, [this, enterCallback, responseCallback, closeCallback](TCPSession::PTR session){
         HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
@@ -113,7 +107,7 @@ void HttpServer::startListen(int port, const char *certificate /* = nullptr */, 
     }
 }
 
-void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HTTPPARSER_CALLBACK callback, CLOSE_CALLBACK closeCallback)
+void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK callback, HttpSession::CLOSE_CALLBACK closeCallback)
 {
     /*TODO::keep alive and timeout close */
     TCPSession::PTR session = httpSession->getSession();
@@ -128,17 +122,30 @@ void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HTTPPARSER_CAL
         }
     });
     session->setDataCallback([this, callback, httpSession](TCPSession::PTR session, const char* buffer, size_t len){
-        int retlen = 0;
+        size_t retlen = 0;
         HTTPParser* httpParser = (HTTPParser*)session->getUD();
         if (httpParser->isWebSocket())
         {
-            std::string frame(buffer, len);
-            std::string payload;
-            uint8_t opcode; /*TODO::opcode是否回传给回调函数*/
-            if (WebSocketFormat::wsFrameExtract(frame, payload, opcode))
+            const char* parse_str = buffer;
+            size_t leftLen = len;
+
+            while (leftLen > 0)
             {
-                callback(*httpParser, httpSession, payload.c_str(), payload.size());
-                retlen = len;
+                std::string payload;
+                uint8_t opcode; /*TODO::opcode是否回传给回调函数*/
+                int frameSize = 0;
+                if (WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, payload, opcode, frameSize))
+                {
+                    callback(*httpParser, httpSession, payload.c_str(), payload.size());
+
+                    leftLen -= frameSize;
+                    retlen += frameSize;
+                    parse_str += frameSize;
+                }
+                else
+                {
+                    break;
+                }
             }
         }
         else

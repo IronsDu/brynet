@@ -67,12 +67,17 @@ public:
         return true;
     }
 
-    static bool wsFrameExtract(const std::string& frame, std::string& payload, uint8_t& opcode)
+    static bool wsFrameExtractBuffer(const char* buffer, size_t bufferSize, std::string& payload, uint8_t& opcode, int& frameSize)
     {
-        bool FIN = !!((uint8_t)frame[0] & 0x80);
-        opcode = (uint8_t)frame[0] & 0x0F;
-        bool MASK = !!((uint8_t)frame[1] & 0x80);
-        uint8_t payloadlen1 = (uint8_t)frame[1] & 0x7F;
+        if (bufferSize < 2)
+        {
+            return false;
+        }
+
+        bool FIN = !!((uint8_t)buffer[0] & 0x80);
+        opcode = (uint8_t)buffer[0] & 0x0F;
+        bool MASK = !!((uint8_t)buffer[1] & 0x80);
+        uint8_t payloadlen1 = (uint8_t)buffer[1] & 0x7F;
 
         // we only want to handle frame:
         // 1.no fragment 2.masked 3.text or binary
@@ -85,17 +90,34 @@ public:
         else if (payloadlen1 == 127)
             pos = 10;
 
-        uint8_t mask[4];
-        mask[0] = (uint8_t)frame[pos++];
-        mask[1] = (uint8_t)frame[pos++];
-        mask[2] = (uint8_t)frame[pos++];
-        mask[3] = (uint8_t)frame[pos++];
+        if (bufferSize < (pos + 4))
+        {
+            return false;
+        }
 
-        payload.resize(frame.size() - pos, 0);
-        for (size_t i = pos, j = 0; i < frame.size(); i++, j++)
-            payload[j] = frame[i] ^ mask[j % 4];
+        uint8_t mask[4];
+        mask[0] = (uint8_t)buffer[pos++];
+        mask[1] = (uint8_t)buffer[pos++];
+        mask[2] = (uint8_t)buffer[pos++];
+        mask[3] = (uint8_t)buffer[pos++];
+
+        if (bufferSize < (pos + payloadlen1))
+        {
+            return false;
+        }
+
+        payload.resize(payloadlen1, 0);
+        for (size_t i = pos, j = 0; j < payloadlen1; i++, j++)
+            payload[j] = buffer[i] ^ mask[j % 4];
+
+        frameSize = payloadlen1 + pos;
 
         return true;
+    }
+
+    static bool wsFrameExtractString(const std::string& buffer, std::string& payload, uint8_t& opcode, int& frameSize)
+    {
+        return wsFrameExtractBuffer(buffer.c_str(), buffer.size(), payload, opcode, frameSize);
     }
 };
 
