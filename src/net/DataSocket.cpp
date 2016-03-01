@@ -523,6 +523,19 @@ void DataSocket::procCloseInLoop()
     }
 }
 
+void DataSocket::procShutdownInLoop()
+{
+    if (mFD != SOCKET_ERROR)
+    {
+#ifdef PLATFORM_WINDOWS
+        shutdown(mFD, SD_SEND);
+#else
+        shutdown(mFD, SHUT_WR);
+#endif
+        mCanWrite = false;
+    }
+}
+
 /*当收到网络断开(或者IOCP下收到模拟的断开通知)后的处理(此函数里的主体逻辑只能被执行一次)*/
 void DataSocket::onClose()
 {
@@ -702,6 +715,17 @@ void DataSocket::postDisConnect()
         DataSocket::PTR tmp = this;
         mEventLoop->pushAsyncProc([=](){
             tmp->procCloseInLoop();
+        });
+    }
+}
+
+void DataSocket::postShutdown()
+{
+    if (mEventLoop != nullptr)
+    {
+        DataSocket::PTR tmp = this;
+        mEventLoop->pushAsyncProc([=](){
+            tmp->procShutdownInLoop();
         });
     }
 }

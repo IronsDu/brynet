@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "http_parser.h"
 
 using namespace std;
@@ -87,7 +89,8 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
         }
 
         const int datalen = atoi(temp);
-        if ((len - (bodystart - copyBuffer.c_str())) >= datalen)
+        assert(datalen >= 0);
+        if (datalen >= 0 && (len - (bodystart - copyBuffer.c_str())) >= static_cast<size_t>(datalen))
         {
             return true;
         }
@@ -279,7 +282,6 @@ int HTTPParser::sHeadValue(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
     httpParser->mHeadValues[string(httpParser->mTmpHeadStr, httpParser->mTmpHeadLen)] = string(at, length);
-    printf("Header field: %.*s\n", (int)length, at);
     return 0;
 }
 
@@ -288,7 +290,6 @@ int HTTPParser::sHeadField(http_parser* hp, const char *at, size_t length)
     HTTPParser* httpParser = (HTTPParser*)hp->data;
     httpParser->mTmpHeadStr = at;
     httpParser->mTmpHeadLen = length;
-    printf("Header value: %.*s\n", (int)length, at);
     return 0;
 }
 
@@ -296,13 +297,11 @@ int HTTPParser::sStatusHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
     httpParser->mStatus = string(at, length);
-    printf("Status: %.*s\n", (int)length, at);
     return 0;
 }
 int HTTPParser::sBodyHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
     httpParser->mBody = string(at, length);
-    printf("Body: %.*s\n", (int)length, at);
     return 0;
 }

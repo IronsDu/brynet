@@ -25,7 +25,7 @@ HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTPREQUEST_PRO
         server.addConnection(fd, [key, value, &mtx, &cv, &server, &timer, timeout, protocol](HttpSession::PTR session){
             /*注册超时定时器*/
             timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr().AddTimer(timeout, [session](){
-                session->getSession()->postClose();
+                session->getSession()->postShutdown();
             });
 
             HttpFormat request;
@@ -45,7 +45,7 @@ HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTPREQUEST_PRO
         }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
             result = httpParser;
             /*关闭连接,并删除超时定时器*/
-            session->getSession()->postClose();
+            session->getSession()->postShutdown();
             if (timer.lock() != nullptr)
             {
                 timer.lock()->Cancel();
@@ -79,8 +79,8 @@ int main(int argc, char **argv)
 {
     HttpServer server;
 
-    server.startListen(8088);
-    server.startWorkThread(1);
+    server.startListen(8080);
+    server.startWorkThread(ox_getcpunum());
     server.setEnterCallback([](HttpSession::PTR session){
         session->setRequestCallback([](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
             if (websocketPacket != nullptr)
@@ -98,10 +98,14 @@ int main(int argc, char **argv)
                 httpFormat.setProtocol(HttpFormat::HRP_RESPONSE);
                 httpFormat.addParameter("<html>hello</html>");
                 std::string result = httpFormat.getResult();
-                session->getSession()->send(result.c_str(), result.size());
+                session->getSession()->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
+                    session->getSession()->postShutdown();
+                }));
             }
         });
     });
+
+    std::cin.get();
 
     HTTPParser result = etcdSet("127.0.0.1", 2379, "server/1", "ip:127.0.0.1, port:8888", 5000);
     result = etcdSet("127.0.0.1", 2379, "server/2", "ip:127.0.0.1, port:9999", 5000);

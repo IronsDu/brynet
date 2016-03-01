@@ -29,6 +29,7 @@ public:
     void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
     void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
+    void                    postShutdown();
     void                    postClose();
     void                    setCloseCallback(const CLOSE_CALLBACK& callback);
 

@@ -137,8 +137,6 @@ void ListenThread::RunListen()
                 }
             }
 
-            printf("accept fd : %d \n", client_fd);
-
             if (SOCKET_ERROR != client_fd && mRunListen)
             {
                 ox_socket_nodelay(client_fd);
@@ -153,7 +151,6 @@ void ListenThread::RunListen()
     else
     {
         printf("listen failed, error:%d \n", sErrno);
-        return;
     }
 }
 
@@ -273,6 +270,26 @@ void TcpService::flushCachePackectList()
             });
             mCachePacketList[i] = std::make_shared<MSG_LIST>();
         }
+    }
+}
+
+void TcpService::shutdown(int64_t id)
+{
+    union  SessionId sid;
+    sid.id = id;
+    assert(sid.data.loopIndex < mLoopNum);
+    if (sid.data.loopIndex < mLoopNum)
+    {
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
+            DataSocket::PTR tmp = nullptr;
+            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
+            {
+                if (tmp != nullptr && tmp->getUserData() == sid.id)
+                {
+                    tmp->postShutdown();
+                }
+            }
+        });
     }
 }
 

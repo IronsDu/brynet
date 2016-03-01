@@ -48,6 +48,11 @@ void TCPSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PA
     mService->send(mSocketID, packet, callback);
 }
 
+void TCPSession::postShutdown()
+{
+    mService->shutdown(mSocketID);
+}
+
 void TCPSession::postClose()
 {
     mService->disConnect(mSocketID);

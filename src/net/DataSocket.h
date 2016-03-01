@@ -58,6 +58,7 @@ public:
     void                            setCheckTime(int overtime);
     /*主动(投递)断开连接,会触发断开回调*/
     void                            postDisConnect();
+    void                            postShutdown();
 
     void                            setUserData(int64_t value);
     int64_t                         getUserData() const;
@@ -88,6 +89,7 @@ private:
     void                            onClose() override;
     void                            closeSocket();
     void                            procCloseInLoop();
+    void                            procShutdownInLoop();
 
     void                            runAfterFlush();
 #ifdef PLATFORM_LINUX
