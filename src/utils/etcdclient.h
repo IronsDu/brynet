@@ -40,7 +40,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
                 }
                 request.setContentType("application/x-www-form-urlencoded");
             }
-            string requestStr = request.getResult();
+            std::string requestStr = request.getResult();
             session->getSession()->send(requestStr.c_str(), requestStr.size());
 
         }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){

@@ -28,6 +28,7 @@ struct parse_tree;
 class SSDBMultiClient
 {
 public:
+
     typedef SSDBProtocolRequest MyRequestProcotol;
 
     typedef std::shared_ptr<SSDBMultiClient> PTR;
@@ -45,9 +46,9 @@ public:
 
     void                                                            startNetThread(std::function<void(void)> frameCallback = nullptr);
     /*开启一个异步链接后端服务器, pingTime为ping时间，-1表示不执行ping操作, isAutoConnection为是否自动重连*/
-    void                                                            asyncConnection(string ip, int port, int pingTime, bool isAutoConnection);
+    void                                                            asyncConnection(std::string ip, int port, int pingTime, bool isAutoConnection);
     /*添加一个(已链接的)后端服务器(线程安全)*/
-    void                                                            addConnection(sock fd, string ip, int port, int pingTime, bool isAutoConnection);
+    void                                                            addConnection(sock fd, std::string ip, int port, int pingTime, bool isAutoConnection);
 
     void                                                            redisSet(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback);
     void                                                            redisGet(const std::string& key, const ONE_STRING_CALLBACK& callback);
@@ -59,13 +60,13 @@ public:
     void                                                            getset(const std::string& key, const std::string& value, const ONE_STRING_CALLBACK& callback);
 
     void                                                            set(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback);
-    void                                                            get(const string& k, const ONE_STRING_CALLBACK& callback);
+    void                                                            get(const std::string& k, const ONE_STRING_CALLBACK& callback);
 
-    void                                                            hget(const string& hname, const string& k, const ONE_STRING_CALLBACK& callback);
-    void                                                            hset(const string& hname, const string& k, const string& v, const NONE_VALUE_CALLBACK& callback);
+    void                                                            hget(const std::string& hname, const std::string& k, const ONE_STRING_CALLBACK& callback);
+    void                                                            hset(const std::string& hname, const std::string& k, const std::string& v, const NONE_VALUE_CALLBACK& callback);
 
-    void                                                            multiHget(const string& hname, const std::vector<std::string> &keys, const STRING_LIST_CALLBACK& callback);
-    void                                                            multiHset(const string& hname, const std::unordered_map<std::string, std::string> &kvs, const NONE_VALUE_CALLBACK& callback);
+    void                                                            multiHget(const std::string& hname, const std::vector<std::string> &keys, const STRING_LIST_CALLBACK& callback);
+    void                                                            multiHset(const std::string& hname, const std::unordered_map<std::string, std::string> &kvs, const NONE_VALUE_CALLBACK& callback);
 
     void                                                            zset(const std::string& name, const std::string& key, int64_t score,
                                                                         const NONE_VALUE_CALLBACK& callback);
@@ -101,22 +102,22 @@ private:
     /*投递返回值为int64_t的db请求*/
     void                                                            pushIntValueRequest(const char* request, size_t len, const ONE_INT64_CALLBACK& callback);
 
-    parse_tree*                                                     processResponse(const string& response);
-    void                                                            forgeError(const string& error, std::function<void(const string&)>& callback);
+    parse_tree*                                                     processResponse(const std::string& response);
+    void                                                            forgeError(const std::string& error, std::function<void(const std::string&)>& callback);
 
     void                                                            sendPing(DataSocket::PTR ds);
 private:
     std::thread*                                                    mNetThread;
     int64_t                                                         mCallbackNextID;
 
-    unordered_map<int64_t, ONE_STRING_CALLBACK>                     mOneStringValueCallback;
-    unordered_map<int64_t, NONE_VALUE_CALLBACK>                     mNoValueCallback;
-    unordered_map<int64_t, ONE_INT64_CALLBACK>                      mOntInt64Callback;
-    unordered_map<int64_t, STRING_LIST_CALLBACK>                    mStringListCallback;
+    std::unordered_map<int64_t, ONE_STRING_CALLBACK>                mOneStringValueCallback;
+    std::unordered_map<int64_t, NONE_VALUE_CALLBACK>                mNoValueCallback;
+    std::unordered_map<int64_t, ONE_INT64_CALLBACK>                 mOntInt64Callback;
+    std::unordered_map<int64_t, STRING_LIST_CALLBACK>               mStringListCallback;
 
     bool                                                            mRunIOLoop;
     EventLoop                                                       mNetService;
-    vector<DataSocket::PTR>                                         mBackends;
+    std::vector<DataSocket::PTR>                                    mBackends;
 
     /*投递到网络线程的db请求*/
     struct RequestMsg
@@ -124,11 +125,11 @@ private:
         RequestMsg()
         {}
 
-        RequestMsg(const std::function<void(const string&)>& acallback, const string& acontent) : callback(acallback), content(acontent)
+        RequestMsg(const std::function<void(const std::string&)>& acallback, const std::string& acontent) : callback(acallback), content(acontent)
         {
         }
 
-        RequestMsg(std::function<void(const string&)>&& acallback, string&& acontent) : callback(std::move(acallback)), content(std::move(acontent))
+        RequestMsg(std::function<void(const std::string&)>&& acallback, std::string&& acontent) : callback(std::move(acallback)), content(std::move(acontent))
         {
         }
 
@@ -146,8 +147,8 @@ private:
 
             return *this;
         }
-        std::function<void(const string&)> callback;    /*用户线程的异步回调*/
-        string  content;                                /*请求的协议内容*/
+        std::function<void(const std::string&)> callback;    /*用户线程的异步回调*/
+        std::string  content;                                /*请求的协议内容*/
     };
 
     MsgQueue<RequestMsg>                                            mRequestList;
