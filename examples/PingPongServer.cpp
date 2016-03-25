@@ -25,12 +25,12 @@ int main(int argc, char **argv)
 {
     if (argc != 3)
     {
-        fprintf(stderr, "Usage: <net work thread num> <listen port> \n");
+        fprintf(stderr, "Usage:  <listen port> <net work thread num>\n");
         exit(-1);
     }
 
-    int thread_num = atoi(argv[1]);
-    int port_num = atoi(argv[2]);
+    int port_num = atoi(argv[1]);
+    int thread_num = atoi(argv[2]);
 
     WrapServer::PTR server = std::make_shared<WrapServer>();
     ListenThread::PTR listenThread = std::make_shared<ListenThread>();

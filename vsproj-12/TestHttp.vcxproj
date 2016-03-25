@@ -72,7 +72,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\examples\TestHttp.cpp" />
+    <ClCompile Include="..\examples\TestHttp.cpp" />
     <ClCompile Include="..\src\net\CurrentThread.cpp" />
     <ClCompile Include="..\src\net\DataSocket.cpp" />
     <ClCompile Include="..\src\net\EventLoop.cpp" />

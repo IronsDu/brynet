@@ -14,8 +14,6 @@
 #include "msgqueue.h"
 #include "SSDBProtocol.h"
 
-using namespace std;
-
 class DataSocket;
 class SSDBProtocolRequest;
 class RedisProtocolRequest;

@@ -26,7 +26,7 @@
     <ClInclude Include="..\src\utils\systemlib.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\examples\BroadCastClient.cpp" />
+    <ClCompile Include="..\examples\BroadCastClient.cpp" />
     <ClCompile Include="..\src\net\CurrentThread.cpp" />
     <ClCompile Include="..\src\net\DataSocket.cpp" />
     <ClCompile Include="..\src\net\EventLoop.cpp" />

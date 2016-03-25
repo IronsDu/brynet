@@ -54,9 +54,6 @@
     <ClCompile Include="..\src\timer\timer.cpp">
       <Filter>timer</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\examples\TestHttp.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\net\http\HttpServer.cpp">
       <Filter>http</Filter>
     </ClCompile>
@@ -71,6 +68,9 @@
     </ClCompile>
     <ClCompile Include="..\src\net\http\HttpParser.cpp">
       <Filter>http</Filter>
+    </ClCompile>
+    <ClCompile Include="..\examples\TestHttp.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -60,11 +60,11 @@
     <ClCompile Include="..\src\ssdb\SSDBProtocol.cpp">
       <Filter>ssdb</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\examples\TestMultiSSDBClient.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\ssdb\RedisSSDBCovert.cpp">
       <Filter>ssdb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\examples\TestMultiSSDBClient.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -4,77 +4,112 @@
 #include <stdint.h>
 #include <assert.h>
 #include <string>
-#include <string.h>
 #include <stdbool.h>
-#include <stdlib.h>
 
-#include "SocketLibTypes.h"
+#include "socketlibtypes.h"
 
 #ifndef PLATFORM_WINDOWS
 #include <endian.h>
 #endif
 
+typedef  uint32_t PACKET_LEN_TYPE;
+typedef  uint16_t PACKET_OP_TYPE;
+
+const static PACKET_LEN_TYPE PACKET_HEAD_LEN = sizeof(PACKET_LEN_TYPE) + sizeof(PACKET_OP_TYPE);
+
 namespace socketendian
 {
-    const static bool IS_ENDIAN = false;
+    const static bool ENABLE_CONVERT_ENDIAN = false;
+
+    inline uint64_t  hl64ton(uint64_t   host)
+    {
+        uint64_t   ret = 0;
+        uint32_t   high, low;
+
+        low = host & 0xFFFFFFFF;
+        high = (host >> 32) & 0xFFFFFFFF;
+        low = htonl(low);
+        high = htonl(high);
+        ret = low;
+        ret <<= 32;
+        ret |= high;
+
+        return   ret;
+    }
+
+    inline uint64_t  ntohl64(uint64_t   host)
+    {
+        uint64_t   ret = 0;
+        uint32_t   high, low;
+
+        low = host & 0xFFFFFFFF;
+        high = (host >> 32) & 0xFFFFFFFF;
+        low = ntohl(low);
+        high = ntohl(high);
+        ret = low;
+        ret <<= 32;
+        ret |= high;
+
+        return   ret;
+    }
 
 #ifdef PLATFORM_WINDOWS
     inline uint64_t hostToNetwork64(uint64_t host64)
     {
-        return host64;
+        return ENABLE_CONVERT_ENDIAN ? hl64ton(host64) : host64;
     }
     inline uint32_t hostToNetwork32(uint32_t host32)
     {
-        return IS_ENDIAN ? htonl(host32) : host32;
+        return ENABLE_CONVERT_ENDIAN ? htonl(host32) : host32;
     }
 
     inline uint16_t hostToNetwork16(uint16_t host16)
     {
-        return IS_ENDIAN ? htons(host16) : host16;
+        return ENABLE_CONVERT_ENDIAN ? htons(host16) : host16;
     }
 
     inline uint64_t networkToHost64(uint64_t net64)
     {
-        return net64;
+        return ENABLE_CONVERT_ENDIAN ? ntohl64(net64) : net64;
     }
 
     inline uint32_t networkToHost32(uint32_t net32)
     {
-        return IS_ENDIAN ? ntohl(net32) : net32;
+        return ENABLE_CONVERT_ENDIAN ? ntohl(net32) : net32;
     }
 
     inline uint16_t networkToHost16(uint16_t net16)
     {
-        return IS_ENDIAN ? ntohs(net16) : net16;
+        return ENABLE_CONVERT_ENDIAN ? ntohs(net16) : net16;
     }
 #else
     inline uint64_t hostToNetwork64(uint64_t host64)
     {
-        return IS_ENDIAN ? htobe64(host64) : host64;
+        return ENABLE_CONVERT_ENDIAN ? htobe64(host64) : host64;
     }
     inline uint32_t hostToNetwork32(uint32_t host32)
     {
-        return IS_ENDIAN ? htobe32(host32) : host32;
+        return ENABLE_CONVERT_ENDIAN ? htobe32(host32) : host32;
     }
 
     inline uint16_t hostToNetwork16(uint16_t host16)
     {
-        return IS_ENDIAN ? htobe16(host16) : host16;
+        return ENABLE_CONVERT_ENDIAN ? htobe16(host16) : host16;
     }
 
     inline uint64_t networkToHost64(uint64_t net64)
     {
-        return IS_ENDIAN ? be64toh(net64) : net64;
+        return ENABLE_CONVERT_ENDIAN ? be64toh(net64) : net64;
     }
 
     inline uint32_t networkToHost32(uint32_t net32)
     {
-        return IS_ENDIAN ? be32toh(net32) : net32;
+        return ENABLE_CONVERT_ENDIAN ? be32toh(net32) : net32;
     }
 
     inline uint16_t networkToHost16(uint16_t net16)
     {
-        return IS_ENDIAN ? be16toh(net16) : net16;
+        return ENABLE_CONVERT_ENDIAN ? be16toh(net16) : net16;
     }
 #endif
 }
@@ -82,12 +117,13 @@ namespace socketendian
 class Packet
 {
 public:
-    Packet(char* buffer, int len)
+    Packet(char* buffer, size_t len, bool isAutoMalloc = false) : mIsAutoMalloc(isAutoMalloc)
     {
         mMaxLen = len;
         mPos = 0;
         mBuffer = buffer;
         mIsFinish = false;
+        mMallocBuffer = nullptr;
     }
     
     virtual ~Packet()
@@ -96,6 +132,12 @@ public:
         {
             assert(mIsFinish);
         }
+
+        if (mMallocBuffer != nullptr)
+        {
+            free(mMallocBuffer);
+            mMallocBuffer = nullptr;
+        }
     }
     
     void    init()
@@ -103,13 +145,30 @@ public:
         mPos = 0;
     }
     
-    void    setOP(int16_t op)
+    size_t getMaxLen() const
+    {
+        return mMaxLen;
+    }
+
+    bool isAutoGrow() const
+    {
+        return mIsAutoMalloc;
+    }
+
+    void    setOP(PACKET_OP_TYPE op)
     {
         assert(mPos == 0);
-        writeINT16(sizeof(int16_t)+sizeof(int16_t));
-        writeINT16(op);
+        if (mPos == 0)
+        {
+            this->operator<< (static_cast<PACKET_LEN_TYPE>(PACKET_HEAD_LEN));
+            this->operator<< (op);
+        }
     }
-    
+    void    writeBool(bool value)
+    {
+        static_assert(sizeof(bool) == sizeof(int8_t), "");
+        writeBuffer((char*)&value, sizeof(value));
+    }
     void    writeINT8(int8_t value)
     {
         writeBuffer((char*)&value, sizeof(value));
@@ -151,13 +210,30 @@ public:
     /*写入二进制字符串，并记录其长度，反序列方使用ReadPacket::readBinary()读取*/
     void    writeBinary(const std::string& binary)
     {
-        writeINT16(binary.size());
+        writeUINT32(binary.size());
         writeBuffer(binary.c_str(), binary.size());
     }
     void    writeBinary(const char* binary, size_t binaryLen)
     {
-        writeINT16(binaryLen);
+        writeUINT32(binaryLen);
         writeBuffer(binary, binaryLen);
+    }
+
+    void    claimBinary(const char* &binary, size_t binaryLen)
+    {
+        growBuffer(binaryLen+sizeof(int32_t));
+        assert((mPos + binaryLen + sizeof(int32_t)) <= mMaxLen);
+        if ((mPos + binaryLen + sizeof(int32_t)) <= mMaxLen)
+        {
+            writeUINT32(binaryLen);
+            binary = getData()+mPos;
+            mPos += binaryLen;
+        }
+        else
+        {
+            writeUINT32(0);
+            binary = nullptr;
+        }
     }
 
     /*writev接口写入可变参数*/
@@ -171,7 +247,16 @@ public:
     void            writev()
     {
     }
-
+    Packet & operator << (const bool &v)
+    {
+        writeBool(v);
+        return *this;
+    }
+    Packet & operator << (const uint8_t &v)
+    {
+        writeUINT8(v);
+        return *this;
+    }
     Packet & operator << (const int8_t &v)
     {
         writeINT8(v);
@@ -182,14 +267,29 @@ public:
         writeINT16(v);
         return *this;
     }
+    Packet & operator << (const uint16_t &v)
+    {
+        writeUINT16(v);
+        return *this;
+    }
     Packet & operator << (const int32_t &v)
     {
         writeINT32(v);
         return *this;
     }
+    Packet & operator << (const uint32_t &v)
+    {
+        writeUINT32(v);
+        return *this;
+    }
     Packet & operator << (const int64_t &v)
     {
         writeINT64(v);
+        return *this;
+    }
+    Packet & operator << (const uint64_t &v)
+    {
+        writeUINT64(v);
         return *this;
     }
     Packet & operator << (const char* const &v)
@@ -206,57 +306,88 @@ public:
     template<typename T>
     Packet & operator << (const T& v)
     {
-        static_assert(std::is_same < T, typename std::remove_pointer<T>::type>::value, "T must a nomal type");
+        static_assert(!std::is_pointer<T>::value, "T must is't a pointer");
+        static_assert(std::is_class <T>::value, "T must a class or struct type");
         static_assert(std::is_pod <T>::value, "T must a pod type");
         writeBuffer((const char*)&v, sizeof(v));
         return *this;
     }
 
-    void        end()
+    size_t      getLen()
     {
-        uint16_t len = socketendian::hostToNetwork16(mPos);
-        if (sizeof(len) <= mMaxLen)
-        {
-            memcpy(mBuffer, &len, sizeof(len));
-            mIsFinish = true;
-        }
-    }
-
-    int         getLen()
-    {
+        end();
         return mPos;
     }
 
-    const char*    getData()
+    const char* getData()
     {
         return mBuffer;
     }
 
 private:
     /*直接写入二进制流，消息包里不记录其长度*/
-    void    writeBuffer(const char* buffer, int len)
+    void    writeBuffer(const char* buffer, size_t len)
     {
-        assert((mPos + len) <= mMaxLen);
+        growBuffer(len);
+
         if ((mPos + len) <= mMaxLen)
         {
             memcpy(mBuffer + mPos, buffer, len);
             mPos += len;
         }
+        else
+        {
+            assert((mPos + len) <= mMaxLen);
+        }
     }
 
+    void        growBuffer(size_t len)
+    {
+        if (mIsAutoMalloc && (mPos + len) > mMaxLen)
+        {
+            char* oldMallocBuffer = mMallocBuffer;
+
+            mMallocBuffer = (char*)malloc(mMaxLen + len);
+            memcpy(mMallocBuffer, mBuffer, mPos);
+
+            if (oldMallocBuffer != nullptr)
+            {
+                free(oldMallocBuffer);
+                oldMallocBuffer = nullptr;
+            }
+
+            mMaxLen += len;
+            mBuffer = mMallocBuffer;
+        }
+    }
+
+    void        end()
+    {
+        PACKET_LEN_TYPE len = socketendian::hostToNetwork32(mPos);
+        if (sizeof(len) <= mMaxLen)
+        {
+            memcpy(mBuffer, &len, sizeof(len));
+            mIsFinish = true;
+        }
+        else
+        {
+            assert(false);
+        }
+    }
 private:
     bool        mIsFinish;
-    int         mPos;
-    int         mMaxLen;
+    size_t      mPos;
+    size_t      mMaxLen;
     char*       mBuffer;
+    const bool  mIsAutoMalloc;
+    char*       mMallocBuffer;
 };
 
 class ReadPacket
 {
 public:
-    ReadPacket(const char* buffer, int len)
+    ReadPacket(const char* buffer, size_t len) : mMaxLen(len)
     {
-        mMaxLen = len;
         mPos = 0;
         mBuffer = buffer;
     }
@@ -265,10 +396,27 @@ public:
     {
         if (mPos != mMaxLen)
         {
-            //assert(mPos == mMaxLen);
+            assert(mPos == mMaxLen);
         }
     }
-    
+
+    PACKET_LEN_TYPE readPacketLen()
+    {
+        return readUINT32();
+    }
+
+    PACKET_OP_TYPE  readOP()
+    {
+        return readUINT16();
+    }
+
+    bool        readBool()
+    {
+        static_assert(sizeof(bool) == sizeof(int8_t), "");
+        bool  value = false;
+        read(value);
+        return value;
+    }
     int8_t      readINT8()
     {
         int8_t  value = 0;
@@ -321,13 +469,28 @@ public:
     std::string     readBinary()
     {
         std::string ret;
-        int len = readINT16();
+        size_t len = readUINT32();
         if ((mPos + len) <= mMaxLen)
         {
             ret = std::string((const char*)(mBuffer + mPos), len);
             mPos += len;
         }
         
+        return ret;
+    }
+    /*  调用方不可管理str内存，只能读操作*/
+    bool            readBinary(const char*& str, size_t& outLen)
+    {
+        bool ret = false;
+        size_t len = readUINT32();
+        outLen = len;
+        if ((mPos + len) <= mMaxLen && len > 0)
+        {
+            str = mBuffer + mPos;
+            mPos += len;
+            ret = true;
+        }
+
         return ret;
     }
     
@@ -345,7 +508,7 @@ public:
         }
         else
         {
-            assert(mPos + sizeof(value) <= mMaxLen);
+             assert(mPos + sizeof(value) <= mMaxLen);
         }
     }
 
@@ -353,19 +516,48 @@ public:
     {
         mPos = mMaxLen;
     }
+
+    size_t          getPos() const
+    {
+        return mPos;
+    }
+
+    size_t          getMaxPos() const
+    {
+        return mMaxLen;
+    }
 private:
     size_t          mPos;
-    size_t          mMaxLen;
+    const size_t    mMaxLen;
     const char*     mBuffer;
 };
 
-template<int SIZE>
-class FixedPacket : public Packet
+class SendPacket : public Packet
 {
 public:
-    FixedPacket() : Packet(mData, SIZE)
+    SendPacket(PACKET_OP_TYPE op, char* buffer, size_t len, bool isAutoMalloc = false) : Packet(buffer, len, isAutoMalloc)
+    {
+        setOP(op);
+    }
+};
+
+template<size_t SIZE>
+class FixedPacket : public SendPacket
+{
+public:
+    FixedPacket(PACKET_OP_TYPE op) : SendPacket(op, mData, SIZE)
     {}
     
+private:
+    char        mData[SIZE];
+};
+
+template<size_t SIZE>
+class AutoMallocPacket : public SendPacket
+{
+public:
+    AutoMallocPacket(PACKET_OP_TYPE op) : SendPacket(op, mData, SIZE, true)
+    {}
 private:
     char        mData[SIZE];
 };
@@ -374,6 +566,40 @@ typedef FixedPacket<128>        TinyPacket;
 typedef FixedPacket<256>        ShortPacket;
 typedef FixedPacket<512>        MiddlePacket;
 typedef FixedPacket<1024>       LongPacket;
-typedef FixedPacket<16*1024>    BigPacket;
+typedef AutoMallocPacket<32 * 1024>    BigPacket;
+
+
+template<typename T>
+static bool serializePBMsgToPacket(T& pbObj, Packet& packet)
+{
+    bool ret = false;
+    int pbByteSize = pbObj.ByteSize();
+    const char* buff = nullptr;
+
+    packet.claimBinary(buff, pbByteSize);
+    assert(buff != nullptr);
+    if (buff != nullptr)
+    {
+        ret = pbObj.SerializeToArray((void*)buff, pbByteSize);
+    }
+
+    return ret;
+}
+
+template<typename T>
+static bool deserializePBMsgToPacket(T& pbObj, ReadPacket& packet)
+{
+    const char* data = nullptr;
+    size_t outLen = 0;
+    packet.readBinary(data, outLen);
+    assert(data != nullptr);
+    if (data != nullptr)
+    {
+        pbObj.ParseFromArray(data, outLen);
+        return true;
+    }
+
+    return false;
+}
 
 #endif

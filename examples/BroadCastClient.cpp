@@ -58,11 +58,9 @@ int main(int argc, char** argv)
             DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);
             pClient->setEnterCallback([&](DataSocket::PTR ds){
 
-                LongPacket sp;
-                sp.setOP(1);
+                LongPacket sp(1);
                 sp.writeINT64((int64_t)ds);
                 sp.writeBinary(senddata, packet_len);
-                sp.end();
 
                 for (int i = 0; i < 1; ++i)
                 {

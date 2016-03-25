@@ -75,7 +75,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\examples\PingPongServer.cpp" />
+    <ClCompile Include="..\examples\PingPongServer.cpp" />
     <ClCompile Include="..\src\net\CurrentThread.cpp" />
     <ClCompile Include="..\src\net\DataSocket.cpp" />
     <ClCompile Include="..\src\net\EventLoop.cpp" />

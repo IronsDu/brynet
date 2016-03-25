@@ -92,7 +92,7 @@
     <ClCompile Include="..\src\utils\systemlib.c">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\examples\BroadCastClient.cpp">
+    <ClCompile Include="..\examples\BroadCastClient.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

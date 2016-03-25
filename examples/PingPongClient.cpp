@@ -19,8 +19,8 @@ int main(int argc, char **argv)
     }
 
     std::string serverip = argv[1];
-    int port_num = atoi(argv[3]);
-    int thread_num = atoi(argv[2]);
+    int port_num = atoi(argv[2]);
+    int thread_num = atoi(argv[3]);
     int num = atoi(argv[4]);
     int packet_len = atoi(argv[5]);
 

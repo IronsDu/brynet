@@ -75,7 +75,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\examples\TestMultiSSDBClient.cpp" />
+    <ClCompile Include="..\examples\TestMultiSSDBClient.cpp" />
     <ClCompile Include="..\src\net\CurrentThread.cpp" />
     <ClCompile Include="..\src\net\DataSocket.cpp" />
     <ClCompile Include="..\src\net\EventLoop.cpp" />
