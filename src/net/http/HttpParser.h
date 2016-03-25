@@ -54,9 +54,11 @@ private:
     std::string                             mStatus;
     std::string                             mBody;
 
-public:
+private:
     const char*                             mTmpHeadStr;
     size_t                                  mTmpHeadLen;
+
+    friend int                              sHeadValue(http_parser* hp, const char *at, size_t length);
 };
 
 #endif

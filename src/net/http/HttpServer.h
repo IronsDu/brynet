@@ -1,11 +1,6 @@
 #ifndef _HTTP_SERVER_H
 #define _HTTP_SERVER_H
 
-#include <iostream>
-#include <mutex>
-#include <string>
-#include <map>
-
 #include "WrapTCPService.h"
 #include "HttpParser.h"
 

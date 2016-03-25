@@ -46,6 +46,11 @@ namespace dodo
         {
             mRpcFunctions.execute(str.c_str(), str.size());
         }
+
+        void    handleRpc(const char* str, size_t len)
+        {
+            mRpcFunctions.execute(str, len);
+        }
         
         /*  返回数据给RPC调用端    */
         template<typename... Args>

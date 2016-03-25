@@ -34,7 +34,7 @@ int main(int argc, char** argv)
         mainLoop.wakeup();
     });
 
-    ssdb->asyncConnectionProxy(argv[1], atoi(argv[2]), -1, false);
+    ssdb->asyncConnection(argv[1], atoi(argv[2]), -1, false);
 
     ssdb->redisGet("hello", [](const std::string& value, const Status& status){
         cout << value << endl;

@@ -65,7 +65,11 @@ void ListenThread::closeListenThread()
         ox_socket_close(tmp);
         tmp = SOCKET_ERROR;
 
-        mListenThread->join();
+        if (mListenThread->joinable())
+        {
+            mListenThread->join();
+        }
+
         delete mListenThread;
         mListenThread = NULL;
     }
@@ -374,7 +378,10 @@ void TcpService::stopWorkerThread()
     {
         for (size_t i = 0; i < mLoopNum; ++i)
         {
-            mIOThreads[i]->join();
+            if (mIOThreads[i]->joinable())
+            {
+                mIOThreads[i]->join();
+            }
             delete mIOThreads[i];
         }
 

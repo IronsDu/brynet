@@ -1,5 +1,5 @@
-#ifndef _SSDB_PROXY_CLIENT_H
-#define _SSDB_PROXY_CLIENT_H
+#ifndef _SSDB_MULTI_CLIENT_H
+#define _SSDB_MULTI_CLIENT_H
 
 #include <string>
 #include <functional>
@@ -47,9 +47,9 @@ public:
 
     void                                                            startNetThread(std::function<void(void)> frameCallback = nullptr);
     /*开启一个异步链接后端服务器, pingTime为ping时间，-1表示不执行ping操作, isAutoConnection为是否自动重连*/
-    void                                                            asyncConnectionProxy(string ip, int port, int pingTime, bool isAutoConnection);
+    void                                                            asyncConnection(string ip, int port, int pingTime, bool isAutoConnection);
     /*添加一个(已链接的)后端服务器(线程安全)*/
-    void                                                            addConnectionProxy(sock fd, string ip, int port, int pingTime, bool isAutoConnection);
+    void                                                            addConnection(sock fd, string ip, int port, int pingTime, bool isAutoConnection);
 
     void                                                            redisSet(const std::string& key, const std::string& value, const NONE_VALUE_CALLBACK& callback);
     void                                                            redisGet(const std::string& key, const ONE_STRING_CALLBACK& callback);
@@ -118,7 +118,7 @@ private:
 
     bool                                                            mRunIOLoop;
     EventLoop                                                       mNetService;
-    vector<DataSocket::PTR>                                         mProxyClients;
+    vector<DataSocket::PTR>                                         mBackends;
 
     /*投递到网络线程的db请求*/
     struct RequestMsg

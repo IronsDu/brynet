@@ -8,7 +8,7 @@
 #include "HttpFormat.h"
 #include "WebSocketFormat.h"
 
-HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTPREQUEST_PROTOCOL protocol, const std::string& key, const std::string& value, int timeout)
+HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYPE_PROTOCOL protocol, const std::string& key, const std::string& value, int timeout)
 {
     HTTPParser result(HTTP_BOTH);
 
@@ -34,12 +34,12 @@ HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTPREQUEST_PRO
             std::string keyUrl = "/v2/keys/";
             keyUrl.append(key);
             request.setRequestUrl(keyUrl.c_str());
-            if (protocol == HttpFormat::HRP_PUT)
+            if (protocol == HttpFormat::HTP_PUT)
             {
                 request.addParameter("value", value.c_str());
                 request.setContentType("application/x-www-form-urlencoded");
             }
-            string requestStr = request.getResult();
+            std::string requestStr = request.getResult();
             session->getSession()->send(requestStr.c_str(), requestStr.size());
 
         }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
@@ -67,12 +67,12 @@ HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTPREQUEST_PRO
 
 HTTPParser etcdSet(const std::string& ip, int port, const std::string& key, const std::string& value, int timeout)
 {
-    return etcdHelp(ip, port, HttpFormat::HRP_PUT, key, value, timeout);
+    return etcdHelp(ip, port, HttpFormat::HTP_PUT, key, value, timeout);
 }
 
 HTTPParser etcdGet(const std::string& ip, int port, const std::string& key, int timeout)
 {
-    return etcdHelp(ip, port, HttpFormat::HRP_GET, key, "", timeout);
+    return etcdHelp(ip, port, HttpFormat::HTP_GET, key, "", timeout);
 }
 
 int main(int argc, char **argv)
@@ -95,7 +95,7 @@ int main(int argc, char **argv)
             {
                 //普通http协议
                 HttpFormat httpFormat;
-                httpFormat.setProtocol(HttpFormat::HRP_RESPONSE);
+                httpFormat.setProtocol(HttpFormat::HTP_RESPONSE);
                 httpFormat.addParameter("<html>hello</html>");
                 std::string result = httpFormat.getResult();
                 session->getSession()->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
@@ -107,22 +107,35 @@ int main(int argc, char **argv)
 
     std::cin.get();
 
-    HTTPParser result = etcdSet("127.0.0.1", 2379, "server/1", "ip:127.0.0.1, port:8888", 5000);
-    result = etcdSet("127.0.0.1", 2379, "server/2", "ip:127.0.0.1, port:9999", 5000);
-    result = etcdGet("127.0.0.1", 2379, "server", 5000);
+    if (false)
+    {
+        HTTPParser result = etcdSet("127.0.0.1", 2379, "server/1", "ip:127.0.0.1, port:8888", 5000);
+        result = etcdSet("127.0.0.1", 2379, "server/2", "ip:127.0.0.1, port:9999", 5000);
+        result = etcdGet("127.0.0.1", 2379, "server", 5000);
+    }
 
-    sock fd = ox_socket_connect("127.0.0.1", 2379);
+    sock fd = ox_socket_connect("192.168.12.128", 8080);
     server.addConnection(fd, [](HttpSession::PTR session){
         HttpFormat request;
-        request.addHeadValue("Accept", "*/*");
-        request.setProtocol(HttpFormat::HRP_PUT);
-        request.setRequestUrl("/v2/keys/asea/aagee");
-        request.addParameter("value", "123456");
-        request.setContentType("application/x-www-form-urlencoded");
-        string requestStr = request.getResult();
+        if (false)
+        {
+            request.addHeadValue("Accept", "*/*");
+            request.setProtocol(HttpFormat::HTP_PUT);
+            request.setRequestUrl("/v2/keys/asea/aagee");
+            request.addParameter("value", "123456");
+            request.setContentType("application/x-www-form-urlencoded");
+        }
+        else
+        {
+            request.setProtocol(HttpFormat::HTP_GET);
+            request.setRequestUrl("/v2/keys/asea/aagee");
+            request.addParameter("value", "123456");
+        }
+        std::string requestStr = request.getResult();
         session->getSession()->send(requestStr.c_str(), requestStr.size());
 
     }, [](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
+        std::cout << httpParser.getBody() << std::endl;
         return;
         /*处理response*/
     }, [](HttpSession::PTR){

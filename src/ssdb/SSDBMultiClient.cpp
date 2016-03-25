@@ -66,10 +66,10 @@ void SSDBMultiClient::startNetThread(std::function<void(void)> frameCallback)
                 RequestMsg tmp;
                 while (mRequestList.PopFront(&tmp))
                 {
-                    if (!mProxyClients.empty())
+                    if (!mBackends.empty())
                     {
                         /*  随机选择一个服务器   */
-                        DataSocket::PTR client = mProxyClients[rand() % mProxyClients.size()];
+                        DataSocket::PTR client = mBackends[rand() % mBackends.size()];
                         DBServerUserData* dbUserData = (DBServerUserData*)client->getUserData();
                         queue<std::function<void(const string& response)>>* callbacklist = dbUserData->callbacklist;
                         callbacklist->push(tmp.callback);
@@ -100,14 +100,14 @@ static void s_connectThreadFunction(SSDBMultiClient* mc, string ip, int port, in
     if (fd != SOCKET_ERROR)
     {
         cout << "connect " << ip << " port " << port << " succed " << endl;
-        mc->addConnectionProxy(fd, ip, port, pingTime, isAutoConnection);
+        mc->addConnection(fd, ip, port, pingTime, isAutoConnection);
     }
     else if (isAutoConnection)
     {
         /*若失败，强行Sleep后继续开启线程*/
         cout << "connect " << ip << " port " << port << " failed , sleep 10s, reconnect" << endl;
         std::this_thread::sleep_for(std::chrono::seconds(10));
-        mc->asyncConnectionProxy(ip, port, pingTime, isAutoConnection);
+        mc->asyncConnection(ip, port, pingTime, isAutoConnection);
     }
 }
 
@@ -133,7 +133,7 @@ void SSDBMultiClient::sendPing(DataSocket::PTR ds)
     }
 }
 
-void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingTime, bool isAutoConnection)
+void SSDBMultiClient::addConnection(sock fd, string ip, int port, int pingTime, bool isAutoConnection)
 {
     ox_socket_nodelay(fd);
 
@@ -149,7 +149,7 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
 
     ds->setEnterCallback([this](DataSocket::PTR ds){
         DBServerUserData* dbUserData = (DBServerUserData*)ds->getUserData();
-        mProxyClients.push_back(ds);
+        mBackends.push_back(ds);
         ds->setCheckTime(dbUserData->pingTime);
         sendPing(ds);
     });
@@ -241,7 +241,7 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
         cout << "disconnect of " << dbUserData->ip << " port " << dbUserData->port << endl;
         if (dbUserData->isAutoConnection)
         {
-            asyncConnectionProxy(dbUserData->ip, dbUserData->port, dbUserData->pingTime, dbUserData->isAutoConnection);
+            asyncConnection(dbUserData->ip, dbUserData->port, dbUserData->pingTime, dbUserData->isAutoConnection);
         }
 
         Timer::Ptr timer = dbUserData->pingTimer.lock();
@@ -256,11 +256,11 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
         }
         delete dbUserData;
 
-        for (size_t i = 0; i < mProxyClients.size(); ++i)
+        for (size_t i = 0; i < mBackends.size(); ++i)
         {
-            if (mProxyClients[i] == arg)
+            if (mBackends[i] == arg)
             {
-                mProxyClients.erase(mProxyClients.begin() + i);
+                mBackends.erase(mBackends.begin() + i);
             }
         }
         delete arg;
@@ -275,7 +275,7 @@ void SSDBMultiClient::addConnectionProxy(sock fd, string ip, int port, int pingT
     });
 }
 
-void SSDBMultiClient::asyncConnectionProxy(string ip, int port, int pingTime, bool isAutoConnection)
+void SSDBMultiClient::asyncConnection(string ip, int port, int pingTime, bool isAutoConnection)
 {
     std::thread(s_connectThreadFunction, this, ip, port, pingTime, isAutoConnection).detach();
 }
@@ -629,12 +629,15 @@ void SSDBMultiClient::stopService()
     {
         mRunIOLoop = false;
         mNetService.wakeup();
-        mNetThread->join();
+        if (mNetThread->joinable())
+        {
+            mNetThread->join();
+        }
         delete mNetThread;
         mNetThread = nullptr;
     }
 
-    mProxyClients.clear();
+    mBackends.clear();
 
     mOneStringValueCallback.clear();
     mNoValueCallback.clear();

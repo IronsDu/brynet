@@ -4,8 +4,8 @@
 #include "Platform.h"
 
 #if defined PLATFORM_WINDOWS
-#include <WinError.h>
 #include <winsock2.h>
+#include <WinError.h>
 #include <winsock.h>
 #include <Ws2tcpip.h>
 #include <errno.h>

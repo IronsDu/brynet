@@ -1,12 +1,5 @@
 #ifndef _LUA_READTABLE_H
 #define _LUA_READTABLE_H
-extern "C"
-{
-#include "lua.h"
-#include "lualib.h"
-#include "lauxlib.h"
-#include "luaconf.h"
-};
 
 #include "lua_tinker.h"
 #include <string>

@@ -99,6 +99,7 @@ private:
 private:
 
 #ifdef PLATFORM_WINDOWS
+    #include <winsock2.h>
     #include <windows.h>
     struct EventLoop::ovl_ext_s     mOvlRecv;
     struct EventLoop::ovl_ext_s     mOvlSend;

@@ -1,26 +1,26 @@
-#ifndef _HTTPREQUEST_H
+#ifndef _HTTPFORMAT_H
 #define _HTTPFORMAT_H
 
 #include <string>
-using namespace std;
+#include <map>
 
 class HttpFormat
 {
 public:
-    enum HTTPREQUEST_PROTOCOL
+    enum HTTP_TYPE_PROTOCOL
     {
-        HRP_NONE,
-        HRP_GET,
-        HRP_POST,
-        HRP_PUT,
-        HRP_RESPONSE,
-        HRP_MAX
+        HTP_NONE,
+        HTP_GET,
+        HTP_POST,
+        HTP_PUT,
+        HTP_RESPONSE,
+        HTP_MAX
     };
 
-    void        setProtocol(HTTPREQUEST_PROTOCOL protocol)
+    void        setProtocol(HTTP_TYPE_PROTOCOL protocol)
     {
-        m_eProtocol = protocol;
-        assert(m_eProtocol > HRP_NONE && m_eProtocol < HRP_MAX);
+        mProtocol = protocol;
+        assert(mProtocol > HTP_NONE && mProtocol < HTP_MAX);
     }
 
     void        setHost(const char* host)
@@ -40,24 +40,24 @@ public:
 
     void        setRequestUrl(const char* url)
     {
-        m_url = url;
+        mUrl = url;
     }
 
     void        addParameter(const char* v)
     {
-        m_parameter += v;
+        mParameter += v;
     }
 
     void        addParameter(const char* k, const char* v)
     {
-        if(m_parameter.size() > 0)
+        if(mParameter.size() > 0)
         {
-            m_parameter += "&";
+            mParameter += "&";
         }
 
-        m_parameter += k;
-        m_parameter += "=";
-        m_parameter += v;
+        mParameter += k;
+        mParameter += "=";
+        mParameter += v;
     }
 
     void        addHeadValue(std::string field, std::string value)
@@ -65,28 +65,28 @@ public:
         mHeadField[field] = value;
     }
 
-    string      getResult()
+    std::string      getResult() const
     {
-        string ret;
-        if(m_eProtocol == HRP_GET)
+        std::string ret;
+        if(mProtocol == HTP_GET)
         {
             ret += "GET";
         }
-        else if (m_eProtocol == HRP_POST)
+        else if (mProtocol == HTP_POST)
         {
             ret += "POST";
         }
-        else if (m_eProtocol == HRP_PUT)
+        else if (mProtocol == HTP_PUT)
         {
             ret += "PUT";
         }
 
         ret += " ";
-        ret += m_url;
-        if (m_eProtocol == HRP_GET && !m_parameter.empty())
+        ret += mUrl;
+        if (mProtocol == HTP_GET && !mParameter.empty())
         {
             ret += "?";
-            ret += m_parameter;
+            ret += mParameter;
         }
 
         ret += " HTTP/1.1";
@@ -100,30 +100,30 @@ public:
             ret += "\r\n";
         }
 
-        if (m_eProtocol != HRP_GET && !m_parameter.empty())
+        if (mProtocol != HTP_GET && !mParameter.empty())
         {
             ret += "Content-Length: ";
             char temp[1024];
-            sprintf(temp, "%d", m_parameter.size());
+            sprintf(temp, "%d", mParameter.size());
             ret += temp;
             ret += "\r\n";
         }
 
         ret += "\r\n";
 
-        if (m_eProtocol != HRP_GET && !m_parameter.empty())
+        if (mProtocol != HTP_GET && !mParameter.empty())
         {
-            ret += m_parameter;
+            ret += mParameter;
         }
 
         return ret;
     }
 private:
 
-    string                  m_url;
-    HTTPREQUEST_PROTOCOL    m_eProtocol;
-    string                  m_parameter;
-    std::map<string, string>    mHeadField;
+    std::string                         mUrl;
+    HTTP_TYPE_PROTOCOL                mProtocol;
+    std::string                         mParameter;
+    std::map<std::string, std::string>  mHeadField;
 };
 
 #endif

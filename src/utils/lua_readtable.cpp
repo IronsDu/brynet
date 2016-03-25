@@ -35,6 +35,11 @@ msvalue_s::~msvalue_s()
 
 void readluatable(lua_State* l, msvalue_s* outmap)
 {
+    if (!lua_istable(l, -1))
+    {
+        throw std::runtime_error("table is not found");
+    }
+
     int t_index = lua_gettop(l);
 
     lua_pushnil(l);
@@ -49,10 +54,8 @@ void readluatable(lua_State* l, msvalue_s* outmap)
 
         if(k_type == LUA_TNUMBER)
         {
-            char temp[1024];
-            int key_value = lua_tonumber(l, -2);
-            sprintf(temp, "%d", key_value);
-            k = temp;
+            lua_Number key_value = lua_tonumber(l, -2);
+            k = std::to_string(key_value);
         }
         else if(k_type == LUA_TSTRING)
         {
@@ -61,6 +64,7 @@ void readluatable(lua_State* l, msvalue_s* outmap)
         else
         {
             assert(false);
+            throw std::runtime_error("key type is not number or string");
         }
 
         int v_type = lua_type(l, -1);
@@ -76,15 +80,20 @@ void readluatable(lua_State* l, msvalue_s* outmap)
         }
         else if(v_type == LUA_TNUMBER)
         {
-            char temp[1024];
-            int v_value = lua_tonumber(l, -1);
-            sprintf(temp, "%d", v_value);
-            v = temp;
+            lua_Number v_value = lua_tonumber(l, -1);
+            v = std::to_string(v_value);
+            (*outmap->_map)[k] = new msvalue_s(v);
+        }
+        else if (v_type == LUA_TBOOLEAN)
+        {
+            lua_Number v_value = lua_toboolean(l, -1);
+            v = std::to_string(v_value);
             (*outmap->_map)[k] = new msvalue_s(v);
         }
         else
         {
             assert(false);
+            throw std::runtime_error("value type is not table , number or string");
         }
 
         lua_pop(l, 1);
@@ -94,5 +103,13 @@ void readluatable(lua_State* l, msvalue_s* outmap)
 void aux_readluatable_byname(lua_State* l, const char* tablename, msvalue_s* outmap)
 {
     lua_getglobal(l, tablename);
-    readluatable(l, outmap);
+    if (lua_istable(l, -1))
+    {
+        readluatable(l, outmap);
+    }
+    else
+    {
+        string error = string("table ") + string(tablename) + string("is not found");
+        throw std::runtime_error(error.c_str());
+    }
 }
