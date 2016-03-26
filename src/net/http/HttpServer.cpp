@@ -1,4 +1,5 @@
 #include <string>
+#include <string.h>
 using namespace std;
 
 #include "SHA1.h"

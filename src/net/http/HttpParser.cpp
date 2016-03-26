@@ -1,5 +1,5 @@
 #include <assert.h>
-
+#include <string.h>
 #include "http_parser.h"
 
 using namespace std;

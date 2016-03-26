@@ -59,7 +59,8 @@ HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYPE_PROTO
             cv.notify_one();
         });
 
-        cv.wait(std::unique_lock<std::mutex>(mtx));
+        auto ul = std::unique_lock<std::mutex>(mtx);
+        cv.wait(ul);
     }
 
     return result;
