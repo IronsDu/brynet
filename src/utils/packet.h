@@ -5,8 +5,9 @@
 #include <assert.h>
 #include <string>
 #include <stdbool.h>
+#include <string.h>
 
-#include "socketlibtypes.h"
+#include "SocketLibTypes.h"
 
 #ifndef PLATFORM_WINDOWS
 #include <endian.h>
