@@ -77,6 +77,12 @@ namespace dodo
     template<typename ...Args>
     struct VariadicArgFunctor
     {
+        static void  destroy(void* p)
+        {
+            VariadicArgFunctor<Args...>* pThis = static_cast<VariadicArgFunctor<Args...>*>(p);
+            delete pThis;
+        }
+
         VariadicArgFunctor(std::function<void(Args...)> f)
         {
             mf = f;
@@ -148,11 +154,11 @@ namespace dodo
         
         virtual ~BaseFunctorMgr()
         {
-            for (auto& p : mRealFunctionPtr)
+            auto copy = mRealFunctionPtr;
+            for (auto& p : copy)
             {
-                delete p.second;
+                del(p.first);
             }
-            mRealFunctionPtr.clear();
         }
         
         template<typename T>
@@ -175,17 +181,21 @@ namespace dodo
             typedef typename INVOKE_TYPE::template Invoke<Args...> TMPTYPE;
             mWrapFunctions[name] = static_cast<CALLBACK_TYPE>(TMPTYPE::invoke);
             mRealFunctionPtr[name] = pbase;
+            mDestroyFunctions[name] = VariadicArgFunctor<Args...>::destroy;
         }
         
         void    del(const string& name)
         {
-            mWrapFunctions.erase(name);
             auto it = mRealFunctionPtr.find(name);
-            if (it != mRealFunctionPtr.end())
+            auto destroyIT = mDestroyFunctions.find(name);
+            if (it != mRealFunctionPtr.end() && destroyIT != mDestroyFunctions.end())
             {
-                delete (*it).second;
-                mRealFunctionPtr.erase(it);
+                (*destroyIT).second((*it).second);
             }
+
+            mWrapFunctions.erase(name);
+            mRealFunctionPtr.erase(it);
+            mDestroyFunctions.erase(destroyIT);
         }
         
         void    setRequestID(int id)
@@ -205,12 +215,16 @@ namespace dodo
             assert(mWrapFunctions.find(name) == mWrapFunctions.end());
             typedef typename INVOKE_TYPE::template Invoke<Args...> TMPTYPE;
             mWrapFunctions[name] = static_cast<CALLBACK_TYPE>(TMPTYPE::invoke);
+            mDestroyFunctions[name] = VariadicArgFunctor<Args...>::destroy;
             mRealFunctionPtr[name] = pbase;
         }
         
     protected:
+        typedef void(*FREE_FUNCTION_CALLBACK)(void*);
+
         map<string, CALLBACK_TYPE>          mWrapFunctions;
         map<string, void*>                  mRealFunctionPtr;
+        map<string, FREE_FUNCTION_CALLBACK> mDestroyFunctions;
         int                                 mRequestID;
     };
 }
