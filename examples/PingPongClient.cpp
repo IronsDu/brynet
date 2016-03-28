@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < num; i++)
     {
-        sock fd = ox_socket_connect(serverip.c_str(), port_num);
+        sock fd = ox_socket_connect(false, serverip.c_str(), port_num);
         server->addSession(fd, [&](TCPSession::PTR session){
             session->setDataCallback(onSessionMsg);
             session->send(tmp.c_str(), tmp.size());

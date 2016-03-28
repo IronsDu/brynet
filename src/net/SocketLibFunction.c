@@ -75,22 +75,38 @@ ox_socket_setrdsize(sock fd, int rd_size)
 }
 
 sock
-ox_socket_connect(const char* server_ip, int port)
+ox_socket_connect(bool isIPV6, const char* server_ip, int port)
 {
-    struct sockaddr_in server_addr;
-    sock clientfd = SOCKET_ERROR;
+    struct sockaddr_in ip4Addr;
+    struct sockaddr_in6 ip6Addr;
+    struct sockaddr_in* paddr = &ip4Addr;
+    int addrLen = sizeof(ip4Addr);
 
+    sock clientfd = SOCKET_ERROR;
     ox_socket_init();
 
-    clientfd = socket(AF_INET, SOCK_STREAM, 0);
+    clientfd = isIPV6 ? socket(AF_INET6, SOCK_STREAM, 0) : socket(AF_INET, SOCK_STREAM, 0);
 
     if(clientfd != SOCKET_ERROR)
     {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_addr.s_addr = inet_addr(server_ip);
-        server_addr.sin_port = htons(port);
+        bool ptonResult = false;
+        if (isIPV6)
+        {
+            memset(&ip6Addr, 0, sizeof(ip6Addr));
+            ip6Addr.sin6_family = AF_INET6;
+            ip6Addr.sin6_port = htons(port);
+            ptonResult = inet_pton(AF_INET6, server_ip, &ip6Addr.sin6_addr) > 0;
+            paddr = (struct sockaddr_in*)&ip6Addr;
+            addrLen = sizeof(ip6Addr);
+        }
+        else
+        {
+            ip4Addr.sin_family = AF_INET;
+            ip4Addr.sin_port = htons(port);
+            ptonResult = inet_pton(AF_INET, server_ip, &ip4Addr.sin_addr) > 0;
+        }
 
-        while(connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) < 0)
+        while (connect(clientfd, (struct sockaddr*)paddr, addrLen) < 0)
         {
             int e = sErrno;
             if(EINTR == sErrno)
@@ -142,25 +158,42 @@ ox_socket_nonblockconnect(const char* server_ip, int port, int timeout)
 }
 
 sock
-ox_socket_listen(int port, int back_num)
+ox_socket_listen(bool isIPV6, const char* ip, int port, int back_num)
 {
     sock socketfd = SOCKET_ERROR;
-    struct  sockaddr_in server_addr;
-    int reuseaddr_value = 1;
+    struct  sockaddr_in ip4Addr;
+    struct sockaddr_in6 ip6Addr;
+    struct sockaddr_in* paddr = &ip4Addr;
+    int addrLen = sizeof(ip4Addr);
 
     ox_socket_init();
 
-    socketfd = socket(AF_INET, SOCK_STREAM, 0);
+    socketfd = isIPV6 ? socket(AF_INET6, SOCK_STREAM, 0) : socket(AF_INET, SOCK_STREAM, 0);
 
     if(socketfd != SOCKET_ERROR)
     {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(port);
-        server_addr.sin_addr.s_addr = INADDR_ANY;
-
-        if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value, sizeof(int)) >= 0)
+        bool ptonResult = false;
+        if (isIPV6)
         {
-            int bindRet = bind(socketfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+            memset(&ip6Addr, 0, sizeof(ip6Addr));
+            ip6Addr.sin6_family = AF_INET6;
+            ip6Addr.sin6_port = htons(port);
+            ptonResult = inet_pton(AF_INET6, ip, &ip6Addr.sin6_addr) > 0;
+            paddr = (struct sockaddr_in*)&ip6Addr;
+            addrLen = sizeof(ip6Addr);
+        }
+        else
+        {
+            ip4Addr.sin_family = AF_INET;
+            ip4Addr.sin_port = htons(port);
+            ip4Addr.sin_addr.s_addr = INADDR_ANY;
+            ptonResult = inet_pton(AF_INET, ip, &ip4Addr.sin_addr) > 0;
+        }
+
+        int reuseaddr_value = 1;
+        if (ptonResult && setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value, sizeof(int)) >= 0)
+        {
+            int bindRet = bind(socketfd, (struct sockaddr*)paddr, addrLen);
             if (bindRet == SOCKET_ERROR ||
                 listen(socketfd, back_num) == SOCKET_ERROR)
             {
@@ -175,7 +208,7 @@ ox_socket_listen(int port, int back_num)
         }
     }
 
-
+    printf("error:%d\n", sErrno);
     return socketfd;
 }
 

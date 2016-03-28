@@ -47,7 +47,7 @@ public:
     void                    addConnection(int fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
 
     void                    startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
-    void                    startListen(int port, const char *certificate = nullptr, const char *privatekey = nullptr);
+    void                    startListen(bool isIPV6, std::string ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 private:
     void                    setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK callback, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
 private:

@@ -19,6 +19,7 @@ static unsigned int sDefaultLoopTimeOutMS = 100;
 
 ListenThread::ListenThread()
 {
+    mIsIPV6 = false;
     mAcceptCallback = nullptr;
     mPort = 0;
     mRunListen = false;
@@ -33,11 +34,13 @@ ListenThread::~ListenThread()
     closeListenThread();
 }
 
-void ListenThread::startListen(int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback)
+void ListenThread::startListen(bool isIPV6, std::string ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback)
 {
     if (!mRunListen)
     {
+        mIsIPV6 = isIPV6;
         mRunListen = true;
+        mIP = ip;
         mPort = port;
         mAcceptCallback = callback;
         if (certificate != nullptr)
@@ -61,7 +64,7 @@ void ListenThread::closeListenThread()
     {
         mRunListen = false;
 
-        sock tmp = ox_socket_connect("127.0.0.1", mPort);
+        sock tmp = ox_socket_connect(mIsIPV6, mIP.c_str(), mPort);
         ox_socket_close(tmp);
         tmp = SOCKET_ERROR;
 
@@ -123,9 +126,17 @@ void ListenThread::RunListen()
 {
     sock client_fd = SOCKET_ERROR;
     struct sockaddr_in socketaddress;
-    socklen_t size = sizeof(struct sockaddr);
+    struct sockaddr_in6 ip6Addr;
+    socklen_t addrLen = sizeof(struct sockaddr);
+    sockaddr_in* pAddr = &socketaddress;
 
-    sock listen_fd = ox_socket_listen(mPort, 25);
+    if (mIsIPV6)
+    {
+        addrLen = sizeof(ip6Addr);
+        pAddr = (sockaddr_in*)&ip6Addr;
+    }
+
+    sock listen_fd = ox_socket_listen(mIsIPV6, mIP.c_str(), mPort, 25);
     initSSL();
 
     if (SOCKET_ERROR != listen_fd)
@@ -133,7 +144,7 @@ void ListenThread::RunListen()
         printf("listen : %d \n", mPort);
         for (; mRunListen;)
         {
-            while ((client_fd = accept(listen_fd, (struct sockaddr*)&socketaddress, &size)) < 0)
+            while ((client_fd = accept(listen_fd, (struct sockaddr*)pAddr, &addrLen)) < 0)
             {
                 if (EINTR == sErrno)
                 {
@@ -390,9 +401,9 @@ void TcpService::stopWorkerThread()
     }
 }
 
-void TcpService::startListen(int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
+void TcpService::startListen(bool isIPV6, std::string ip, int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
 {
-    mListenThread.startListen(port, certificate, privatekey, [this, maxSessionRecvBufferSize](int fd){
+    mListenThread.startListen(isIPV6, ip, port, certificate, privatekey, [this, maxSessionRecvBufferSize](int fd){
         std::string ip = ox_socket_getipoffd(fd);
         DataSocket::PTR channel = new DataSocket(fd, maxSessionRecvBufferSize);
 #ifdef USE_OPENSSL

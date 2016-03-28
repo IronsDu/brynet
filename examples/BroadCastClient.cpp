@@ -52,7 +52,7 @@ int main(int argc, char** argv)
         TimerMgr tm;
         for (int i = 0; i < client_num; i++)
         {
-            int client = ox_socket_connect(ip.c_str(), port_num);
+            int client = ox_socket_connect(false, ip.c_str(), port_num);
             ox_socket_nodelay(client);
 
             DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);

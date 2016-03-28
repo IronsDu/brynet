@@ -25,7 +25,7 @@ public:
     ~ListenThread();
 
     /*  开启监听线程  */
-    void                                startListen(int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
+    void                                startListen(bool isIPV6, std::string ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
     void                                closeListenThread();
 #ifdef USE_OPENSSL
     SSL_CTX*                            getOpenSSLCTX();
@@ -36,6 +36,8 @@ private:
     void                                destroySSL();
 private:
     ACCEPT_CALLBACK                     mAcceptCallback;
+    bool                                mIsIPV6;
+    std::string                         mIP;
     int                                 mPort;
     bool                                mRunListen;
     std::thread*                        mListenThread;
@@ -90,7 +92,7 @@ public:
                                                         bool forceSameThreadLoop = false);
 
     /*  开启监听线程  */
-    void                                startListen(int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
+    void                                startListen(bool isIPV6, std::string ip, int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
     /*  开启IO工作线程    */
     void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
 

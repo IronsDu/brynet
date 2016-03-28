@@ -90,12 +90,12 @@ void HttpServer::startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK c
     mServer->startWorkThread(workthreadnum, callback);
 }
 
-void HttpServer::startListen(int port, const char *certificate /* = nullptr */, const char *privatekey /* = nullptr */)
+void HttpServer::startListen(bool isIPV6, std::string ip, int port, const char *certificate /* = nullptr */, const char *privatekey /* = nullptr */)
 {
     if (mListenThread == nullptr)
     {
         mListenThread = std::make_shared<ListenThread>();
-        mListenThread->startListen(port, certificate, privatekey, [this](int fd){
+        mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [this](int fd){
             mServer->addSession(fd, [this](TCPSession::PTR session){
                 HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
                 if (mOnEnter != nullptr)

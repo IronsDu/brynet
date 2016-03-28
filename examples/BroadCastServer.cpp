@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     EventLoop       mainLoop;
 
     TcpService t;
-    t.startListen(port_num, 1024 * 1024, nullptr, nullptr);
+    t.startListen(false, "127.0.0.1", port_num, 1024 * 1024, nullptr, nullptr);
     t.startWorkerThread(1, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         lockStatistics();

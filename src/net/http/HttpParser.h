@@ -6,27 +6,28 @@
 
 #include "http_parser.h"
 
+class HttpServer;
+
 class HTTPParser
 {
 public:
     HTTPParser(http_parser_type parserType);
-    void                                    clearParse();
     bool                                    isWebSocket() const;
     bool                                    isKeepAlive() const;
 
-    bool                                    checkCompleted(const char* buffer, size_t len);
-
-    /*直接尝试解析http协议,如果完整则返回报文长度，否则返回0*/
-    size_t                                  tryParse(const char* buffer, size_t len);
-
     const std::string&                      getPath() const;
-
     const std::string&                      getQuery() const;
-
-    bool                                    isCompleted() const;
 
     std::string                             getValue(const std::string& key) const;
     const std::string&                      getBody() const;
+
+private:
+    void                                    clearParse();
+    bool                                    checkCompleted(const char* buffer, size_t len);
+    /*直接尝试解析http协议,如果完整则返回报文长度，否则返回0*/
+    size_t                                  tryParse(const char* buffer, size_t len);
+    bool                                    isCompleted() const;
+
 private:
     static int                              sChunkHeader(http_parser* hp);
     static int                              sChunkComplete(http_parser* hp);
@@ -59,6 +60,7 @@ private:
     size_t                                  mTmpHeadLen;
 
     friend int                              sHeadValue(http_parser* hp, const char *at, size_t length);
+    friend class HttpServer;
 };
 
 #endif

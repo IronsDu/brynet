@@ -96,7 +96,7 @@ void SSDBMultiClient::startNetThread(std::function<void(void)> frameCallback)
 /*  TODO::此线程函数中SSDBMultiClient 的内存可能失效 */
 static void s_connectThreadFunction(SSDBMultiClient* mc, string ip, int port, int pingTime, bool isAutoConnection)
 {
-    sock fd = ox_socket_connect(ip.c_str(), port);
+    sock fd = ox_socket_connect(false, ip.c_str(), port);
     if (fd != SOCKET_ERROR)
     {
         cout << "connect " << ip << " port " << port << " succed " << endl;

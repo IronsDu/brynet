@@ -16,6 +16,16 @@ public:
 
     }
 private:
+
+    ~WakeupChannel()
+    {
+#ifdef PLATFORM_WINDOWS
+#else
+        close(mFd);
+        mFd = SOCKET_ERROR;
+#endif
+    }
+
     void    canRecv() override
     {
 #ifdef PLATFORM_WINDOWS

@@ -17,7 +17,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
     Timer::WeakPtr timer;
     server.startWorkThread(1);  /*必须为1个线程*/
 
-    sock fd = ox_socket_connect(ip.c_str(), port);
+    sock fd = ox_socket_connect(false, ip.c_str(), port);
     if (fd != SOCKET_ERROR)
     {
         server.addConnection(fd, [kv, url, &mtx, &cv, &server, &timer, timeout, protocol](HttpSession::PTR session){

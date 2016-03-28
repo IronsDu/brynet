@@ -35,7 +35,7 @@ int main(int argc, char **argv)
     WrapServer::PTR server = std::make_shared<WrapServer>();
     ListenThread::PTR listenThread = std::make_shared<ListenThread>();
 
-    listenThread->startListen(port_num, nullptr, nullptr, [=](int fd){
+    listenThread->startListen(false, "127.0.0.1", port_num, nullptr, nullptr, [=](int fd){
         server->addSession(fd, [](TCPSession::PTR session){
             session->setCloseCallback(onSessionClose);
             session->setDataCallback(onSessionMsg);
