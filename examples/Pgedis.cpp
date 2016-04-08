@@ -1,4 +1,5 @@
 #include <string>
+#include <list>
 #include <iostream>
 #include <unordered_map>
 #include <memory>
@@ -393,26 +394,25 @@ int main()
     using std::chrono::system_clock;
 
     AsyncPGClient asyncClient;
-    asyncClient.createConnection("127.0.0.1", "5432", nullptr, nullptr, "postgres", "postgres", "19870323", 8);
+    asyncClient.createConnection("192.168.12.1", "5432", nullptr, nullptr, "postgres", "postgres", "19870323", 8);
     system_clock::time_point startTime = system_clock::now();
 
-    for (int i = 0; i < 5000; i++)
+    auto nowTime = time(NULL);
+    
+    for (int i = 0; i < 100000; i++)
     {
-        //ap.postQuery("select * from public.kv_data where key='dd';");
-        //ap.postQuery("select * from public.kv_data where key='dodo';");
-        //ap.postQuery("insert into public.vs(value) values('{\"xxxx\":1}');");
-        asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('dd1', '{\"hp\":100000}') "
-            " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-        asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('dodo2', '{\"hp\":100000}') "
-            " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-        asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('dodo5', '{\"hp\":100000}') "
-            " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-        asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('33343', '{\"hp\":100000}') "
-            " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-        asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('asegg', '{\"hp\":100000}') "
-            " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-        asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('132444tgg', '{\"hp\":100000}') "
-            " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+        if(false)
+        {
+            string test = "INSERT INTO public.kv_data(key, value) VALUES ('";
+            test += std::to_string(nowTime*1000+i);
+            test += "', '{\"hp\":100000}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;";
+
+            asyncClient.postQuery(test);
+        }
+        else
+        {
+            asyncClient.postQuery("select * from public.kv_data where key='dd';");
+        }
     }
 
     asyncClient.postQuery("INSERT INTO public.kv_data(key, value) VALUES ('dodo5', '{\"hp\":100000}') "
