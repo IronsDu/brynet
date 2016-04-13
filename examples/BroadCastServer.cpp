@@ -37,7 +37,7 @@ struct NetMsg
 
     NetMsgType  mType;
     int64_t     mID;
-    std::string      mData;
+    std::string mData;
 };
 
 std::mutex                      gTatisticsCppMutex;
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
     t.setDataCallback([&](int64_t id, const char* buffer, size_t len){
         const char* parse_str = buffer;
         size_t total_proc_len = 0;
-        int left_len = len;
+        size_t left_len = len;
 
         while (true)
         {

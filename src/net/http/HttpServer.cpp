@@ -49,6 +49,21 @@ HttpSession::CLOSE_CALLBACK& HttpSession::getCloseCallback()
     return mCloseCallback;
 }
 
+void HttpSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback /* = nullptr */)
+{
+    mSession->send(packet, callback);
+}
+
+void HttpSession::send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+{
+    mSession->send(packet, len, callback);
+}
+
+void HttpSession::postShutdown()
+{
+    mSession->postShutdown();
+}
+
 HttpServer::HttpServer()
 {
     mServer = std::make_shared<WrapServer>();

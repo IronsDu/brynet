@@ -22,7 +22,7 @@ int main(int argc, char **argv)
                 std::string sendFrame;
                 WebSocketFormat::wsFrameBuild(sendPayload, sendFrame);
 
-                session->getSession()->send(sendFrame.c_str(), sendFrame.size());
+                session->send(sendFrame.c_str(), sendFrame.size());
             }
             else
             {
@@ -31,8 +31,8 @@ int main(int argc, char **argv)
                 httpFormat.setProtocol(HttpFormat::HTP_RESPONSE);
                 httpFormat.addParameter("<html>hello</html>");
                 std::string result = httpFormat.getResult();
-                session->getSession()->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
-                    session->getSession()->postShutdown();
+                session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
+                    session->postShutdown();
                 }));
             }
         });
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
             request.addParameter("value", "123456");
         }
         std::string requestStr = request.getResult();
-        session->getSession()->send(requestStr.c_str(), requestStr.size());
+        session->send(requestStr.c_str(), requestStr.size());
 
     }, [](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
         std::cout << httpParser.getBody() << std::endl;

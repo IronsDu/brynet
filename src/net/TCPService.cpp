@@ -36,7 +36,7 @@ ListenThread::~ListenThread()
 
 void ListenThread::startListen(bool isIPV6, std::string ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback)
 {
-    if (!mRunListen)
+    if (mListenThread == nullptr)
     {
         mIsIPV6 = isIPV6;
         mRunListen = true;

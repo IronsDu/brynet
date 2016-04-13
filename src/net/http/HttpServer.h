@@ -4,6 +4,8 @@
 #include "WrapTCPService.h"
 #include "HttpParser.h"
 
+class HttpServer;
+
 class HttpSession
 {
 public:
@@ -13,10 +15,6 @@ public:
     typedef std::function < void(HttpSession::PTR) > CLOSE_CALLBACK;
 
     HttpSession(TCPSession::PTR);
-    /*TODO::返回它之后不太安全,因为能访问TCPSession的特定函数：setUD，然而此函数应该只能在此http封装层调用*/
-    TCPSession::PTR     getSession();
-    int64_t             getUD() const;
-    void                setUD(int64_t userData);
 
     void                    setRequestCallback(HTTPPARSER_CALLBACK callback);
     void                    setCloseCallback(CLOSE_CALLBACK callback);
@@ -24,11 +22,22 @@ public:
     HTTPPARSER_CALLBACK&    getRequestCallback();
     CLOSE_CALLBACK&         getCloseCallback();
 
+    void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                    send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+
+    void                    postShutdown();
 private:
-    TCPSession::PTR     mSession;
-    int64_t             mUserData;
-    HTTPPARSER_CALLBACK mRequestCallback;
-    CLOSE_CALLBACK      mCloseCallback;
+    int64_t                 getUD() const;
+    void                    setUD(int64_t userData);
+    TCPSession::PTR         getSession();
+
+private:
+    TCPSession::PTR         mSession;
+    int64_t                 mUserData;
+    HTTPPARSER_CALLBACK     mRequestCallback;
+    CLOSE_CALLBACK          mCloseCallback;
+
+    friend class HttpServer;
 };
 
 class HttpServer

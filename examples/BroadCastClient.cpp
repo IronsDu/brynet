@@ -24,7 +24,6 @@ int main(int argc, char** argv)
     if (argc != 5)
     {
         fprintf(stderr, "Usage: <server ip> <server port> <session num> <packet size>\n");
-
         exit(-1);
     }
 
@@ -58,7 +57,7 @@ int main(int argc, char** argv)
             DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);
             pClient->setEnterCallback([&](DataSocket::PTR ds){
 
-                LongPacket sp(1);
+                BigPacket sp(1);
                 sp.writeINT64((int64_t)ds);
                 sp.writeBinary(senddata, packet_len);
 
