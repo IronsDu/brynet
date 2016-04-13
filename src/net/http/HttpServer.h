@@ -26,6 +26,7 @@ public:
     void                    send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                    postShutdown();
+    void                    postClose();
 private:
     int64_t                 getUD() const;
     void                    setUD(int64_t userData);

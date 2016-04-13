@@ -23,7 +23,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
         server.addConnection(fd, [kv, url, &mtx, &cv, &server, &timer, timeout, protocol](HttpSession::PTR session){
             /*注册超时定时器*/
             timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr().AddTimer(timeout, [session](){
-                session->getSession()->postClose();
+                session->postClose();
             });
 
             HttpFormat request;
@@ -41,12 +41,12 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
                 request.setContentType("application/x-www-form-urlencoded");
             }
             std::string requestStr = request.getResult();
-            session->getSession()->send(requestStr.c_str(), requestStr.size());
+            session->send(requestStr.c_str(), requestStr.size());
 
         }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
             result = httpParser;
             /*关闭连接,并删除超时定时器*/
-            session->getSession()->postClose();
+            session->postClose();
             if (timer.lock() != nullptr)
             {
                 timer.lock()->Cancel();

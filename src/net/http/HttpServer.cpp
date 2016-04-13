@@ -64,6 +64,11 @@ void HttpSession::postShutdown()
     mSession->postShutdown();
 }
 
+void HttpSession::postClose()
+{
+    mSession->postClose();
+}
+
 HttpServer::HttpServer()
 {
     mServer = std::make_shared<WrapServer>();
