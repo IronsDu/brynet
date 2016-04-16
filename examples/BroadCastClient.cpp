@@ -28,9 +28,9 @@ int main(int argc, char** argv)
     }
 
     std::string ip = argv[1];
-    int client_num = atoi(argv[2]);
-    int packet_len = atoi(argv[3]);
-    int port_num = atoi(argv[4]);
+    int port_num = atoi(argv[2]);
+    int client_num = atoi(argv[3]);
+    int packet_len = atoi(argv[4]);
 
     ox_socket_init();
 
@@ -70,23 +70,23 @@ int main(int argc, char** argv)
                 ds->setDataCallback([&total_recv, &packet_num](DataSocket::PTR ds, const char* buffer, size_t len){
                     const char* parse_str = buffer;
                     int total_proc_len = 0;
-                    int left_len = len;
+                    size_t left_len = len;
 
                     while (true)
                     {
                         bool flag = false;
-                        if (left_len >= sizeof(sizeof(uint16_t) + sizeof(uint16_t)))
+                        if (left_len >= PACKET_HEAD_LEN)
                         {
                             ReadPacket rp(parse_str, left_len);
-                            uint16_t packet_len = rp.readINT16();
-                            if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
+                            PACKET_LEN_TYPE packet_len = rp.readPacketLen();
+                            if (left_len >= packet_len && packet_len >= PACKET_HEAD_LEN)
                             {
                                 total_recv += packet_len;
                                 packet_num++;
 
                                 ReadPacket rp(parse_str, packet_len);
-                                rp.readINT16();
-                                rp.readINT16();
+                                rp.readPacketLen();
+                                rp.readOP();
                                 int64_t addr = rp.readINT64();
 
                                 if (addr == (int64_t)(ds))
@@ -98,7 +98,9 @@ int main(int argc, char** argv)
                                 parse_str += packet_len;
                                 left_len -= packet_len;
                                 flag = true;
+                                rp.skipAll();
                             }
+                            rp.skipAll();
                         }
 
                         if (!flag)

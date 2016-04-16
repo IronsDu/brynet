@@ -117,11 +117,11 @@ int main(int argc, char** argv)
         while (true)
         {
             bool flag = false;
-            if (left_len >= sizeof(sizeof(uint16_t) + sizeof(uint16_t)))
+            if (left_len >= PACKET_HEAD_LEN)
             {
                 ReadPacket rp(parse_str, left_len);
-                uint16_t packet_len = rp.readINT16();
-                if (left_len >= packet_len && packet_len >= (sizeof(uint16_t) + sizeof(uint16_t)))
+                PACKET_LEN_TYPE packet_len = rp.readPacketLen();
+                if (left_len >= packet_len && packet_len >= PACKET_HEAD_LEN)
                 {
                     NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
                     msg->setData(parse_str, packet_len);
@@ -134,6 +134,7 @@ int main(int argc, char** argv)
                     left_len -= packet_len;
                     flag = true;
                 }
+                rp.skipAll();
             }
 
             if (!flag)
