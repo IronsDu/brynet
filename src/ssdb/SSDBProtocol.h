@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <stdint.h>
 
+#include "NonCopyable.h"
+
 #define DEFAULT_SSDBPROTOCOL_LEN 1024
 
 struct buffer_s;
@@ -42,12 +44,12 @@ private:
 };
 
 /*  ssdb协议的请求格式 */
-class SSDBProtocolRequest
+class SSDBProtocolRequest : public NonCopyable
 {
 public:
     SSDBProtocolRequest();
 
-    ~SSDBProtocolRequest();
+    virtual ~SSDBProtocolRequest();
 
     void            appendStr(const char* str);
     void            appendStr(const char* str, size_t len);

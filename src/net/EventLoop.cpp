@@ -233,25 +233,25 @@ void EventLoop::loop(int64_t timeout)
 
 void EventLoop::processAfterLoopProcs()
 {
-    copyAfterLoopProcs.swap(mAfterLoopProcs);
-    for (auto& x : copyAfterLoopProcs)
+    mCopyAfterLoopProcs.swap(mAfterLoopProcs);
+    for (auto& x : mCopyAfterLoopProcs)
     {
         x();
     }
-    copyAfterLoopProcs.clear();
+    mCopyAfterLoopProcs.clear();
 }
 
 void EventLoop::processAsyncProcs()
 {
-    std::vector<USER_PROC> temp;
     mAsyncProcsMutex.lock();
-    temp.swap(mAsyncProcs);
+    mCopyAsyncProcs.swap(mAsyncProcs);
     mAsyncProcsMutex.unlock();
 
-    for (auto& x : temp)
+    for (auto& x : mCopyAsyncProcs)
     {
         x();
     }
+    mCopyAsyncProcs.clear();
 }
 
 bool EventLoop::isInLoopThread()
@@ -294,7 +294,6 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
 {
     if (!isInLoopThread())
     {
-        /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mAsyncProcsMutex.lock();
         mAsyncProcs.push_back(f);
         mAsyncProcsMutex.unlock();
@@ -311,7 +310,6 @@ void EventLoop::pushAsyncProc(USER_PROC&& f)
 {
     if (!isInLoopThread())
     {
-        /*TODO::效率是否可以优化，多个线程同时添加异步函数，加锁导致效率下降*/
         mAsyncProcsMutex.lock();
         mAsyncProcs.push_back(std::move(f));
         mAsyncProcsMutex.unlock();

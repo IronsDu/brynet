@@ -4,9 +4,10 @@
 #include <mutex>
 #include <condition_variable>
 #include <deque>
+#include "NonCopyable.h"
 
 template<typename T>
-class MsgQueue
+class MsgQueue : public NonCopyable
 {
 public:
     typedef std::deque<T>   Container;

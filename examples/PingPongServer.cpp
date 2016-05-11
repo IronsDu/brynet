@@ -8,6 +8,7 @@
 
 std::atomic_llong total_recv = ATOMIC_VAR_INIT(0);
 std::atomic_llong total_client_num = ATOMIC_VAR_INIT(0);
+std::atomic_llong total_packet_num = ATOMIC_VAR_INIT(0);
 
 int main(int argc, char **argv)
 {
@@ -20,13 +21,15 @@ int main(int argc, char **argv)
     WrapServer::PTR server = std::make_shared<WrapServer>();
     ListenThread::PTR listenThread = std::make_shared<ListenThread>();
 
-    listenThread->startListen(false, "127.0.0.1", atoi(argv[1]), nullptr, nullptr, [=](int fd){
+    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
+        std::cout << "enter" << std::endl;
         server->addSession(fd, [](TCPSession::PTR session){
             total_client_num++;
 
             session->setDataCallback([](TCPSession::PTR session, const char* buffer, size_t len){
                 session->send(buffer, len);
                 total_recv += len;
+                total_packet_num++;
                 return len;
             });
 
@@ -44,6 +47,8 @@ int main(int argc, char **argv)
     {
         mainLoop.loop(1000);
         std::cout << "total recv : " << (total_recv / 1024) / 1024 << " M /s, of client num:" << total_client_num << std::endl;
+        std::cout << "packet num:" << total_packet_num << std::endl;
+        total_packet_num = 0;
         total_recv = 0;
     }
 }

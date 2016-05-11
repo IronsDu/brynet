@@ -3,10 +3,11 @@
 
 #include "WrapTCPService.h"
 #include "HttpParser.h"
+#include "NonCopyable.h"
 
 class HttpServer;
 
-class HttpSession
+class HttpSession final : public NonCopyable
 {
 public:
     typedef std::shared_ptr<HttpSession>    PTR;
@@ -41,7 +42,7 @@ private:
     friend class HttpServer;
 };
 
-class HttpServer
+class HttpServer : public NonCopyable
 {
 public:
     typedef std::shared_ptr<HttpServer> PTR;

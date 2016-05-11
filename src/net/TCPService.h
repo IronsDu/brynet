@@ -11,18 +11,19 @@
 
 #include "DataSocket.h"
 #include "typeids.h"
+#include "NonCopyable.h"
 
 class EventLoop;
 class DataSocket;
 
-class ListenThread
+class ListenThread : public NonCopyable
 {
 public:
     typedef std::shared_ptr<ListenThread>   PTR;
 
     typedef std::function<void(int fd)> ACCEPT_CALLBACK;
     ListenThread();
-    ~ListenThread();
+    virtual ~ListenThread();
 
     /*  开启监听线程  */
     void                                startListen(bool isIPV6, std::string ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
@@ -48,7 +49,7 @@ private:
 #endif
 };
 
-class TcpService
+class TcpService : public NonCopyable
 {
 public:
     typedef std::shared_ptr<TcpService>                                 PTR;
@@ -60,7 +61,7 @@ public:
 
 public:
     TcpService();
-    ~TcpService();
+    virtual ~TcpService();
 
     /*  设置默认事件回调    */
     void                                setEnterCallback(TcpService::ENTER_CALLBACK callback);

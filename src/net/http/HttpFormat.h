@@ -121,7 +121,7 @@ public:
 private:
 
     std::string                         mUrl;
-    HTTP_TYPE_PROTOCOL                mProtocol;
+    HTTP_TYPE_PROTOCOL                  mProtocol;
     std::string                         mParameter;
     std::map<std::string, std::string>  mHeadField;
 };

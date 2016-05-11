@@ -13,10 +13,11 @@
 #include "CurrentThread.h"
 #include "SocketLibFunction.h"
 #include "timer.h"
+#include "NonCopyable.h"
 
 class Channel;
 
-class EventLoop
+class EventLoop : public NonCopyable
 {
 public:
     typedef std::function<void(void)>           USER_PROC;
@@ -37,7 +38,7 @@ public:
 
 public:
     EventLoop();
-    ~EventLoop();
+    virtual ~EventLoop();
 
     void                            loop(int64_t    timeout);
 
@@ -88,9 +89,10 @@ private:
     std::atomic_bool                mIsAlreadyPostWakeup;
 
     std::vector<USER_PROC>          mAsyncProcs;                /*  投递到此eventloop的异步function队列    */
+    std::vector<USER_PROC>          mCopyAsyncProcs;
 
     std::vector<USER_PROC>          mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数   */
-    std::vector<USER_PROC>          copyAfterLoopProcs;         /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
+    std::vector<USER_PROC>          mCopyAfterLoopProcs;        /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
 
     std::mutex                      mAsyncProcsMutex;
 

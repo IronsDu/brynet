@@ -5,10 +5,11 @@
 #include <stdint.h>
 
 #include "TCPService.h"
+#include "NonCopyable.h"
 
 class WrapServer;
 
-class TCPSession
+class TCPSession : public NonCopyable
 {
 public:
     typedef std::shared_ptr<TCPSession>     PTR;
@@ -17,9 +18,6 @@ public:
     typedef std::function<void(TCPSession::PTR)>   CLOSE_CALLBACK;
     typedef std::function<int(TCPSession::PTR, const char*, size_t)>   DATA_CALLBACK;
 
-    TCPSession();
-
-    virtual ~TCPSession();
     int64_t                 getUD();
     void                    setUD(int64_t ud);
 
@@ -31,11 +29,15 @@ public:
 
     void                    postShutdown();
     void                    postClose();
-    void                    setCloseCallback(const CLOSE_CALLBACK& callback);
 
+    void                    setCloseCallback(const CLOSE_CALLBACK& callback);
     void                    setDataCallback(const DATA_CALLBACK& callback);
 
+protected:
+    ~TCPSession();
 private:
+    TCPSession();
+
     void                    setSocketID(int64_t id);
     void                    setIP(const std::string& ip);
 
@@ -45,6 +47,11 @@ private:
 
     DATA_CALLBACK&          getDataCallback();
 
+    static  PTR             Create()
+    {
+        struct make_shared_enabler : public TCPSession {};
+        return std::make_shared<make_shared_enabler>();
+    }
 private:
     TcpService::PTR         mService;
     int64_t                 mSocketID;
@@ -57,7 +64,7 @@ private:
     friend class WrapServer;
 };
 
-class WrapServer
+class WrapServer : public NonCopyable
 {
 public:
     typedef std::shared_ptr<WrapServer> PTR;

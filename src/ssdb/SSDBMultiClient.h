@@ -13,6 +13,7 @@
 #include "datasocket.h"
 #include "msgqueue.h"
 #include "SSDBProtocol.h"
+#include "NonCopyable.h"
 
 class DataSocket;
 class SSDBProtocolRequest;
@@ -25,7 +26,7 @@ struct parse_tree;
 
 /*  TODO::目前主要支持ssdb；而redis只支持get/set。且redis和ssdb的转换也没有测试   */
 
-class SSDBMultiClient
+class SSDBMultiClient : public NonCopyable
 {
 public:
 
@@ -40,7 +41,7 @@ public:
 
 public:
     SSDBMultiClient();
-    ~SSDBMultiClient();
+    virtual ~SSDBMultiClient();
 
     EventLoop&                                                      getEventLoop();
 

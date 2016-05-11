@@ -12,10 +12,17 @@ int main(int argc, char **argv)
 {
     HttpServer server;
 
-    server.startListen(false, "127.0.0.1", 8080);
+    server.startListen(false, "0.0.0.0", 8080);
     server.startWorkThread(ox_getcpunum());
-    server.setEnterCallback([](HttpSession::PTR session){
-        session->setRequestCallback([](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
+    std::string body;
+    body += "<html>";
+    for(int i = 0; i < 1; i ++)
+    {
+        body += "hello";
+    }
+    body += "</html>";
+    server.setEnterCallback([&body](HttpSession::PTR session){
+        session->setRequestCallback([&body](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
             if (websocketPacket != nullptr)
             {
                 std::string sendPayload = "hello";
@@ -29,7 +36,7 @@ int main(int argc, char **argv)
                 //∆’Õ®http–≠“È
                 HttpFormat httpFormat;
                 httpFormat.setProtocol(HttpFormat::HTP_RESPONSE);
-                httpFormat.addParameter("<html>hello</html>");
+                httpFormat.addParameter(body.c_str());
                 std::string result = httpFormat.getResult();
                 session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
                     session->postShutdown();

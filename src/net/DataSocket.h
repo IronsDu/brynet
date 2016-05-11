@@ -9,6 +9,7 @@
 #include "Channel.h"
 #include "timer.h"
 #include "EventLoop.h"
+#include "NonCopyable.h"
 
 #ifdef USE_OPENSSL
 
@@ -25,7 +26,7 @@ extern "C" {
 class EventLoop;
 struct buffer_s;
 
-class DataSocket : public Channel
+class DataSocket final : public Channel, public NonCopyable
 {
 public:
     typedef DataSocket*                                                         PTR;
