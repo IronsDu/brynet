@@ -240,6 +240,10 @@ void DataSocket::recv()
         else
         {
             ox_buffer_addwritepos(mRecvBuffer, retlen);
+            if (ox_buffer_getreadvalidcount(mRecvBuffer) == ox_buffer_getsize(mRecvBuffer))
+            {
+                growRecvBuffer();
+            }
 
             if (mDataCallback != nullptr)
             {
@@ -257,14 +261,9 @@ void DataSocket::recv()
             }
         }
 
-        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0)
+        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer) == 0)
         {
             ox_buffer_adjustto_head(mRecvBuffer);
-        }
-
-        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0 || retlen == ox_buffer_getsize(mRecvBuffer))
-        {
-            growRecvBuffer();
         }
     }
 

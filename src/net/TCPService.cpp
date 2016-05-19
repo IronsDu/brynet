@@ -136,7 +136,7 @@ void ListenThread::RunListen()
         pAddr = (sockaddr_in*)&ip6Addr;
     }
 
-    sock listen_fd = ox_socket_listen(mIsIPV6, mIP.c_str(), mPort, 25);
+    sock listen_fd = ox_socket_listen(mIsIPV6, mIP.c_str(), mPort, 512);
     initSSL();
 
     if (SOCKET_ERROR != listen_fd)
