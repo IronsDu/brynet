@@ -1,4 +1,4 @@
-﻿#include "platform.h"
+﻿#include "Platform.h"
 
 #ifdef PLATFORM_WINDOWS
 #include <direct.h>
