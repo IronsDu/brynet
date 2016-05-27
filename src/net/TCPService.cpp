@@ -205,6 +205,21 @@ void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
     mDataCallback = callback;
 }
 
+TcpService::ENTER_CALLBACK TcpService::getEnterCallback()
+{
+    return mEnterCallback;
+}
+
+TcpService::DISCONNECT_CALLBACK TcpService::getDisconnectCallback()
+{
+    return mDisConnectCallback;
+}
+
+TcpService::DATA_CALLBACK TcpService::getDataCallback()
+{
+    return mDataCallback;
+}
+
 void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     send(id, packet, callback);

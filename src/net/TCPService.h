@@ -68,6 +68,10 @@ public:
     void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
     void                                setDataCallback(TcpService::DATA_CALLBACK callback);
 
+    TcpService::ENTER_CALLBACK          getEnterCallback();
+    TcpService::DISCONNECT_CALLBACK     getDisconnectCallback();
+    TcpService::DATA_CALLBACK           getDataCallback();
+
     void                                send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
     void                                send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
