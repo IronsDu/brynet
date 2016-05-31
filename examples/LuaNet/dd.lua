@@ -1,5 +1,6 @@
 local TcpService = require "TcpService"
 local AcyncConnect = require "Connect"
+local Redis = require "Redis"
 
 function _myenter(session)
 	print("enter")
@@ -28,6 +29,24 @@ local totalRecvNum = 0
 
 function userMain()
 	if true then
+		local redisService = TcpService:New()
+		redisService:createService()
+
+		coroutine_start(function ( ... )
+			local redis = Redis:New()
+			redis:connect(redisService, "192.168.12.128", 6979, 10000)
+			redis:set("haha", "heihei")
+
+			while true do
+				local v, err = redis:get("haha")
+				if v ~= nil then
+					totalRecvNum = totalRecvNum + 1
+				end
+			end
+		end)
+	end
+
+	if false then
 		--开启http服务器
 		local serverService = TcpService:New()
 		serverService:listen("0.0.0.0", 80)
@@ -62,7 +81,7 @@ function userMain()
 		end)
 	end
 
-	if true then
+	if false then
 		--开启服务器
 		local serverService = TcpService:New()
 		serverService:listen("0.0.0.0", 81)
@@ -90,7 +109,7 @@ function userMain()
 		end)
 	end
 
-	if true then
+	if false then
 		--开启10个客户端
 		local clientService = TcpService:New()
 		clientService:createService()
