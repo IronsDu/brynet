@@ -33,7 +33,6 @@ local function TcpServiceNew(p)
 	o.sessions = {}
 	o.connectedCo = {}
 	o.connectedSessions = {}
-	o.connectedUnpacks = {}
 	
 	o.entercallback = nil
 	o.closecallback = nil
@@ -79,8 +78,6 @@ function TcpService:createService()
 			local session = TcpSession:New()
 			session:init(serviceID, socketID)
 			session:setServer(server)
-			session:setUnpack(server.connectedUnpacks[uid])
-			server.connectedUnpacks[uid] = nil
 
 			server.connectedSessions[uid] = session
 			server.sessions[socketID] = session
@@ -92,7 +89,7 @@ function TcpService:createService()
 	end
 end
 
-function TcpService:listen(ip, port, unpackcallback)
+function TcpService:listen(ip, port)
 	self:createService()
 	if self.entercallback  == nil then
 		CoreDD:listen(self.serviceID, ip, port)	--开启监听服务
@@ -102,7 +99,6 @@ function TcpService:listen(ip, port, unpackcallback)
 			local session = TcpSession:New()
 			session:init(serviceID, socketID)
 			session:setServer(server)
-			session:setUnpack(unpackcallback)
 
 			table.insert(server.acceptSessions, session)
 			server.sessions[socketID] = session
@@ -111,7 +107,7 @@ function TcpService:listen(ip, port, unpackcallback)
 	end
 end
 
-function TcpService:connect(ip, port, timeout, unpackcallback)
+function TcpService:connect(ip, port, timeout)
 	local server = self
 
 	local uid = AsyncConnect.AsyncConnect(ip, port, timeout, function (fd, uid)
@@ -126,7 +122,6 @@ function TcpService:connect(ip, port, timeout, unpackcallback)
 		end
 	end)
 
-	server.connectedUnpacks[uid] = unpackcallback
 	server.connectedCo[uid] = coroutine_running()
 	local co = coroutine_running()
 	co.waitType = "WAIT_ESTABLISH"
@@ -135,40 +130,8 @@ function TcpService:connect(ip, port, timeout, unpackcallback)
 	local session = self.connectedSessions[uid]
 	self.connectedSessions[uid] = nil
 	self.connectedCo[uid] = nil
-	self.connectedUnpacks[uid] = nil
 
 	return session
-end
-
-function TcpService:startCoService(enterHandler, msgHandler, closeHandler)
-	--TODO::将参数传入协程启动函数
-	local server = self
-	coroutine_start(function()
-		while true do
-			local session = server:accept()
-			if session ~= nil then
-				coroutine_start(function ()
-					if enterHandler ~= nil then
-						enterHandler(session)
-					end
-
-					while true do
-						local packet = session:recv()
-						if packet ~= nil then
-							msgHandler(session, packet)
-						end
-
-						if session:isClose() then
-							if closeHandler ~= nil then
-								closeHandler(session)
-							end
-							break
-						end
-					end
-				end)
-			end
-		end
-	end)
 end
 
 function TcpService:accept(timeout)
