@@ -56,6 +56,7 @@ public:
 
     virtual ~ThreadConnector();
     void                startThread();
+    void                destroy();
 
     void                asyncConnect(const char* ip, int port, int ms, int64_t uid);
 
@@ -78,13 +79,15 @@ private:
     };
 
     MsgQueue<AsyncConnectAddr>      mConnectRequests;     /*  请求列表    */
-    MsgQueue<sock>                  m_sockets;  /*  完成列表    */
 
     std::map<sock, ConnectingInfo>  mConnectingInfos;
     std::set<sock>                  mConnectingFds;
     std::function<void(sock, int64_t)>    mCallback;
     EventLoop                       mThreadEventloop;
-    struct fdset_s*                 fdset;
+    struct fdset_s*                 mFDSet;
+
+    std::thread*                    mThread;
+    bool                            mIsRun;
 };
 
 #endif

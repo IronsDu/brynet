@@ -724,7 +724,13 @@ void DataSocket::postShutdown()
     {
         DataSocket::PTR tmp = this;
         mEventLoop->pushAsyncProc([=](){
-            tmp->procShutdownInLoop();
+            if (mFD != SOCKET_ERROR)
+            {
+                /*  使用pushAfterLoopProc是因为尽量保证在处理完send之后再shutdown，这在实现http server中很重要   */
+                mEventLoop->pushAfterLoopProc([=](){
+                    tmp->procShutdownInLoop();
+                });
+            }
         });
     }
 }

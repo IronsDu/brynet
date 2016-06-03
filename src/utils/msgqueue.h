@@ -16,6 +16,20 @@ public:
     {
     }
 
+    ~MsgQueue()
+    {
+        clear();
+    }
+
+    void    clear()
+    {
+        mMutex.lock();
+        mReadList.clear();
+        mWriteList.clear();
+        mSharedList.clear();
+        mMutex.unlock();
+    }
+
     void    Push(const T& t)
     {
         mWriteList.push_back(t);
@@ -62,9 +76,9 @@ public:
                     /*  Ç¿ÖÆÐ´Èë    */
                     if (mWriteList.size() > mSharedList.size())
                     {
-                        for (auto& x : mSharedList)
+                        for (auto it = mSharedList.rbegin(); it != mSharedList.rend(); ++it)
                         {
-                            mWriteList.push_front(std::move(x));
+                            mWriteList.push_front(std::move(*it));
                         }
 
                         mSharedList.clear();

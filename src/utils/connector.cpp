@@ -19,15 +19,40 @@ using namespace std;
 ThreadConnector::ThreadConnector(std::function<void(sock, int64_t)> callback)
 {
     mCallback = callback;
+    mThread = nullptr;
+    mIsRun = false;
 }
 
 ThreadConnector::~ThreadConnector()
 {
+    destroy();
 }
 
 void ThreadConnector::startThread()
 {
-    new std::thread(ThreadConnector::s_thread, this);
+    if (mThread != nullptr)
+    {
+        mIsRun = true;
+        mThread = new std::thread(ThreadConnector::s_thread, this);
+    }
+}
+
+void ThreadConnector::destroy()
+{
+    if (mThread != nullptr)
+    {
+        mIsRun = false;
+        if (mThread->joinable())
+        {
+            mThread->join();
+        }
+        delete mThread;
+        mThread = nullptr;
+    }
+
+    mConnectRequests.clear();
+    mConnectingInfos.clear();
+    mConnectingFds.clear();
 }
 
 bool ThreadConnector::isConnectSuccess(struct fdset_s* fdset, sock clientfd)
@@ -108,20 +133,20 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
 
 void ThreadConnector::run()
 {
-    fdset = ox_fdset_new();
+    mFDSet = ox_fdset_new();
 
-    while (true)
+    while (mIsRun)
     {
         mThreadEventloop.loop(10);
 
-        checkConnectStatus(fdset, 0);
+        checkConnectStatus(mFDSet, 0);
 
         pollConnectRequest();
 
         checkTimeout();
     }
-
-    return;
+    ox_fdset_delete(mFDSet);
+    mFDSet = nullptr;
 }
 
 void ThreadConnector::pollConnectRequest()
@@ -172,7 +197,7 @@ void ThreadConnector::pollConnectRequest()
                         mConnectingInfos[clientfd] = ci;
                         mConnectingFds.insert(clientfd);
 
-                        ox_fdset_add(fdset, clientfd, ReadCheck | WriteCheck);
+                        ox_fdset_add(mFDSet, clientfd, ReadCheck | WriteCheck);
 
                         add_success = true;
                     }
@@ -202,7 +227,7 @@ void ThreadConnector::checkTimeout()
             sock fd = it->first;
             int64_t uid = it->second.uid;
 
-            ox_fdset_del(fdset, fd, ReadCheck | WriteCheck);
+            ox_fdset_del(mFDSet, fd, ReadCheck | WriteCheck);
 
             mConnectingFds.erase(fd);
             mConnectingInfos.erase(it++);

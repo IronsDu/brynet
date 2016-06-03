@@ -58,3 +58,11 @@ time_t TimerMgr::NearEndMs()
         return (tmp < 0 ? 0 : tmp);
     }
 }
+
+void TimerMgr::Clear()
+{
+    while (!mTimers.empty())
+    {
+        mTimers.pop();
+    }
+}

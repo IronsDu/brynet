@@ -51,6 +51,8 @@ public:
 
     time_t                                  NearEndMs();
 
+    void                                    Clear();
+
 private:
     class CompareTimer
     {
