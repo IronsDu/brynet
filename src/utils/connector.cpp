@@ -30,7 +30,7 @@ ThreadConnector::~ThreadConnector()
 
 void ThreadConnector::startThread()
 {
-    if (mThread != nullptr)
+    if (mThread == nullptr)
     {
         mIsRun = true;
         mThread = new std::thread(ThreadConnector::s_thread, this);
