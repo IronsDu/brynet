@@ -21,6 +21,8 @@ void ox_socket_close(sock fd);
 const char* ox_socket_getipoffd(sock fd);
 const char* ox_socket_getipstr(unsigned int ip);
 int ox_socket_send(sock fd, const char* buffer, int len);
+sock ox_socket_accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen);
+sock ox_socket_create(int af, int type, int protocol);
 
 #ifdef  __cplusplus
 }

@@ -21,6 +21,7 @@ ThreadConnector::ThreadConnector(std::function<void(sock, int64_t)> callback)
     mCallback = callback;
     mThread = nullptr;
     mIsRun = false;
+    mFDSet = nullptr;
 }
 
 ThreadConnector::~ThreadConnector()
@@ -164,7 +165,7 @@ void ThreadConnector::pollConnectRequest()
 
             ox_socket_init();
 
-            clientfd = socket(AF_INET, SOCK_STREAM, 0);
+            clientfd = ox_socket_create(AF_INET, SOCK_STREAM, 0);
             ox_socket_nonblock(clientfd);
 
             if (clientfd != SOCKET_ERROR)

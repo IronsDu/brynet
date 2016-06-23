@@ -64,24 +64,13 @@ public:
 private:
     void                increase()
     {
-        const static int _NUM = 100;
+        const static size_t _NUM = 100;
 
-        int oldsize = mValues.size();
-        if (oldsize > 0)
+        size_t oldsize = mValues.size();
+        mValues.resize(oldsize + _NUM, nullptr);
+        for (size_t i = 0; i < _NUM; i++)
         {
-            mValues.resize(oldsize + _NUM, nullptr);
-            for (int i = 0; i < _NUM; i++)
-            {
-                mIds.push_back(oldsize + i);
-            }
-        }
-        else
-        {
-            mValues.resize(oldsize + _NUM, nullptr);
-            for (int i = 0; i < _NUM; i++)
-            {
-                mIds.push_back(oldsize + i);
-            }
+            mIds.push_back(oldsize + i);
         }
     }
 

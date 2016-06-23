@@ -144,7 +144,7 @@ void    DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
-    if (mFD == SOCKET_ERROR && !mPostWriteCheck && !mPostRecvCheck)
+    if (mFD == SOCKET_ERROR && !mPostWriteCheck)
     {
         onClose();
         return;
@@ -157,7 +157,7 @@ void DataSocket::canSend()
 {
 #ifdef PLATFORM_WINDOWS
     mPostWriteCheck = false;
-    if (mFD == SOCKET_ERROR && !mPostWriteCheck && !mPostRecvCheck)
+    if (mFD == SOCKET_ERROR && !mPostRecvCheck)
     {
         onClose();
         return;

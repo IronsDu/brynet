@@ -109,7 +109,7 @@ private:
     bool                            mPostWriteCheck;    /*  是否投递了可写检测   */
 #endif
 
-    int                             mFD;
+    sock                            mFD;
     bool                            mIsPostFinalClose;  /*  是否投递了最终的close处理    */
 
     bool                            mCanWrite;          /*  socket是否可写  */

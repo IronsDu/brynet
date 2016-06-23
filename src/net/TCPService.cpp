@@ -144,7 +144,7 @@ void ListenThread::RunListen()
         printf("listen : %d \n", mPort);
         for (; mRunListen;)
         {
-            while ((client_fd = accept(listen_fd, (struct sockaddr*)pAddr, &addrLen)) < 0)
+            while ((client_fd = ox_socket_accept(listen_fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
             {
                 if (EINTR == sErrno)
                 {
@@ -173,6 +173,7 @@ TcpService::TcpService()
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
     mLoops = nullptr;
+    mLoopNum = 0;
     mIOThreads = nullptr;
     mIds = nullptr;
     mIncIds = nullptr;

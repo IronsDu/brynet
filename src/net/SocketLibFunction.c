@@ -85,7 +85,7 @@ ox_socket_connect(bool isIPV6, const char* server_ip, int port)
     sock clientfd = SOCKET_ERROR;
     ox_socket_init();
 
-    clientfd = isIPV6 ? socket(AF_INET6, SOCK_STREAM, 0) : socket(AF_INET, SOCK_STREAM, 0);
+    clientfd = isIPV6 ? ox_socket_create(AF_INET6, SOCK_STREAM, 0) : ox_socket_create(AF_INET, SOCK_STREAM, 0);
 
     if(clientfd != SOCKET_ERROR)
     {
@@ -263,4 +263,35 @@ ox_socket_send(sock fd, const char* buffer, int len)
 
     /*  send error if transnum < 0  */
     return transnum;
+}
+
+sock
+ox_socket_accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen)
+{
+#if defined PLATFORM_WINDOWS
+    sock fd = accept(listenSocket, addr, addrLen);
+    if(fd == INVALID_SOCKET)
+    {
+        fd = SOCKET_ERROR;
+    }
+    return fd;
+#else
+    return accept(listenSocket, addr, addrLen);
+#endif
+}
+
+sock
+ox_socket_create(int af, int type, int protocol)
+{
+#if defined PLATFORM_WINDOWS
+    sock fd = socket(af, type, protocol);
+    if(fd == INVALID_SOCKET)
+    {
+        fd = SOCKET_ERROR;
+    }
+
+    return fd;
+#else
+    return socket(af, type, protocol);
+#endif
 }

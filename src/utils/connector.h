@@ -15,7 +15,13 @@
 class AsyncConnectAddr
 {
 public:
-    AsyncConnectAddr(){}
+    AsyncConnectAddr()
+    {
+        mPort = 0;
+        mTimeout = 0;
+        mUid = -1;
+    }
+
     AsyncConnectAddr(const char* ip, int port, int timeout, int64_t uid) : mIP(ip), mPort(port), mTimeout(timeout), mUid(uid)
     {
     }
