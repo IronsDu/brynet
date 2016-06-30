@@ -80,17 +80,40 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
         return;
     }
 
-    fd_set* write_result = ox_fdset_getresult(fdset, WriteCheck);
-
-    vector<sock>    complete_fds;   /*  完成队列    */
+    set<sock>       complete_fds;   /*  完成队列    */
     set<sock>       failed_fds;     /*  失败队列    */
 
 #if defined PLATFORM_WINDOWS
+    fd_set* error_result = ox_fdset_getresult(fdset, ErrorCheck);
+    fd_set* write_result = ox_fdset_getresult(fdset, WriteCheck);
+
+    for (size_t i = 0; i < error_result->fd_count; ++i)
     {
-        int fdcount = (int)write_result->fd_count;
-        for (int i = 0; i < fdcount; ++i)
+        sock clientfd = error_result->fd_array[i];
+        complete_fds.insert(clientfd);
+        failed_fds.insert(clientfd);
+    }
+
+    for (size_t i = 0; i < write_result->fd_count; ++i)
+    {
+        sock clientfd = write_result->fd_array[i];
+        complete_fds.insert(clientfd);
+        if (!isConnectSuccess(fdset, clientfd))
         {
-            sock clientfd = write_result->fd_array[i];
+            failed_fds.insert(clientfd);
+        }
+    }
+#else
+    for (std::set<sock>::iterator it = mConnectingFds.begin(); it != mConnectingFds.end(); ++it)
+    {
+        sock clientfd = *it;
+        if(ox_fdset_check(fdset, clientfd, ErrorCheck))
+        {
+            complete_fds.insert(clientfd);
+            failed_fds.insert(clientfd);
+        }
+        else if (ox_fdset_check(fdset, clientfd, WriteCheck))
+        {
             complete_fds.push_back(clientfd);
             if (!isConnectSuccess(fdset, clientfd))
             {
@@ -98,36 +121,20 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
             }
         }
     }
-#else
-        {
-            for (std::set<sock>::iterator it = mConnectingFds.begin(); it != mConnectingFds.end(); ++it)
-            {
-                sock clientfd = *it;
-                if(ox_fdset_check(fdset, clientfd, WriteCheck))
-                {
-                    complete_fds.push_back(clientfd);
-                    if (!isConnectSuccess(fdset, clientfd))
-                    {
-                        failed_fds.insert(clientfd);
-                    }
-                }
-            }
-        }
 #endif
-        for (size_t i = 0; i < complete_fds.size(); ++i)
+    for (auto fd : complete_fds)
+    {
+        ox_fdset_del(fdset, fd, WriteCheck | ErrorCheck);
+
+        map<sock, ConnectingInfo>::iterator it = mConnectingInfos.find(fd);
+        if (it != mConnectingInfos.end())
         {
-            sock fd = complete_fds[i];
-            ox_fdset_del(fdset, fd, WriteCheck);
-
-            map<sock, ConnectingInfo>::iterator it = mConnectingInfos.find(fd);
-            if (it != mConnectingInfos.end())
-            {
-                mCallback(failed_fds.find(fd) == failed_fds.end() ? fd: -1, it->second.uid);
-                mConnectingInfos.erase(it);
-            }
-
-            mConnectingFds.erase(fd);
+            mCallback(failed_fds.find(fd) == failed_fds.end() ? fd : -1, it->second.uid);
+            mConnectingInfos.erase(it);
         }
+
+        mConnectingFds.erase(fd);
+    }
 }
 
 void ThreadConnector::run()
@@ -198,7 +205,7 @@ void ThreadConnector::pollConnectRequest()
                         mConnectingInfos[clientfd] = ci;
                         mConnectingFds.insert(clientfd);
 
-                        ox_fdset_add(mFDSet, clientfd, WriteCheck | ReadCheck);
+                        ox_fdset_add(mFDSet, clientfd, WriteCheck | ErrorCheck);
                         addToFDSet = true;
                     }
                 }
@@ -238,7 +245,7 @@ void ThreadConnector::checkTimeout()
             sock fd = it->first;
             int64_t uid = it->second.uid;
 
-            ox_fdset_del(mFDSet, fd, WriteCheck);
+            ox_fdset_del(mFDSet, fd, WriteCheck | ErrorCheck);
 
             mConnectingFds.erase(fd);
             mConnectingInfos.erase(it++);

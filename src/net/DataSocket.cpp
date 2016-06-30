@@ -59,15 +59,15 @@ DataSocket::~DataSocket()
     }
 
 #ifdef USE_OPENSSL
-    if (mSSLCtx != nullptr)
-    {
-        SSL_CTX_free(mSSLCtx);
-        mSSLCtx = nullptr;
-    }
     if (mSSL != nullptr)
     {
         SSL_free(mSSL);
         mSSL = nullptr;
+    }
+    if (mSSLCtx != nullptr)
+    {
+        SSL_CTX_free(mSSLCtx);
+        mSSLCtx = nullptr;
     }
 #endif
 
@@ -656,7 +656,7 @@ void DataSocket::growRecvBuffer()
 {
     if (mRecvBuffer == nullptr)
     {
-        mRecvBuffer = ox_buffer_new(GROW_BUFFER_SIZE);
+        mRecvBuffer = ox_buffer_new(100*1024+GROW_BUFFER_SIZE);
     }
     else if ((ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE) <= mMaxRecvBufferSize)
     {
@@ -746,25 +746,45 @@ int64_t DataSocket::getUserData() const
 }
 
 #ifdef USE_OPENSSL
-void DataSocket::setupAcceptSSL(SSL_CTX* ctx)
+//TODO::Òì²½ ssl Á´½Ó
+bool DataSocket::setupAcceptSSL(SSL_CTX* ctx)
 {
+    bool ret = false;
+
     if(mSSL == nullptr)
     {
         mSSL = SSL_new(ctx);
-        SSL_set_fd(mSSL, mFD);
-        SSL_accept(mSSL);
+        ret = SSL_set_fd(mSSL, mFD) == 1 && SSL_accept(mSSL) == 1;
+
+        if (!ret)
+        {
+            ERR_print_errors_fp(stdout);
+            ::fflush(stdout);
+        }
     }
+
+    return ret;
 }
 
-void DataSocket::setupConnectSSL()
+bool DataSocket::setupConnectSSL()
 {
+    bool ret = false;
+
     if(mSSLCtx == nullptr)
     {
         mSSLCtx = SSL_CTX_new(SSLv23_client_method());
         mSSL = SSL_new(mSSLCtx);
-        SSL_set_fd(mSSL, mFD);
-        SSL_connect(mSSL);
+
+        ret = SSL_set_fd(mSSL, mFD) == 1 && SSL_connect(mSSL) == 1;
+
+        if (!ret)
+        {
+            ERR_print_errors_fp(stdout);
+            ::fflush(stdout);
+        }
     }
+
+    return ret;
 }
 #endif
 

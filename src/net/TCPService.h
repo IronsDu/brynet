@@ -88,7 +88,7 @@ public:
 
     void                                setPingCheckTime(int64_t id, int checktime);
 
-    void                                addDataSocket(  int fd,
+    bool                                addDataSocket(  int fd,
                                                         TcpService::ENTER_CALLBACK enterCallback,
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                                         TcpService::DATA_CALLBACK dataCallback,
@@ -117,7 +117,7 @@ public:
     EventLoop*                          getRandomEventLoop();
     EventLoop*                          getEventLoopBySocketID(int64_t id);
 private:
-    void                                helpAddChannel(DataSocket::PTR channel, 
+    bool                                helpAddChannel(DataSocket::PTR channel, 
                                                     const std::string& ip,
                                                     TcpService::ENTER_CALLBACK enterCallback,
                                                     TcpService::DISCONNECT_CALLBACK disConnectCallback,

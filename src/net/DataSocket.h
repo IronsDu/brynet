@@ -17,6 +17,7 @@
 extern "C" {
 #endif
 #include "openssl/ssl.h"
+#include "openssl/err.h"
 #ifdef  __cplusplus
 }
 #endif
@@ -65,8 +66,8 @@ public:
     int64_t                         getUserData() const;
 
 #ifdef USE_OPENSSL
-    void                            setupAcceptSSL(SSL_CTX*);
-    void                            setupConnectSSL();
+    bool                            setupAcceptSSL(SSL_CTX*);
+    bool                            setupConnectSSL();
 #endif
 
     static  PACKET_PTR              makePacket(const char* buffer, size_t len);

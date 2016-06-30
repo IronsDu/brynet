@@ -11,6 +11,7 @@ extern "C" {
 bool ox_socket_init();
 void ox_socket_destroy();
 int  ox_socket_nodelay(sock fd);
+bool ox_socket_block(sock fd);
 bool ox_socket_nonblock(sock fd);
 int  ox_socket_setsdsize(sock fd, int sd_size);
 int  ox_socket_setrdsize(sock fd, int rd_size);

@@ -49,6 +49,20 @@ ox_socket_nodelay(sock fd)
 }
 
 bool
+ox_socket_block(sock fd)
+{
+    int err;
+    unsigned long ul = false;
+#if defined PLATFORM_WINDOWS
+    err = ioctlsocket(fd, FIONBIO, &ul);
+#else
+    err = ioctl(fd, FIONBIO, &ul);
+#endif
+
+    return err != SOCKET_ERROR;
+}
+
+bool
 ox_socket_nonblock(sock fd)
 {
     int err;
