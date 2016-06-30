@@ -129,7 +129,16 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
         map<sock, ConnectingInfo>::iterator it = mConnectingInfos.find(fd);
         if (it != mConnectingInfos.end())
         {
-            mCallback(failed_fds.find(fd) == failed_fds.end() ? fd : -1, it->second.uid);
+            if (failed_fds.find(fd) != failed_fds.end())
+            {
+                ox_socket_close(fd);
+                mCallback(-1, it->second.uid);
+            }
+            else
+            {
+                mCallback(fd, it->second.uid);
+            }
+
             mConnectingInfos.erase(it);
         }
 
