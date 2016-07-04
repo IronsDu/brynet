@@ -426,7 +426,7 @@ void TcpService::startListen(bool isIPV6, std::string ip, int port, int maxSessi
 #ifdef USE_OPENSSL
         if (mListenThread.getOpenSSLCTX() != nullptr)
         {
-            ret = channel->setupAcceptSSL(mListenThread.getOpenSSLCTX());
+            ret = channel->initAcceptSSL(mListenThread.getOpenSSLCTX());
         }
 #endif
         if (ret)
@@ -469,7 +469,7 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
             mIOThreads[i] = new std::thread([this, &l, callback](){
                 while (mRunIOLoop)
                 {
-                    l.loop(sDefaultLoopTimeOutMS);
+                    l.loop(l.getTimerMgr().IsEmpty() ? sDefaultLoopTimeOutMS : l.getTimerMgr().NearEndMs());
                     if (callback != nullptr)
                     {
                         callback(l);
@@ -621,8 +621,7 @@ bool TcpService::addDataSocket(int fd,
 #ifdef USE_OPENSSL
     if (isUseSSL)
     {
-        ox_socket_block(fd);
-        ret = channel->setupConnectSSL();
+        ret = channel->initConnectSSL();
     }
 #endif
     if (ret)

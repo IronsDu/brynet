@@ -90,18 +90,26 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
         ox_socket_nonblock(mFD);
         mEventLoop->linkChannel(mFD, this);
         
-        if (checkRead())
+        if (mSSL != nullptr)
         {
-            if (mEnterCallback != nullptr)
-            {
-                mEnterCallback(this);
-                mEnterCallback = nullptr;
-            }
+            processSSLHandshake();
             ret = true;
         }
         else
         {
-            closeSocket();
+            if (checkRead())
+            {
+                if (mEnterCallback != nullptr)
+                {
+                    mEnterCallback(this);
+                    mEnterCallback = nullptr;
+                }
+                ret = true;
+            }
+            else
+            {
+                closeSocket();
+            }
         }
     }
 
@@ -150,6 +158,15 @@ void    DataSocket::canRecv()
         return;
     }
 #endif
+
+#ifdef USE_OPENSSL
+    if (!mIsHandsharked)
+    {
+        processSSLHandshake();
+        return;
+    }
+#endif
+
     recv();
 }
 
@@ -166,6 +183,15 @@ void DataSocket::canSend()
     removeCheckWrite();
 #endif
     mCanWrite = true;
+
+#ifdef USE_OPENSSL
+    if (!mIsHandsharked)
+    {
+        processSSLHandshake();
+        return;
+    }
+#endif
+
     runAfterFlush();
 }
 
@@ -746,15 +772,14 @@ int64_t DataSocket::getUserData() const
 }
 
 #ifdef USE_OPENSSL
-//TODO::异步 ssl 链接
-bool DataSocket::setupAcceptSSL(SSL_CTX* ctx)
+bool DataSocket::initAcceptSSL(SSL_CTX* ctx)
 {
     bool ret = false;
 
     if(mSSL == nullptr)
     {
         mSSL = SSL_new(ctx);
-        ret = SSL_set_fd(mSSL, mFD) == 1 && SSL_accept(mSSL) == 1;
+        ret = SSL_set_fd(mSSL, mFD) == 1;
 
         if (!ret)
         {
@@ -766,7 +791,7 @@ bool DataSocket::setupAcceptSSL(SSL_CTX* ctx)
     return ret;
 }
 
-bool DataSocket::setupConnectSSL()
+bool DataSocket::initConnectSSL()
 {
     bool ret = false;
 
@@ -775,7 +800,7 @@ bool DataSocket::setupConnectSSL()
         mSSLCtx = SSL_CTX_new(SSLv23_client_method());
         mSSL = SSL_new(mSSLCtx);
 
-        ret = SSL_set_fd(mSSL, mFD) == 1 && SSL_connect(mSSL) == 1;
+        ret = SSL_set_fd(mSSL, mFD) == 1;
 
         if (!ret)
         {
@@ -785,6 +810,73 @@ bool DataSocket::setupConnectSSL()
     }
 
     return ret;
+}
+
+void DataSocket::processSSLHandshake()
+{
+    if (mIsHandsharked)
+    {
+        return;
+    }
+
+    bool mustClose = false;
+    int ret = 0;
+
+    if (mSSLCtx != nullptr)
+    {
+        ret = SSL_connect(mSSL);
+    }
+    else
+    {
+        ret = SSL_accept(mSSL);
+    }
+
+    if (ret == 1)
+    {
+        mIsHandsharked = true;
+        if (checkRead())
+        {
+            if (mEnterCallback != nullptr)
+            {
+                mEnterCallback(this);
+                mEnterCallback = nullptr;
+            }
+        }
+        else
+        {
+            mustClose = true;
+        }
+    }
+    else if (ret == 0)
+    {
+        mustClose = true;
+    }
+    else if (ret < 0)
+    {
+        int err = SSL_get_error(mSSL, ret);
+        if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ)
+        {
+            if (!checkRead())
+            {
+                mustClose = true;
+            }
+        }
+        else
+        {
+            mustClose = true;
+        }
+    }
+
+    if (mustClose)
+    {
+        /*  触发一次enter再触发close,上层可以delete "this"，方便资源管理    */
+        if (mEnterCallback != nullptr)
+        {
+            mEnterCallback(this);
+            mEnterCallback = nullptr;
+        }
+        procCloseInLoop();
+    }
 }
 #endif
 

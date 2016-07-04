@@ -66,8 +66,8 @@ public:
     int64_t                         getUserData() const;
 
 #ifdef USE_OPENSSL
-    bool                            setupAcceptSSL(SSL_CTX*);
-    bool                            setupConnectSSL();
+    bool                            initAcceptSSL(SSL_CTX*);
+    bool                            initConnectSSL();
 #endif
 
     static  PACKET_PTR              makePacket(const char* buffer, size_t len);
@@ -96,6 +96,9 @@ private:
     void                            runAfterFlush();
 #ifdef PLATFORM_LINUX
     void                            removeCheckWrite();
+#endif
+#ifdef USE_OPENSSL
+    void                            processSSLHandshake();
 #endif
 
 private:
@@ -138,8 +141,9 @@ private:
     int64_t                         mUserData;          /*  链接的用户自定义数据  */
 
 #ifdef USE_OPENSSL
-    SSL_CTX*                        mSSLCtx;
-    SSL*                            mSSL;
+    SSL_CTX*                        mSSLCtx;            /*  mSSL不为null时，如果mSSLCtx不为null，则表示ssl的客户端链接，否则为accept链接  */
+    SSL*                            mSSL;               /*  mSSL不为null，则表示为ssl安全连接   */
+    bool                            mIsHandsharked;
 #endif
 
     bool                            mRecvData;
