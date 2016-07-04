@@ -160,7 +160,7 @@ void    DataSocket::canRecv()
 #endif
 
 #ifdef USE_OPENSSL
-    if (!mIsHandsharked)
+    if (!mIsHandsharked && mSSL != nullptr)
     {
         processSSLHandshake();
         return;
@@ -185,7 +185,7 @@ void DataSocket::canSend()
     mCanWrite = true;
 
 #ifdef USE_OPENSSL
-    if (!mIsHandsharked)
+    if (!mIsHandsharked && mSSL != nullptr)
     {
         processSSLHandshake();
         return;
