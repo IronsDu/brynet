@@ -89,11 +89,17 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
 
         ox_socket_nonblock(mFD);
         mEventLoop->linkChannel(mFD, this);
-        
-        if (mSSL != nullptr)
+        auto isUseSSL = false;
+
+#ifdef USE_OPENSSL
+        isUseSSL = mSSL != nullptr;
+#endif
+        if (isUseSSL)
         {
+#ifdef USE_OPENSSL
             processSSLHandshake();
             ret = true;
+#endif
         }
         else
         {
