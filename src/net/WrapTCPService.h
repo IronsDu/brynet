@@ -9,6 +9,7 @@
 
 class WrapServer;
 
+/*  以智能指针对象为网络会话标识的网络服务   */
 class TCPSession : public NonCopyable
 {
 public:
@@ -35,6 +36,7 @@ public:
 
 protected:
     ~TCPSession();
+
 private:
     TCPSession();
 
@@ -52,6 +54,7 @@ private:
         struct make_shared_enabler : public TCPSession {};
         return std::make_shared<make_shared_enabler>();
     }
+
 private:
     TcpService::PTR         mService;
     int64_t                 mSocketID;
@@ -80,6 +83,7 @@ public:
     void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
     void                    addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop = false);
+
 private:
     TcpService::PTR         mTCPService;
 };

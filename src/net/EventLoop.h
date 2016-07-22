@@ -40,7 +40,7 @@ public:
     EventLoop();
     virtual ~EventLoop();
 
-    void                            loop(int64_t    timeout);
+    void                            loop(int64_t timeout);
 
     bool                            wakeup();
 
@@ -67,7 +67,6 @@ private:
     void                            reallocEventSize(int size);
     void                            processAfterLoopProcs();
     void                            processAsyncProcs();
-
 
 private:
     size_t                          mEventEntriesNum;

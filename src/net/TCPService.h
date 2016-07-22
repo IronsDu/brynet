@@ -49,6 +49,7 @@ private:
 #endif
 };
 
+/*  以数字ID为网络会话标识的网络服务   */
 class TcpService : public NonCopyable
 {
 public:

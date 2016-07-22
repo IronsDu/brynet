@@ -10,7 +10,6 @@
 
 using namespace std;
 
-
 DataSocket::DataSocket(int fd, int maxRecvBufferSize)
 {
     mMaxRecvBufferSize = maxRecvBufferSize;
@@ -329,25 +328,33 @@ void DataSocket::flush()
     }
 }
 
+#ifdef PLATFORM_WINDOWS
+extern __declspec(thread) char* threadLocalSendBuf = nullptr;
+#else
+extern __thread char* threadLocalSendBuf = nullptr;
+#endif
+
 void DataSocket::normalFlush()
 {
     bool must_close = false;
 
     static  const   int SENDBUF_SIZE = 1024 * 32;
-    char    sendbuf[SENDBUF_SIZE];
-    /*TODO::将sendbuf改为堆内存或线程私有数据， 提高此内存区域大小，提高吞吐*/
+    if (threadLocalSendBuf == nullptr)
+    {
+        threadLocalSendBuf = (char*)malloc(SENDBUF_SIZE);
+    }
     
 SEND_PROC:
-    char* sendptr = sendbuf;
+    char* sendptr = threadLocalSendBuf;
     int     wait_send_size = 0;
 
-    for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end(); ++it)
+    for (auto it = mSendList.begin(); it != mSendList.end(); ++it)
     {
-        pending_packet& b = *it;
-        char* packetLeftBuf = (char*)(b.packet->c_str() + (b.packet->size() - b.left));
-        int packetLeftLen = b.left;
+        auto& packet = *it;
+        char* packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
+        int packetLeftLen = packet.left;
 
-        if ((wait_send_size + packetLeftLen) <= sizeof(sendbuf))
+        if ((wait_send_size + packetLeftLen) <= SENDBUF_SIZE)
         {
             memcpy(sendptr + wait_send_size, packetLeftBuf, packetLeftLen);
             wait_send_size += packetLeftLen;
@@ -383,21 +390,21 @@ SEND_PROC:
         if (send_retlen > 0)
         {
             size_t tmp_len = send_retlen;
-            for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+            for (auto it = mSendList.begin(); it != mSendList.end();)
             {
-                pending_packet& b = *it;
-                if (b.left <= tmp_len)
+                auto& packet = *it;
+                if (packet.left <= tmp_len)
                 {
-                    tmp_len -= b.left;
-                    if (b.mCompleteCallback != nullptr)
+                    tmp_len -= packet.left;
+                    if (packet.mCompleteCallback != nullptr)
                     {
-                        (*b.mCompleteCallback)();
+                        (*packet.mCompleteCallback)();
                     }
                     it = mSendList.erase(it);
                 }
                 else
                 {
-                    b.left -= tmp_len;
+                    packet.left -= tmp_len;
                     break;
                 }
             }
@@ -463,7 +470,7 @@ SEND_PROC:
     for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
     {
         pending_packet& b = *it;
-        iov[num].iov_base = (void*)(b.packet->c_str() + (b.packet->size() - b.left));
+        iov[num].iov_base = (void*)(b.data->c_str() + (b.data->size() - b.left));
         iov[num].iov_len = b.left;
         ready_send_len += b.left;
 
@@ -688,7 +695,7 @@ void DataSocket::growRecvBuffer()
 {
     if (mRecvBuffer == nullptr)
     {
-        mRecvBuffer = ox_buffer_new(100*1024+GROW_BUFFER_SIZE);
+        mRecvBuffer = ox_buffer_new(16*1024+GROW_BUFFER_SIZE);
     }
     else if ((ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE) <= mMaxRecvBufferSize)
     {

@@ -57,13 +57,13 @@ int main(int argc, char** argv)
             DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);
             pClient->setEnterCallback([&](DataSocket::PTR ds){
 
-                BigPacket sp(1);
-                sp.writeINT64((int64_t)ds);
-                sp.writeBinary(senddata, packet_len);
+                std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
+                sp->writeINT64((int64_t)ds);
+                sp->writeBinary(senddata, packet_len);
 
                 for (int i = 0; i < 1; ++i)
                 {
-                    ds->send(sp.getData(), sp.getLen());
+                    ds->send(sp->getData(), sp->getLen());
                 }
 
                 /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/

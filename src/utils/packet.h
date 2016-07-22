@@ -346,19 +346,21 @@ private:
     {
         if (mIsAutoMalloc && (mPos + len) > mMaxLen)
         {
-            char* oldMallocBuffer = mMallocBuffer;
-
-            mMallocBuffer = (char*)malloc(mMaxLen + len);
-            memcpy(mMallocBuffer, mBuffer, mPos);
-
-            if (oldMallocBuffer != nullptr)
+            char* newBuffer = (char*)malloc(mMaxLen + len);
+            if (newBuffer != nullptr)
             {
-                free(oldMallocBuffer);
-                oldMallocBuffer = nullptr;
-            }
+                memcpy(newBuffer, mBuffer, mPos);
 
-            mMaxLen += len;
-            mBuffer = mMallocBuffer;
+                if (mMallocBuffer != nullptr)
+                {
+                    free(mMallocBuffer);
+                    mMallocBuffer = nullptr;
+                }
+
+                mMaxLen += len;
+                mMallocBuffer = newBuffer;
+                mBuffer = newBuffer;
+            }
         }
     }
 

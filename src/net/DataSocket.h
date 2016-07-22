@@ -57,8 +57,9 @@ public:
     void                            setDataCallback(DATA_CALLBACK cb);
     void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
+    /*  设置心跳检测时间,overtime为-1表示不检测   */
     void                            setCheckTime(int overtime);
-    /*主动(投递)断开连接,会触发断开回调*/
+    /*  主动(投递)断开连接,如果成功主动断开(表明底层没有先触发被动断开)则会触发断开回调  */
     void                            postDisConnect();
     void                            postShutdown();
 
@@ -124,7 +125,7 @@ private:
 
     struct pending_packet
     {
-        PACKET_PTR  packet;
+        PACKET_PTR  data;
         size_t      left;
         PACKED_SENDED_CALLBACK  mCompleteCallback;
     };
