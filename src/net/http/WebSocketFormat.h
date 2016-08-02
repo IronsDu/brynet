@@ -74,14 +74,14 @@ public:
             return false;
         }
 
-        bool FIN = !!((uint8_t)buffer[0] & 0x80);
+        bool FIN = ((uint8_t)buffer[0] & 0x80);
         opcode = (uint8_t)buffer[0] & 0x0F;
-        bool MASK = !!((uint8_t)buffer[1] & 0x80);
+        bool MASK = ((uint8_t)buffer[1] & 0x80);
         uint8_t payloadlen1 = (uint8_t)buffer[1] & 0x7F;
 
         // we only want to handle frame:
         // 1.no fragment 2.masked 3.text or binary
-        if (!FIN || !MASK || opcode != WS_OPCODE_TEXT && opcode != WS_OPCODE_BINARY)
+        if (!FIN && !MASK && opcode != WS_OPCODE_TEXT && opcode != WS_OPCODE_BINARY)
             return false;
 
         uint32_t pos = 2;
@@ -89,26 +89,35 @@ public:
             pos = 4;
         else if (payloadlen1 == 127)
             pos = 10;
-
-        if (bufferSize < (pos + 4))
-        {
-            return false;
-        }
-
         uint8_t mask[4];
-        mask[0] = (uint8_t)buffer[pos++];
-        mask[1] = (uint8_t)buffer[pos++];
-        mask[2] = (uint8_t)buffer[pos++];
-        mask[3] = (uint8_t)buffer[pos++];
+        if (MASK)
+        {
+            if (bufferSize < (pos + 4))
+            {
+                return false;
+            }
+
+            mask[0] = (uint8_t)buffer[pos++];
+            mask[1] = (uint8_t)buffer[pos++];
+            mask[2] = (uint8_t)buffer[pos++];
+            mask[3] = (uint8_t)buffer[pos++];
+        }
 
         if (bufferSize < (pos + payloadlen1))
         {
             return false;
         }
-
-        payload.resize(payloadlen1, 0);
-        for (size_t i = pos, j = 0; j < payloadlen1; i++, j++)
-            payload[j] = buffer[i] ^ mask[j % 4];
+        
+        if (MASK)
+        {
+            payload.resize(payloadlen1, 0);
+            for (size_t i = pos, j = 0; j < payloadlen1; i++, j++)
+                payload[j] = buffer[i] ^ mask[j % 4];
+        }
+        else
+        {
+            payload.append(buffer, pos, payloadlen1);
+        }
 
         frameSize = payloadlen1 + pos;
 
