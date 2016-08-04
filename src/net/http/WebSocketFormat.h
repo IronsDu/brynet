@@ -74,9 +74,9 @@ public:
             return false;
         }
 
-        bool FIN = ((uint8_t)buffer[0] & 0x80);
+        bool FIN = ((uint8_t)buffer[0] & 0x80) != 0;
         opcode = (uint8_t)buffer[0] & 0x0F;
-        bool MASK = ((uint8_t)buffer[1] & 0x80);
+        bool MASK = ((uint8_t)buffer[1] & 0x80) != 0;
         uint8_t payloadlen1 = (uint8_t)buffer[1] & 0x7F;
 
         // we only want to handle frame:

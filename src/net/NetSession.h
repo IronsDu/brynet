@@ -9,6 +9,7 @@ class BaseNetSession
 {
 public:
     typedef std::shared_ptr<BaseNetSession>  PTR;
+    typedef std::weak_ptr<BaseNetSession>   WEAK_PTR;
 
     BaseNetSession()
     {
