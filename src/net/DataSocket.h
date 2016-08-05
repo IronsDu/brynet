@@ -33,7 +33,7 @@ public:
     typedef DataSocket*                                                         PTR;
 
     typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
-    typedef std::function<int(PTR, const char* buffer, size_t len)>             DATA_CALLBACK;
+    typedef std::function<size_t(PTR, const char* buffer, size_t len)>          DATA_CALLBACK;
     typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
     typedef std::shared_ptr<std::function<void(void)>>                          PACKED_SENDED_CALLBACK;
 
@@ -72,6 +72,7 @@ public:
 #endif
 
     static  PACKET_PTR              makePacket(const char* buffer, size_t len);
+
 private:
     void                            growRecvBuffer();
 

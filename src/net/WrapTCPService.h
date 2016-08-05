@@ -17,19 +17,20 @@ public:
     typedef std::weak_ptr<TCPSession>       WEAK_PTR;
 
     typedef std::function<void(TCPSession::PTR)>   CLOSE_CALLBACK;
-    typedef std::function<int(TCPSession::PTR, const char*, size_t)>   DATA_CALLBACK;
+    typedef std::function<size_t(TCPSession::PTR, const char*, size_t)>   DATA_CALLBACK;
 
-    int64_t                 getUD();
+    int64_t                 getUD() const;
     void                    setUD(int64_t ud);
 
     std::string             getIP() const;
     int64_t                 getSocketID() const;
 
-    void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
-    void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
+    void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
+    void                    send(DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
-    void                    postShutdown();
-    void                    postClose();
+    void                    postShutdown() const;
+    void                    postClose() const;
 
     void                    setCloseCallback(const CLOSE_CALLBACK& callback);
     void                    setDataCallback(const DATA_CALLBACK& callback);

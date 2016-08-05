@@ -20,8 +20,8 @@ class ListenThread : public NonCopyable
 {
 public:
     typedef std::shared_ptr<ListenThread>   PTR;
-
     typedef std::function<void(int fd)> ACCEPT_CALLBACK;
+
     ListenThread();
     virtual ~ListenThread();
 
@@ -31,10 +31,12 @@ public:
 #ifdef USE_OPENSSL
     SSL_CTX*                            getOpenSSLCTX();
 #endif
+
 private:
     void                                RunListen();
     void                                initSSL();
     void                                destroySSL();
+
 private:
     ACCEPT_CALLBACK                     mAcceptCallback;
     bool                                mIsIPV6;
@@ -58,7 +60,7 @@ public:
     typedef std::function<void (EventLoop&)>                            FRAME_CALLBACK;
     typedef std::function<void(int64_t, std::string)>                   ENTER_CALLBACK;
     typedef std::function<void(int64_t)>                                DISCONNECT_CALLBACK;
-    typedef std::function<int (int64_t, const char* buffer, size_t len)>   DATA_CALLBACK;
+    typedef std::function<size_t (int64_t, const char* buffer, size_t len)>   DATA_CALLBACK;
 
 public:
     TcpService();
@@ -69,12 +71,12 @@ public:
     void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
     void                                setDataCallback(TcpService::DATA_CALLBACK callback);
 
-    TcpService::ENTER_CALLBACK          getEnterCallback();
-    TcpService::DISCONNECT_CALLBACK     getDisconnectCallback();
-    TcpService::DATA_CALLBACK           getDataCallback();
+    TcpService::ENTER_CALLBACK          getEnterCallback() const;
+    TcpService::DISCONNECT_CALLBACK     getDisconnectCallback() const;
+    TcpService::DATA_CALLBACK           getDataCallback() const;
 
-    void                                send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
-    void                                send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+    void                                send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
+    void                                send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
     /*  逻辑线程调用，将要发送的消息包缓存起来，再一次性通过flushCachePackectList放入到网络线程    */
     void                                cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
@@ -82,10 +84,10 @@ public:
 
     void                                flushCachePackectList();
 
-    void                                shutdown(int64_t id);
+    void                                shutdown(int64_t id) const;
 
     /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
-    void                                disConnect(int64_t id);
+    void                                disConnect(int64_t id) const;
 
     void                                setPingCheckTime(int64_t id, int checktime);
 
@@ -111,12 +113,13 @@ public:
     void                                stopWorkerThread();
 
     /*  wakeup某id所在的网络工作线程:非线程安全    */
-    void                                wakeup(int64_t id);
+    void                                wakeup(int64_t id) const;
     /*  wakeup 所有的网络工作线程:非线程安全  */
-    void                                wakeupAll();
+    void                                wakeupAll() const;
     /*  随机获取一个EventLoop:非线程安全   */
     EventLoop*                          getRandomEventLoop();
     EventLoop*                          getEventLoopBySocketID(int64_t id);
+
 private:
     bool                                helpAddChannel(DataSocket::PTR channel, 
                                                     const std::string& ip,
@@ -128,10 +131,13 @@ private:
     int64_t                             MakeID(int loopIndex);
 
     void                                procDataSocketClose(DataSocket::PTR);
+    /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
+    void                                postSessionAsyncProc(int64_t id, std::function<void(DataSocket::PTR)> callback) const;
 
 private:
     typedef std::vector<std::tuple<int64_t, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
     std::shared_ptr<MSG_LIST>*          mCachePacketList;
+
     EventLoop*                          mLoops;
     std::thread**                       mIOThreads;
     size_t                              mLoopNum;

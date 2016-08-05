@@ -59,12 +59,12 @@ void HttpSession::send(const char* packet, size_t len, const DataSocket::PACKED_
     mSession->send(packet, len, callback);
 }
 
-void HttpSession::postShutdown()
+void HttpSession::postShutdown() const
 {
     mSession->postShutdown();
 }
 
-void HttpSession::postClose()
+void HttpSession::postClose() const
 {
     mSession->postClose();
 }

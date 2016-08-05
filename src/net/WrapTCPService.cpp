@@ -18,7 +18,7 @@ TCPSession::~TCPSession()
     mUserData = -1;
 }
 
-int64_t TCPSession::getUD()
+int64_t TCPSession::getUD() const
 {
     return mUserData;
 }
@@ -38,22 +38,27 @@ int64_t TCPSession::getSocketID() const
     return mSocketID;
 }
 
-void    TCPSession::send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void    TCPSession::send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     mService->send(mSocketID, DataSocket::makePacket(buffer, len), callback);
 }
 
-void TCPSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void TCPSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     mService->send(mSocketID, packet, callback);
 }
 
-void TCPSession::postShutdown()
+void TCPSession::send(DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
+{
+    mService->send(mSocketID, packet, callback);
+}
+
+void TCPSession::postShutdown() const
 {
     mService->shutdown(mSocketID);
 }
 
-void TCPSession::postClose()
+void TCPSession::postClose() const
 {
     mService->disConnect(mSocketID);
 }
@@ -142,7 +147,7 @@ void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback,
         }
         else
         {
-            return 0;
+            return static_cast<size_t>(0);
         }
     };
 

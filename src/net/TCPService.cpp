@@ -206,33 +206,34 @@ void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
     mDataCallback = callback;
 }
 
-TcpService::ENTER_CALLBACK TcpService::getEnterCallback()
+TcpService::ENTER_CALLBACK TcpService::getEnterCallback() const
 {
     return mEnterCallback;
 }
 
-TcpService::DISCONNECT_CALLBACK TcpService::getDisconnectCallback()
+TcpService::DISCONNECT_CALLBACK TcpService::getDisconnectCallback() const
 {
     return mDisConnectCallback;
 }
 
-TcpService::DATA_CALLBACK TcpService::getDataCallback()
+TcpService::DATA_CALLBACK TcpService::getDataCallback() const
 {
     return mDataCallback;
 }
 
-void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     send(id, packet, callback);
 }
 
-void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     union  SessionId sid;
     sid.id = id;
     assert(sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex < mLoopNum)
     {
+        /*  如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响),否则可使用postSessionAsyncProc */
         if (mLoops[sid.data.loopIndex].isInLoopThread())
         {
             DataSocket::PTR tmp = nullptr;
@@ -304,60 +305,44 @@ void TcpService::flushCachePackectList()
     }
 }
 
-void TcpService::shutdown(int64_t id)
+void TcpService::shutdown(int64_t id) const
 {
-    union  SessionId sid;
-    sid.id = id;
-    assert(sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex < mLoopNum)
-    {
-        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
-            DataSocket::PTR tmp = nullptr;
-            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
-            {
-                if (tmp != nullptr && tmp->getUserData() == sid.id)
-                {
-                    tmp->postShutdown();
-                }
-            }
-        });
-    }
+    postSessionAsyncProc(id, [](DataSocket::PTR ds){
+        ds->postShutdown();
+    });
 }
 
-void TcpService::disConnect(int64_t id)
+void TcpService::disConnect(int64_t id) const
 {
-    union  SessionId sid;
-    sid.id = id;
-    assert(sid.data.loopIndex < mLoopNum);
-    if (sid.data.loopIndex < mLoopNum)
-    {
-        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid](){
-            DataSocket::PTR tmp = nullptr;
-            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
-            {
-                if (tmp != nullptr && tmp->getUserData() == sid.id)
-                {
-                    tmp->postDisConnect();
-                }
-            }
-        });
-    }
+    postSessionAsyncProc(id, [](DataSocket::PTR ds){
+        ds->postDisConnect();
+    });
 }
 
 void TcpService::setPingCheckTime(int64_t id, int checktime)
 {
+    postSessionAsyncProc(id, [checktime](DataSocket::PTR ds){
+        ds->setCheckTime(checktime);
+    });
+}
+
+void TcpService::postSessionAsyncProc(int64_t id, std::function<void(DataSocket::PTR)> callback) const
+{
     union  SessionId sid;
     sid.id = id;
     assert(sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex < mLoopNum)
     {
-        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, checktime](){
+        mLoops[sid.data.loopIndex].pushAsyncProc([this, sid, callback](){
             DataSocket::PTR tmp = nullptr;
             if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
             {
                 if (tmp != nullptr && tmp->getUserData() == sid.id)
                 {
-                    tmp->setCheckTime(checktime);
+                    if (callback != nullptr)
+                    {
+                        callback(tmp);
+                    }
                 }
             }
         });
@@ -480,7 +465,7 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
     }
 }
 
-void TcpService::wakeup(int64_t id)
+void TcpService::wakeup(int64_t id) const
 {
     union  SessionId sid;
     sid.id = id;
@@ -491,7 +476,7 @@ void TcpService::wakeup(int64_t id)
     }
 }
 
-void TcpService::wakeupAll()
+void TcpService::wakeupAll() const
 {
     for (size_t i = 0; i < mLoopNum; ++i)
     {

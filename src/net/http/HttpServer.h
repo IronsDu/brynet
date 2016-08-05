@@ -26,11 +26,13 @@ public:
     void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
     void                    send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
-    void                    postShutdown();
-    void                    postClose();
-private:
+    void                    postShutdown() const;
+    void                    postClose() const;
+
     int64_t                 getUD() const;
     void                    setUD(int64_t userData);
+
+private:
     TCPSession::PTR         getSession();
 
 private:

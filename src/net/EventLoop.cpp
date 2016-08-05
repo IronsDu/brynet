@@ -13,10 +13,9 @@ public:
     WakeupChannel(int fd)
     {
         mFd = fd;
-
     }
-private:
 
+private:
     ~WakeupChannel()
     {
 #ifdef PLATFORM_WINDOWS
