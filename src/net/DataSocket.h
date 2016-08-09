@@ -27,6 +27,8 @@ extern "C" {
 class EventLoop;
 struct buffer_s;
 
+/*  使用裸指针,且一旦投递到eventloop,只有在onEnterEventLoop失败或者断开回调中才能delete它(一个DataSocket的断开回调只会被调用一次)  */
+
 class DataSocket final : public Channel, public NonCopyable
 {
 public:
@@ -43,6 +45,7 @@ public:
     explicit DataSocket(int fd, int maxRecvBufferSize);
     ~DataSocket();
 
+    /*  仅在网络线程中调用才可能返回成功 */
     bool                            onEnterEventLoop(EventLoop* el);
 
     void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);

@@ -454,7 +454,7 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
             mIOThreads[i] = new std::thread([this, &l, callback](){
                 while (mRunIOLoop)
                 {
-                    l.loop(l.getTimerMgr().IsEmpty() ? sDefaultLoopTimeOutMS : l.getTimerMgr().NearEndMs());
+                    l.loop(l.getTimerMgr()->IsEmpty() ? sDefaultLoopTimeOutMS : l.getTimerMgr()->NearEndMs());
                     if (callback != nullptr)
                     {
                         callback(l);

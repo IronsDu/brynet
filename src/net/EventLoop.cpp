@@ -83,6 +83,7 @@ EventLoop::EventLoop()
     reallocEventSize(1024);
     mSelfThreadid = -1;
     mIsInitThreadID = false;
+    mTimer = std::make_shared<TimerMgr>();
 }
 
 EventLoop::~EventLoop()
@@ -102,18 +103,25 @@ EventLoop::~EventLoop()
     mEventEntries = nullptr;
 }
 
-TimerMgr& EventLoop::getTimerMgr()
+TimerMgr::PTR EventLoop::getTimerMgr()
 {
-    return mTimer;
+    tryInitThreadID();
+    assert(isInLoopThread());
+    return isInLoopThread() ? mTimer : nullptr;
 }
 
-void EventLoop::loop(int64_t timeout)
+inline void EventLoop::tryInitThreadID()
 {
     if (!mIsInitThreadID)
     {
         mSelfThreadid = CurrentThread::tid();
         mIsInitThreadID = true;
     }
+}
+
+void EventLoop::loop(int64_t timeout)
+{
+    tryInitThreadID();
 
 #ifndef NDEBUG
     assert(isInLoopThread());
@@ -227,7 +235,7 @@ void EventLoop::loop(int64_t timeout)
         reallocEventSize(mEventEntriesNum + 128);
     }
 
-    mTimer.Schedule();
+    mTimer->Schedule();
 }
 
 void EventLoop::processAfterLoopProcs()
@@ -253,7 +261,7 @@ void EventLoop::processAsyncProcs()
     mCopyAsyncProcs.clear();
 }
 
-bool EventLoop::isInLoopThread()
+inline bool EventLoop::isInLoopThread() const
 {
     return mSelfThreadid == CurrentThread::tid();
 }
@@ -277,6 +285,7 @@ bool EventLoop::wakeup()
 
 bool EventLoop::linkChannel(int fd, Channel* ptr)
 {
+    assert(isInLoopThread());
 #ifdef PLATFORM_WINDOWS
     HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
     return ret != nullptr;
@@ -323,12 +332,20 @@ void EventLoop::pushAsyncProc(USER_PROC&& f)
 
 void EventLoop::pushAfterLoopProc(const USER_PROC& f)
 {
-    mAfterLoopProcs.push_back(f);
+    assert(isInLoopThread());
+    if (isInLoopThread())
+    {
+        mAfterLoopProcs.push_back(f);
+    }
 }
 
 void EventLoop::pushAfterLoopProc(USER_PROC&& f)
 {
-    mAfterLoopProcs.push_back(std::move(f));
+    assert(isInLoopThread());
+    if (isInLoopThread())
+    {
+        mAfterLoopProcs.push_back(std::move(f));
+    }
 }
 
 #ifdef PLATFORM_WINDOWS

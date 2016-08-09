@@ -94,7 +94,6 @@
     <ClInclude Include="..\src\net\Channel.h" />
     <ClInclude Include="..\src\net\CurrentThread.h" />
     <ClInclude Include="..\src\net\DataSocket.h" />
-    <ClInclude Include="..\src\net\dllconf.h" />
     <ClInclude Include="..\src\net\EventLoop.h" />
     <ClInclude Include="..\src\net\http\HttpParser.h" />
     <ClInclude Include="..\src\net\http\HttpServer.h" />

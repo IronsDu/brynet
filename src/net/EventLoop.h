@@ -16,6 +16,7 @@
 #include "NonCopyable.h"
 
 class Channel;
+class DataSocket;
 
 class EventLoop : public NonCopyable
 {
@@ -48,25 +49,27 @@ public:
     void                            pushAsyncProc(const USER_PROC& f);
     void                            pushAsyncProc(USER_PROC&& f);
 
-    /*  非线程安全:投递回调放置在单次loop结尾时执行   */
+    /*  (网络线程中调用才会成功)投递回调放置在单次loop结尾时执行   */
     void                            pushAfterLoopProc(const USER_PROC& f);
     void                            pushAfterLoopProc(USER_PROC&& f);
 
-    TimerMgr&                       getTimerMgr();
+    /*  非网络线程调用时返回nullptr   */
+    TimerMgr::PTR                   getTimerMgr();
 
-    bool                            linkChannel(int fd, Channel* ptr);
+    bool                            isInLoopThread() const;
+
+private:
+    void                            reallocEventSize(int size);
+    void                            processAfterLoopProcs();
+    void                            processAsyncProcs();
 
 #ifdef PLATFORM_WINDOWS
     HANDLE                          getIOCPHandle() const;
 #else
     int                             getEpollHandle() const;
 #endif
-
-    bool                            isInLoopThread();
-private:
-    void                            reallocEventSize(int size);
-    void                            processAfterLoopProcs();
-    void                            processAsyncProcs();
+    bool                            linkChannel(int fd, Channel* ptr);
+    void                            tryInitThreadID();
 
 private:
     size_t                          mEventEntriesNum;
@@ -98,7 +101,9 @@ private:
     bool                            mIsInitThreadID;
     CurrentThread::THREAD_ID_TYPE   mSelfThreadid;              /*  调用loop函数所在thread的id */
 
-    TimerMgr                        mTimer;
+    TimerMgr::PTR                   mTimer;
+
+    friend class DataSocket;
 };
 
 #endif

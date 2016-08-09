@@ -127,7 +127,7 @@ void SSDBMultiClient::sendPing(DataSocket::PTR ds)
         queue<std::function<void(const string& response)>>* callbacklist = dbUserData->callbacklist;
         callbacklist->push(nullptr);
 
-        dbUserData->pingTimer = mNetService.getTimerMgr().AddTimer(dbUserData->pingTime, [this, ds](){
+        dbUserData->pingTimer = mNetService.getTimerMgr()->AddTimer(dbUserData->pingTime, [this, ds](){
             sendPing(ds);
         });
     }

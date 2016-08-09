@@ -49,6 +49,7 @@ DataSocket::DataSocket(int fd, int maxRecvBufferSize)
 
 DataSocket::~DataSocket()
 {
+    /*  断言检测,当DataSocket析构时,应该处于断开状态    */
     assert(mFD == SOCKET_ERROR);
 
     if (mRecvBuffer != nullptr)
@@ -80,8 +81,15 @@ DataSocket::~DataSocket()
 
 bool DataSocket::onEnterEventLoop(EventLoop* el)
 {
+    assert(el->isInLoopThread());
+    if (!el->isInLoopThread())
+    {
+        return false;
+    }
+
     bool ret = false;
 
+    assert(mEventLoop == nullptr);
     if (mEventLoop == nullptr)
     {
         mEventLoop = el;
@@ -130,14 +138,20 @@ void    DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CAL
 void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
-    mSendList.push_back({ packet, packet->size(), callback });
-    runAfterFlush();
+    if (mEventLoop->isInLoopThread())
+    {
+        mSendList.push_back({ packet, packet->size(), callback });
+        runAfterFlush();
+    }
 }
 
 void DataSocket::sendPacketInLoop(PACKET_PTR&& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
-    sendPacketInLoop(packet, callback);
+    if (mEventLoop->isInLoopThread())
+    {
+        sendPacketInLoop(packet, callback);
+    }
 }
 
 void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
@@ -580,6 +594,7 @@ void DataSocket::onClose()
     if (!mIsPostFinalClose)
     {
         DataSocket::PTR thisPtr = this;
+        /*  使用pushAfterLoopProc来执行断开回调,可以保证它总是在其他此DataSocket相关的After Callback之后执行,进而可以安全的delete DataSocket对象   */
         mEventLoop->pushAfterLoopProc([=](){
             if (mDisConnectCallback != nullptr)
             {
@@ -722,7 +737,7 @@ void DataSocket::startPingCheckTimer()
 {
     if (!mTimer.lock() && mCheckTime > 0)
     {
-        mTimer = mEventLoop->getTimerMgr().AddTimer(mCheckTime, [this](){
+        mTimer = mEventLoop->getTimerMgr()->AddTimer(mCheckTime, [this](){
             this->PingCheck();
         });
     }
@@ -730,19 +745,23 @@ void DataSocket::startPingCheckTimer()
 
 void DataSocket::setCheckTime(int overtime)
 {
-    if (overtime > 0)
+    assert(mEventLoop->isInLoopThread());
+    if (mEventLoop->isInLoopThread())
     {
-        mCheckTime = overtime;
-        startPingCheckTimer();
-    }
-    else if (overtime == -1)
-    {
-        if (mTimer.lock())
+        if (overtime > 0)
         {
-            mTimer.lock()->Cancel();
+            mCheckTime = overtime;
+            startPingCheckTimer();
         }
+        else if (overtime == -1)
+        {
+            if (mTimer.lock())
+            {
+                mTimer.lock()->Cancel();
+            }
 
-        mCheckTime = -1;
+            mCheckTime = -1;
+        }
     }
 }
 
