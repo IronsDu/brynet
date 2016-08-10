@@ -261,11 +261,6 @@ void EventLoop::processAsyncProcs()
     mCopyAsyncProcs.clear();
 }
 
-inline bool EventLoop::isInLoopThread() const
-{
-    return mSelfThreadid == CurrentThread::tid();
-}
-
 bool EventLoop::wakeup()
 {
     bool ret = false;
@@ -285,7 +280,6 @@ bool EventLoop::wakeup()
 
 bool EventLoop::linkChannel(int fd, Channel* ptr)
 {
-    assert(isInLoopThread());
 #ifdef PLATFORM_WINDOWS
     HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
     return ret != nullptr;

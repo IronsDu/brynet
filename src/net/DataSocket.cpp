@@ -343,9 +343,9 @@ void DataSocket::flush()
 }
 
 #ifdef PLATFORM_WINDOWS
-extern __declspec(thread) char* threadLocalSendBuf = nullptr;
+__declspec(thread) char* threadLocalSendBuf = nullptr;
 #else
-extern __thread char* threadLocalSendBuf = nullptr;
+__thread char* threadLocalSendBuf = nullptr;
 #endif
 
 void DataSocket::normalFlush()

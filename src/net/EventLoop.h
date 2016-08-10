@@ -56,7 +56,10 @@ public:
     /*  非网络线程调用时返回nullptr   */
     TimerMgr::PTR                   getTimerMgr();
 
-    bool                            isInLoopThread() const;
+    inline bool                     isInLoopThread() const
+    {
+        return mSelfThreadid == CurrentThread::tid();
+    }
 
 private:
     void                            reallocEventSize(int size);
