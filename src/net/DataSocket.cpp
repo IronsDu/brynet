@@ -10,7 +10,7 @@
 
 using namespace std;
 
-DataSocket::DataSocket(int fd, int maxRecvBufferSize)
+DataSocket::DataSocket(sock fd, int maxRecvBufferSize)
 {
     mMaxRecvBufferSize = maxRecvBufferSize;
     mRecvData = false;
@@ -233,8 +233,8 @@ void DataSocket::recv()
 
     while (mFD != SOCKET_ERROR)
     {
-        const int tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
-        if (tryRecvLen <= 0)
+        const size_t tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
+        if (tryRecvLen == 0)
         {
             break;
         }
@@ -250,7 +250,7 @@ void DataSocket::recv()
             retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
         }
 #else
-        retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
+        retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), static_cast<int>(tryRecvLen), 0);
 #endif
 
         if (retlen < 0)
@@ -360,13 +360,13 @@ void DataSocket::normalFlush()
     
 SEND_PROC:
     char* sendptr = threadLocalSendBuf;
-    int     wait_send_size = 0;
+    size_t     wait_send_size = 0;
 
     for (auto it = mSendList.begin(); it != mSendList.end(); ++it)
     {
         auto& packet = *it;
         char* packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
-        int packetLeftLen = packet.left;
+        size_t packetLeftLen = packet.left;
 
         if ((wait_send_size + packetLeftLen) <= SENDBUF_SIZE)
         {
@@ -398,7 +398,7 @@ SEND_PROC:
             send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
         }
 #else
-        send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
+        send_retlen = ::send(mFD, sendptr, static_cast<int>(wait_send_size), 0);
 #endif
 
         if (send_retlen > 0)

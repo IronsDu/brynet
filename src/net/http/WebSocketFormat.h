@@ -19,7 +19,7 @@ public:
         secKey.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
         CSHA1 s1;
-        s1.Update((unsigned char*)secKey.c_str(), secKey.size());
+        s1.Update((unsigned char*)secKey.c_str(), static_cast<unsigned int>(secKey.size()));
         s1.Final();
         unsigned char puDest[20];
         s1.GetHash(puDest);
@@ -39,7 +39,7 @@ public:
 
     static bool wsFrameBuild(const std::string& payload, std::string& frame)
     {
-        uint32_t payloadLen = payload.size();
+        size_t payloadLen = payload.size();
         frame.clear();
         frame.push_back((char)0x81); // FIN = 1, opcode = BINARY
         if (payloadLen <= 125)
@@ -57,10 +57,10 @@ public:
             frame.push_back(0x00);
             frame.push_back(0x00);
             frame.push_back(0x00);
-            frame.push_back((payloadLen & 0xFF000000) >> 24);
-            frame.push_back((payloadLen & 0x00FF0000) >> 16);
-            frame.push_back((payloadLen & 0x0000FF00) >> 8);
-            frame.push_back(payloadLen & 0x000000FF);
+            frame.push_back(static_cast<char>((payloadLen & 0xFF000000) >> 24));
+            frame.push_back(static_cast<char>((payloadLen & 0x00FF0000) >> 16));
+            frame.push_back(static_cast<char>((payloadLen & 0x0000FF00) >> 8));
+            frame.push_back(static_cast<char>(payloadLen & 0x000000FF));
         }
 
         frame.insert(frame.end(), payload.begin(), payload.end());

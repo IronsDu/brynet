@@ -404,7 +404,7 @@ void TcpService::stopWorkerThread()
 
 void TcpService::startListen(bool isIPV6, std::string ip, int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
 {
-    mListenThread.startListen(isIPV6, ip, port, certificate, privatekey, [this, maxSessionRecvBufferSize](int fd){
+    mListenThread.startListen(isIPV6, ip, port, certificate, privatekey, [this, maxSessionRecvBufferSize](sock fd){
         std::string ip = ox_socket_getipoffd(fd);
         DataSocket::PTR channel = new DataSocket(fd, maxSessionRecvBufferSize);
         bool ret = true;
@@ -541,7 +541,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
         {
             if (mLoops[i].isInLoopThread())
             {
-                loopIndex = i;
+                loopIndex = static_cast<int>(i);
             }
         }
     }
@@ -592,7 +592,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
     return true;
 }
 
-bool TcpService::addDataSocket(int fd,
+bool TcpService::addDataSocket( sock fd,
                                 TcpService::ENTER_CALLBACK enterCallback,
                                 TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                 TcpService::DATA_CALLBACK dataCallback,

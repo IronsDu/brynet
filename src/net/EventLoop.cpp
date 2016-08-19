@@ -137,7 +137,7 @@ void EventLoop::loop(int64_t timeout)
     ULONG numComplete = 0;
     if (mPGetQueuedCompletionStatusEx != nullptr)
     {
-        BOOL rc = mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, mEventEntriesNum, &numComplete, static_cast<DWORD>(timeout), false);
+        BOOL rc = mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, static_cast<ULONG>(mEventEntriesNum), &numComplete, static_cast<DWORD>(timeout), false);
         if (!rc)
         {
             numComplete = 0;
@@ -278,10 +278,10 @@ bool EventLoop::wakeup()
     return ret;
 }
 
-bool EventLoop::linkChannel(int fd, Channel* ptr)
+bool EventLoop::linkChannel(sock fd, Channel* ptr)
 {
 #ifdef PLATFORM_WINDOWS
-    HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (DWORD)ptr, 0);
+    HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0);
     return ret != nullptr;
 #else
     struct epoll_event ev = { 0, { 0 } };
@@ -354,7 +354,7 @@ int EventLoop::getEpollHandle() const
 }
 #endif
 
-void EventLoop::reallocEventSize(int size)
+void EventLoop::reallocEventSize(size_t size)
 {
     if (mEventEntries != NULL)
     {

@@ -96,7 +96,7 @@ void HttpServer::setEnterCallback(ENTER_CALLBACK callback)
     mOnEnter = callback;
 }
 
-void HttpServer::addConnection(int fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback)
+void HttpServer::addConnection(sock fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback)
 {
     mServer->addSession(fd, [this, enterCallback, responseCallback, closeCallback](TCPSession::PTR session){
         HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
@@ -115,7 +115,7 @@ void HttpServer::startListen(bool isIPV6, std::string ip, int port, const char *
     if (mListenThread == nullptr)
     {
         mListenThread = std::make_shared<ListenThread>();
-        mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [this](int fd){
+        mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [this](sock fd){
             mServer->addSession(fd, [this](TCPSession::PTR session){
                 HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
                 if (mOnEnter != nullptr)

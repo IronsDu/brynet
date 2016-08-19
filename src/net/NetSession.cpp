@@ -1,6 +1,6 @@
 #include "NetSession.h"
 
-void WrapAddNetSession(WrapServer::PTR server, int fd, BaseNetSession::PTR connection, int pingCheckTime, int maxRecvBufferSize)
+void WrapAddNetSession(WrapServer::PTR server, sock fd, BaseNetSession::PTR connection, int pingCheckTime, int maxRecvBufferSize)
 {
     server->addSession(fd, [connection, server, pingCheckTime](TCPSession::PTR session){
         connection->setSession(server, session->getSocketID(), session->getIP());

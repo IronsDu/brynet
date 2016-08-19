@@ -60,7 +60,7 @@ namespace dodo
 
             static  void    readJson(const rapidjson::Value& msg, vector<int>& ret)
             {
-                for (size_t i = 0; i < msg.Size(); ++i)
+                for (rapidjson::SizeType i = 0; i < msg.Size(); ++i)
                 {
                     ret.push_back(msg[i].GetInt());
                 }

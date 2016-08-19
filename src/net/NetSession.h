@@ -55,7 +55,7 @@ public:
         mServer->getService()->disConnect(mSocketID);
     }
 
-    void            sendPacket(const char* data, int len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
+    void            sendPacket(const char* data, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
     {
         mServer->getService()->send(mSocketID, DataSocket::makePacket(data, len), callback);
     }
@@ -75,6 +75,6 @@ private:
     int64_t             mSocketID;
 };
 
-void WrapAddNetSession(WrapServer::PTR server, int fd, BaseNetSession::PTR pClient, int pingCheckTime, int maxRecvBufferSize);
+void WrapAddNetSession(WrapServer::PTR server, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, int maxRecvBufferSize);
 
 #endif

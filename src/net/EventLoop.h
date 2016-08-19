@@ -62,7 +62,7 @@ public:
     }
 
 private:
-    void                            reallocEventSize(int size);
+    void                            reallocEventSize(size_t size);
     void                            processAfterLoopProcs();
     void                            processAsyncProcs();
 
@@ -71,7 +71,7 @@ private:
 #else
     int                             getEpollHandle() const;
 #endif
-    bool                            linkChannel(int fd, Channel* ptr);
+    bool                            linkChannel(sock fd, Channel* ptr);
     void                            tryInitThreadID();
 
 private:

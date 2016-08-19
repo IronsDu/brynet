@@ -20,7 +20,7 @@ public:
 
         if (!mIds.empty())
         {
-            ret = mIds[mIds.size() - 1];
+            ret = static_cast<int>(mIds[mIds.size() - 1]);
             mIds.pop_back();
         }
 

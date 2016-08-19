@@ -22,11 +22,12 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
     {
         server.addConnection(fd, [kv, url, &mtx, &cv, &server, &timer, timeout, protocol](HttpSession::PTR session){
             /*×¢²á³¬Ê±¶¨Ê±Æ÷*/
-            timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr().AddTimer(timeout, [session](){
+            timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr()->AddTimer(timeout, [session](){
                 session->postClose();
             });
 
             HttpFormat request;
+            request.setHost("127.0.0.1");
             request.addHeadValue("Accept", "*/*");
             request.setProtocol(protocol);
             std::string keyUrl = "/v2/keys/";

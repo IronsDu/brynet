@@ -51,16 +51,16 @@ bool HTTPParser::isKeepAlive() const
 bool HTTPParser::checkCompleted(const char* buffer, size_t len)
 {
     const static char* RL = "\r\n";
-    const static int RL_LEN = strlen(RL);
+    const static size_t RL_LEN = strlen(RL);
 
     const static char* DOUBLE_RL = "\r\n\r\n";
-    const static int DOUBLE_RL_LEN = strlen(DOUBLE_RL);
+    const static size_t DOUBLE_RL_LEN = strlen(DOUBLE_RL);
 
     const static char* CONTENT_LENGTH_FLAG = "Content-Length: ";
-    const static int CONTENT_LENGTH_FLAG_LEN = strlen(CONTENT_LENGTH_FLAG);
+    const static size_t CONTENT_LENGTH_FLAG_LEN = strlen(CONTENT_LENGTH_FLAG);
 
     const static char* CHUNKED_FLAG = "Transfer-Encoding: chunked";
-    const static int CHUNKED_FLAG_LEN = strlen(CHUNKED_FLAG);
+    const static size_t CHUNKED_FLAG_LEN = strlen(CHUNKED_FLAG);
 
     std::string copyBuffer(buffer, len);
     copyBuffer.push_back(0);

@@ -20,7 +20,7 @@ class ListenThread : public NonCopyable
 {
 public:
     typedef std::shared_ptr<ListenThread>   PTR;
-    typedef std::function<void(int fd)> ACCEPT_CALLBACK;
+    typedef std::function<void(sock fd)> ACCEPT_CALLBACK;
 
     ListenThread();
     virtual ~ListenThread();
@@ -91,7 +91,7 @@ public:
 
     void                                setPingCheckTime(int64_t id, int checktime);
 
-    bool                                addDataSocket(  int fd,
+    bool                                addDataSocket(  sock fd,
                                                         TcpService::ENTER_CALLBACK enterCallback,
                                                         TcpService::DISCONNECT_CALLBACK disConnectCallback,
                                                         TcpService::DATA_CALLBACK dataCallback,

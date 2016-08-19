@@ -211,12 +211,12 @@ public:
     /*写入二进制字符串，并记录其长度，反序列方使用ReadPacket::readBinary()读取*/
     void    writeBinary(const std::string& binary)
     {
-        writeUINT32(binary.size());
+        writeUINT32(static_cast<uint32_t>(binary.size()));
         writeBuffer(binary.c_str(), binary.size());
     }
     void    writeBinary(const char* binary, size_t binaryLen)
     {
-        writeUINT32(binaryLen);
+        writeUINT32(static_cast<uint32_t>(binaryLen));
         writeBuffer(binary, binaryLen);
     }
 
@@ -226,7 +226,7 @@ public:
         assert((mPos + binaryLen + sizeof(int32_t)) <= mMaxLen);
         if ((mPos + binaryLen + sizeof(int32_t)) <= mMaxLen)
         {
-            writeUINT32(binaryLen);
+            writeUINT32(static_cast<uint32_t>(binaryLen));
             binary = getData()+mPos;
             mPos += binaryLen;
         }
@@ -366,7 +366,7 @@ private:
 
     void        end()
     {
-        PACKET_LEN_TYPE len = socketendian::hostToNetwork32(mPos);
+        PACKET_LEN_TYPE len = socketendian::hostToNetwork32(static_cast<uint32_t>(mPos));
         if (sizeof(len) <= mMaxLen)
         {
             memcpy(mBuffer, &len, sizeof(len));
@@ -528,6 +528,15 @@ public:
     size_t          getMaxPos() const
     {
         return mMaxLen;
+    }
+
+    void            addPos(int value)
+    {
+        auto tmp = mPos + value;
+        if (tmp >= 0 && tmp <= mMaxLen)
+        {
+            mPos = tmp;
+        }
     }
 private:
     size_t          mPos;

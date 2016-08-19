@@ -117,7 +117,7 @@ void    WrapServer::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK
     mTCPService->startWorkerThread(threadNum, callback);
 }
 
-void    WrapServer::addSession(int fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop)
+void    WrapServer::addSession(sock fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop)
 {
     TCPSession::PTR tmpSession = TCPSession::Create();// std::make_shared<TCPSession>();
     tmpSession->setService(mTCPService);

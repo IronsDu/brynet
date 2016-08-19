@@ -42,7 +42,7 @@ public:
     typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
 public:
-    explicit DataSocket(int fd, int maxRecvBufferSize);
+    explicit DataSocket(sock fd, int maxRecvBufferSize);
     ~DataSocket();
 
     /*  仅在网络线程中调用才可能返回成功 */

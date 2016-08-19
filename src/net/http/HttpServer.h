@@ -57,7 +57,7 @@ public:
 
     void                    setEnterCallback(ENTER_CALLBACK callback);
 
-    void                    addConnection(int fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
+    void                    addConnection(sock fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
 
     void                    startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
     void                    startListen(bool isIPV6, std::string ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
