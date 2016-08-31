@@ -1,6 +1,5 @@
-#include <thread>
-
 #include "CurrentThread.h"
+
 #ifdef PLATFORM_WINDOWS
 #else
 #include <unistd.h>

@@ -7,21 +7,46 @@
 #include <iostream>
 
 #include "msgqueue.h"
-
-using namespace std;
-
 #include "SocketLibFunction.h"
 #include "fdset.h"
 #include "systemlib.h"
 
+using namespace std;
+
 #include "connector.h"
 
-ThreadConnector::ThreadConnector(std::function<void(sock, int64_t)> callback)
+class  ConnectorWorkThread final : public NonCopyable
 {
-    mCallback = callback;
-    mThread = nullptr;
+public:
+    typedef std::shared_ptr<ConnectorWorkThread>    PTR;
+
+    ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK);
+    ~ConnectorWorkThread();
+
+    void                checkConnectStatus(int timeout);
+    bool                isConnectSuccess(sock clientfd);
+    void                checkTimeout();
+    void                pollConnectRequest(MsgQueue<AsyncConnectAddr>& connectRequests);
+
+private:
+    ThreadConnector::COMPLETED_CALLBACK    mCallback;
+
+    struct ConnectingInfo
+    {
+        int64_t startConnectTime;
+        int     timeout;
+        int64_t uid;
+    };
+
+    std::map<sock, ConnectingInfo>  mConnectingInfos;
+    std::set<sock>                  mConnectingFds;
+    struct fdset_s*                 mFDSet;
+};
+
+ThreadConnector::ThreadConnector()
+{
     mIsRun = false;
-    mFDSet = nullptr;
+    mThread = nullptr;
 }
 
 ThreadConnector::~ThreadConnector()
@@ -29,38 +54,22 @@ ThreadConnector::~ThreadConnector()
     destroy();
 }
 
-void ThreadConnector::startThread()
+ConnectorWorkThread::ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK callback) : mCallback(callback)
 {
-    if (mThread == nullptr)
-    {
-        mIsRun = true;
-        mThread = new std::thread(ThreadConnector::s_thread, this);
-    }
+    mFDSet = ox_fdset_new();
 }
 
-void ThreadConnector::destroy()
+ConnectorWorkThread::~ConnectorWorkThread()
 {
-    if (mThread != nullptr)
-    {
-        mIsRun = false;
-        if (mThread->joinable())
-        {
-            mThread->join();
-        }
-        delete mThread;
-        mThread = nullptr;
-    }
-
-    mConnectRequests.clear();
-    mConnectingInfos.clear();
-    mConnectingFds.clear();
+    ox_fdset_delete(mFDSet);
+    mFDSet = nullptr;
 }
 
-bool ThreadConnector::isConnectSuccess(struct fdset_s* fdset, sock clientfd)
+bool ConnectorWorkThread::isConnectSuccess(sock clientfd)
 {
     bool connect_ret = false;
 
-    if (ox_fdset_check(fdset, clientfd, WriteCheck))
+    if (ox_fdset_check(mFDSet, clientfd, WriteCheck))
     {
         int error;
         int len = sizeof(error);
@@ -73,9 +82,9 @@ bool ThreadConnector::isConnectSuccess(struct fdset_s* fdset, sock clientfd)
     return connect_ret;
 }
 
-void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
+void ConnectorWorkThread::checkConnectStatus(int timeout)
 {
-    if (ox_fdset_poll(fdset, timeout) <= 0)
+    if (ox_fdset_poll(mFDSet, timeout) <= 0)
     {
         return;
     }
@@ -84,8 +93,8 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
     set<sock>       failed_fds;     /*   ß∞‹∂”¡–    */
 
 #if defined PLATFORM_WINDOWS
-    fd_set* error_result = ox_fdset_getresult(fdset, ErrorCheck);
-    fd_set* write_result = ox_fdset_getresult(fdset, WriteCheck);
+    fd_set* error_result = ox_fdset_getresult(mFDSet, ErrorCheck);
+    fd_set* write_result = ox_fdset_getresult(mFDSet, WriteCheck);
 
     for (size_t i = 0; i < error_result->fd_count; ++i)
     {
@@ -98,7 +107,7 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
     {
         sock clientfd = write_result->fd_array[i];
         complete_fds.insert(clientfd);
-        if (!isConnectSuccess(fdset, clientfd))
+        if (!isConnectSuccess(clientfd))
         {
             failed_fds.insert(clientfd);
         }
@@ -107,15 +116,15 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
     for (std::set<sock>::iterator it = mConnectingFds.begin(); it != mConnectingFds.end(); ++it)
     {
         sock clientfd = *it;
-        if(ox_fdset_check(fdset, clientfd, ErrorCheck))
+        if(ox_fdset_check(mFDSet, clientfd, ErrorCheck))
         {
             complete_fds.insert(clientfd);
             failed_fds.insert(clientfd);
         }
-        else if (ox_fdset_check(fdset, clientfd, WriteCheck))
+        else if (ox_fdset_check(mFDSet, clientfd, WriteCheck))
         {
-            complete_fds.push_back(clientfd);
-            if (!isConnectSuccess(fdset, clientfd))
+            complete_fds.insert(clientfd);
+            if (!isConnectSuccess(clientfd))
             {
                 failed_fds.insert(clientfd);
             }
@@ -124,7 +133,7 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
 #endif
     for (auto fd : complete_fds)
     {
-        ox_fdset_del(fdset, fd, WriteCheck | ErrorCheck);
+        ox_fdset_del(mFDSet, fd, WriteCheck | ErrorCheck);
 
         map<sock, ConnectingInfo>::iterator it = mConnectingInfos.find(fd);
         if (it != mConnectingInfos.end())
@@ -146,32 +155,39 @@ void ThreadConnector::checkConnectStatus(struct fdset_s* fdset, int timeout)
     }
 }
 
-void ThreadConnector::run()
+void ConnectorWorkThread::checkTimeout()
 {
-    mFDSet = ox_fdset_new();
+    int64_t now_time = ox_getnowtime();
 
-    while (mIsRun)
+    for (map<sock, ConnectingInfo>::iterator it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
     {
-        mThreadEventloop.loop(10);
+        if ((now_time - it->second.startConnectTime) >= it->second.timeout)
+        {
+            sock fd = it->first;
+            int64_t uid = it->second.uid;
 
-        checkConnectStatus(mFDSet, 0);
+            ox_fdset_del(mFDSet, fd, WriteCheck | ErrorCheck);
 
-        pollConnectRequest();
+            mConnectingFds.erase(fd);
+            mConnectingInfos.erase(it++);
 
-        checkTimeout();
+            ox_socket_close(fd);
+
+            mCallback(SOCKET_ERROR, uid);
+        }
+        else
+        {
+            ++it;
+        }
     }
-    ox_fdset_delete(mFDSet);
-    mFDSet = nullptr;
 }
 
-void ThreadConnector::pollConnectRequest()
+void ConnectorWorkThread::pollConnectRequest(MsgQueue<AsyncConnectAddr>& connectRequests)
 {
-    mConnectRequests.SyncRead(0);
-
     while (mConnectingFds.size() < FD_SETSIZE)
     {
         AsyncConnectAddr addr;
-        if (mConnectRequests.PopBack(&addr))
+        if (connectRequests.PopBack(&addr))
         {
             bool addToFDSet = false;
             bool connectSuccess = false;
@@ -243,43 +259,48 @@ void ThreadConnector::pollConnectRequest()
     }
 }
 
-void ThreadConnector::checkTimeout()
+void ThreadConnector::run(ConnectorWorkThread::PTR cwt)
 {
-    int64_t now_time = ox_getnowtime();
-
-    for (map<sock, ConnectingInfo>::iterator it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
+    while (mIsRun)
     {
-        if ((now_time - it->second.startConnectTime) >= it->second.timeout)
-        {
-            sock fd = it->first;
-            int64_t uid = it->second.uid;
+        mThreadEventloop.loop(10);
 
-            ox_fdset_del(mFDSet, fd, WriteCheck | ErrorCheck);
+        cwt->checkConnectStatus(0);
+        mConnectRequests.SyncRead(0);
+        cwt->pollConnectRequest(mConnectRequests);
 
-            mConnectingFds.erase(fd);
-            mConnectingInfos.erase(it++);
-
-            ox_socket_close(fd);
-
-            mCallback(SOCKET_ERROR, uid);
-        }
-        else
-        {
-            ++it;
-        }
+        cwt->checkTimeout();
     }
 }
 
+void ThreadConnector::startThread(COMPLETED_CALLBACK callback)
+{
+    if (mThread == nullptr)
+    {
+        mIsRun = true;
+
+        mThread = new std::thread([](ThreadConnector::PTR tc, ConnectorWorkThread::PTR cwt){
+            tc->run(cwt);
+        }, shared_from_this(), std::make_shared<ConnectorWorkThread>(callback));
+    }
+}
+
+void ThreadConnector::destroy()
+{
+    if (mThread != nullptr)
+    {
+        mIsRun = false;
+        if (mThread->joinable())
+        {
+            mThread->join();
+        }
+        delete mThread;
+    }
+}
 
 void ThreadConnector::asyncConnect(const char* ip, int port, int ms, int64_t uid)
 {
     mConnectRequests.Push(AsyncConnectAddr(ip, port, ms, uid));
     mConnectRequests.ForceSyncWrite();
     mThreadEventloop.wakeup();
-}
-
-void ThreadConnector::s_thread(void* arg)
-{
-    ThreadConnector* tc = (ThreadConnector*)arg;
-    tc->run();
 }

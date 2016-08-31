@@ -1,6 +1,8 @@
 #ifndef _TYPEIDS_H
 #define _TYPEIDS_H
 
+#include <cassert>
+
 /*采用ID管理对象的管理器*/
 
 template<typename T>

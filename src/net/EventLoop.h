@@ -5,9 +5,7 @@
 #include <functional>
 #include <vector>
 #include <mutex>
-#include <thread>
 #include <memory>
-#include <unordered_map>
 #include <atomic>
 
 #include "CurrentThread.h"
@@ -21,10 +19,11 @@ class DataSocket;
 class EventLoop : public NonCopyable
 {
 public:
+    typedef std::shared_ptr<EventLoop>          PTR;
     typedef std::function<void(void)>           USER_PROC;
 
 #ifdef PLATFORM_WINDOWS
-    enum OLV_VALUE
+    enum class OLV_VALUE
     {
         OVL_RECV = 1,
         OVL_SEND,
@@ -33,7 +32,12 @@ public:
     struct ovl_ext_s
     {
         OVERLAPPED  base;
-        int         OP;
+        const EventLoop::OLV_VALUE  OP;
+
+        ovl_ext_s(OLV_VALUE op) : OP(op)
+        {
+            memset(&base, 0, sizeof(base));
+        }
     };
 #endif
 

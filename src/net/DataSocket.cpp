@@ -1,4 +1,3 @@
-#include <iostream>
 #include <assert.h>
 #include <string.h>
 
@@ -11,6 +10,9 @@
 using namespace std;
 
 DataSocket::DataSocket(sock fd, int maxRecvBufferSize)
+#if defined PLATFORM_WINDOWS
+    : mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), mOvlSend(EventLoop::OLV_VALUE::OVL_SEND)
+#endif
 {
     mMaxRecvBufferSize = maxRecvBufferSize;
     mRecvData = false;
@@ -24,11 +26,6 @@ DataSocket::DataSocket(sock fd, int maxRecvBufferSize)
     mCanWrite = true;
 
 #ifdef PLATFORM_WINDOWS
-    memset(&mOvlRecv, 0, sizeof(mOvlRecv));
-    memset(&mOvlSend, 0, sizeof(mOvlSend));
-
-    mOvlRecv.OP = EventLoop::OVL_RECV;
-    mOvlSend.OP = EventLoop::OVL_SEND;
 
     mPostRecvCheck = false;
     mPostWriteCheck = false;

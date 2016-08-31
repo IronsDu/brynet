@@ -53,44 +53,29 @@ private:
     int64_t     mUid;
 };
 
-class ThreadConnector : NonCopyable
+class ConnectorWorkThread;
+
+class ThreadConnector : NonCopyable, public std::enable_shared_from_this<ThreadConnector>
 {
 public:
     typedef std::shared_ptr<ThreadConnector> PTR;
+    typedef std::function<void(sock, int64_t)> COMPLETED_CALLBACK;
 
-    ThreadConnector(std::function<void(sock, int64_t)> callback);
+    ThreadConnector();
 
     virtual ~ThreadConnector();
-    void                startThread();
+    void                startThread(COMPLETED_CALLBACK callback);
     void                destroy();
 
     void                asyncConnect(const char* ip, int port, int ms, int64_t uid);
 
 private:
-    void                checkConnectStatus(struct fdset_s* fdset, int timeout);
-    bool                isConnectSuccess(struct fdset_s* fdset, sock clientfd);
-    void                pollConnectRequest();
-    void                checkTimeout();
-
-    void                run();
-    static  void        s_thread(void* arg);
+    void                run(std::shared_ptr<ConnectorWorkThread>);
 
 private:
 
-    struct ConnectingInfo 
-    {
-        int64_t startConnectTime;
-        int     timeout;
-        int64_t uid;
-    };
-
     MsgQueue<AsyncConnectAddr>      mConnectRequests;     /*  «Î«Û¡–±Ì    */
-
-    std::map<sock, ConnectingInfo>  mConnectingInfos;
-    std::set<sock>                  mConnectingFds;
-    std::function<void(sock, int64_t)>    mCallback;
     EventLoop                       mThreadEventloop;
-    struct fdset_s*                 mFDSet;
 
     std::thread*                    mThread;
     bool                            mIsRun;

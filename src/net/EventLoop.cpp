@@ -7,12 +7,11 @@
 #include "Channel.h"
 #include "EventLoop.h"
 
-class WakeupChannel : public Channel
+class WakeupChannel : public Channel, public NonCopyable
 {
 public:
-    WakeupChannel(int fd)
+    explicit WakeupChannel(sock fd) : mFd(fd)
     {
-        mFd = fd;
     }
 
 private:
@@ -51,10 +50,13 @@ private:
     }
 
 private:
-    int     mFd;
+    sock    mFd;
 };
 
 EventLoop::EventLoop()
+#ifdef PLATFORM_WINDOWS
+    : mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
+#endif
 {
 #ifdef PLATFORM_WINDOWS
     mPGetQueuedCompletionStatusEx = NULL;
@@ -65,8 +67,6 @@ EventLoop::EventLoop()
             "GetQueuedCompletionStatusEx");
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
-    memset(&mWakeupOvl, 0, sizeof(mWakeupOvl));
-    mWakeupOvl.OP = EventLoop::OVL_RECV; 
     mWakeupChannel = new WakeupChannel(-1);
 #else
     mEpollFd = epoll_create(1);
@@ -126,6 +126,11 @@ void EventLoop::loop(int64_t timeout)
 #ifndef NDEBUG
     assert(isInLoopThread());
 #endif
+    if (!isInLoopThread())
+    {
+        return;
+    }
+
     /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调或者某会话断开处理中又向其他会话发送消息而新产生callback），将timeout改为0，表示不阻塞iocp/epoll wait   */
     if (!mAfterLoopProcs.empty())
     {
@@ -178,15 +183,15 @@ void EventLoop::loop(int64_t timeout)
 
     for (ULONG i = 0; i < numComplete; ++i)
     {
-        Channel* ds = (Channel*)mEventEntries[i].lpCompletionKey;
+        Channel* channel = (Channel*)mEventEntries[i].lpCompletionKey;
         EventLoop::ovl_ext_s* ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
-        if (ovl->OP == EventLoop::OVL_RECV)
+        if (ovl->OP == EventLoop::OLV_VALUE::OVL_RECV)
         {
-            ds->canRecv();
+            channel->canRecv();
         }
-        else if (ovl->OP == EventLoop::OVL_SEND)
+        else if (ovl->OP == EventLoop::OLV_VALUE::OVL_SEND)
         {
-            ds->canSend();
+            channel->canSend();
         }
         else
         {
@@ -200,24 +205,24 @@ void EventLoop::loop(int64_t timeout)
 
     for (int i = 0; i < numComplete; ++i)
     {
-        Channel*   ds = (Channel*)(mEventEntries[i].data.ptr);
-        uint32_t event_data = mEventEntries[i].events;
+        Channel*    channel = (Channel*)(mEventEntries[i].data.ptr);
+        uint32_t    event_data = mEventEntries[i].events;
 
         if (event_data & EPOLLRDHUP)
         {
-            ds->canRecv();
-            ds->onClose();   /*  无条件调用断开处理(安全的，不会造成重复close)，以防canRecv里没有recv 断开通知*/
+            channel->canRecv();
+            channel->onClose();   /*  无条件调用断开处理(安全的，不会造成重复close)，以防canRecv里没有recv 断开通知*/
         }
         else
         {
             if (event_data & EPOLLIN)
             {
-                ds->canRecv();
+                channel->canRecv();
             }
 
             if (event_data & EPOLLOUT)
             {
-                ds->canSend();
+                channel->canSend();
             }
         }
     }
@@ -281,14 +286,12 @@ bool EventLoop::wakeup()
 bool EventLoop::linkChannel(sock fd, Channel* ptr)
 {
 #ifdef PLATFORM_WINDOWS
-    HANDLE ret = CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0);
-    return ret != nullptr;
+    return CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0) != nullptr;
 #else
     struct epoll_event ev = { 0, { 0 } };
     ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
     ev.data.ptr = ptr;
-    int ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev);
-    return ret == 0;
+    return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;
 #endif
 }
 

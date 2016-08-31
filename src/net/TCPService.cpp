@@ -601,12 +601,20 @@ bool TcpService::addDataSocket( sock fd,
                                 bool forceSameThreadLoop)
 {
     std::string ip = ox_socket_getipoffd(fd);
-    DataSocket::PTR channel = new DataSocket(fd, maxRecvBufferSize);
-    bool ret = true;
+    DataSocket::PTR channel = nullptr;
 #ifdef USE_OPENSSL
+    bool ret = true;
+    channel = new DataSocket(fd, maxRecvBufferSize);
     if (isUseSSL)
     {
         ret = channel->initConnectSSL();
+    }
+#else
+    bool ret = false;
+    if (!isUseSSL)
+    {
+        channel = new DataSocket(fd, maxRecvBufferSize);
+        ret = true;
     }
 #endif
     if (ret)
@@ -616,8 +624,15 @@ bool TcpService::addDataSocket( sock fd,
 
     if (!ret)
     {
-        delete channel;
-        channel = nullptr;
+        if (channel != nullptr)
+        {
+            delete channel;
+            channel = nullptr;
+        }
+        else
+        {
+            ox_socket_close(fd);
+        }
     }
 
     return ret;

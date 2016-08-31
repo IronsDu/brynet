@@ -5,7 +5,6 @@
 #include <functional>
 #include <deque>
 
-#include "SocketLibFunction.h"
 #include "Channel.h"
 #include "timer.h"
 #include "EventLoop.h"
@@ -24,7 +23,6 @@ extern "C" {
 
 #endif
 
-class EventLoop;
 struct buffer_s;
 
 /*  使用裸指针,且一旦投递到eventloop,只有在onEnterEventLoop失败或者断开回调中才能delete它(一个DataSocket的断开回调只会被调用一次)  */
@@ -109,8 +107,6 @@ private:
 private:
 
 #ifdef PLATFORM_WINDOWS
-    #include <winsock2.h>
-    #include <windows.h>
     struct EventLoop::ovl_ext_s     mOvlRecv;
     struct EventLoop::ovl_ext_s     mOvlSend;
 

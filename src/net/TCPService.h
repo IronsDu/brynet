@@ -5,7 +5,6 @@
 #include <string>
 #include <functional>
 #include <thread>
-#include <assert.h>
 #include <stdint.h>
 #include <memory>
 
@@ -14,7 +13,6 @@
 #include "NonCopyable.h"
 
 class EventLoop;
-class DataSocket;
 
 class ListenThread : public NonCopyable
 {
