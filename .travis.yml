@@ -1,0 +1,3 @@
+language: cpp
+compiler: g++
+script: cd examples/ && make all testhttp

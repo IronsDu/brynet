@@ -1,0 +1,15 @@
+os: Visual Studio 2013
+version: 1.1.0.{build}
+configuration:
+- Debug
+- Release
+environment:
+  matrix:
+  - VS_VERSION: 12 2013
+    VS_PLATFORM: win32
+  - VS_VERSION: 12 2013
+    VS_PLATFORM: x64
+build:
+  project: accumulation-dev.sln
+  parallel: true
+  verbosity: minimal
