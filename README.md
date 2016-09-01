@@ -1,4 +1,5 @@
 ##跨平台游戏开发组件
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/accumulation-dev/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/accumulation-dev.svg?branch=master)](https://travis-ci.org/IronsDu/accumulation-dev)
 
 # 介绍
 * src\net TCP 网络库(C++ 11 实现)

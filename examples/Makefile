@@ -32,19 +32,19 @@ all :	pingpongserver\
 	broadcastclient
 
 pingpongserver: $(COMMON_TARGETS) $(PINGPONGSERVER_TARGETS)
-	g++ $(COMMON_TARGETS) $(PINGPONGSERVER_TARGETS) $(LIBS) -o pingpongserver
+	$(CXX) $(COMMON_TARGETS) $(PINGPONGSERVER_TARGETS) $(LIBS) -o pingpongserver
 pingpongclient: $(COMMON_TARGETS) $(PINGPONGCLIENT_TARGETS)
-	g++ $(COMMON_TARGETS) $(PINGPONGCLIENT_TARGETS) $(LIBS) -o pingpongclient
+	$(CXX) $(COMMON_TARGETS) $(PINGPONGCLIENT_TARGETS) $(LIBS) -o pingpongclient
 broadcastserver: $(COMMON_TARGETS) $(BROADCASTSERVER_TARGETS)
-	g++ $(COMMON_TARGETS) $(BROADCASTSERVER_TARGETS) $(LIBS) -o broadcastserver
+	$(CXX) $(COMMON_TARGETS) $(BROADCASTSERVER_TARGETS) $(LIBS) -o broadcastserver
 broadcastclient: $(COMMON_TARGETS) $(BROADCASTCLIENT_TARGETS)
-	g++ $(COMMON_TARGETS) $(BROADCASTCLIENT_TARGETS) $(LIBS) -o broadcastclient
+	$(CXX) $(COMMON_TARGETS) $(BROADCASTCLIENT_TARGETS) $(LIBS) -o broadcastclient
 testhttp: $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS)
-	g++ $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS) $(LIBS) -o testhttp
+	$(CXX) $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS) $(LIBS) -o testhttp
 
 %.o: %.cpp
-	g++ $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CXX) $(CFLAGS) $(INCLUDES) -c $< -o $@
 %.o: %.c
-	g++ $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CXX) $(CFLAGS) $(INCLUDES) -c $< -o $@
 clean : 
 	find ./../ -name "*.o"  | xargs rm -f
