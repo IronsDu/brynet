@@ -92,45 +92,23 @@ void ConnectorWorkThread::checkConnectStatus(int timeout)
     set<sock>       complete_fds;   /*  完成队列    */
     set<sock>       failed_fds;     /*  失败队列    */
 
-#if defined PLATFORM_WINDOWS
-    fd_set* error_result = ox_fdset_getresult(mFDSet, ErrorCheck);
-    fd_set* write_result = ox_fdset_getresult(mFDSet, WriteCheck);
-
-    for (size_t i = 0; i < error_result->fd_count; ++i)
+    for (auto& v : mConnectingFds)
     {
-        sock clientfd = error_result->fd_array[i];
-        complete_fds.insert(clientfd);
-        failed_fds.insert(clientfd);
-    }
-
-    for (size_t i = 0; i < write_result->fd_count; ++i)
-    {
-        sock clientfd = write_result->fd_array[i];
-        complete_fds.insert(clientfd);
-        if (!isConnectSuccess(clientfd))
+        if (ox_fdset_check(mFDSet, v, ErrorCheck))
         {
-            failed_fds.insert(clientfd);
-        }
-    }
-#else
-    for (std::set<sock>::iterator it = mConnectingFds.begin(); it != mConnectingFds.end(); ++it)
-    {
-        sock clientfd = *it;
-        if(ox_fdset_check(mFDSet, clientfd, ErrorCheck))
+            complete_fds.insert(v);
+            failed_fds.insert(v);
+        } 
+        else if (ox_fdset_check(mFDSet, v, WriteCheck))
         {
-            complete_fds.insert(clientfd);
-            failed_fds.insert(clientfd);
-        }
-        else if (ox_fdset_check(mFDSet, clientfd, WriteCheck))
-        {
-            complete_fds.insert(clientfd);
-            if (!isConnectSuccess(clientfd))
+            complete_fds.insert(v);
+            if (!isConnectSuccess(v))
             {
-                failed_fds.insert(clientfd);
+                failed_fds.insert(v);
             }
         }
     }
-#endif
+
     for (auto fd : complete_fds)
     {
         ox_fdset_del(mFDSet, fd, WriteCheck | ErrorCheck);
@@ -184,77 +162,70 @@ void ConnectorWorkThread::checkTimeout()
 
 void ConnectorWorkThread::pollConnectRequest(MsgQueue<AsyncConnectAddr>& connectRequests)
 {
-    while (mConnectingFds.size() < FD_SETSIZE)
+    AsyncConnectAddr addr;
+    while (connectRequests.PopBack(&addr))
     {
-        AsyncConnectAddr addr;
-        if (connectRequests.PopBack(&addr))
+        bool addToFDSet = false;
+        bool connectSuccess = false;
+
+        struct sockaddr_in server_addr;
+        sock clientfd = SOCKET_ERROR;
+
+        ox_socket_init();
+
+        clientfd = ox_socket_create(AF_INET, SOCK_STREAM, 0);
+        ox_socket_nonblock(clientfd);
+
+        if (clientfd != SOCKET_ERROR)
         {
-            bool addToFDSet = false;
-            bool connectSuccess = false;
+            server_addr.sin_family = AF_INET;
+            server_addr.sin_addr.s_addr = inet_addr(addr.getIP().c_str());
+            server_addr.sin_port = htons(addr.getPort());
 
-            struct sockaddr_in server_addr;
-            sock clientfd = SOCKET_ERROR;
-
-            ox_socket_init();
-
-            clientfd = ox_socket_create(AF_INET, SOCK_STREAM, 0);
-            ox_socket_nonblock(clientfd);
-
-            if (clientfd != SOCKET_ERROR)
+            int n = connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+            if (n < 0)
             {
-                server_addr.sin_family = AF_INET;
-                server_addr.sin_addr.s_addr = inet_addr(addr.getIP().c_str());
-                server_addr.sin_port = htons(addr.getPort());
-
-                int n = connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
-                if (n < 0)
-                {
-                    int check_error = 0;
+                int check_error = 0;
 #if defined PLATFORM_WINDOWS
-                    check_error = WSAEWOULDBLOCK;
+                check_error = WSAEWOULDBLOCK;
 #else
-                    check_error = EINPROGRESS;
+                check_error = EINPROGRESS;
 #endif
-                    if (check_error != sErrno)
-                    {
-                        ox_socket_close(clientfd);
-                        clientfd = SOCKET_ERROR;
-                    }
-                    else
-                    {
-                        ConnectingInfo ci;
-                        ci.startConnectTime = ox_getnowtime();
-                        ci.uid = addr.getUID();
-                        ci.timeout = addr.getTimeout();
-
-                        mConnectingInfos[clientfd] = ci;
-                        mConnectingFds.insert(clientfd);
-
-                        ox_fdset_add(mFDSet, clientfd, WriteCheck | ErrorCheck);
-                        addToFDSet = true;
-                    }
-                }
-                else if (n == 0)
+                if (check_error != sErrno)
                 {
-                    connectSuccess = true;
+                    ox_socket_close(clientfd);
+                    clientfd = SOCKET_ERROR;
                 }
-            }
-
-            if (connectSuccess)
-            {
-                mCallback(clientfd, addr.getUID());
-            }
-            else
-            {
-                if (!addToFDSet)
+                else
                 {
-                    mCallback(SOCKET_ERROR, addr.getUID());
+                    ConnectingInfo ci;
+                    ci.startConnectTime = ox_getnowtime();
+                    ci.uid = addr.getUID();
+                    ci.timeout = addr.getTimeout();
+
+                    mConnectingInfos[clientfd] = ci;
+                    mConnectingFds.insert(clientfd);
+
+                    ox_fdset_add(mFDSet, clientfd, WriteCheck | ErrorCheck);
+                    addToFDSet = true;
                 }
             }
+            else if (n == 0)
+            {
+                connectSuccess = true;
+            }
+        }
+
+        if (connectSuccess)
+        {
+            mCallback(clientfd, addr.getUID());
         }
         else
         {
-            break;
+            if (!addToFDSet)
+            {
+                mCallback(SOCKET_ERROR, addr.getUID());
+            }
         }
     }
 }

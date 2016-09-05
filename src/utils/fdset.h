@@ -19,7 +19,6 @@ extern "C" {
 struct fdset_s;
 
 DLL_CONF struct fdset_s* ox_fdset_new(void);
-DLL_CONF fd_set* ox_fdset_getresult(struct fdset_s* self, enum CheckType type);
 DLL_CONF void ox_fdset_delete(struct fdset_s* self);
 DLL_CONF void ox_fdset_add(struct fdset_s* self, sock fd, int type);
 DLL_CONF void ox_fdset_del(struct fdset_s* self, sock fd, int type);

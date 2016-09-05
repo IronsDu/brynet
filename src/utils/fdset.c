@@ -1,65 +1,93 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <assert.h>
 
-#include "array.h"
 #include "fdset.h"
+
+#if defined PLATFORM_LINUX
+#include <poll.h>
+#define CHECK_READ_FLAG (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)
+#define CHECK_WRITE_FLAG (POLLOUT | POLLWRNORM | POLLWRBAND)
+#define CHECK_ERROR_FLAG (POLLERR | POLLHUP)
+#else
+#define CHECK_READ_FLAG (POLLIN | POLLRDNORM | POLLRDBAND)
+#define CHECK_WRITE_FLAG (POLLOUT | POLLWRNORM)
+#define CHECK_ERROR_FLAG (POLLERR | POLLHUP)
+#endif
 
 struct fdset_s
 {
-    fd_set  read;
-    fd_set  write;
-    fd_set  error;
-
-    fd_set  read_result;
-    fd_set  write_result;
-    fd_set  error_result;
-
-    #if defined PLATFORM_LINUX
-    struct array_s*    fds;
-    sock        max_fd; /*当前加入到fdset中的最大fd*/
-    #endif
+    struct pollfd* pollFds;
+    int nfds;
+    int limitSize;
 };
 
-struct fdset_s* 
+static
+void upstepPollfd(struct fdset_s* self, int upSize)
+{
+    if (upSize > 0)
+    {
+        struct pollfd* newPollfds = (struct pollfd*)malloc(sizeof(struct pollfd)*(self->limitSize+upSize));
+        if (newPollfds != NULL)
+        {
+            if (self->pollFds != NULL)
+            {
+                memcpy(newPollfds, self->pollFds, sizeof(struct pollfd)*self->nfds);
+                free(self->pollFds);
+                self->pollFds = NULL;
+            }
+            self->pollFds = newPollfds;
+            self->limitSize += upSize;
+        }
+    }
+}
+
+static
+struct pollfd* findPollfd(struct fdset_s* self, sock fd)
+{
+    for (int i = 0; i < self->nfds; i++)
+    {
+        if(self->pollFds[i].fd == fd)
+        {
+            return self->pollFds+i;
+        }
+    }
+
+    return NULL;
+}
+
+static
+void TryRemovePollFd(struct fdset_s* self, sock fd)
+{
+    int pos = -1;
+    for (int i = 0; i < self->nfds; i++)
+    {
+        if(self->pollFds[i].fd == fd)
+        {
+            pos = i;
+            break;
+        }
+    }
+
+    if (pos != -1)
+    {
+        memmove(self->pollFds + pos, self->pollFds + pos + 1, sizeof(struct pollfd)*(self->nfds - pos - 1));
+        self->nfds--;
+        assert(self->nfds >= 0);
+    }
+}
+
+struct fdset_s*
 ox_fdset_new(void)
 {
     struct fdset_s* ret = (struct fdset_s*)malloc(sizeof(struct fdset_s));
     if(ret != NULL)
     {
-        FD_ZERO(&ret->read);
-        FD_ZERO(&ret->write);
-        FD_ZERO(&ret->error);
-
-        FD_ZERO(&ret->read_result);
-        FD_ZERO(&ret->write_result);
-        FD_ZERO(&ret->error_result);
-
-
-
-        #ifdef PLATFORM_LINUX
-        ret->max_fd = SOCKET_ERROR;
-        ret->fds = NULL;
-        #endif
-    }
-
-    return ret;
-}
-
-fd_set* 
-ox_fdset_getresult(struct fdset_s* self, enum CheckType type)
-{
-    fd_set* ret = NULL;
-    if(ReadCheck == type)
-    {
-        ret = &self->read_result;
-    }
-    else if(WriteCheck == type)
-    {
-        ret = &self->write_result;
-    }
-    else
-    {
-        ret = &self->error_result;
+        ret->pollFds = NULL;
+        ret->limitSize = 0;
+        ret->nfds = 0;
+        upstepPollfd(ret, 1024);
     }
 
     return ret;
@@ -68,154 +96,89 @@ ox_fdset_getresult(struct fdset_s* self, enum CheckType type)
 void 
 ox_fdset_delete(struct fdset_s* self)
 {
-    #ifdef PLATFORM_LINUX
-    self->max_fd = SOCKET_ERROR;
-    if(self->fds != NULL)
-    {
-        ox_array_delete(self->fds);
-        self->fds = NULL;
-    }
-    #endif
+    free(self->pollFds);
+    self->pollFds = NULL;
+    self->nfds = 0;
+    self->limitSize = 0;
 
     free(self);
     self = NULL;
 }
 
-#if defined PLATFORM_LINUX
-
-static void 
-fdset_push(struct fdset_s* self, sock fd)
-{
-    int old_fd_num = 0;
-    if(self->fds != NULL)
-    {
-        old_fd_num = ox_array_num(self->fds);
-    }
-
-    if (old_fd_num <= fd)
-    {
-        if (self->fds == NULL)
-        {
-            self->fds = ox_array_new(fd + 1, sizeof(bool));
-        }
-        else
-        {
-            ox_array_increase(self->fds, fd - old_fd_num + 1);
-        }
-
-        int i = old_fd_num;
-        bool data = false;
-        int current_fd_num = ox_array_num(self->fds);
-        for (; i < current_fd_num; ++i)
-        {
-            ox_array_set(self->fds, i, &data);
-        }
-    }
-
-    bool data = true;
-    ox_array_set(self->fds, fd, &data);
-
-    if(fd > self->max_fd)
-    {
-        self->max_fd = fd;
-    }
-}
-
-static void 
-fdset_erase(struct fdset_s* self, sock fd)
-{
-    bool data = false;
-    ox_array_set(self->fds, fd, &data);
-
-    if(fd == self->max_fd)
-    {
-        self->max_fd = SOCKET_ERROR;
-        int i = fd;
-        for(; i >= 0; --i)
-        {
-            if(*(bool*)ox_array_at(self->fds, i))
-            {
-                self->max_fd = i;
-                break;
-            }
-
-        }
-    }
-}
-
-#endif
-
-void 
+void
 ox_fdset_add(struct fdset_s* self, sock fd, int type)
 {
-    if(type & ReadCheck)
+    if (self->limitSize == self->nfds)
     {
-        FD_SET(fd, &self->read);
+        upstepPollfd(self, 128);
     }
 
-    if(type & WriteCheck)
+    if (self->limitSize > self->nfds)
     {
-        FD_SET(fd, &self->write);
-    }
+        struct pollfd* pf = findPollfd(self, fd);
+        if (pf == NULL)
+        {
+            /*real add*/
+            pf = self->pollFds + self->nfds;
+            pf->events = 0;
+            pf->fd = fd;
 
-    if(type & ErrorCheck)
-    {
-        FD_SET(fd, &self->error);
-    }
+            self->nfds++;
+        }
 
-    #if defined PLATFORM_LINUX
-    fdset_push(self, fd);
-    #endif
+        if (type & ReadCheck)
+        {
+            pf->events |= CHECK_READ_FLAG;
+        }
+
+        if (type & WriteCheck)
+        {
+            pf->events |= CHECK_WRITE_FLAG;
+        }
+
+        if (type & ErrorCheck)
+        {
+            pf->events |= CHECK_ERROR_FLAG;
+        }
+    }
 }
 
-void 
+void
 ox_fdset_del(struct fdset_s* self, sock fd, int type)
 {
-    if(type & ReadCheck)
+    struct pollfd* pf = findPollfd(self, fd);
+    if (pf != NULL)
     {
-        FD_CLR(fd, &self->read);
-    }
+        if (type & ReadCheck)
+        {
+            pf->events &= ~CHECK_READ_FLAG;
+        }
 
-    if(type & WriteCheck)
-    {
-        FD_CLR(fd, &self->write);
-    }
+        if (type & WriteCheck)
+        {
+            pf->events &= ~CHECK_WRITE_FLAG;
+        }
 
-    if(type & ErrorCheck)
-    {
-        FD_CLR(fd, &self->error);
-    }
+        if (type & ErrorCheck)
+        {
+            pf->events &= ~CHECK_ERROR_FLAG;
+        }
 
-    #if defined PLATFORM_LINUX
-    if(!FD_ISSET(fd, &self->write) && !FD_ISSET(fd, &self->read) && !FD_ISSET(fd, &self->error))
-    {
-        fdset_erase(self, fd);
+        if (pf->events == 0)
+        {
+            TryRemovePollFd(self, fd);
+        }
     }
-    #endif
 }
 
 int 
 ox_fdset_poll(struct fdset_s* self, long overtime)
 {
-    struct timeval t = { 0, overtime*1000};
-    int ret = 0;
-
-    self->read_result = self->read;
-    self->write_result = self->write;
-    self->error_result = self->error;
-
-    #if defined PLATFORM_WINDOWS
-    if(self->read.fd_count != 0 || self->write.fd_count != 0 || self->error.fd_count != 0)
-    {
-        ret = select(0, &self->read_result, &self->write_result, &self->error_result, &t);
-    }
-    #else
-    int max_fd = self->max_fd;
-    if(SOCKET_ERROR != max_fd)
-    {
-        ret = select(max_fd + 1, &self->read_result, &self->write_result, &self->error_result, &t);
-    }
-    #endif
+#if defined PLATFORM_WINDOWS
+    int ret = WSAPoll(&self->pollFds[0], self->nfds, overtime);
+#else
+    int ret = poll(self->pollFds, self->nfds, overtime);
+#endif
 
     if(ret == SOCKET_ERROR)
     {
@@ -230,32 +193,41 @@ ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type)
 {
     bool active = false;
 
-    do
+    for (int i = 0; i < self->nfds; i++)
     {
-        if(type & ReadCheck)
+        struct pollfd* pf = self->pollFds + i;
+        if (pf->fd == fd)
         {
-            if((active = FD_ISSET(fd, &self->read_result)))
+            do
             {
-                break;
-            }
-        }
+                if (type & ReadCheck)
+                {
+                    if (active = (pf->revents & CHECK_READ_FLAG))
+                    {
+                        break;
+                    }
+                }
 
-        if(type & WriteCheck)
-        {
-            if((active = FD_ISSET(fd, &self->write_result)))
-            {
-                break;
-            }
-        }
+                if (type & WriteCheck)
+                {
+                    if (active = (pf->revents & CHECK_WRITE_FLAG))
+                    {
+                        break;
+                    }
+                }
 
-        if(type & ErrorCheck)
-        {
-            if((active = FD_ISSET(fd, &self->error_result)))
-            {
-                break;
-            }
+                if (type & ErrorCheck)
+                {
+                    if (active = (pf->revents & CHECK_ERROR_FLAG))
+                    {
+                        break;
+                    }
+                }
+            } while (0);
+
+            break;
         }
-    }   while(0);
+    }
 
     return active;
 }
