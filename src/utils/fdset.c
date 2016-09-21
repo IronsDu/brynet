@@ -138,7 +138,7 @@ ox_fdset_add(struct fdset_s* self, sock fd, int type)
 
         if (type & ErrorCheck)
         {
-            pf->events |= CHECK_ERROR_FLAG;
+            //pf->events |= CHECK_ERROR_FLAG;   TODO::on windows, not supports
         }
     }
 }

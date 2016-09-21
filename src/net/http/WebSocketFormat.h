@@ -7,9 +7,22 @@
 #include "SHA1.h"
 #include "base64.h"
 
+enum WebSocketFrameType {
+    ERROR_FRAME = 0xFF00,
+    INCOMPLETE_FRAME = 0xFE00,
 
-#define WS_OPCODE_TEXT (0x1)
-#define WS_OPCODE_BINARY (0x2)
+    OPENING_FRAME = 0x3300,
+    CLOSING_FRAME = 0x3400,
+
+    INCOMPLETE_TEXT_FRAME = 0x01,
+    INCOMPLETE_BINARY_FRAME = 0x02,
+
+    TEXT_FRAME = 0x81,
+    BINARY_FRAME = 0x82,
+
+    PING_FRAME = 0x19,
+    PONG_FRAME = 0x1A
+};
 
 class WebSocketFormat
 {
@@ -37,11 +50,11 @@ public:
         return response;
     }
 
-    static bool wsFrameBuild(const std::string& payload, std::string& frame)
+    static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = TEXT_FRAME)
     {
         size_t payloadLen = payload.size();
         frame.clear();
-        frame.push_back((char)0x81); // FIN = 1, opcode = BINARY
+        frame.push_back((char)frame_type);
         if (payloadLen <= 125)
             frame.push_back((uint8_t)payloadLen); // mask << 7 | payloadLen, mask = 0
         else if (payloadLen <= 0xFFFF)
@@ -67,7 +80,7 @@ public:
         return true;
     }
 
-    static bool wsFrameExtractBuffer(const char* buffer, size_t bufferSize, std::string& payload, uint8_t& opcode, int& frameSize)
+    static bool wsFrameExtractBuffer(const char* buffer, size_t bufferSize, std::string& payload, uint8_t& outopcode, int& frameSize)
     {
         if (bufferSize < 2)
         {
@@ -75,19 +88,14 @@ public:
         }
 
         bool FIN = ((uint8_t)buffer[0] & 0x80) != 0;
-        opcode = (uint8_t)buffer[0] & 0x0F;
+        uint8_t opcode = (uint8_t)buffer[0] & 0x0F;
         bool MASK = ((uint8_t)buffer[1] & 0x80) != 0;
-        uint8_t payloadlen1 = (uint8_t)buffer[1] & 0x7F;
-
-        // we only want to handle frame:
-        // 1.no fragment 2.masked 3.text or binary
-        if (!FIN && !MASK && opcode != WS_OPCODE_TEXT && opcode != WS_OPCODE_BINARY)
-            return false;
+        uint8_t payloadlen = (uint8_t)buffer[1] & 0x7F;
 
         uint32_t pos = 2;
-        if (payloadlen1 == 126)
+        if (payloadlen == 126)
             pos = 4;
-        else if (payloadlen1 == 127)
+        else if (payloadlen == 127)
             pos = 10;
         uint8_t mask[4];
         if (MASK)
@@ -103,23 +111,44 @@ public:
             mask[3] = (uint8_t)buffer[pos++];
         }
 
-        if (bufferSize < (pos + payloadlen1))
+        if (bufferSize < (pos + payloadlen))
         {
             return false;
         }
         
         if (MASK)
         {
-            payload.resize(payloadlen1, 0);
-            for (size_t i = pos, j = 0; j < payloadlen1; i++, j++)
+            payload.resize(payloadlen, 0);
+            for (size_t i = pos, j = 0; j < payloadlen; i++, j++)
                 payload[j] = buffer[i] ^ mask[j % 4];
         }
         else
         {
-            payload.append(buffer, pos, payloadlen1);
+            payload.append(buffer, pos, payloadlen);
         }
 
-        frameSize = payloadlen1 + pos;
+        frameSize = payloadlen + pos;
+
+        if (opcode == 0x0)
+        {
+            outopcode = (FIN) ? TEXT_FRAME : INCOMPLETE_TEXT_FRAME;
+        }
+        else if (opcode == 0x01)
+        {
+            outopcode = (FIN) ? TEXT_FRAME : INCOMPLETE_TEXT_FRAME;
+        }
+        else if (opcode == 0x02)
+        {
+            outopcode = (FIN) ? BINARY_FRAME : INCOMPLETE_BINARY_FRAME;
+        }
+        else if (opcode == 0x09)
+        {
+            outopcode = PING_FRAME;
+        }
+        else if (opcode == 0x0A)
+        {
+            outopcode = PONG_FRAME;
+        }
 
         return true;
     }
