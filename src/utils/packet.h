@@ -340,6 +340,7 @@ class Packet : public BasePacketWriter
 public:
     Packet(char* buffer, size_t len, bool useBigEndian = true, bool isAutoMalloc = false) : BasePacketWriter(buffer, len, useBigEndian, isAutoMalloc)
     {
+        mIsFinish = false;
     }
     
     virtual ~Packet()
@@ -598,7 +599,7 @@ public:
 class SendPacket : public Packet
 {
 public:
-    SendPacket(PACKET_OP_TYPE op, char* buffer, size_t len, bool isAutoMalloc = false) : Packet(buffer, len, isAutoMalloc)
+    SendPacket(PACKET_OP_TYPE op, char* buffer, size_t len, bool useBigEndian = true, bool isAutoMalloc = false) : Packet(buffer, len, useBigEndian, isAutoMalloc)
     {
         setOP(op);
     }
