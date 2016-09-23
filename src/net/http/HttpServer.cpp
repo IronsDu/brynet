@@ -153,7 +153,7 @@ void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::H
             while (leftLen > 0)
             {
                 std::string payload;
-                uint8_t opcode; /*TODO::opcode是否回传给回调函数*/
+                auto opcode = WebSocketFormat::WebSocketFrameType::ERROR_FRAME; /*TODO::opcode是否回传给回调函数*/
                 int frameSize = 0;
                 if (WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, payload, opcode, frameSize))
                 {
