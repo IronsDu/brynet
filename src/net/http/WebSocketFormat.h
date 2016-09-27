@@ -50,8 +50,10 @@ public:
         return response;
     }
 
-    static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME)
+    static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool masking = false)
     {
+        static_assert(std::is_same<std::string::value_type, char>::value, "");
+
         size_t payloadLen = payload.size();
         frame.clear();
         frame.push_back((char)frame_type);
@@ -76,27 +78,58 @@ public:
             frame.push_back(static_cast<char>(payloadLen & 0x000000FF));
         }
 
-        frame.insert(frame.end(), payload.begin(), payload.end());
+        if (masking)
+        {
+            frame[1] = ((uint8_t)frame[1]) | 0x80;
+            uint8_t mask[4];
+            for (size_t i = 0; i < sizeof(mask) / sizeof(mask[0]); i++)
+            {
+                mask[i] = rand();
+                frame.push_back(mask[i]);
+            }
+
+            std::string maskPayload;
+            for (size_t i = 0; i < payload.size(); i++)
+            {
+                maskPayload.push_back((uint8_t)payload[i] ^ mask[i % 4]);
+            }
+            
+            frame.insert(frame.end(), maskPayload.begin(), maskPayload.end());
+        }
+        else
+        {
+            frame.insert(frame.end(), payload.begin(), payload.end());
+        }
+
         return true;
     }
 
-    static bool wsFrameExtractBuffer(const char* buffer, size_t bufferSize, std::string& payload, WebSocketFrameType& outopcode, int& frameSize)
+    static bool wsFrameExtractBuffer(const char* inbuffer, size_t bufferSize, std::string& payload, WebSocketFrameType& outopcode, int& frameSize)
     {
+        const unsigned char* buffer = (const unsigned char*)inbuffer;
+
         if (bufferSize < 2)
         {
             return false;
         }
 
-        bool FIN = ((uint8_t)buffer[0] & 0x80) != 0;
-        uint8_t opcode = (uint8_t)buffer[0] & 0x0F;
-        bool MASK = ((uint8_t)buffer[1] & 0x80) != 0;
-        uint8_t payloadlen = (uint8_t)buffer[1] & 0x7F;
+        bool FIN = (buffer[0] & 0x80) != 0;
+        uint8_t opcode = buffer[0] & 0x0F;
+        bool MASK = (buffer[1] & 0x80) != 0;
+        uint32_t payloadlen = buffer[1] & 0x7F;
 
         uint32_t pos = 2;
         if (payloadlen == 126)
+        {
+            payloadlen = (buffer[2] << 8) + buffer[3];
             pos = 4;
+        }
         else if (payloadlen == 127)
+        {
+            payloadlen = (buffer[6] << 24) + (buffer[7] << 16) + (buffer[8] << 8) + buffer[9];
             pos = 10;
+        }
+
         uint8_t mask[4];
         if (MASK)
         {
@@ -105,10 +138,10 @@ public:
                 return false;
             }
 
-            mask[0] = (uint8_t)buffer[pos++];
-            mask[1] = (uint8_t)buffer[pos++];
-            mask[2] = (uint8_t)buffer[pos++];
-            mask[3] = (uint8_t)buffer[pos++];
+            mask[0] = buffer[pos++];
+            mask[1] = buffer[pos++];
+            mask[2] = buffer[pos++];
+            mask[3] = buffer[pos++];
         }
 
         if (bufferSize < (pos + payloadlen))
@@ -124,7 +157,7 @@ public:
         }
         else
         {
-            payload.append(buffer, pos, payloadlen);
+            payload.append((const char*)buffer, pos, payloadlen);
         }
 
         frameSize = payloadlen + pos;
