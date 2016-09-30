@@ -44,7 +44,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
             std::string requestStr = request.getResult();
             session->send(requestStr.c_str(), requestStr.size());
 
-        }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
+        }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session){
             result = httpParser;
             /*关闭连接,并删除超时定时器*/
             session->postClose();
@@ -52,7 +52,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
             {
                 timer.lock()->Cancel();
             }
-        }, [&cv, &timer](HttpSession::PTR session){
+        }, nullptr, [&cv, &timer](HttpSession::PTR session){
             /*收到断开通知,通知等待线程*/
             if (timer.lock() != nullptr)
             {

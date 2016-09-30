@@ -21,6 +21,8 @@ public:
     std::string                             getValue(const std::string& key) const;
     const std::string&                      getBody() const;
 
+    std::string&                            getWSCacheFrame();
+
 private:
     void                                    clearParse();
     bool                                    checkCompleted(const char* buffer, size_t len);
@@ -54,6 +56,8 @@ private:
     std::map<std::string, std::string>      mHeadValues;
     std::string                             mStatus;
     std::string                             mBody;
+
+    std::string                             mWSCacheFrame;
 
 private:
     const char*                             mTmpHeadStr;

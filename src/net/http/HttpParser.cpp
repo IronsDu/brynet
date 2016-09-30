@@ -231,6 +231,11 @@ const std::string& HTTPParser::getBody() const
     return mBody;
 }
 
+std::string& HTTPParser::getWSCacheFrame()
+{
+    return mWSCacheFrame;
+}
+
 int HTTPParser::sChunkHeader(http_parser* hp)
 {
     return 0;

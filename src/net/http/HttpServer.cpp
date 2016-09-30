@@ -29,9 +29,9 @@ void HttpSession::setUD(int64_t userData)
     mUserData = userData;
 }
 
-void HttpSession::setRequestCallback(HTTPPARSER_CALLBACK callback)
+void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK callback)
 {
-    mRequestCallback = callback;
+    mHttpRequestCallback = callback;
 }
 
 void HttpSession::setCloseCallback(CLOSE_CALLBACK callback)
@@ -39,14 +39,24 @@ void HttpSession::setCloseCallback(CLOSE_CALLBACK callback)
     mCloseCallback = callback;
 }
 
-HttpSession::HTTPPARSER_CALLBACK& HttpSession::getRequestCallback()
+void HttpSession::setWSCallback(WS_CALLBACK callback)
 {
-    return mRequestCallback;
+    mWSCallback = callback;
+}
+
+HttpSession::HTTPPARSER_CALLBACK& HttpSession::getHttpCallback()
+{
+    return mHttpRequestCallback;
 }
 
 HttpSession::CLOSE_CALLBACK& HttpSession::getCloseCallback()
 {
     return mCloseCallback;
+}
+
+HttpSession::WS_CALLBACK& HttpSession::getWSCallback()
+{
+    return mWSCallback;
 }
 
 void HttpSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback /* = nullptr */)
@@ -96,12 +106,12 @@ void HttpServer::setEnterCallback(ENTER_CALLBACK callback)
     mOnEnter = callback;
 }
 
-void HttpServer::addConnection(sock fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::CLOSE_CALLBACK closeCallback)
+void HttpServer::addConnection(sock fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::WS_CALLBACK wsCallback, HttpSession::CLOSE_CALLBACK closeCallback)
 {
-    mServer->addSession(fd, [this, enterCallback, responseCallback, closeCallback](TCPSession::PTR session){
+    mServer->addSession(fd, [this, enterCallback, responseCallback, wsCallback, closeCallback](TCPSession::PTR session){
         HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
         enterCallback(httpSession);
-        setSessionCallback(httpSession, responseCallback, closeCallback);
+        setSessionCallback(httpSession, responseCallback, wsCallback, closeCallback);
     }, false, 32*1024 * 1024);
 }
 
@@ -122,13 +132,13 @@ void HttpServer::startListen(bool isIPV6, std::string ip, int port, const char *
                 {
                     mOnEnter(httpSession);
                 }
-                setSessionCallback(httpSession, httpSession->getRequestCallback(), httpSession->getCloseCallback());
+                setSessionCallback(httpSession, httpSession->getHttpCallback(), httpSession->getWSCallback(), httpSession->getCloseCallback());
             }, false, 32 * 1024 * 1024);
         });
     }
 }
 
-void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK callback, HttpSession::CLOSE_CALLBACK closeCallback)
+void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK httpCallback, HttpSession::WS_CALLBACK wsCallback, HttpSession::CLOSE_CALLBACK closeCallback)
 {
     /*TODO::keep alive and timeout close */
     TCPSession::PTR session = httpSession->getSession();
@@ -142,7 +152,7 @@ void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::H
             closeCallback(httpSession);
         }
     });
-    session->setDataCallback([this, callback, httpSession](TCPSession::PTR session, const char* buffer, size_t len){
+    session->setDataCallback([this, httpCallback, wsCallback, httpSession](TCPSession::PTR session, const char* buffer, size_t len){
         size_t retlen = 0;
         HTTPParser* httpParser = (HTTPParser*)session->getUD();
         if (httpParser->isWebSocket())
@@ -154,10 +164,42 @@ void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::H
             {
                 std::string payload;
                 auto opcode = WebSocketFormat::WebSocketFrameType::ERROR_FRAME; /*TODO::opcode是否回传给回调函数*/
-                int frameSize = 0;
-                if (WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, payload, opcode, frameSize))
+                size_t frameSize = 0;
+                bool isFin = false;
+                if (WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, payload, opcode, frameSize, isFin))
                 {
-                    callback(*httpParser, httpSession, payload.c_str(), payload.size());
+                    if (isFin && (opcode == WebSocketFormat::WebSocketFrameType::TEXT_FRAME || opcode == WebSocketFormat::WebSocketFrameType::BINARY_FRAME))
+                    {
+                        if (!httpParser->getWSCacheFrame().empty())
+                        {
+                            payload.insert(0, httpParser->getWSCacheFrame().c_str(), httpParser->getWSCacheFrame().size());
+                            httpParser->getWSCacheFrame().clear();
+                        }
+
+                        assert(wsCallback != nullptr);
+                        if (wsCallback != nullptr)
+                        {
+                            wsCallback(httpSession, opcode, payload);
+                        }
+                    }
+                    else if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
+                    {
+                        httpParser->getWSCacheFrame().append(payload.c_str(), payload.size());
+                    }
+                    else if (opcode == WebSocketFormat::WebSocketFrameType::PING_FRAME ||
+                            opcode == WebSocketFormat::WebSocketFrameType::PONG_FRAME ||
+                            opcode == WebSocketFormat::WebSocketFrameType::CLOSE_FRAME)
+                    {
+                        assert(wsCallback != nullptr);
+                        if (wsCallback != nullptr)
+                        {
+                            wsCallback(httpSession, opcode, payload);
+                        }
+                    }
+                    else
+                    {
+                        assert(false);
+                    }
 
                     leftLen -= frameSize;
                     retlen += frameSize;
@@ -181,7 +223,11 @@ void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::H
                 }
                 else
                 {
-                    callback(*httpParser, httpSession, nullptr, 0);
+                    assert(httpCallback != nullptr);
+                    if (httpCallback != nullptr)
+                    {
+                        httpCallback(*httpParser, httpSession);
+                    }
                     if (httpParser->isKeepAlive())
                     {
                         /*清除本次http报文数据，为下一次http报文准备*/

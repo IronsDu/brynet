@@ -22,26 +22,15 @@ int main(int argc, char **argv)
     }
     body += "</html>";
     server.setEnterCallback([&body](HttpSession::PTR session){
-        session->setRequestCallback([&body](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
-            if (websocketPacket != nullptr)
-            {
-                std::string sendPayload = "hello";
-                std::string sendFrame;
-                WebSocketFormat::wsFrameBuild(sendPayload, sendFrame);
-
-                session->send(sendFrame.c_str(), sendFrame.size());
-            }
-            else
-            {
-                //普通http协议
-                HttpFormat httpFormat;
-                httpFormat.setProtocol(HttpFormat::HTP_RESPONSE);
-                httpFormat.addParameter(body.c_str());
-                std::string result = httpFormat.getResult();
-                session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
-                    session->postShutdown();
-                }));
-            }
+        session->setHttpCallback([&body](const HTTPParser& httpParser, HttpSession::PTR session){
+            //普通http协议
+            HttpFormat httpFormat;
+            httpFormat.setProtocol(HttpFormat::HTP_RESPONSE);
+            httpFormat.addParameter(body.c_str());
+            std::string result = httpFormat.getResult();
+            session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
+                session->postShutdown();
+            }));
         });
     });
 
@@ -67,11 +56,12 @@ int main(int argc, char **argv)
         std::string requestStr = request.getResult();
         session->send(requestStr.c_str(), requestStr.size());
 
-    }, [](const HTTPParser& httpParser, HttpSession::PTR session, const char* websocketPacket, size_t websocketPacketLen){
+    }, [](const HTTPParser& httpParser, HttpSession::PTR session){
         std::cout << httpParser.getBody() << std::endl;
         return;
         /*处理response*/
-    }, [](HttpSession::PTR){
+    }, [](HttpSession::PTR session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
+    },[](HttpSession::PTR){
     });
 
     std::cin.get();

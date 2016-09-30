@@ -11,20 +11,13 @@ class WebSocketFormat
 {
 public:
     enum class WebSocketFrameType {
-        ERROR_FRAME = 0xFF00,
-        INCOMPLETE_FRAME = 0xFE00,
-
-        OPENING_FRAME = 0x3300,
-        CLOSING_FRAME = 0x3400,
-
-        INCOMPLETE_TEXT_FRAME = 0x01,
-        INCOMPLETE_BINARY_FRAME = 0x02,
-
-        TEXT_FRAME = 0x81,
-        BINARY_FRAME = 0x82,
-
-        PING_FRAME = 0x19,
-        PONG_FRAME = 0x1A
+        ERROR_FRAME = 0xff,
+        CONTINUATION_FRAME = 0x00,
+        TEXT_FRAME = 0x01,
+        BINARY_FRAME = 0x02,
+        CLOSE_FRAME = 0x08,
+        PING_FRAME = 0x09,
+        PONG_FRAME = 0x0A
     };
 
     static std::string wsHandshake(std::string secKey)
@@ -50,13 +43,15 @@ public:
         return response;
     }
 
-    static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool masking = false)
+    static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool isFin = true, bool masking = false)
     {
         static_assert(std::is_same<std::string::value_type, char>::value, "");
 
+        uint8_t head = (uint8_t)frame_type | (isFin ? 0x80: 0x00);
+
         size_t payloadLen = payload.size();
         frame.clear();
-        frame.push_back((char)frame_type);
+        frame.push_back((char)head);
         if (payloadLen <= 125)
             frame.push_back((uint8_t)payloadLen); // mask << 7 | payloadLen, mask = 0
         else if (payloadLen <= 0xFFFF)
@@ -104,7 +99,7 @@ public:
         return true;
     }
 
-    static bool wsFrameExtractBuffer(const char* inbuffer, size_t bufferSize, std::string& payload, WebSocketFrameType& outopcode, int& frameSize)
+    static bool wsFrameExtractBuffer(const char* inbuffer, const size_t bufferSize, std::string& payload, WebSocketFrameType& outopcode, size_t& frameSize, bool& outfin)
     {
         const unsigned char* buffer = (const unsigned char*)inbuffer;
 
@@ -113,25 +108,35 @@ public:
             return false;
         }
 
-        bool FIN = (buffer[0] & 0x80) != 0;
-        uint8_t opcode = buffer[0] & 0x0F;
-        bool MASK = (buffer[1] & 0x80) != 0;
+        const bool isFinish = (buffer[0] & 0x80) != 0;
+        const WebSocketFrameType frameType = (WebSocketFrameType)(buffer[0] & 0x0F);
+        const bool isMasking = (buffer[1] & 0x80) != 0;
         uint32_t payloadlen = buffer[1] & 0x7F;
 
         uint32_t pos = 2;
         if (payloadlen == 126)
         {
+            if (bufferSize < 4)
+            {
+                return false;
+            }
+
             payloadlen = (buffer[2] << 8) + buffer[3];
             pos = 4;
         }
         else if (payloadlen == 127)
         {
+            if (bufferSize < 10)
+            {
+                return false;
+            }
+
             payloadlen = (buffer[6] << 24) + (buffer[7] << 16) + (buffer[8] << 8) + buffer[9];
             pos = 10;
         }
 
         uint8_t mask[4];
-        if (MASK)
+        if (isMasking)
         {
             if (bufferSize < (pos + 4))
             {
@@ -149,7 +154,7 @@ public:
             return false;
         }
         
-        if (MASK)
+        if (isMasking)
         {
             payload.resize(payloadlen, 0);
             for (size_t i = pos, j = 0; j < payloadlen; i++, j++)
@@ -161,34 +166,15 @@ public:
         }
 
         frameSize = payloadlen + pos;
-
-        if (opcode == 0x0)
-        {
-            outopcode = (FIN) ? WebSocketFrameType::TEXT_FRAME : WebSocketFrameType::INCOMPLETE_TEXT_FRAME;
-        }
-        else if (opcode == 0x01)
-        {
-            outopcode = (FIN) ? WebSocketFrameType::TEXT_FRAME : WebSocketFrameType::INCOMPLETE_TEXT_FRAME;
-        }
-        else if (opcode == 0x02)
-        {
-            outopcode = (FIN) ? WebSocketFrameType::BINARY_FRAME : WebSocketFrameType::INCOMPLETE_BINARY_FRAME;
-        }
-        else if (opcode == 0x09)
-        {
-            outopcode = WebSocketFrameType::PING_FRAME;
-        }
-        else if (opcode == 0x0A)
-        {
-            outopcode = WebSocketFrameType::PONG_FRAME;
-        }
+        outopcode = frameType;
+        outfin = isFinish;
 
         return true;
     }
 
-    static bool wsFrameExtractString(const std::string& buffer, std::string& payload, WebSocketFrameType& opcode, int& frameSize)
+    static bool wsFrameExtractString(const std::string& buffer, std::string& payload, WebSocketFrameType& opcode, size_t& frameSize, bool& isFin)
     {
-        return wsFrameExtractBuffer(buffer.c_str(), buffer.size(), payload, opcode, frameSize);
+        return wsFrameExtractBuffer(buffer.c_str(), buffer.size(), payload, opcode, frameSize, isFin);
     }
 };
 
