@@ -142,26 +142,12 @@ void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_
     }
 }
 
-void DataSocket::sendPacketInLoop(PACKET_PTR&& packet, const PACKED_SENDED_CALLBACK& callback)
-{
-    assert(mEventLoop->isInLoopThread());
-    if (mEventLoop->isInLoopThread())
-    {
-        sendPacketInLoop(packet, callback);
-    }
-}
-
 void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     mEventLoop->pushAsyncProc([this, packet, callback](){
         mSendList.push_back({ packet, packet->size(), callback });
         runAfterFlush();
     });
-}
-
-void DataSocket::sendPacket(PACKET_PTR&& packet, const PACKED_SENDED_CALLBACK& callback)
-{
-    sendPacket(packet, callback);
 }
 
 void    DataSocket::canRecv()

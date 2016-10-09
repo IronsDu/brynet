@@ -221,11 +221,6 @@ TcpService::DATA_CALLBACK TcpService::getDataCallback() const
     return mDataCallback;
 }
 
-void TcpService::send(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
-{
-    send(id, packet, callback);
-}
-
 void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     union  SessionId sid;
@@ -259,11 +254,6 @@ void TcpService::send(int64_t id, const DataSocket::PACKET_PTR& packet, const Da
             });
         }
     }
-}
-
-void TcpService::cacheSend(int64_t id, DataSocket::PACKET_PTR&& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
-{
-    cacheSend(id, packet, callback);
 }
 
 void TcpService::cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)

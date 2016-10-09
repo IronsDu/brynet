@@ -49,10 +49,8 @@ public:
     void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-    void                            sendPacketInLoop(PACKET_PTR&&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-    void                            sendPacket(PACKET_PTR&&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
     void                            setEnterCallback(ENTER_CALLBACK cb);
     void                            setDataCallback(DATA_CALLBACK cb);
