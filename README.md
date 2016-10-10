@@ -13,7 +13,7 @@ Cross platform and high performance TCP network library using C++ 11.
 * IPv6 support
 
 ## Benchamrk
-   Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 5)
+   Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 i5)
 * PingPong
 
   Benchamrk's server and client both only use one thread, and packet size is 4k
