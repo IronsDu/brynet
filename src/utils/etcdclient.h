@@ -61,7 +61,8 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
             cv.notify_one();
         });
 
-        cv.wait(std::unique_lock<std::mutex>(mtx));
+        std::unique_lock<std::mutex> tmp(mtx);
+        cv.wait(tmp);
     }
 
     return result;

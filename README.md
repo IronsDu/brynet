@@ -1,7 +1,8 @@
-Accumulation-dev
+Accumulation
 =======
-
 Cross platform and high performance TCP network library using C++ 11.
+
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/accumulation-dev/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/accumulation-dev.svg?branch=master)](https://travis-ci.org/IronsDu/accumulation-dev)
 
 ## Features
 * Cross platform (Linux | Windows)
