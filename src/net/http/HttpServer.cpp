@@ -14,7 +14,7 @@ HttpSession::HttpSession(TCPSession::PTR session)
     mSession = session;
 }
 
-TCPSession::PTR HttpSession::getSession()
+TCPSession::PTR& HttpSession::getSession()
 {
     return mSession;
 }
@@ -29,17 +29,32 @@ void HttpSession::setUD(int64_t userData)
     mUserData = userData;
 }
 
-void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK callback)
+void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK&& callback)
+{
+    mHttpRequestCallback = std::move(callback);
+}
+
+void HttpSession::setCloseCallback(CLOSE_CALLBACK&& callback)
+{
+    mCloseCallback = std::move(callback);
+}
+
+void HttpSession::setWSCallback(WS_CALLBACK&& callback)
+{
+    mWSCallback = std::move(callback);
+}
+
+void HttpSession::setHttpCallback(const HTTPPARSER_CALLBACK& callback)
 {
     mHttpRequestCallback = callback;
 }
 
-void HttpSession::setCloseCallback(CLOSE_CALLBACK callback)
+void HttpSession::setCloseCallback(const CLOSE_CALLBACK& callback)
 {
     mCloseCallback = callback;
 }
 
-void HttpSession::setWSCallback(WS_CALLBACK callback)
+void HttpSession::setWSCallback(const WS_CALLBACK& callback)
 {
     mWSCallback = callback;
 }
@@ -101,14 +116,15 @@ WrapServer::PTR HttpServer::getServer()
     return mServer;
 }
 
-void HttpServer::setEnterCallback(ENTER_CALLBACK callback)
+void HttpServer::setEnterCallback(const ENTER_CALLBACK& callback)
 {
     mOnEnter = callback;
 }
 
-void HttpServer::addConnection(sock fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::WS_CALLBACK wsCallback, HttpSession::CLOSE_CALLBACK closeCallback)
+void HttpServer::addConnection(sock fd, 
+    const ENTER_CALLBACK& enterCallback, const HttpSession::HTTPPARSER_CALLBACK& responseCallback, const HttpSession::WS_CALLBACK& wsCallback, const HttpSession::CLOSE_CALLBACK& closeCallback)
 {
-    mServer->addSession(fd, [this, enterCallback, responseCallback, wsCallback, closeCallback](TCPSession::PTR session){
+    mServer->addSession(fd, [this, enterCallback, responseCallback, wsCallback, closeCallback](TCPSession::PTR& session){
         HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
         enterCallback(httpSession);
         setSessionCallback(httpSession, responseCallback, wsCallback, closeCallback);
@@ -120,13 +136,13 @@ void HttpServer::startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK c
     mServer->startWorkThread(workthreadnum, callback);
 }
 
-void HttpServer::startListen(bool isIPV6, std::string ip, int port, const char *certificate /* = nullptr */, const char *privatekey /* = nullptr */)
+void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const char *certificate /* = nullptr */, const char *privatekey /* = nullptr */)
 {
     if (mListenThread == nullptr)
     {
         mListenThread = std::make_shared<ListenThread>();
         mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [this](sock fd){
-            mServer->addSession(fd, [this](TCPSession::PTR session){
+            mServer->addSession(fd, [this](TCPSession::PTR& session){
                 HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
                 if (mOnEnter != nullptr)
                 {
@@ -138,13 +154,13 @@ void HttpServer::startListen(bool isIPV6, std::string ip, int port, const char *
     }
 }
 
-void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK httpCallback, HttpSession::WS_CALLBACK wsCallback, HttpSession::CLOSE_CALLBACK closeCallback)
+void HttpServer::setSessionCallback(HttpSession::PTR& httpSession, const HttpSession::HTTPPARSER_CALLBACK& httpCallback, const HttpSession::WS_CALLBACK& wsCallback, const HttpSession::CLOSE_CALLBACK& closeCallback)
 {
     /*TODO::keep alive and timeout close */
-    TCPSession::PTR session = httpSession->getSession();
+    TCPSession::PTR& session = httpSession->getSession();
     HTTPParser* httpParser = new HTTPParser(HTTP_BOTH);
     session->setUD((int64_t)httpParser);
-    session->setCloseCallback([closeCallback, httpSession](TCPSession::PTR session){
+    session->setCloseCallback([closeCallback, httpSession](TCPSession::PTR& session){
         HTTPParser* httpParser = (HTTPParser*)session->getUD();
         delete httpParser;
         if (closeCallback != nullptr)
@@ -152,7 +168,7 @@ void HttpServer::setSessionCallback(HttpSession::PTR httpSession, HttpSession::H
             closeCallback(httpSession);
         }
     });
-    session->setDataCallback([this, httpCallback, wsCallback, httpSession](TCPSession::PTR session, const char* buffer, size_t len){
+    session->setDataCallback([this, httpCallback, wsCallback, httpSession](TCPSession::PTR& session, const char* buffer, size_t len){
         size_t retlen = 0;
         HTTPParser* httpParser = (HTTPParser*)session->getUD();
         if (httpParser->isWebSocket())

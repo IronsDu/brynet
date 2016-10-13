@@ -16,13 +16,13 @@ public:
     typedef std::shared_ptr<TCPSession>     PTR;
     typedef std::weak_ptr<TCPSession>       WEAK_PTR;
 
-    typedef std::function<void(TCPSession::PTR)>   CLOSE_CALLBACK;
-    typedef std::function<size_t(TCPSession::PTR, const char*, size_t)>   DATA_CALLBACK;
+    typedef std::function<void(TCPSession::PTR&)>   CLOSE_CALLBACK;
+    typedef std::function<size_t(TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
     int64_t                 getUD() const;
     void                    setUD(int64_t ud);
 
-    std::string             getIP() const;
+    const std::string&      getIP() const;
     int64_t                 getSocketID() const;
 
     void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
@@ -31,7 +31,10 @@ public:
     void                    postShutdown() const;
     void                    postClose() const;
 
+    void                    setCloseCallback(CLOSE_CALLBACK&& callback);
     void                    setCloseCallback(const CLOSE_CALLBACK& callback);
+
+    void                    setDataCallback(DATA_CALLBACK&& callback);
     void                    setDataCallback(const DATA_CALLBACK& callback);
 
 protected:
@@ -43,7 +46,7 @@ private:
     void                    setSocketID(int64_t id);
     void                    setIP(const std::string& ip);
 
-    void                    setService(TcpService::PTR service);
+    void                    setService(TcpService::PTR& service);
 
     CLOSE_CALLBACK&         getCloseCallback();
 
@@ -73,7 +76,7 @@ public:
     typedef std::shared_ptr<WrapServer> PTR;
     typedef std::weak_ptr<WrapServer>   WEAK_PTR;
 
-    typedef std::function<void(TCPSession::PTR)>   SESSION_ENTER_CALLBACK;
+    typedef std::function<void(TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
     WrapServer();
     virtual ~WrapServer();
@@ -82,7 +85,7 @@ public:
 
     void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
-    void                    addSession(sock fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop = false);
+    void                    addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop = false);
 
 private:
     TcpService::PTR         mTCPService;

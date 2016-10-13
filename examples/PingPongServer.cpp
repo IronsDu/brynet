@@ -23,17 +23,17 @@ int main(int argc, char **argv)
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
         std::cout << "enter" << std::endl;
-        server->addSession(fd, [](TCPSession::PTR session){
+        server->addSession(fd, [](TCPSession::PTR& session){
             total_client_num++;
 
-            session->setDataCallback([](TCPSession::PTR session, const char* buffer, size_t len){
+            session->setDataCallback([](TCPSession::PTR& session, const char* buffer, size_t len){
                 session->send(buffer, len);
                 total_recv += len;
                 total_packet_num++;
                 return len;
             });
 
-            session->setCloseCallback([](TCPSession::PTR session){
+            session->setCloseCallback([](TCPSession::PTR& session){
                 total_client_num--;
             });
         }, false, 1024*1024);

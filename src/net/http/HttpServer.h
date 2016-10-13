@@ -20,9 +20,13 @@ public:
 
     HttpSession(TCPSession::PTR);
 
-    void                    setHttpCallback(HTTPPARSER_CALLBACK callback);
-    void                    setCloseCallback(CLOSE_CALLBACK callback);
-    void                    setWSCallback(WS_CALLBACK callback);
+    void                    setHttpCallback(HTTPPARSER_CALLBACK&& callback);
+    void                    setCloseCallback(CLOSE_CALLBACK&& callback);
+    void                    setWSCallback(WS_CALLBACK&& callback);
+
+    void                    setHttpCallback(const HTTPPARSER_CALLBACK& callback);
+    void                    setCloseCallback(const CLOSE_CALLBACK& callback);
+    void                    setWSCallback(const WS_CALLBACK& callback);
 
     HTTPPARSER_CALLBACK&    getHttpCallback();
     CLOSE_CALLBACK&         getCloseCallback();
@@ -38,7 +42,7 @@ public:
     void                    setUD(int64_t userData);
 
 private:
-    TCPSession::PTR         getSession();
+    TCPSession::PTR&        getSession();
 
 private:
     TCPSession::PTR         mSession;
@@ -55,20 +59,21 @@ class HttpServer : public NonCopyable
 public:
     typedef std::shared_ptr<HttpServer> PTR;
 
-    typedef std::function < void(HttpSession::PTR) > ENTER_CALLBACK;
+    typedef std::function < void(HttpSession::PTR&) > ENTER_CALLBACK;
 
     HttpServer();
     ~HttpServer();
     WrapServer::PTR         getServer();
 
-    void                    setEnterCallback(ENTER_CALLBACK callback);
+    void                    setEnterCallback(const ENTER_CALLBACK& callback);
 
-    void                    addConnection(sock fd, ENTER_CALLBACK enterCallback, HttpSession::HTTPPARSER_CALLBACK responseCallback, HttpSession::WS_CALLBACK wsCallback = nullptr, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
+    void                    addConnection(sock fd, const ENTER_CALLBACK& enterCallback, const HttpSession::HTTPPARSER_CALLBACK& responseCallback, const HttpSession::WS_CALLBACK& wsCallback = nullptr, const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr);
 
     void                    startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
-    void                    startListen(bool isIPV6, std::string ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
+    void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 private:
-    void                    setSessionCallback(HttpSession::PTR httpSession, HttpSession::HTTPPARSER_CALLBACK callback, HttpSession::WS_CALLBACK wsCallback = nullptr, HttpSession::CLOSE_CALLBACK closeCallback = nullptr);
+    void                    setSessionCallback(HttpSession::PTR& httpSession, const HttpSession::HTTPPARSER_CALLBACK& callback, const HttpSession::WS_CALLBACK& wsCallback = nullptr, const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr);
+
 private:
     ENTER_CALLBACK          mOnEnter;
     WrapServer::PTR         mServer;

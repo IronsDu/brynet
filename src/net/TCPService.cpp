@@ -34,7 +34,7 @@ ListenThread::~ListenThread()
     closeListenThread();
 }
 
-void ListenThread::startListen(bool isIPV6, std::string ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback)
+void ListenThread::startListen(bool isIPV6, const std::string& ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback)
 {
     if (mListenThread == nullptr)
     {
@@ -191,32 +191,47 @@ TcpService::~TcpService()
     closeService();
 }
 
-void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK callback)
+void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK&& callback)
+{
+    mEnterCallback = std::move(callback);
+}
+
+void TcpService::setEnterCallback(const TcpService::ENTER_CALLBACK& callback)
 {
     mEnterCallback = callback;
 }
 
-void TcpService::setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback)
+void TcpService::setDisconnectCallback(TcpService::DISCONNECT_CALLBACK&& callback)
+{
+    mDisConnectCallback = std::move(callback);
+}
+
+void TcpService::setDisconnectCallback(const TcpService::DISCONNECT_CALLBACK& callback)
 {
     mDisConnectCallback = callback;
 }
 
-void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
+void TcpService::setDataCallback(TcpService::DATA_CALLBACK&& callback)
+{
+    mDataCallback = std::move(callback);
+}
+
+void TcpService::setDataCallback(const TcpService::DATA_CALLBACK& callback)
 {
     mDataCallback = callback;
 }
 
-TcpService::ENTER_CALLBACK TcpService::getEnterCallback() const
+const TcpService::ENTER_CALLBACK& TcpService::getEnterCallback() const
 {
     return mEnterCallback;
 }
 
-TcpService::DISCONNECT_CALLBACK TcpService::getDisconnectCallback() const
+const TcpService::DISCONNECT_CALLBACK& TcpService::getDisconnectCallback() const
 {
     return mDisConnectCallback;
 }
 
-TcpService::DATA_CALLBACK TcpService::getDataCallback() const
+const TcpService::DATA_CALLBACK& TcpService::getDataCallback() const
 {
     return mDataCallback;
 }
@@ -273,7 +288,7 @@ void TcpService::flushCachePackectList()
     {
         if (!mCachePacketList[i]->empty())
         {
-            auto msgList = mCachePacketList[i];
+            auto& msgList = mCachePacketList[i];
             mLoops[i].pushAsyncProc([this, msgList](){
                 for (auto& v : *msgList)
                 {
@@ -316,7 +331,7 @@ void TcpService::setPingCheckTime(int64_t id, int checktime)
     });
 }
 
-void TcpService::postSessionAsyncProc(int64_t id, std::function<void(DataSocket::PTR)> callback) const
+void TcpService::postSessionAsyncProc(int64_t id, const std::function<void(DataSocket::PTR)>& callback) const
 {
     union  SessionId sid;
     sid.id = id;
@@ -392,7 +407,7 @@ void TcpService::stopWorkerThread()
     }
 }
 
-void TcpService::startListen(bool isIPV6, std::string ip, int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
+void TcpService::startListen(bool isIPV6, const std::string& ip, int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
 {
     mListenThread.startListen(isIPV6, ip, port, certificate, privatekey, [this, maxSessionRecvBufferSize](sock fd){
         std::string ip = ox_socket_getipoffd(fd);
@@ -520,7 +535,8 @@ void TcpService::procDataSocketClose(DataSocket::PTR ds)
     mIds[sid.data.loopIndex].reclaimID(sid.data.index);
 }
 
-bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, TcpService::ENTER_CALLBACK enterCallback, TcpService::DISCONNECT_CALLBACK disConnectCallback, TcpService::DATA_CALLBACK dataCallback,
+bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
+    const TcpService::ENTER_CALLBACK& enterCallback, const TcpService::DISCONNECT_CALLBACK& disConnectCallback, const TcpService::DATA_CALLBACK& dataCallback,
     bool forceSameThreadLoop)
 {
     int loopIndex = -1;
@@ -583,9 +599,9 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
 }
 
 bool TcpService::addDataSocket( sock fd,
-                                TcpService::ENTER_CALLBACK enterCallback,
-                                TcpService::DISCONNECT_CALLBACK disConnectCallback,
-                                TcpService::DATA_CALLBACK dataCallback,
+                                const TcpService::ENTER_CALLBACK& enterCallback,
+                                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
+                                const TcpService::DATA_CALLBACK& dataCallback,
                                 bool isUseSSL,
                                 int maxRecvBufferSize,
                                 bool forceSameThreadLoop)

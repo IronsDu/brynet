@@ -21,8 +21,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < atoi(argv[4]); i++)
     {
         sock fd = ox_socket_connect(false, argv[1], atoi(argv[2]));
-        server->addSession(fd, [&](TCPSession::PTR session){
-            session->setDataCallback([](TCPSession::PTR session, const char* buffer, size_t len){
+        server->addSession(fd, [&](TCPSession::PTR& session){
+            session->setDataCallback([](TCPSession::PTR& session, const char* buffer, size_t len){
                 session->send(buffer, len);
                 return len;
             });

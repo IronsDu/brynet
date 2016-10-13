@@ -18,7 +18,7 @@ public:
     const std::string&                      getPath() const;
     const std::string&                      getQuery() const;
 
-    std::string                             getValue(const std::string& key) const;
+    const std::string&                      getValue(const std::string& key) const;
     const std::string&                      getBody() const;
 
     std::string&                            getWSCacheFrame();

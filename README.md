@@ -23,7 +23,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
 
 * Broadcast
 
-  Server use 4 network thread, client use 4 network thread and one logic thread. one packet size is 46 bytes.
+  Server use two network threads and one logic thread, client use one network(also process logic) thread. every packet size is 46 bytes.
   every packet contain client's id.
   server broadcast packet to all client when recv one packet from any client.
   client send one packet when recv packet from server and packet's id equal self.

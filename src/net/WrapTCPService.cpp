@@ -28,7 +28,7 @@ void    TCPSession::setUD(int64_t ud)
     mUserData = ud;
 }
 
-string TCPSession::getIP() const
+const string& TCPSession::getIP() const
 {
     return mIP;
 }
@@ -58,9 +58,19 @@ void TCPSession::postClose() const
     mService->disConnect(mSocketID);
 }
 
+void    TCPSession::setCloseCallback(CLOSE_CALLBACK&& callback)
+{
+    mCloseCallback = std::move(callback);
+}
+
 void    TCPSession::setCloseCallback(const CLOSE_CALLBACK& callback)
 {
     mCloseCallback = callback;
+}
+
+void    TCPSession::setDataCallback(DATA_CALLBACK&& callback)
+{
+    mDataCallback = std::move(callback);
 }
 
 void    TCPSession::setDataCallback(const DATA_CALLBACK& callback)
@@ -78,7 +88,7 @@ void TCPSession::setIP(const string& ip)
     mIP = ip;
 }
 
-void    TCPSession::setService(TcpService::PTR service)
+void    TCPSession::setService(TcpService::PTR& service)
 {
     mService = service;
 }
@@ -112,12 +122,12 @@ void    WrapServer::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK
     mTCPService->startWorkerThread(threadNum, callback);
 }
 
-void    WrapServer::addSession(sock fd, SESSION_ENTER_CALLBACK userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop)
+void    WrapServer::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL, int maxRecvBufferSize, bool forceSameThreadLoop)
 {
-    TCPSession::PTR tmpSession = TCPSession::Create();// std::make_shared<TCPSession>();
+    TCPSession::PTR tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);
 
-    auto enterCallback = [tmpSession, userEnterCallback](int64_t id, std::string ip){
+    auto enterCallback = [tmpSession, userEnterCallback](int64_t id, std::string ip) mutable {
         tmpSession->setSocketID(id);
         tmpSession->setIP(ip);
         if (userEnterCallback != nullptr)
@@ -126,7 +136,7 @@ void    WrapServer::addSession(sock fd, SESSION_ENTER_CALLBACK userEnterCallback
         }
     };
 
-    auto closeCallback = [tmpSession](int64_t id){
+    auto closeCallback = [tmpSession](int64_t id) mutable {
         auto& callback = tmpSession->getCloseCallback();
         if (callback != nullptr)
         {
@@ -134,7 +144,7 @@ void    WrapServer::addSession(sock fd, SESSION_ENTER_CALLBACK userEnterCallback
         }
     };
 
-    auto msgCallback = [tmpSession](int64_t id, const char* buffer, size_t len){
+    auto msgCallback = [tmpSession](int64_t id, const char* buffer, size_t len) mutable {
         auto& callback = tmpSession->getDataCallback();
         if (callback != nullptr)
         {

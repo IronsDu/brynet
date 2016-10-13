@@ -14,7 +14,7 @@
 
 class EventLoop;
 
-class ListenThread : public NonCopyable
+class ListenThread : public NonCopyable, public std::enable_shared_from_this<ListenThread>
 {
 public:
     typedef std::shared_ptr<ListenThread>   PTR;
@@ -24,7 +24,7 @@ public:
     virtual ~ListenThread();
 
     /*  开启监听线程  */
-    void                                startListen(bool isIPV6, std::string ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
+    void                                startListen(bool isIPV6, const std::string& ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
     void                                closeListenThread();
 #ifdef USE_OPENSSL
     SSL_CTX*                            getOpenSSLCTX();
@@ -56,7 +56,7 @@ public:
     typedef std::shared_ptr<TcpService>                                 PTR;
 
     typedef std::function<void (EventLoop&)>                            FRAME_CALLBACK;
-    typedef std::function<void(int64_t, std::string)>                   ENTER_CALLBACK;
+    typedef std::function<void(int64_t, const std::string&)>            ENTER_CALLBACK;
     typedef std::function<void(int64_t)>                                DISCONNECT_CALLBACK;
     typedef std::function<size_t (int64_t, const char* buffer, size_t len)>   DATA_CALLBACK;
 
@@ -65,13 +65,18 @@ public:
     virtual ~TcpService();
 
     /*  设置默认事件回调    */
-    void                                setEnterCallback(TcpService::ENTER_CALLBACK callback);
-    void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
-    void                                setDataCallback(TcpService::DATA_CALLBACK callback);
+    void                                setEnterCallback(TcpService::ENTER_CALLBACK&& callback);
+    void                                setEnterCallback(const TcpService::ENTER_CALLBACK& callback);
 
-    TcpService::ENTER_CALLBACK          getEnterCallback() const;
-    TcpService::DISCONNECT_CALLBACK     getDisconnectCallback() const;
-    TcpService::DATA_CALLBACK           getDataCallback() const;
+    void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK&& callback);
+    void                                setDisconnectCallback(const TcpService::DISCONNECT_CALLBACK& callback);
+
+    void                                setDataCallback(TcpService::DATA_CALLBACK&& callback);
+    void                                setDataCallback(const TcpService::DATA_CALLBACK& callback);
+
+    const TcpService::ENTER_CALLBACK&       getEnterCallback() const;
+    const TcpService::DISCONNECT_CALLBACK&  getDisconnectCallback() const;
+    const TcpService::DATA_CALLBACK&        getDataCallback() const;
 
     void                                send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
@@ -88,15 +93,15 @@ public:
     void                                setPingCheckTime(int64_t id, int checktime);
 
     bool                                addDataSocket(  sock fd,
-                                                        TcpService::ENTER_CALLBACK enterCallback,
-                                                        TcpService::DISCONNECT_CALLBACK disConnectCallback,
-                                                        TcpService::DATA_CALLBACK dataCallback,
+                                                        const TcpService::ENTER_CALLBACK& enterCallback,
+                                                        const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
+                                                        const TcpService::DATA_CALLBACK& dataCallback,
                                                         bool isUseSSL,
                                                         int maxRecvBufferSize,
                                                         bool forceSameThreadLoop = false);
 
     /*  开启监听线程  */
-    void                                startListen(bool isIPV6, std::string ip, int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
+    void                                startListen(bool isIPV6, const std::string& ip, int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
     /*  开启IO工作线程    */
     void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
 
@@ -117,18 +122,18 @@ public:
     EventLoop*                          getEventLoopBySocketID(int64_t id);
 
 private:
-    bool                                helpAddChannel(DataSocket::PTR channel, 
+    bool                                helpAddChannel(DataSocket::PTR channel,
                                                     const std::string& ip,
-                                                    TcpService::ENTER_CALLBACK enterCallback,
-                                                    TcpService::DISCONNECT_CALLBACK disConnectCallback,
-                                                    TcpService::DATA_CALLBACK dataCallback,
+                                                    const TcpService::ENTER_CALLBACK& enterCallback,
+                                                    const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
+                                                    const TcpService::DATA_CALLBACK& dataCallback,
                                                     bool forceSameThreadLoop = false);
 private:
     int64_t                             MakeID(int loopIndex);
 
     void                                procDataSocketClose(DataSocket::PTR);
     /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
-    void                                postSessionAsyncProc(int64_t id, std::function<void(DataSocket::PTR)> callback) const;
+    void                                postSessionAsyncProc(int64_t id, const std::function<void(DataSocket::PTR)>& callback) const;
 
 private:
     typedef std::vector<std::tuple<int64_t, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;

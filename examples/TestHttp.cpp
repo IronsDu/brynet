@@ -21,7 +21,7 @@ int main(int argc, char **argv)
         body += "hello";
     }
     body += "</html>";
-    server.setEnterCallback([&body](HttpSession::PTR session){
+    server.setEnterCallback([&body](HttpSession::PTR& session){
         session->setHttpCallback([&body](const HTTPParser& httpParser, HttpSession::PTR session){
             //∆’Õ®http–≠“È
             HttpFormat httpFormat;

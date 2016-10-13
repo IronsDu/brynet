@@ -62,6 +62,7 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
     const static char* CHUNKED_FLAG = "Transfer-Encoding: chunked";
     const static size_t CHUNKED_FLAG_LEN = strlen(CHUNKED_FLAG);
 
+    /*  TODO::*/
     std::string copyBuffer(buffer, len);
     copyBuffer.push_back(0);
 
@@ -213,8 +214,10 @@ bool HTTPParser::isCompleted() const
     return mISCompleted;
 }
 
-std::string HTTPParser::getValue(const std::string& key) const
+const std::string& HTTPParser::getValue(const std::string& key) const
 {
+    static std::string emptystr("");
+
     auto it = mHeadValues.find(key);
     if (it != mHeadValues.end())
     {
@@ -222,7 +225,7 @@ std::string HTTPParser::getValue(const std::string& key) const
     }
     else
     {
-        return "";
+        return emptystr;
     }
 }
 

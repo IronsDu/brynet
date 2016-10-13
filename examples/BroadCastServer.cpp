@@ -79,7 +79,7 @@ int main(int argc, char** argv)
 
     TcpService t;
     t.startListen(false, "0.0.0.0", port_num, 1024 * 1024, nullptr, nullptr);
-    t.startWorkerThread(1, [&](EventLoop& l){
+    t.startWorkerThread(2, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         lockStatistics();
         msgList.ForceSyncWrite();
