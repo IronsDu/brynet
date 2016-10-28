@@ -1,20 +1,15 @@
 ﻿#ifndef _DRPC_H
 #define _DRPC_H
 
-#include <stdio.h>
-#include <assert.h>
 #include <string>
-#include <iostream>
-#include <sstream>
-#include <map>
-#include <vector>
 #include <functional>
-#include <tuple>
 
 namespace dodo
 {
     using namespace std;
     
+    const static string RPC_REPLY_STR = "rpc_reply";
+
     template<typename PROTOCOL_TYPE>
     class rpc
     {
@@ -22,7 +17,7 @@ namespace dodo
         rpc()
         {
             /*  注册rpc_reply 服务函数，处理rpc返回值   */
-            def("rpc_reply", [this](int req_id, const string& response){
+            def(RPC_REPLY_STR.c_str(), [this](int req_id, const string& response){
                 handleResponse(response);
                 mResponseCallbacks.del(std::to_string(req_id));
             });
@@ -31,7 +26,7 @@ namespace dodo
         template<typename F>
         void        def(const char* funname, F func)
         {
-            regFunctor(funname, func);
+            mRpcFunctions.insertFunction(funname, func);
         }
         
         /*  远程调用，返回值为经过序列化后的消息  */
@@ -57,7 +52,7 @@ namespace dodo
         string    reply(int reqid, const Args&... args)
         {
             /*  把实际返回值打包作为参数,调用对端的rpc_reply 函数*/
-            return call("rpc_reply", reqid, call(std::to_string(reqid).c_str(), args...));
+            return call(RPC_REPLY_STR.c_str(), reqid, call(std::to_string(reqid).c_str(), args...));
         }
         
     private:
@@ -67,19 +62,6 @@ namespace dodo
             mResponseCallbacks.execute(str.c_str(), str.size());
         }
 
-    private:
-
-        template<typename ...Args>
-        void regFunctor(const char* funname, void(*func)(Args...))
-        {
-            mRpcFunctions.insertStaticFunction(funname, func);
-        }
-        
-        template<typename LAMBDA>
-        void regFunctor(const char* funname, LAMBDA lambdaObj)
-        {
-            mRpcFunctions.insertLambda(funname, lambdaObj);
-        }
     private:
         typename PROTOCOL_TYPE::FunctionMgr      mResponseCallbacks;
         typename PROTOCOL_TYPE::FunctionMgr      mRpcFunctions;

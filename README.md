@@ -1,6 +1,6 @@
 Accumulation
 =======
-Cross platform and high performance TCP network library using C++ 11.
+Cross platform high performance TCP network library and RPC library using C++ 11.
 
 Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/accumulation-dev/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/accumulation-dev.svg?branch=master)](https://travis-ci.org/IronsDu/accumulation-dev)
 
@@ -12,6 +12,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
 * SSL support
 * Support HTTP、HTTPS、WebSocket protocol
 * IPv6 support
+* [RPC Library](https://github.com/IronsDu/accumulation-dev/tree/master/src/rpc), only for C++, not need proto file.
 
 ## Benchamrk
    Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 i5)
@@ -31,14 +32,14 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
   ![Broadcast](image/broadcast.png "Broadcast")
 
 * Ab HTTP(1 network thread)
-        
+
         Server Software:
         Server Hostname:        127.0.0.1
         Server Port:            8080
-        
+
         Document Path:          /
         Document Length:        18 bytes
-        
+
         Concurrency Level:      100
         Time taken for tests:   5.871 seconds
         Complete requests:      100000
@@ -51,14 +52,14 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
         Time per request:       5.871 [ms] (mean)
         Time per request:       0.059 [ms] (mean, across all concurrent requests)
         Transfer rate:          864.89 [Kbytes/sec] received
-        
+
         Connection Times (ms)
                     min  mean[+/-sd] median   max
         Connect:        0    2   0.7      2       8
         Processing:     1    3   0.7      3       9
         Waiting:        0    3   0.8      3       8
         Total:          2    6   0.8      6      11
-        
+
         Percentage of the requests served within a certain time (ms)
         50%      6
         66%      6
@@ -69,7 +70,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
         98%      7
         99%      8
         100%     11 (longest request)
-        
+
 ## About session safety
   This library use three layer ident one session(also is three way to use this library).
   * First, use raw pointer named [DataSocket](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/DataSocket.h#L30), combine with [EventLoop](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/EventLoop.h) in used
@@ -79,8 +80,13 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
 I suggest you use the second or thrid way above, because don't worry memory manager
 
 ## Usage
-  Please see [examples](https://github.com/IronsDu/accumulation-dev/tree/master/examples)
+  About TCP Library ,Please see [examples](https://github.com/IronsDu/accumulation-dev/tree/master/examples);
 
+## About RPC
+  About RPC Library example, you can [click here](https://github.com/IronsDu/DServerFramework/blob/master/DDServerFramework/src/test/CenterServerExt.cpp).
+  
+  The RCP support any C++ base type, sush as int、string、vector、map, and support Protobuf Message Type; Of course, RPC can use async callback mode, when you need process RPC reply msg return from server.
+  
 ## Users
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [Distributed game server framework](https://github.com/IronsDu/DServerFramework)

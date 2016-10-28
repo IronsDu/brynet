@@ -58,8 +58,8 @@ public:
     {
         return mResult.size();
     }
-private:
 
+private:
     RedisProtocolRequest & operator << (const std::vector<std::string> &keys)
     {
         for (auto& v : keys)
@@ -94,6 +94,7 @@ private:
         addStr(v);
         return *this;
     }
+
 private:
     void addStr(const std::string& arg)
     {
@@ -109,6 +110,7 @@ private:
         mResult += "\r\n";
         mArgc += 1;
     }
+
 private:
     int     mArgc;
     std::string  mResult;

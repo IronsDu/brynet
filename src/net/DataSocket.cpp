@@ -9,7 +9,7 @@
 
 using namespace std;
 
-DataSocket::DataSocket(sock fd, int maxRecvBufferSize)
+DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
 #if defined PLATFORM_WINDOWS
     : mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), mOvlSend(EventLoop::OLV_VALUE::OVL_SEND)
 #endif
@@ -576,12 +576,12 @@ void DataSocket::onClose()
 {
     if (!mIsPostFinalClose)
     {
-        DataSocket::PTR thisPtr = this;
+        auto self = this;
         /*  使用pushAfterLoopProc来执行断开回调,可以保证它总是在其他此DataSocket相关的After Callback之后执行,进而可以安全的delete DataSocket对象   */
         mEventLoop->pushAfterLoopProc([=](){
             if (mDisConnectCallback != nullptr)
             {
-                mDisConnectCallback(thisPtr);
+                mDisConnectCallback(self);
             }
         });
 
@@ -767,9 +767,9 @@ void DataSocket::postDisConnect()
 {
     if (mEventLoop != nullptr)
     {
-        DataSocket::PTR tmp = this;
+        auto self = this;
         mEventLoop->pushAsyncProc([=](){
-            tmp->procCloseInLoop();
+            self->procCloseInLoop();
         });
     }
 }
@@ -778,13 +778,13 @@ void DataSocket::postShutdown()
 {
     if (mEventLoop != nullptr)
     {
-        DataSocket::PTR tmp = this;
+        auto self = this;
         mEventLoop->pushAsyncProc([=](){
             if (mFD != SOCKET_ERROR)
             {
                 /*  使用pushAfterLoopProc是因为尽量保证在处理完send之后再shutdown，这在实现http server中很重要   */
                 mEventLoop->pushAfterLoopProc([=](){
-                    tmp->procShutdownInLoop();
+                    self->procShutdownInLoop();
                 });
             }
         });

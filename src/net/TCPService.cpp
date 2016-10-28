@@ -411,7 +411,7 @@ void TcpService::startListen(bool isIPV6, const std::string& ip, int port, int m
 {
     mListenThread.startListen(isIPV6, ip, port, certificate, privatekey, [this, maxSessionRecvBufferSize](sock fd){
         std::string ip = ox_socket_getipoffd(fd);
-        DataSocket::PTR channel = new DataSocket(fd, maxSessionRecvBufferSize);
+        auto channel = new DataSocket(fd, maxSessionRecvBufferSize);
         bool ret = true;
 #ifdef USE_OPENSSL
         if (mListenThread.getOpenSSLCTX() != nullptr)
@@ -527,7 +527,7 @@ int64_t TcpService::MakeID(int loopIndex)
 
 void TcpService::procDataSocketClose(DataSocket::PTR ds)
 {
-    int64_t id = ds->getUserData();
+    auto id = ds->getUserData();
     union SessionId sid;
     sid.id = id;
 
@@ -563,10 +563,10 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
         return false;
     }
 
-    EventLoop* loop = mLoops + loopIndex;
+    auto loop = mLoops + loopIndex;
 
     channel->setEnterCallback([this, loopIndex, enterCallback, disConnectCallback, dataCallback, ip](DataSocket::PTR dataSocket){
-        int64_t id = MakeID(loopIndex);
+        auto id = MakeID(loopIndex);
         union SessionId sid;
         sid.id = id;
         mIds[loopIndex].set(dataSocket, sid.data.index);
@@ -576,7 +576,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
         });
 
         dataSocket->setDisConnectCallback([this, disConnectCallback](DataSocket::PTR arg){
-            int64_t id = arg->getUserData();
+            auto id = arg->getUserData();
             procDataSocketClose(arg);
             disConnectCallback(id);
             delete arg;
@@ -603,7 +603,7 @@ bool TcpService::addDataSocket( sock fd,
                                 const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
                                 const TcpService::DATA_CALLBACK& dataCallback,
                                 bool isUseSSL,
-                                int maxRecvBufferSize,
+                                size_t maxRecvBufferSize,
                                 bool forceSameThreadLoop)
 {
     std::string ip = ox_socket_getipoffd(fd);

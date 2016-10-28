@@ -1,11 +1,8 @@
 #ifndef _JSONRPC_H
 #define _JSONRPC_H
 
-#include <stdio.h>
 #include <assert.h>
 #include <string>
-#include <iostream>
-#include <sstream>
 #include <map>
 #include <vector>
 #include <functional>
@@ -68,7 +65,7 @@ namespace dodo
 
             static  void    readJson(const rapidjson::Value& msg, vector<string>& ret)
             {
-                for (size_t i = 0; i < msg.Size(); ++i)
+                for (rapidjson::SizeType i = 0; i < msg.Size(); ++i)
                 {
                     ret.push_back(msg[i].GetString());
                 }
@@ -77,7 +74,7 @@ namespace dodo
             template<typename T>
             static  void    readJson(const rapidjson::Value& msg, vector<T>& ret)
             {
-                for (size_t i = 0; i < msg.Size(); ++i)
+                for (rapidjson::SizeType i = 0; i < msg.Size(); ++i)
                 {
                     T tmp;
                     readJson(msg[i], tmp);
@@ -440,7 +437,7 @@ namespace dodo
             void    writeCallArg(FunctionMgr& jsonFunctionResponseMgr, rapidjson::Document& doc, rapidjson::Value& msg, int& index, const Arg& arg)
             {
                 /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-                SelectWriteArgJson<HasCallOperator<Arg>::value>::Write(*this, jsonFunctionResponseMgr, doc, msg, arg, index++);
+                SelectWriteArgJson<std::is_function<Arg>::value>::Write(*this, jsonFunctionResponseMgr, doc, msg, arg, index++);
             }
 
             template<typename Arg1, typename... Args>
@@ -460,7 +457,7 @@ namespace dodo
                 static  void    Write(Caller& jc, FunctionMgr& functionMgr, rapidjson::Document& doc, rapidjson::Value& parms, const ARGTYPE& arg, int index)
                 {
                     int id = jc.makeNextID();
-                    functionMgr.insertLambda(std::to_string(id), arg);
+                    functionMgr.insertFunction(std::to_string(id), arg);
                 }
             };
 

@@ -32,7 +32,7 @@ private:
         char temp[1024 * 10];
         while (true)
         {
-            ssize_t n = read(mFd, temp, 1024 * 10);
+            auto n = read(mFd, temp, sizeof(temp));
             if (n == -1)
             {
                 break;
@@ -65,6 +65,7 @@ EventLoop::EventLoop()
         mPGetQueuedCompletionStatusEx = (sGetQueuedCompletionStatusEx)GetProcAddress(
             kernel32_module,
             "GetQueuedCompletionStatusEx");
+        FreeLibrary(kernel32_module);
     }
     mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
     mWakeupChannel = new WakeupChannel(-1);
@@ -183,8 +184,8 @@ void EventLoop::loop(int64_t timeout)
 
     for (ULONG i = 0; i < numComplete; ++i)
     {
-        Channel* channel = (Channel*)mEventEntries[i].lpCompletionKey;
-        EventLoop::ovl_ext_s* ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
+        auto channel = (Channel*)mEventEntries[i].lpCompletionKey;
+        auto ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
         if (ovl->OP == EventLoop::OLV_VALUE::OVL_RECV)
         {
             channel->canRecv();

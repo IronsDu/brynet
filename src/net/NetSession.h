@@ -69,12 +69,13 @@ public:
     {
         return mServer->getService()->getEventLoopBySocketID(mSocketID);
     }
+
 private:
     std::string         mIP;
     WrapServer::PTR     mServer;
     int64_t             mSocketID;
 };
 
-void WrapAddNetSession(WrapServer::PTR server, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, int maxRecvBufferSize);
+void WrapAddNetSession(WrapServer::PTR server, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, size_t maxRecvBufferSize);
 
 #endif

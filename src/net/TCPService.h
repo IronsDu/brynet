@@ -97,7 +97,7 @@ public:
                                                         const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
                                                         const TcpService::DATA_CALLBACK& dataCallback,
                                                         bool isUseSSL,
-                                                        int maxRecvBufferSize,
+                                                        size_t maxRecvBufferSize,
                                                         bool forceSameThreadLoop = false);
 
     /*  ¿ªÆô¼àÌýÏß³Ì  */
