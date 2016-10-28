@@ -12,7 +12,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
 * SSL support
 * Support HTTP、HTTPS、WebSocket protocol
 * IPv6 support
-* [RPC Library](https://github.com/IronsDu/accumulation-dev/tree/master/src/rpc), only for C++, not need proto file.
+* [RPC Library](https://github.com/IronsDu/accumulation-dev/tree/master/src/rpc)
 
 ## Benchamrk
    Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 i5)
@@ -83,10 +83,64 @@ I suggest you use the second or thrid way above, because don't worry memory mana
   About TCP Library ,Please see [examples](https://github.com/IronsDu/accumulation-dev/tree/master/examples);
 
 ## About RPC
-  About RPC Library example, you can [click here](https://github.com/IronsDu/DServerFramework/blob/master/DDServerFramework/src/test/CenterServerExt.cpp).
+  Use this RPC library, you not need any proto file sush as Protobuf and Thrift, because i use C++ Template Generic Programming do this work.
   
-  The RCP support any C++ base type, sush as int、string、vector、map, and support Protobuf Message Type; Of course, RPC can use async callback mode, when you need process RPC reply msg return from server.
+  you can [click here](https://github.com/IronsDu/DServerFramework/blob/master/DDServerFramework/src/test/CenterServerExt.cpp) see example.
   
+  The RPC support any C++ base type, sush as int、string、vector、map, and support Protobuf Message Type; Of course, RPC can use async callback mode, when you need process RPC reply msg return from server.
+  
+  On server side:
+```
+static int add(int a, int b)
+{
+    //CenterServerRPCMgr::getRpcFromer()为调用者会话对象
+    return a + b;
+}
+
+static void addNoneRet(int a, int b, dodo::RpcRequestInfo reqInfo)
+{
+    // 添加dodo::RpcRequestInfo reqInfo形参(不影响调用者调用)
+    // 这里本身不返回数据(函数返回类型为void),但RPC本身是具有返回值语义的
+    // 适用于需要调用其他异步操作之后(通过reqInfo)才能返回数据给调用者的情况
+    // 譬如:
+    /*
+        auto caller = CenterServerRPCMgr::getRpcFromer();
+        redis->get("k", [caller, reqInfo](const std::string& value){
+            caller->reply(reqInfo, value);
+        });
+    */
+
+    /*
+        //客户端:
+        centerServerConnectionRpc->call("test", 1, 2, [](const std::string& value){
+        });
+    */
+}
+
+void initCenterServerExt()
+{
+    CenterServerRPCMgr::def("test", [](int a, int b){
+        return a + b;
+    });
+
+    CenterServerRPCMgr::def("testNoneRet", [](int a, int b){
+    });
+
+    CenterServerRPCMgr::def("add", add);
+
+    CenterServerRPCMgr::def("addNoneRet", addNoneRet);
+}
+```
+
+On client side:
+
+```
+gLogicCenterServerClient->call("test", 1, 2);
+gLogicCenterServerClient->call("add", 1, 2);
+gLogicCenterServerClient->call("add", 1, 2, [](int result) {
+    cout << result << endl;
+});
+``` 
 ## Users
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [Distributed game server framework](https://github.com/IronsDu/DServerFramework)
