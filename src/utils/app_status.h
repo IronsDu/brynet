@@ -3,7 +3,7 @@
 
 /*  ½ø³Ì×´Ì¬¿ØÖÆ  */
 
-#include "stdbool.h"
+#include <stdbool.h>
 
 #ifdef  __cplusplus
 extern "C" {

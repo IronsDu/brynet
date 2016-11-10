@@ -2,6 +2,8 @@
 #define _TYPEIDS_H
 
 #include <cassert>
+#include <exception>
+#include <algorithm>
 
 /*采用ID管理对象的管理器*/
 
@@ -9,22 +11,22 @@ template<typename T>
 class TypeIDS
 {
 public:
-    int         claimID()
+    size_t         claimID()
     {
-        int ret = -1;
+        size_t ret = 0;
 
         if (mIds.empty())
         {
             increase();
         }
 
-        assert(!mIds.empty());
-
-        if (!mIds.empty())
+        if (mIds.empty())
         {
-            ret = static_cast<int>(mIds[mIds.size() - 1]);
-            mIds.pop_back();
+            throw std::runtime_error("no memory in TypeIDS::claimID");
         }
+
+        ret = mIds[mIds.size() - 1];
+        mIds.pop_back();
 
         return ret;
     }
@@ -32,10 +34,11 @@ public:
     void        reclaimID(size_t id)
     {
         assert(id < mValues.size());
+        assert(std::find(mIds.begin(), mIds.end(), id) == mIds.end());
         mIds.push_back(id);
     }
 
-    bool        set(T t, size_t id)
+    bool        set(const T& t, size_t id)
     {
         assert(id < mValues.size());
         if (id < mValues.size())
@@ -49,12 +52,26 @@ public:
         }
     }
 
+    bool        set(T&& t, size_t id)
+    {
+        assert(id < mValues.size());
+        if (id < mValues.size())
+        {
+            mValues[id] = std::move(t);
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
     bool          get(size_t id, T& out)
     {
         assert(id < mValues.size());
         if (id < mValues.size())
         {
-            out = mValues[id];
+            out = std::move(mValues[id]);
             return true;
         }
         else

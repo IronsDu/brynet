@@ -160,7 +160,7 @@ int main(int argc, char** argv)
         NetMsg* msg = nullptr;
         while (msgList.ReadListSize() > 0)
         {
-            bool ret = msgList.PopFront(&msg);
+            bool ret = msgList.PopFront(msg);
             if (ret)
             {
                 if (msg->mType == NMT_ENTER)

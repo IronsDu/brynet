@@ -64,7 +64,7 @@ void SSDBMultiClient::startNetThread(std::function<void(void)> frameCallback)
 
                 mRequestList.SyncRead(0);
                 RequestMsg tmp;
-                while (mRequestList.PopFront(&tmp))
+                while (mRequestList.PopFront(tmp))
                 {
                     if (!mBackends.empty())
                     {
@@ -617,7 +617,7 @@ void SSDBMultiClient::pull()
 {
     mLogicFunctorMQ.SyncRead(0);
     std::function<void(void)> tmp;
-    while (mLogicFunctorMQ.PopFront(&tmp))
+    while (mLogicFunctorMQ.PopFront(tmp))
     {
         tmp();
     }

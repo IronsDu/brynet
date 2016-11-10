@@ -31,26 +31,26 @@ public:
         return mIP;
     }
 
-    int             getPort() const
+    int                 getPort() const
     {
         return mPort;
     }
 
-    int64_t         getUID() const
+    int64_t             getUID() const
     {
         return mUid;
     }
 
-    int             getTimeout() const
+    int                 getTimeout() const
     {
         return mTimeout;
     }
 
 private:
-    std::string mIP;
-    int         mPort;
-    int         mTimeout;
-    int64_t     mUid;
+    std::string         mIP;
+    int                 mPort;
+    int                 mTimeout;
+    int64_t             mUid;
 };
 
 class ConnectorWorkThread;

@@ -1,6 +1,10 @@
 #ifndef C_COROUTINE_H
 #define C_COROUTINE_H
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 enum COROUTINE_STATE
 {
     COROUTINE_READY,
@@ -37,5 +41,9 @@ void coroutine_block(struct schedule *);
 
 /*  协程调度器   */
 void coroutine_schedule(struct schedule*);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

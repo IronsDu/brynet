@@ -16,7 +16,7 @@ public:
     {
     }
 
-    ~MsgQueue()
+    virtual ~MsgQueue()
     {
         clear();
     }
@@ -102,14 +102,14 @@ public:
         }
     }
 
-    bool      PopFront(T* data)
+    bool      PopFront(T& data)
     {
         bool ret = false;
 
         if (!mReadList.empty())
         {
             T& tmp = mReadList.front();
-            *data = std::move(tmp);
+            data = std::move(tmp);
             mReadList.pop_front();
             ret = true;
         }
@@ -117,14 +117,14 @@ public:
         return ret;
     }
 
-    bool      PopBack(T* data)
+    bool      PopBack(T& data)
     {
         bool ret = false;
 
         if (!mReadList.empty())
         {
             T& tmp = mReadList.back();
-            *data = std::move(tmp);
+            data = std::move(tmp);
             mReadList.pop_back();
             ret = true;
         }
@@ -133,7 +133,7 @@ public:
     }
 
     /*  从共享队列同步到读缓冲区(必须读缓冲区为空时) */
-    void    SyncRead(int waitMicroSecond)
+    void    SyncRead(size_t waitMicroSecond)
     {
         if (mReadList.empty())
         {

@@ -163,7 +163,7 @@ void ConnectorWorkThread::checkTimeout()
 void ConnectorWorkThread::pollConnectRequest(MsgQueue<AsyncConnectAddr>& connectRequests)
 {
     AsyncConnectAddr addr;
-    while (connectRequests.PopBack(&addr))
+    while (connectRequests.PopBack(addr))
     {
         bool addToFDSet = false;
         bool connectSuccess = false;

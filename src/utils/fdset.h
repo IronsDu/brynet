@@ -1,9 +1,8 @@
 #ifndef _FDSET_INCLUDED_H
 #define _FDSET_INCLUDED_H
 
-#include "dllconf.h"
-#include "stdbool.h"
-#include "socketlibtypes.h"
+#include <stdbool.h>
+#include "SocketLibTypes.h"
 
 enum CheckType
 {
@@ -18,12 +17,12 @@ extern "C" {
 
 struct fdset_s;
 
-DLL_CONF struct fdset_s* ox_fdset_new(void);
-DLL_CONF void ox_fdset_delete(struct fdset_s* self);
-DLL_CONF void ox_fdset_add(struct fdset_s* self, sock fd, int type);
-DLL_CONF void ox_fdset_del(struct fdset_s* self, sock fd, int type);
-DLL_CONF int ox_fdset_poll(struct fdset_s* self, long overtime);
-DLL_CONF bool ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type);
+struct fdset_s* ox_fdset_new(void);
+void ox_fdset_delete(struct fdset_s* self);
+void ox_fdset_add(struct fdset_s* self, sock fd, int type);
+void ox_fdset_del(struct fdset_s* self, sock fd, int type);
+int ox_fdset_poll(struct fdset_s* self, long overtime);
+bool ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type);
 
 #ifdef  __cplusplus
 }
