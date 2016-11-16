@@ -362,7 +362,7 @@ namespace dodo
             void    writeCallArg(FunctionMgr& msgpackFunctionResponseMgr, msgpack::sbuffer& sbuf, msgpack::sbuffer& lambdabuf, const Arg& arg)
             {
                 /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-                SelectWriteArgMsgpack<std::is_function<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, lambdabuf, arg);
+                SelectWriteArgMsgpack<std::is_function<Arg>::value || HasCallOperator<Arg>::value>::Write(*this, msgpackFunctionResponseMgr, sbuf, lambdabuf, arg);
             }
 
             template<typename Arg1, typename... Args>

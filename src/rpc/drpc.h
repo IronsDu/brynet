@@ -7,7 +7,20 @@
 namespace dodo
 {
     using namespace std;
-    
+
+    template <typename T>
+    class HasCallOperator
+    {
+        typedef char _One;
+        typedef struct{ char a[2]; }_Two;
+        template<typename TT>
+        static _One hasFunc(decltype(&TT::operator()));
+        template<typename TT>
+        static _Two hasFunc(...);
+    public:
+        static const bool value = sizeof(hasFunc<T>(nullptr)) == sizeof(_One);
+    };
+
     const static string RPC_REPLY_STR = "rpc_reply";
 
     template<typename PROTOCOL_TYPE>

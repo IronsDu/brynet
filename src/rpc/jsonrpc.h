@@ -437,7 +437,7 @@ namespace dodo
             void    writeCallArg(FunctionMgr& jsonFunctionResponseMgr, rapidjson::Document& doc, rapidjson::Value& msg, int& index, const Arg& arg)
             {
                 /*只(剩)有一个参数,肯定也为最后一个参数，允许为lambda*/
-                SelectWriteArgJson<std::is_function<Arg>::value>::Write(*this, jsonFunctionResponseMgr, doc, msg, arg, index++);
+                SelectWriteArgJson<std::is_function<Arg>::value || HasCallOperator<Arg>::value>::Write(*this, jsonFunctionResponseMgr, doc, msg, arg, index++);
             }
 
             template<typename Arg1, typename... Args>
