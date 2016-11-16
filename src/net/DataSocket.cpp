@@ -41,6 +41,7 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
 #ifdef USE_OPENSSL
     mSSLCtx = nullptr;
     mSSL = nullptr;
+    mIsHandsharked = false;
 #endif
 }
 
