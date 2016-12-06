@@ -1,7 +1,7 @@
 CFLAGS = -O3 -std=c++0x
 LIBS = -lrt
 INCLUDES = -I./../src/net -I./../src/utils -I./../src/timer -I./../src/net/http
-COMMON_SRCS =	./../src/timer/timer.cpp\
+COMMON_SRCS =	./../src/timer/Timer.cpp\
 		./../src/net/CurrentThread.cpp\
 		./../src/net/EventLoop.cpp\
 		./../src/net/WrapTCPService.cpp\

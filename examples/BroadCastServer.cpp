@@ -85,10 +85,10 @@ int main(int argc, char** argv)
     t.startWorkerThread(2, [&](EventLoop& l){
         /*每帧回调函数里强制同步rwlist*/
         lockStatistics();
-        msgList.ForceSyncWrite();
+        msgList.forceSyncWrite();
         unLockStatistics();
 
-        if (msgList.SharedListSize() > 0)
+        if (msgList.sharedListSize() > 0)
         {
             mainLoop.wakeup();
         }
@@ -97,7 +97,7 @@ int main(int argc, char** argv)
     t.setEnterCallback([&](int64_t id, std::string ip){
         NetMsg* msg = new NetMsg(NMT_ENTER, id);
         lockStatistics();
-        msgList.Push(msg);
+        msgList.push(msg);
         unLockStatistics();
 
         mainLoop.wakeup();
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
     t.setDisconnectCallback([&](int64_t id){
         NetMsg* msg = new NetMsg(NMT_CLOSE, id);
         lockStatistics();
-        msgList.Push(msg);
+        msgList.push(msg);
         unLockStatistics();
 
         mainLoop.wakeup();
@@ -129,7 +129,7 @@ int main(int argc, char** argv)
                     NetMsg* msg = new NetMsg(NMT_RECV_DATA, id);
                     msg->setData(parse_str, packet_len);
                     lockStatistics();
-                    msgList.Push(msg);
+                    msgList.push(msg);
                     unLockStatistics();
 
                     total_proc_len += packet_len;
@@ -159,11 +159,11 @@ int main(int argc, char** argv)
     {
         mainLoop.loop(10);
 
-        msgList.SyncRead(0);
+        msgList.syncRead(0);
         NetMsg* msg = nullptr;
-        while (msgList.ReadListSize() > 0)
+        while (msgList.readListSize() > 0)
         {
-            bool ret = msgList.PopFront(msg);
+            bool ret = msgList.popFront(msg);
             if (ret)
             {
                 if (msg->mType == NMT_ENTER)

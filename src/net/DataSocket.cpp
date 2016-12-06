@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstring>
 
 #include "SocketLibFunction.h"
 #include "EventLoop.h"

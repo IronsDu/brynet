@@ -2,7 +2,7 @@ dodo
 =======
 Cross platform high performance TCP network library and RPC library using C++ 11.
 
-Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/dodo/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/dodo.svg?branch=master)](https://travis-ci.org/IronsDu/dodo)
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/accumulation-dev/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/accumulation-dev.svg?branch=master)](https://travis-ci.org/IronsDu/accumulation-dev)
 
 ## Features
 * Cross platform (Linux | Windows)
@@ -97,9 +97,9 @@ static int add(int a, int b)
     return a + b;
 }
 
-static void addNoneRet(int a, int b, dodo::RpcRequestInfo reqInfo)
+static void addNoneRet(int a, int b, dodo::rpc::RpcRequestInfo reqInfo)
 {
-    // 添加dodo::RpcRequestInfo reqInfo形参(不影响调用者调用)
+    // 添加dodo::rpc::RpcRequestInfo reqInfo形参(不影响调用者调用)
     // 这里本身不返回数据(函数返回类型为void),但RPC本身是具有返回值语义的
     // 适用于需要调用其他异步操作之后(通过reqInfo)才能返回数据给调用者的情况
     // 譬如:

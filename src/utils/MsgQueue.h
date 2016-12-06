@@ -33,18 +33,18 @@ namespace dodo
             mMutex.unlock();
         }
 
-        void    Push(const T& t)
+        void    push(const T& t)
         {
             mWriteList.push_back(t);
         }
 
-        void    Push(T&& t)
+        void    push(T&& t)
         {
             mWriteList.push_back(std::move(t));
         }
 
         /*  同步写缓冲到共享队列(共享队列必须为空)    */
-        void    TrySyncWrite()
+        void    trySyncWrite()
         {
             if (!mWriteList.empty() && mSharedList.empty())
             {
@@ -61,14 +61,14 @@ namespace dodo
         }
 
         /*  强制同步    */
-        void    ForceSyncWrite()
+        void    forceSyncWrite()
         {
             if (!mWriteList.empty())
             {
                 if (mSharedList.empty())
                 {
                     /*  如果共享队列为空，则进行交换  */
-                    TrySyncWrite();
+                    trySyncWrite();
                 }
                 else
                 {
@@ -105,7 +105,7 @@ namespace dodo
             }
         }
 
-        bool      PopFront(T& data)
+        bool      popFront(T& data)
         {
             bool ret = false;
 
@@ -120,7 +120,7 @@ namespace dodo
             return ret;
         }
 
-        bool      PopBack(T& data)
+        bool      popBack(T& data)
         {
             bool ret = false;
 
@@ -136,7 +136,7 @@ namespace dodo
         }
 
         /*  从共享队列同步到读缓冲区(必须读缓冲区为空时) */
-        void    SyncRead(size_t waitMicroSecond)
+        void    syncRead(size_t waitMicroSecond)
         {
             if (mReadList.empty())
             {
@@ -157,17 +157,17 @@ namespace dodo
             }
         }
 
-        size_t  SharedListSize() const
+        size_t  sharedListSize() const
         {
             return mSharedList.size();
         }
 
-        size_t  ReadListSize() const
+        size_t  readListSize() const
         {
             return mReadList.size();
         }
 
-        size_t  WriteListSize() const
+        size_t  writeListSize() const
         {
             return mWriteList.size();
         }

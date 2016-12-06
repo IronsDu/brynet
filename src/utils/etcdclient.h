@@ -5,6 +5,8 @@
 #include "HttpParser.h"
 #include "HttpFormat.h"
 
+using namespace dodo::net;
+
 static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYPE_PROTOCOL protocol, const std::string& url,
     const std::map<std::string, std::string>& kv, int timeout)
 {
@@ -14,7 +16,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
     std::condition_variable cv;
 
     HttpServer server;
-    Timer::WeakPtr timer;
+    dodo::Timer::WeakPtr timer;
     server.startWorkThread(1);  /*必须为1个线程*/
 
     sock fd = ox_socket_connect(false, ip.c_str(), port);
@@ -22,7 +24,7 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
     {
         server.addConnection(fd, [kv, url, &mtx, &cv, &server, &timer, timeout, protocol](HttpSession::PTR session){
             /*注册超时定时器*/
-            timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr()->AddTimer(timeout, [session](){
+            timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr()->addTimer(timeout, [session](){
                 session->postClose();
             });
 
@@ -50,13 +52,13 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
             session->postClose();
             if (timer.lock() != nullptr)
             {
-                timer.lock()->Cancel();
+                timer.lock()->cancel();
             }
         }, nullptr, [&cv, &timer](HttpSession::PTR session){
             /*收到断开通知,通知等待线程*/
             if (timer.lock() != nullptr)
             {
-                timer.lock()->Cancel();
+                timer.lock()->cancel();
             }
             cv.notify_one();
         });
