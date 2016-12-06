@@ -14,33 +14,39 @@
 
 using namespace dodo::net;
 
-class ConnectorWorkThread final : public NonCopyable
+namespace dodo
 {
-public:
-    typedef std::shared_ptr<ConnectorWorkThread>    PTR;
-
-    ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK);
-    ~ConnectorWorkThread();
-
-    void                checkConnectStatus(int timeout);
-    bool                isConnectSuccess(sock clientfd);
-    void                checkTimeout();
-    void                pollConnectRequest(MsgQueue<AsyncConnectAddr>& connectRequests);
-
-private:
-    ThreadConnector::COMPLETED_CALLBACK    mCallback;
-
-    struct ConnectingInfo
+    namespace net
     {
-        int64_t startConnectTime;
-        int     timeout;
-        int64_t uid;
-    };
+        class ConnectorWorkThread final : public dodo::NonCopyable
+        {
+        public:
+            typedef std::shared_ptr<ConnectorWorkThread>    PTR;
 
-    std::map<sock, ConnectingInfo>  mConnectingInfos;
-    std::set<sock>                  mConnectingFds;
-    struct fdset_s*                 mFDSet;
-};
+            ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK);
+            ~ConnectorWorkThread();
+
+            void                checkConnectStatus(int timeout);
+            bool                isConnectSuccess(sock clientfd);
+            void                checkTimeout();
+            void                pollConnectRequest(dodo::MsgQueue<AsyncConnectAddr>& connectRequests);
+
+        private:
+            ThreadConnector::COMPLETED_CALLBACK    mCallback;
+
+            struct ConnectingInfo
+            {
+                int64_t startConnectTime;
+                int     timeout;
+                int64_t uid;
+            };
+
+            std::map<sock, ConnectingInfo>  mConnectingInfos;
+            std::set<sock>                  mConnectingFds;
+            struct fdset_s*                 mFDSet;
+        };
+    }
+}
 
 ThreadConnector::ThreadConnector()
 {
@@ -88,8 +94,8 @@ void ConnectorWorkThread::checkConnectStatus(int timeout)
         return;
     }
 
-    set<sock>       complete_fds;   /*  完成队列    */
-    set<sock>       failed_fds;     /*  失败队列    */
+    std::set<sock>       complete_fds;   /*  完成队列    */
+    std::set<sock>       failed_fds;     /*  失败队列    */
 
     for (auto& v : mConnectingFds)
     {
@@ -112,7 +118,7 @@ void ConnectorWorkThread::checkConnectStatus(int timeout)
     {
         ox_fdset_del(mFDSet, fd, WriteCheck | ErrorCheck);
 
-        map<sock, ConnectingInfo>::iterator it = mConnectingInfos.find(fd);
+        auto it = mConnectingInfos.find(fd);
         if (it != mConnectingInfos.end())
         {
             if (failed_fds.find(fd) != failed_fds.end())
@@ -136,7 +142,7 @@ void ConnectorWorkThread::checkTimeout()
 {
     int64_t now_time = ox_getnowtime();
 
-    for (map<sock, ConnectingInfo>::iterator it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
+    for (auto it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
     {
         if ((now_time - it->second.startConnectTime) >= it->second.timeout)
         {
@@ -159,10 +165,10 @@ void ConnectorWorkThread::checkTimeout()
     }
 }
 
-void ConnectorWorkThread::pollConnectRequest(MsgQueue<AsyncConnectAddr>& connectRequests)
+void ConnectorWorkThread::pollConnectRequest(dodo::MsgQueue<AsyncConnectAddr>& connectRequests)
 {
     AsyncConnectAddr addr;
-    while (connectRequests.PopBack(addr))
+    while (connectRequests.popBack(addr))
     {
         bool addToFDSet = false;
         bool connectSuccess = false;
@@ -236,7 +242,7 @@ void ThreadConnector::run(ConnectorWorkThread::PTR cwt)
         mThreadEventloop.loop(10);
 
         cwt->checkConnectStatus(0);
-        mConnectRequests.SyncRead(0);
+        mConnectRequests.syncRead(0);
         cwt->pollConnectRequest(mConnectRequests);
 
         cwt->checkTimeout();
@@ -270,7 +276,7 @@ void ThreadConnector::destroy()
 
 void ThreadConnector::asyncConnect(const char* ip, int port, int ms, int64_t uid)
 {
-    mConnectRequests.Push(AsyncConnectAddr(ip, port, ms, uid));
-    mConnectRequests.ForceSyncWrite();
+    mConnectRequests.push(AsyncConnectAddr(ip, port, ms, uid));
+    mConnectRequests.forceSyncWrite();
     mThreadEventloop.wakeup();
 }
