@@ -15,7 +15,10 @@
 #include "EventLoop.h"
 #include "DataSocket.h"
 #include "TCPService.h"
-#include "msgqueue.h"
+#include "MsgQueue.h"
+
+using namespace dodo;
+using namespace dodo::net;
 
 enum NetMsgType
 {

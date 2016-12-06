@@ -10,6 +10,6 @@ environment:
   - VS_VERSION: 12 2013
     VS_PLATFORM: x64
 build:
-  project: accumulation-dev.sln
+  project: dodo.sln
   parallel: true
   verbosity: minimal

@@ -1,16 +1,18 @@
-#include "timer.h"
+#include "Timer.h"
 
-time_t Timer::GetEndMs() const
+using namespace dodo;
+
+time_t Timer::getEndMs() const
 {
     return mEndMs;
 }
 
-void Timer::Cancel()
+void Timer::cancel()
 {
     mActive = false;
 }
 
-Timer::Timer(time_t ms, Callback f) : mEndMs(ms), mCallback(f)
+Timer::Timer(time_t ms, Callback callback) : mEndMs(ms), mCallback(callback)
 {
     mActive = true;
 }
@@ -23,13 +25,13 @@ void Timer::operator() ()
     }
 }
 
-void TimerMgr::Schedule()
+void TimerMgr::schedule()
 {
     while (!mTimers.empty())
     {
         auto tmp = mTimers.top();
 
-        if (tmp->GetEndMs() < ox_getnowtime())
+        if (tmp->getEndMs() < ox_getnowtime())
         {
             mTimers.pop();
             tmp->operator() ();
@@ -41,12 +43,12 @@ void TimerMgr::Schedule()
     }
 }
 
-bool TimerMgr::IsEmpty()
+bool TimerMgr::isEmpty()
 {
     return mTimers.empty();
 }
 
-time_t TimerMgr::NearEndMs()
+time_t TimerMgr::nearEndMs()
 {
     if (mTimers.empty())
     {
@@ -54,12 +56,12 @@ time_t TimerMgr::NearEndMs()
     }
     else
     {
-        time_t tmp = mTimers.top()->GetEndMs() - ox_getnowtime();
+        time_t tmp = mTimers.top()->getEndMs() - ox_getnowtime();
         return (tmp < 0 ? 0 : tmp);
     }
 }
 
-void TimerMgr::Clear()
+void TimerMgr::clear()
 {
     while (!mTimers.empty())
     {

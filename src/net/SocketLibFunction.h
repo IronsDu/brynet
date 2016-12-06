@@ -1,5 +1,5 @@
-#ifndef _SOCKETLIBFUNCTION_H_INCLUDED_
-#define _SOCKETLIBFUNCTION_H_INCLUDED_
+#ifndef DODO_NET_SOCKETLIBFUNCTION_H_
+#define DODO_NET_SOCKETLIBFUNCTION_H_
 
 #include <stdbool.h>
 #include "SocketLibTypes.h"

@@ -6,6 +6,9 @@
 #include "EventLoop.h"
 #include "WrapTCPService.h"
 
+using namespace dodo;
+using namespace dodo::net;
+
 std::atomic_llong total_recv = ATOMIC_VAR_INIT(0);
 std::atomic_llong total_client_num = ATOMIC_VAR_INIT(0);
 std::atomic_llong total_packet_num = ATOMIC_VAR_INIT(0);

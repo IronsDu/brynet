@@ -15,9 +15,11 @@
 
 #include "EventLoop.h"
 #include "DataSocket.h"
-#include "timer.h"
+#include "Timer.h"
 
 using namespace std;
+using namespace dodo;
+using namespace dodo::net;
 
 int main(int argc, char** argv)
 {
@@ -128,8 +130,8 @@ int main(int argc, char** argv)
         int64_t now = ox_getnowtime();
         while (true)
         {
-            clientEventLoop.loop(tm.NearEndMs());
-            tm.Schedule();
+            clientEventLoop.loop(tm.nearEndMs());
+            tm.schedule();
             if ((ox_getnowtime() - now) >= 1000)
             {
                 cout << "total recv:" << (total_recv / 1024) / 1024 << " M /s" << " , num " << packet_num << endl;

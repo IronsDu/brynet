@@ -1,5 +1,4 @@
-#include <assert.h>
-#include <string.h>
+#include <cassert>
 
 #include "SocketLibFunction.h"
 #include "EventLoop.h"
@@ -7,7 +6,7 @@
 
 #include "DataSocket.h"
 
-using namespace std;
+using namespace dodo::net;
 
 DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
 #if defined PLATFORM_WINDOWS
@@ -73,7 +72,7 @@ DataSocket::~DataSocket()
 
     if (mTimer.lock())
     {
-        mTimer.lock()->Cancel();
+        mTimer.lock()->cancel();
     }
 }
 
@@ -736,7 +735,7 @@ void DataSocket::startPingCheckTimer()
 {
     if (!mTimer.lock() && mCheckTime > 0)
     {
-        mTimer = mEventLoop->getTimerMgr()->AddTimer(mCheckTime, [this](){
+        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [this](){
             this->PingCheck();
         });
     }
@@ -756,7 +755,7 @@ void DataSocket::setCheckTime(int overtime)
         {
             if (mTimer.lock())
             {
-                mTimer.lock()->Cancel();
+                mTimer.lock()->cancel();
             }
 
             mCheckTime = -1;

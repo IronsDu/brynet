@@ -8,6 +8,9 @@
 #include "HttpFormat.h"
 #include "WebSocketFormat.h"
 
+using namespace dodo;
+using namespace dodo::net;
+
 int main(int argc, char **argv)
 {
     HttpServer server;

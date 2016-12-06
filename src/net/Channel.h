@@ -1,19 +1,25 @@
-#ifndef _CHANNEL_H
-#define _CHANNEL_H
+#ifndef DODO_NET_CHANNEL_H_
+#define DODO_NET_CHANNEL_H_
 
-class EventLoop;
-
-class Channel
+namespace dodo
 {
-public:
-    virtual ~Channel(){}
+    namespace net
+    {
+        class EventLoop;
 
-private:
-    virtual void    canSend() = 0;
-    virtual void    canRecv() = 0;
-    virtual void    onClose() = 0;
+        class Channel
+        {
+        public:
+            virtual ~Channel(){}
 
-    friend class EventLoop;
-};
+        private:
+            virtual void    canSend() = 0;
+            virtual void    canRecv() = 0;
+            virtual void    onClose() = 0;
+
+            friend class EventLoop;
+        };
+    }
+}
 
 #endif

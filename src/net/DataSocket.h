@@ -1,12 +1,12 @@
-#ifndef _DATASOCKET_H
-#define _DATASOCKET_H
+#ifndef DODO_NET_DATASOCKET_H_
+#define DODO_NET_DATASOCKET_H_
 
 #include <memory>
 #include <functional>
 #include <deque>
 
 #include "Channel.h"
-#include "timer.h"
+#include "Timer.h"
 #include "EventLoop.h"
 #include "NonCopyable.h"
 
@@ -27,132 +27,138 @@ struct buffer_s;
 
 /*  使用裸指针,且一旦投递到eventloop,只有在onEnterEventLoop失败或者断开回调中才能delete它(一个DataSocket的断开回调只会被调用一次)  */
 
-class DataSocket final : public Channel, public NonCopyable
+namespace dodo
 {
-public:
-    typedef DataSocket*                                                         PTR;
+    namespace net
+    {
+        class DataSocket final : public Channel, public NonCopyable
+        {
+        public:
+            typedef DataSocket*                                                         PTR;
 
-    typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
-    typedef std::function<size_t(PTR, const char* buffer, size_t len)>          DATA_CALLBACK;
-    typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
-    typedef std::shared_ptr<std::function<void(void)>>                          PACKED_SENDED_CALLBACK;
+            typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
+            typedef std::function<size_t(PTR, const char* buffer, size_t len)>          DATA_CALLBACK;
+            typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
+            typedef std::shared_ptr<std::function<void(void)>>                          PACKED_SENDED_CALLBACK;
 
-    typedef std::shared_ptr<std::string>                                        PACKET_PTR;
+            typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
-public:
-    explicit DataSocket(sock fd, size_t maxRecvBufferSize);
-    ~DataSocket();
+        public:
+            explicit DataSocket(sock fd, size_t maxRecvBufferSize);
+            ~DataSocket();
 
-    /*  仅在网络线程中调用才可能返回成功 */
-    bool                            onEnterEventLoop(EventLoop* el);
+            /*  仅在网络线程中调用才可能返回成功 */
+            bool                            onEnterEventLoop(EventLoop* el);
 
-    void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-    void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-    void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-    void                            setEnterCallback(ENTER_CALLBACK&& cb);
-    void                            setEnterCallback(const ENTER_CALLBACK& cb);
+            void                            setEnterCallback(ENTER_CALLBACK&& cb);
+            void                            setEnterCallback(const ENTER_CALLBACK& cb);
 
-    void                            setDataCallback(DATA_CALLBACK&& cb);
-    void                            setDataCallback(const DATA_CALLBACK& cb);
+            void                            setDataCallback(DATA_CALLBACK&& cb);
+            void                            setDataCallback(const DATA_CALLBACK& cb);
 
-    void                            setDisConnectCallback(DISCONNECT_CALLBACK&& cb);
-    void                            setDisConnectCallback(const DISCONNECT_CALLBACK& cb);
+            void                            setDisConnectCallback(DISCONNECT_CALLBACK&& cb);
+            void                            setDisConnectCallback(const DISCONNECT_CALLBACK& cb);
 
-    /*  设置心跳检测时间,overtime为-1表示不检测   */
-    void                            setCheckTime(int overtime);
-    /*  主动(投递)断开连接,如果成功主动断开(表明底层没有先触发被动断开)则会触发断开回调  */
-    void                            postDisConnect();
-    void                            postShutdown();
+            /*  设置心跳检测时间,overtime为-1表示不检测   */
+            void                            setCheckTime(int overtime);
+            /*  主动(投递)断开连接,如果成功主动断开(表明底层没有先触发被动断开)则会触发断开回调  */
+            void                            postDisConnect();
+            void                            postShutdown();
 
-    void                            setUserData(int64_t value);
-    int64_t                         getUserData() const;
+            void                            setUserData(int64_t value);
+            int64_t                         getUserData() const;
 
 #ifdef USE_OPENSSL
-    bool                            initAcceptSSL(SSL_CTX*);
-    bool                            initConnectSSL();
+            bool                            initAcceptSSL(SSL_CTX*);
+            bool                            initConnectSSL();
 #endif
 
-    static  PACKET_PTR              makePacket(const char* buffer, size_t len);
+            static  PACKET_PTR              makePacket(const char* buffer, size_t len);
 
-private:
-    void                            growRecvBuffer();
+        private:
+            void                            growRecvBuffer();
 
-    void                            PingCheck();
-    void                            startPingCheckTimer();
+            void                            PingCheck();
+            void                            startPingCheckTimer();
 
-    void                            canRecv() override;
-    void                            canSend() override;
+            void                            canRecv() override;
+            void                            canSend() override;
 
-    bool                            checkRead();
-    bool                            checkWrite();
+            bool                            checkRead();
+            bool                            checkWrite();
 
-    void                            recv();
-    void                            flush();
-    void                            normalFlush();
-    void                            quickFlush();
+            void                            recv();
+            void                            flush();
+            void                            normalFlush();
+            void                            quickFlush();
 
-    void                            onClose() override;
-    void                            closeSocket();
-    void                            procCloseInLoop();
-    void                            procShutdownInLoop();
+            void                            onClose() override;
+            void                            closeSocket();
+            void                            procCloseInLoop();
+            void                            procShutdownInLoop();
 
-    void                            runAfterFlush();
+            void                            runAfterFlush();
 #ifdef PLATFORM_LINUX
-    void                            removeCheckWrite();
+            void                            removeCheckWrite();
 #endif
 #ifdef USE_OPENSSL
-    void                            processSSLHandshake();
+            void                            processSSLHandshake();
 #endif
 
-private:
+        private:
 
 #ifdef PLATFORM_WINDOWS
-    struct EventLoop::ovl_ext_s     mOvlRecv;
-    struct EventLoop::ovl_ext_s     mOvlSend;
+            struct EventLoop::ovl_ext_s     mOvlRecv;
+            struct EventLoop::ovl_ext_s     mOvlSend;
 
-    bool                            mPostRecvCheck;     /*  是否投递了可读检测   */
-    bool                            mPostWriteCheck;    /*  是否投递了可写检测   */
+            bool                            mPostRecvCheck;     /*  是否投递了可读检测   */
+            bool                            mPostWriteCheck;    /*  是否投递了可写检测   */
 #endif
 
-    sock                            mFD;
-    bool                            mIsPostFinalClose;  /*  是否投递了最终的close处理    */
+            sock                            mFD;
+            bool                            mIsPostFinalClose;  /*  是否投递了最终的close处理    */
 
-    bool                            mCanWrite;          /*  socket是否可写  */
+            bool                            mCanWrite;          /*  socket是否可写  */
 
-    EventLoop*                      mEventLoop;
-    buffer_s*                       mRecvBuffer;
-    size_t                          mMaxRecvBufferSize;
+            EventLoop*                      mEventLoop;
+            buffer_s*                       mRecvBuffer;
+            size_t                          mMaxRecvBufferSize;
 
-    struct pending_packet
-    {
-        PACKET_PTR  data;
-        size_t      left;
-        PACKED_SENDED_CALLBACK  mCompleteCallback;
-    };
+            struct pending_packet
+            {
+                PACKET_PTR  data;
+                size_t      left;
+                PACKED_SENDED_CALLBACK  mCompleteCallback;
+            };
 
-    typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
-    PACKET_LIST_TYPE                mSendList;          /*  发送消息列表  */
+            typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
+            PACKET_LIST_TYPE                mSendList;          /*  发送消息列表  */
 
-    ENTER_CALLBACK                  mEnterCallback;
-    DATA_CALLBACK                   mDataCallback;
-    DISCONNECT_CALLBACK             mDisConnectCallback;
+            ENTER_CALLBACK                  mEnterCallback;
+            DATA_CALLBACK                   mDataCallback;
+            DISCONNECT_CALLBACK             mDisConnectCallback;
 
-    bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
+            bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
 
-    int64_t                         mUserData;          /*  链接的用户自定义数据  */
+            int64_t                         mUserData;          /*  链接的用户自定义数据  */
 
 #ifdef USE_OPENSSL
-    SSL_CTX*                        mSSLCtx;            /*  mSSL不为null时，如果mSSLCtx不为null，则表示ssl的客户端链接，否则为accept链接  */
-    SSL*                            mSSL;               /*  mSSL不为null，则表示为ssl安全连接   */
-    bool                            mIsHandsharked;
+            SSL_CTX*                        mSSLCtx;            /*  mSSL不为null时，如果mSSLCtx不为null，则表示ssl的客户端链接，否则为accept链接  */
+            SSL*                            mSSL;               /*  mSSL不为null，则表示为ssl安全连接   */
+            bool                            mIsHandsharked;
 #endif
 
-    bool                            mRecvData;
-    int                             mCheckTime;
-    Timer::WeakPtr                  mTimer;
-};
+            bool                            mRecvData;
+            int                             mCheckTime;
+            Timer::WeakPtr                  mTimer;
+        };
+    }
+}
 
 #endif

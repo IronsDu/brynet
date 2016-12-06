@@ -1,12 +1,14 @@
 #include <string>
-#include <string.h>
-using namespace std;
+#include <cstring>
 
 #include "SHA1.h"
 #include "base64.h"
 #include "http_parser.h"
 #include "WebSocketFormat.h"
+
 #include "HttpServer.h"
+
+using namespace dodo::net;
 
 HttpSession::HttpSession(TCPSession::PTR session)
 {
@@ -122,7 +124,10 @@ void HttpServer::setEnterCallback(const ENTER_CALLBACK& callback)
 }
 
 void HttpServer::addConnection(sock fd, 
-    const ENTER_CALLBACK& enterCallback, const HttpSession::HTTPPARSER_CALLBACK& responseCallback, const HttpSession::WS_CALLBACK& wsCallback, const HttpSession::CLOSE_CALLBACK& closeCallback)
+    const ENTER_CALLBACK& enterCallback, 
+    const HttpSession::HTTPPARSER_CALLBACK& responseCallback, 
+    const HttpSession::WS_CALLBACK& wsCallback, 
+    const HttpSession::CLOSE_CALLBACK& closeCallback)
 {
     mServer->addSession(fd, [this, enterCallback, responseCallback, wsCallback, closeCallback](TCPSession::PTR& session){
         HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
@@ -154,7 +159,10 @@ void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const
     }
 }
 
-void HttpServer::setSessionCallback(HttpSession::PTR& httpSession, const HttpSession::HTTPPARSER_CALLBACK& httpCallback, const HttpSession::WS_CALLBACK& wsCallback, const HttpSession::CLOSE_CALLBACK& closeCallback)
+void HttpServer::setSessionCallback(HttpSession::PTR& httpSession, 
+    const HttpSession::HTTPPARSER_CALLBACK& httpCallback,
+    const HttpSession::WS_CALLBACK& wsCallback, 
+    const HttpSession::CLOSE_CALLBACK& closeCallback)
 {
     /*TODO::keep alive and timeout close */
     TCPSession::PTR& session = httpSession->getSession();

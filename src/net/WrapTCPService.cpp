@@ -1,7 +1,6 @@
-#include <iostream>
-using namespace std;
-
 #include "WrapTCPService.h"
+
+using namespace dodo::net;
 
 TCPSession::TCPSession()
 {
@@ -28,7 +27,7 @@ void    TCPSession::setUD(int64_t ud)
     mUserData = ud;
 }
 
-const string& TCPSession::getIP() const
+const std::string& TCPSession::getIP() const
 {
     return mIP;
 }
@@ -83,7 +82,7 @@ void    TCPSession::setSocketID(int64_t id)
     mSocketID = id;
 }
 
-void TCPSession::setIP(const string& ip)
+void TCPSession::setIP(const std::string& ip)
 {
     mIP = ip;
 }

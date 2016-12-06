@@ -1,5 +1,5 @@
-#ifndef CURRENT_THREAD_H
-#define CURRENT_THREAD_H
+#ifndef DODO_NET_CURRENTTHREAD_H_
+#define DODO_NET_CURRENTTHREAD_H_
 
 #include <thread>
 #include "Platform.h"
@@ -12,26 +12,32 @@
 #include <sys/types.h>
 #endif
 
-namespace CurrentThread
+namespace dodo
 {
+    namespace net
+    {
+        namespace CurrentThread
+        {
 #ifdef PLATFORM_WINDOWS
-    typedef DWORD THREAD_ID_TYPE;
-    extern __declspec(thread) THREAD_ID_TYPE cachedTid;
+            typedef DWORD THREAD_ID_TYPE;
+            extern __declspec(thread) THREAD_ID_TYPE cachedTid;
 #else
-    typedef int THREAD_ID_TYPE;
-    extern __thread THREAD_ID_TYPE cachedTid;
+            typedef int THREAD_ID_TYPE;
+            extern __thread THREAD_ID_TYPE cachedTid;
 #endif
 
-    void cacheTid();
+            void cacheTid();
 
-    inline THREAD_ID_TYPE& tid()
-    {
-        if (cachedTid == 0)
-        {
-            cacheTid();
+            inline THREAD_ID_TYPE& tid()
+            {
+                if (cachedTid == 0)
+                {
+                    cacheTid();
+                }
+
+                return cachedTid;
+            }
         }
-
-        return cachedTid;
     }
 }
 

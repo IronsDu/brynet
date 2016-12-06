@@ -1,57 +1,61 @@
-#include <iostream>
-#include <assert.h>
-#include <thread>
-#include <atomic>
+#include <cassert>
 
-#include "SocketLibFunction.h"
 #include "Channel.h"
 #include "EventLoop.h"
 
-class WakeupChannel : public Channel, public NonCopyable
+using namespace dodo::net;
+
+namespace dodo
 {
-public:
-    explicit WakeupChannel(sock fd) : mFd(fd)
+    namespace net
     {
-    }
-
-private:
-    ~WakeupChannel()
-    {
-#ifdef PLATFORM_WINDOWS
-#else
-        close(mFd);
-        mFd = SOCKET_ERROR;
-#endif
-    }
-
-    void    canRecv() override
-    {
-#ifdef PLATFORM_WINDOWS
-#else
-        /*  linux 下必须读完所有数据 */
-        char temp[1024 * 10];
-        while (true)
+        class WakeupChannel : public Channel, public NonCopyable
         {
-            auto n = read(mFd, temp, sizeof(temp));
-            if (n == -1)
+        public:
+            explicit WakeupChannel(sock fd) : mFd(fd)
             {
-                break;
             }
-        }
+
+        private:
+            ~WakeupChannel()
+            {
+#ifdef PLATFORM_WINDOWS
+#else
+                close(mFd);
+                mFd = SOCKET_ERROR;
 #endif
-    }
+            }
 
-    void    canSend() override
-    {
-    }
+            void    canRecv() override
+            {
+#ifdef PLATFORM_WINDOWS
+#else
+                /*  linux 下必须读完所有数据 */
+                char temp[1024 * 10];
+                while (true)
+                {
+                    auto n = read(mFd, temp, sizeof(temp));
+                    if (n == -1)
+                    {
+                        break;
+                    }
+                }
+#endif
+            }
 
-    void    onClose() override
-    {
-    }
+            void    canSend() override
+            {
+            }
 
-private:
-    sock    mFd;
-};
+            void    onClose() override
+            {
+            }
+
+        private:
+            sock    mFd;
+        };
+    }
+}
 
 EventLoop::EventLoop()
 #ifdef PLATFORM_WINDOWS
@@ -104,7 +108,7 @@ EventLoop::~EventLoop()
     mEventEntries = nullptr;
 }
 
-TimerMgr::PTR EventLoop::getTimerMgr()
+dodo::TimerMgr::PTR EventLoop::getTimerMgr()
 {
     tryInitThreadID();
     assert(isInLoopThread());
@@ -241,7 +245,7 @@ void EventLoop::loop(int64_t timeout)
         reallocEventSize(mEventEntriesNum + 128);
     }
 
-    mTimer->Schedule();
+    mTimer->schedule();
 }
 
 void EventLoop::processAfterLoopProcs()

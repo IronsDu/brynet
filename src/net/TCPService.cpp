@@ -1,21 +1,12 @@
-#include <time.h>
-#include <stdio.h>
-#include <string.h>
-
-#include <functional>
-#include <thread>
-#include <iostream>
-#include <exception>
-#include <string>
-
 #include "SocketLibFunction.h"
-
 #include "EventLoop.h"
 #include "DataSocket.h"
 
 #include "TCPService.h"
 
 static unsigned int sDefaultLoopTimeOutMS = 100;
+
+using namespace dodo::net;
 
 ListenThread::ListenThread()
 {
@@ -53,7 +44,7 @@ void ListenThread::startListen(bool isIPV6, const std::string& ip, int port, con
         }
 
         mListenThread = new std::thread([this](){
-            RunListen();
+            runListen();
         });
     }
 }
@@ -122,7 +113,7 @@ void ListenThread::destroySSL()
 #endif
 }
 
-void ListenThread::RunListen()
+void ListenThread::runListen()
 {
     sock client_fd = SOCKET_ERROR;
     struct sockaddr_in socketaddress;
@@ -459,7 +450,7 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
             mIOThreads[i] = new std::thread([this, &l, callback](){
                 while (mRunIOLoop)
                 {
-                    l.loop(l.getTimerMgr()->IsEmpty() ? sDefaultLoopTimeOutMS : l.getTimerMgr()->NearEndMs());
+                    l.loop(l.getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : l.getTimerMgr()->nearEndMs());
                     if (callback != nullptr)
                     {
                         callback(l);

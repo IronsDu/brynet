@@ -1,15 +1,18 @@
-#ifndef __NON_COPYABLE_H__
-#define __NON_COPYABLE_H__
+#ifndef DODO_NONCOPYABLE_H_
+#define DODO_NONCOPYABLE_H_
 
-class NonCopyable
+namespace dodo
 {
-protected:
-    NonCopyable()   {}
-    ~NonCopyable()  {}
+    class NonCopyable
+    {
+    protected:
+        NonCopyable()   {}
+        ~NonCopyable()  {}
 
-private:
-    NonCopyable(const NonCopyable&) = delete;
-    const NonCopyable& operator=(const NonCopyable&) = delete;
-};
+    private:
+        NonCopyable(const NonCopyable&) = delete;
+        const NonCopyable& operator=(const NonCopyable&) = delete;
+    };
+}
 
 #endif

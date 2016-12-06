@@ -4,6 +4,9 @@
 #include "SocketLibFunction.h"
 #include "WrapTCPService.h"
 
+using namespace dodo;
+using namespace dodo::net;
+
 int main(int argc, char **argv)
 {
     if (argc != 6)

@@ -1,8 +1,8 @@
-Accumulation
+dodo
 =======
 Cross platform high performance TCP network library and RPC library using C++ 11.
 
-Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/accumulation-dev/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/accumulation-dev.svg?branch=master)](https://travis-ci.org/IronsDu/accumulation-dev)
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/dodo/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/dodo.svg?branch=master)](https://travis-ci.org/IronsDu/dodo)
 
 ## Features
 * Cross platform (Linux | Windows)
@@ -12,7 +12,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
 * SSL support
 * Support HTTP、HTTPS、WebSocket protocol
 * IPv6 support
-* [RPC Library](https://github.com/IronsDu/accumulation-dev/tree/master/src/rpc)
+* [RPC Library](https://github.com/IronsDu/dodo/tree/master/src/rpc)
 
 ## Benchamrk
    Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 i5)
@@ -73,14 +73,14 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26y
 
 ## About session safety
   This library use three layer ident one session(also is three way to use this library).
-  * First, use raw pointer named [DataSocket](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/DataSocket.h#L30), combine with [EventLoop](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/EventLoop.h) in used
-  * Second, use int64_t number ident one session, used in some callback of [TCPService](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/TCPService.h#L53) that wrapper DataSocket of first layer
-  * Thrid, use smart pointer named [TCPSession::PTR](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/WrapTCPService.h#L13) combine with [WrapServer](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/WrapTCPService.h#L70), you can control session by [TCPSession::PTR](https://github.com/IronsDu/accumulation-dev/blob/master/src/net/WrapTCPService.h#L13)
+  * First, use raw pointer named [DataSocket](https://github.com/IronsDu/dodo/blob/master/src/net/DataSocket.h#L30), combine with [EventLoop](https://github.com/IronsDu/dodo/blob/master/src/net/EventLoop.h) in used
+  * Second, use int64_t number ident one session, used in some callback of [TCPService](https://github.com/IronsDu/dodo/blob/master/src/net/TCPService.h#L53) that wrapper DataSocket of first layer
+  * Thrid, use smart pointer named [TCPSession::PTR](https://github.com/IronsDu/dodo/blob/master/src/net/WrapTCPService.h#L13) combine with [WrapServer](https://github.com/IronsDu/dodo/blob/master/src/net/WrapTCPService.h#L70), you can control session by [TCPSession::PTR](https://github.com/IronsDu/dodo/blob/master/src/net/WrapTCPService.h#L13)
 
 I suggest you use the second or thrid way above, because don't worry memory manager
 
 ## Usage
-  About TCP Library ,Please see [examples](https://github.com/IronsDu/accumulation-dev/tree/master/examples);
+  About TCP Library ,Please see [examples](https://github.com/IronsDu/dodo/tree/master/examples);
 
 ## About RPC
   Use this RPC library, you not need any proto file sush as Protobuf and Thrift, because i use C++ Template Generic Programming do this work.
@@ -90,7 +90,7 @@ I suggest you use the second or thrid way above, because don't worry memory mana
   The RPC support any C++ base type, sush as int、string、vector、map, and support Protobuf Message Type; Of course, RPC can use async callback mode, when you need process RPC reply msg return from server.
   
   On server side:
-```
+```cpp
 static int add(int a, int b)
 {
     //CenterServerRPCMgr::getRpcFromer()为调用者会话对象
@@ -134,7 +134,7 @@ void initCenterServerExt()
 
 On client side:
 
-```
+```cpp
 gLogicCenterServerClient->call("test", 1, 2);
 gLogicCenterServerClient->call("add", 1, 2);
 gLogicCenterServerClient->call("add", 1, 2, [](int result) {

@@ -1,10 +1,10 @@
-#include <assert.h>
-#include <string.h>
+#include <cassert>
+#include <cstring>
 #include "http_parser.h"
 
-using namespace std;
-
 #include "HttpParser.h"
+
+using namespace dodo::net;
 
 HTTPParser::HTTPParser(http_parser_type parserType)
 {
@@ -107,7 +107,7 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
             const char* len_flag = strstr(bodystart, RL);
             while (len_flag != nullptr)
             {
-                string numstr(tmp, len_flag);
+                std::string numstr(tmp, len_flag);
                 int    nValude = 0;
                 sscanf(numstr.c_str(), "%x", &nValude);
 
@@ -266,19 +266,24 @@ int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
     HTTPParser* httpParser = (HTTPParser*)hp->data;
 
     int result = http_parser_parse_url(url, length, 0, &u);
-    if (result) {
+    if (result != 0)
+    {
         return -1;
     }
-    else {
-        if ((u.field_set & (1 << UF_PATH))) {
+    else
+    {
+        if ((u.field_set & (1 << UF_PATH)))
+        {
             httpParser->mPath = std::string(url + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
         }
-        else {
+        else
+        {
             fprintf(stderr, "\n\n*** failed to parse PATH in URL %s ***\n\n", url);
             return -1;
         }
 
-        if ((u.field_set & (1 << UF_QUERY))) {
+        if ((u.field_set & (1 << UF_QUERY)))
+        {
             httpParser->mQuery = std::string(url + u.field_data[UF_QUERY].off, u.field_data[UF_QUERY].len);
         }
     }
@@ -289,7 +294,7 @@ int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
 int HTTPParser::sHeadValue(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mHeadValues[string(httpParser->mTmpHeadStr, httpParser->mTmpHeadLen)] = string(at, length);
+    httpParser->mHeadValues[std::string(httpParser->mTmpHeadStr, httpParser->mTmpHeadLen)] = std::string(at, length);
     return 0;
 }
 
@@ -304,12 +309,12 @@ int HTTPParser::sHeadField(http_parser* hp, const char *at, size_t length)
 int HTTPParser::sStatusHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mStatus = string(at, length);
+    httpParser->mStatus = std::string(at, length);
     return 0;
 }
 int HTTPParser::sBodyHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mBody = string(at, length);
+    httpParser->mBody = std::string(at, length);
     return 0;
 }
