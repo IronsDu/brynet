@@ -4,6 +4,8 @@
 #include <string>
 #include "WrapTCPService.h"
 
+using namespace dodo::net;
+
 /*应用服务器的网络层会话对象基类*/
 class BaseNetSession
 {

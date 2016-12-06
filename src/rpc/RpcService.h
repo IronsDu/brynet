@@ -29,7 +29,7 @@ namespace dodo
         class RpcService
         {
         public:
-            rpc()
+            RpcService()
             {
                 /*  注册rpc_reply 服务函数，处理rpc返回值   */
                 def(RPC_REPLY_STR.c_str(), [this](int req_id, const string& response){
