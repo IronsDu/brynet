@@ -2,7 +2,7 @@ dodo
 =======
 Cross platform high performance TCP network library and RPC library using C++ 11.
 
-Windows : [![Build status](https://ci.appveyor.com/api/projects/status/je9n1g26yah31e5e/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/accumulation-dev/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/accumulation-dev.svg?branch=master)](https://travis-ci.org/IronsDu/accumulation-dev)
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyqlw3ekua/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/dodo/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/dodo.svg?branch=master)](https://travis-ci.org/IronsDu/dodo)
 
 ## Features
 * Cross platform (Linux | Windows)
