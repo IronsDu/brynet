@@ -28,7 +28,7 @@ namespace dodo
             {
             }
 
-            const std::string&   getIP() const
+            const std::string&  getIP() const
             {
                 return mIP;
             }

@@ -29,7 +29,8 @@ namespace dodo
 #ifdef PLATFORM_WINDOWS
             enum class OLV_VALUE
             {
-                OVL_RECV = 1,
+                OVL_NONE = 0,
+                OVL_RECV,
                 OVL_SEND,
             };
 
@@ -85,16 +86,16 @@ namespace dodo
         private:
             size_t                          mEventEntriesNum;
 #ifdef PLATFORM_WINDOWS
-            typedef BOOL(WINAPI *sGetQueuedCompletionStatusEx) (HANDLE, LPOVERLAPPED_ENTRY, ULONG, PULONG, DWORD, BOOL);
-
             OVERLAPPED_ENTRY*               mEventEntries;
+
+            typedef BOOL(WINAPI *sGetQueuedCompletionStatusEx) (HANDLE, LPOVERLAPPED_ENTRY, ULONG, PULONG, DWORD, BOOL);
             sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
             HANDLE                          mIOCP;
             ovl_ext_s                       mWakeupOvl;
             Channel*                        mWakeupChannel;
 #else
-            int                             mEpollFd;
             epoll_event*                    mEventEntries;
+            int                             mEpollFd;
             int                             mWakeupFd;
             Channel*                        mWakeupChannel;
 #endif

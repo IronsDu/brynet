@@ -77,7 +77,7 @@ namespace dodo
                                                     const HttpSession::WS_CALLBACK& wsCallback = nullptr,
                                                     const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr);
 
-            void                    startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
+            void                    startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
             void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
         private:
             void                    setSessionCallback(HttpSession::PTR& httpSession, 

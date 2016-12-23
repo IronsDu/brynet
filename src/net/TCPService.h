@@ -57,12 +57,13 @@ namespace dodo
         class TcpService : public NonCopyable
         {
         public:
-            typedef std::shared_ptr<TcpService>                                 PTR;
+            typedef std::shared_ptr<TcpService>                                         PTR;
+            typedef int64_t SESSION_TYPE;
 
-            typedef std::function<void(EventLoop&)>                            FRAME_CALLBACK;
-            typedef std::function<void(int64_t, const std::string&)>            ENTER_CALLBACK;
-            typedef std::function<void(int64_t)>                                DISCONNECT_CALLBACK;
-            typedef std::function<size_t(int64_t, const char* buffer, size_t len)>   DATA_CALLBACK;
+            typedef std::function<void(EventLoop&)>                                     FRAME_CALLBACK;
+            typedef std::function<void(SESSION_TYPE, const std::string&)>               ENTER_CALLBACK;
+            typedef std::function<void(SESSION_TYPE)>                                   DISCONNECT_CALLBACK;
+            typedef std::function<size_t(SESSION_TYPE, const char* buffer, size_t len)> DATA_CALLBACK;
 
         public:
             TcpService();
@@ -82,27 +83,27 @@ namespace dodo
             const TcpService::DISCONNECT_CALLBACK&  getDisconnectCallback() const;
             const TcpService::DATA_CALLBACK&        getDataCallback() const;
 
-            void                                send(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
+            void                                send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
             /*  逻辑线程调用，将要发送的消息包缓存起来，再一次性通过flushCachePackectList放入到网络线程    */
-            void                                cacheSend(int64_t id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                                cacheSend(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
             void                                flushCachePackectList();
 
-            void                                shutdown(int64_t id) const;
+            void                                shutdown(SESSION_TYPE id) const;
 
             /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
-            void                                disConnect(int64_t id) const;
+            void                                disConnect(SESSION_TYPE id) const;
 
-            void                                setPingCheckTime(int64_t id, int checktime);
+            void                                setPingCheckTime(SESSION_TYPE id, int checktime);
 
             bool                                addDataSocket(sock fd,
-                const TcpService::ENTER_CALLBACK& enterCallback,
-                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
-                const TcpService::DATA_CALLBACK& dataCallback,
-                bool isUseSSL,
-                size_t maxRecvBufferSize,
-                bool forceSameThreadLoop = false);
+                                                                const TcpService::ENTER_CALLBACK& enterCallback,
+                                                                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
+                                                                const TcpService::DATA_CALLBACK& dataCallback,
+                                                                bool isUseSSL,
+                                                                size_t maxRecvBufferSize,
+                                                                bool forceSameThreadLoop = false);
 
             /*  开启监听线程  */
             void                                startListen(bool isIPV6, const std::string& ip, int port, int maxSessionRecvBufferSize, const char *certificate = nullptr, const char *privatekey = nullptr);
@@ -118,29 +119,29 @@ namespace dodo
             void                                stopWorkerThread();
 
             /*  wakeup某id所在的网络工作线程:非线程安全    */
-            void                                wakeup(int64_t id) const;
+            void                                wakeup(SESSION_TYPE id) const;
             /*  wakeup 所有的网络工作线程:非线程安全  */
             void                                wakeupAll() const;
             /*  随机获取一个EventLoop:非线程安全   */
             EventLoop*                          getRandomEventLoop();
-            EventLoop*                          getEventLoopBySocketID(int64_t id);
+            EventLoop*                          getEventLoopBySocketID(SESSION_TYPE id);
 
         private:
             bool                                helpAddChannel(DataSocket::PTR channel,
-                const std::string& ip,
-                const TcpService::ENTER_CALLBACK& enterCallback,
-                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
-                const TcpService::DATA_CALLBACK& dataCallback,
-                bool forceSameThreadLoop = false);
+                                                                const std::string& ip,
+                                                                const TcpService::ENTER_CALLBACK& enterCallback,
+                                                                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
+                                                                const TcpService::DATA_CALLBACK& dataCallback,
+                                                                bool forceSameThreadLoop = false);
         private:
-            int64_t                             MakeID(int loopIndex);
+            SESSION_TYPE                        MakeID(size_t loopIndex);
 
             void                                procDataSocketClose(DataSocket::PTR);
             /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
-            void                                postSessionAsyncProc(int64_t id, const std::function<void(DataSocket::PTR)>& callback) const;
+            void                                postSessionAsyncProc(SESSION_TYPE id, const std::function<void(DataSocket::PTR)>& callback) const;
 
         private:
-            typedef std::vector<std::tuple<int64_t, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
+            typedef std::vector<std::tuple<SESSION_TYPE, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
             std::shared_ptr<MSG_LIST>*          mCachePacketList;
 
             EventLoop*                          mLoops;
@@ -159,7 +160,6 @@ namespace dodo
             TcpService::DATA_CALLBACK           mDataCallback;
 
             /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
-
             union SessionId
             {
                 struct
@@ -169,7 +169,7 @@ namespace dodo
                     uint32_t    iid;            /*  自增计数器   */
                 }data;  /*  warn::so,服务器最大支持0xFFFF(65536)个io loop线程，每一个io loop最大支持0xFFFF(65536)个链接。*/
 
-                int64_t id;
+                SESSION_TYPE id;
             };
         };
     }

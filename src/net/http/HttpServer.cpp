@@ -136,7 +136,7 @@ void HttpServer::addConnection(sock fd,
     }, false, 32*1024 * 1024);
 }
 
-void HttpServer::startWorkThread(int workthreadnum, TcpService::FRAME_CALLBACK callback)
+void HttpServer::startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback)
 {
     mServer->startWorkThread(workthreadnum, callback);
 }

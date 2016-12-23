@@ -48,13 +48,13 @@ namespace dodo
             ~DataSocket();
 
             /*  仅在网络线程中调用才可能返回成功 */
-            bool                            onEnterEventLoop(EventLoop* el);
+            bool                            onEnterEventLoop(EventLoop* eventLoop);
 
             void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-            void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-
             void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+
+            void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
             void                            setEnterCallback(ENTER_CALLBACK&& cb);
             void                            setEnterCallback(const ENTER_CALLBACK& cb);

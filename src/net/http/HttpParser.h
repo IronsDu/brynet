@@ -47,7 +47,7 @@ namespace dodo
             static int                              sBodyHandle(http_parser* hp, const char *at, size_t length);
 
         private:
-            http_parser_type                        mParserType;
+            const http_parser_type                  mParserType;
             http_parser                             mParser;
             http_parser_settings                    mSettings;
 

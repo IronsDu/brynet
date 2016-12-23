@@ -17,7 +17,7 @@ namespace dodo
         typedef std::weak_ptr<Timer>            WeakPtr;
         typedef std::function<void(void)>       Callback;
 
-        Timer(time_t ms, Callback f);
+        Timer(time_t endTime, Callback f);
 
         time_t                                  getEndMs() const;
         void                                    cancel();
@@ -26,7 +26,7 @@ namespace dodo
     private:
         bool                                    mActive;
         Callback                                mCallback;
-        time_t                                  mEndMs;
+        const time_t                            mEndTime;
     };
 
     class TimerMgr

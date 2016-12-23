@@ -19,15 +19,16 @@ namespace dodo
         public:
             typedef std::shared_ptr<TCPSession>     PTR;
             typedef std::weak_ptr<TCPSession>       WEAK_PTR;
+            typedef int64_t USER_TYPE;
 
             typedef std::function<void(TCPSession::PTR&)>   CLOSE_CALLBACK;
             typedef std::function<size_t(TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
-            int64_t                 getUD() const;
-            void                    setUD(int64_t ud);
+            USER_TYPE               getUD() const;
+            void                    setUD(USER_TYPE ud);
 
             const std::string&      getIP() const;
-            int64_t                 getSocketID() const;
+            TcpService::SESSION_TYPE    getSocketID() const;
 
             void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
             void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
@@ -47,7 +48,7 @@ namespace dodo
         private:
             TCPSession();
 
-            void                    setSocketID(int64_t id);
+            void                    setSocketID(TcpService::SESSION_TYPE id);
             void                    setIP(const std::string& ip);
 
             void                    setService(TcpService::PTR& service);
@@ -63,13 +64,13 @@ namespace dodo
             }
 
         private:
-            TcpService::PTR         mService;
-            int64_t                 mSocketID;
-            std::string             mIP;
-            int64_t                 mUserData;
+            TcpService::PTR             mService;
+            TcpService::SESSION_TYPE    mSocketID;
+            std::string                 mIP;
+            USER_TYPE                   mUserData;
 
-            CLOSE_CALLBACK          mCloseCallback;
-            DATA_CALLBACK           mDataCallback;
+            CLOSE_CALLBACK              mCloseCallback;
+            DATA_CALLBACK               mDataCallback;
 
             friend class WrapServer;
         };
@@ -89,7 +90,11 @@ namespace dodo
 
             void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
 
-            void                    addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL, size_t maxRecvBufferSize, bool forceSameThreadLoop = false);
+            void                    addSession(sock fd, 
+                                                const SESSION_ENTER_CALLBACK& userEnterCallback, 
+                                                bool isUseSSL, 
+                                                size_t maxRecvBufferSize, 
+                                                bool forceSameThreadLoop = false);
 
         private:
             TcpService::PTR         mTCPService;

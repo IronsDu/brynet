@@ -6,7 +6,7 @@
 
 using namespace dodo::net;
 
-HTTPParser::HTTPParser(http_parser_type parserType)
+HTTPParser::HTTPParser(http_parser_type parserType) : mParserType(parserType)
 {
     mTmpHeadStr = nullptr;
     mTmpHeadLen = 0;
@@ -14,7 +14,6 @@ HTTPParser::HTTPParser(http_parser_type parserType)
     mIsWebSocket = false;
     mIsKeepAlive = false;
     mISCompleted = false;
-    mParserType = parserType;
     mSettings.on_status = sStatusHandle;
     mSettings.on_body = sBodyHandle;
     mSettings.on_url = sUrlHandle;

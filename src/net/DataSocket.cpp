@@ -26,14 +26,10 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
     mCanWrite = true;
 
 #ifdef PLATFORM_WINDOWS
-
     mPostRecvCheck = false;
     mPostWriteCheck = false;
 #endif
 
-    mEnterCallback = nullptr;
-    mDisConnectCallback = nullptr;
-    mDataCallback = nullptr;
     mUserData = -1;
     mRecvBuffer = nullptr;
     growRecvBuffer();
@@ -77,10 +73,10 @@ DataSocket::~DataSocket()
     }
 }
 
-bool DataSocket::onEnterEventLoop(EventLoop* el)
+bool DataSocket::onEnterEventLoop(EventLoop* eventLoop)
 {
-    assert(el->isInLoopThread());
-    if (!el->isInLoopThread())
+    assert(eventLoop->isInLoopThread());
+    if (!eventLoop->isInLoopThread())
     {
         return false;
     }
@@ -90,36 +86,42 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
     assert(mEventLoop == nullptr);
     if (mEventLoop == nullptr)
     {
-        mEventLoop = el;
+        mEventLoop = eventLoop;
 
         ox_socket_nonblock(mFD);
-        mEventLoop->linkChannel(mFD, this);
-        auto isUseSSL = false;
-
-#ifdef USE_OPENSSL
-        isUseSSL = mSSL != nullptr;
-#endif
-        if (isUseSSL)
+        if (!mEventLoop->linkChannel(mFD, this))
         {
-#ifdef USE_OPENSSL
-            processSSLHandshake();
-            ret = true;
-#endif
+            closeSocket();
         }
         else
         {
-            if (checkRead())
+            auto isUseSSL = false;
+
+#ifdef USE_OPENSSL
+            isUseSSL = mSSL != nullptr;
+#endif
+            if (isUseSSL)
             {
-                if (mEnterCallback != nullptr)
-                {
-                    mEnterCallback(this);
-                    mEnterCallback = nullptr;
-                }
+#ifdef USE_OPENSSL
+                processSSLHandshake();
                 ret = true;
+#endif
             }
             else
             {
-                closeSocket();
+                if (checkRead())
+                {
+                    if (mEnterCallback != nullptr)
+                    {
+                        mEnterCallback(this);
+                        mEnterCallback = nullptr;
+                    }
+                    ret = true;
+                }
+                else
+                {
+                    closeSocket();
+                }
             }
         }
     }
@@ -127,10 +129,17 @@ bool DataSocket::onEnterEventLoop(EventLoop* el)
     return ret;
 }
 
-/*  添加发送数据队列    */
-void    DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
+void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
 {
     sendPacket(makePacket(buffer, len), callback);
+}
+
+void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+{
+    mEventLoop->pushAsyncProc([this, packet, callback](){
+        mSendList.push_back({ packet, packet->size(), callback });
+        runAfterFlush();
+    });
 }
 
 void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
@@ -143,15 +152,7 @@ void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_
     }
 }
 
-void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
-{
-    mEventLoop->pushAsyncProc([this, packet, callback](){
-        mSendList.push_back({ packet, packet->size(), callback });
-        runAfterFlush();
-    });
-}
-
-void    DataSocket::canRecv()
+void DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
@@ -202,7 +203,7 @@ void DataSocket::runAfterFlush()
 {
     if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
     {
-        mEventLoop->pushAfterLoopProc([this](){
+        mEventLoop->pushAfterLoopProc([=](){
             mIsPostFlush = false;
             flush();
         });
@@ -217,7 +218,7 @@ void DataSocket::recv()
 
     while (mFD != SOCKET_ERROR)
     {
-        const size_t tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
+        const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
         if (tryRecvLen == 0)
         {
             break;
@@ -277,7 +278,7 @@ void DataSocket::recv()
             if (mDataCallback != nullptr)
             {
                 mRecvData = true;
-                size_t proclen = mDataCallback(this, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
+                auto proclen = mDataCallback(this, ox_buffer_getreadptr(mRecvBuffer), ox_buffer_getreadvalidcount(mRecvBuffer));
                 assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer));
                 if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer))
                 {
@@ -349,8 +350,8 @@ SEND_PROC:
     for (auto it = mSendList.begin(); it != mSendList.end(); ++it)
     {
         auto& packet = *it;
-        char* packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
-        size_t packetLeftLen = packet.left;
+        auto packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
+        auto packetLeftLen = packet.left;
 
         if ((wait_send_size + packetLeftLen) <= SENDBUF_SIZE)
         {
@@ -387,7 +388,7 @@ SEND_PROC:
 
         if (send_retlen > 0)
         {
-            size_t tmp_len = send_retlen;
+            auto tmp_len = static_cast<size_t>(send_retlen);
             for (auto it = mSendList.begin(); it != mSendList.end();)
             {
                 auto& packet = *it;
@@ -577,12 +578,11 @@ void DataSocket::onClose()
 {
     if (!mIsPostFinalClose)
     {
-        auto self = this;
         /*  使用pushAfterLoopProc来执行断开回调,可以保证它总是在其他此DataSocket相关的After Callback之后执行,进而可以安全的delete DataSocket对象   */
         mEventLoop->pushAfterLoopProc([=](){
             if (mDisConnectCallback != nullptr)
             {
-                mDisConnectCallback(self);
+                mDisConnectCallback(this);
             }
         });
 
@@ -607,8 +607,6 @@ bool    DataSocket::checkRead()
 #ifdef PLATFORM_WINDOWS
     static CHAR temp[] = { 0 };
     static WSABUF  in_buf = { 0, temp };
-
-    /*  添加可读检测  */
 
     if (!mPostRecvCheck)
     {
@@ -736,8 +734,8 @@ void DataSocket::startPingCheckTimer()
 {
     if (!mTimer.lock() && mCheckTime > 0)
     {
-        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [this](){
-            this->PingCheck();
+        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [=](){
+            PingCheck();
         });
     }
 }
@@ -768,9 +766,8 @@ void DataSocket::postDisConnect()
 {
     if (mEventLoop != nullptr)
     {
-        auto self = this;
         mEventLoop->pushAsyncProc([=](){
-            self->procCloseInLoop();
+            procCloseInLoop();
         });
     }
 }
@@ -779,13 +776,12 @@ void DataSocket::postShutdown()
 {
     if (mEventLoop != nullptr)
     {
-        auto self = this;
         mEventLoop->pushAsyncProc([=](){
             if (mFD != SOCKET_ERROR)
             {
                 /*  使用pushAfterLoopProc是因为尽量保证在处理完send之后再shutdown，这在实现http server中很重要   */
                 mEventLoop->pushAfterLoopProc([=](){
-                    self->procShutdownInLoop();
+                    procShutdownInLoop();
                 });
             }
         });

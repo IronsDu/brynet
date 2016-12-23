@@ -4,7 +4,7 @@ using namespace dodo;
 
 time_t Timer::getEndMs() const
 {
-    return mEndMs;
+    return mEndTime;
 }
 
 void Timer::cancel()
@@ -12,7 +12,7 @@ void Timer::cancel()
     mActive = false;
 }
 
-Timer::Timer(time_t ms, Callback callback) : mEndMs(ms), mCallback(callback)
+Timer::Timer(time_t ms, Callback callback) : mEndTime(ms), mCallback(callback)
 {
     mActive = true;
 }
@@ -56,7 +56,7 @@ time_t TimerMgr::nearEndMs()
     }
     else
     {
-        time_t tmp = mTimers.top()->getEndMs() - ox_getnowtime();
+        auto tmp = mTimers.top()->getEndMs() - ox_getnowtime();
         return (tmp < 0 ? 0 : tmp);
     }
 }
