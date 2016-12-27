@@ -1,0 +1,17 @@
+package sofa.pbrpc.test;
+option cc_generic_services = true;
+
+// 定义请求消息
+message EchoRequest {
+    required string message = 1;
+}
+
+// 定义回应消息
+message EchoResponse {
+    required string message = 1;
+}
+
+// 定义RPC服务，可包含多个方法（这里只列出一个）
+service EchoServer {
+    rpc Echo(EchoRequest) returns(EchoResponse);
+}
