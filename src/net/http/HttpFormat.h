@@ -11,6 +11,13 @@ namespace dodo
         class HttpFormat
         {
         public:
+
+            enum class HTTP_RESPONSE_STATUS
+            {
+                NONE,
+                OK = 200,
+            };
+
             enum HTTP_TYPE_PROTOCOL
             {
                 HTP_NONE,
@@ -20,6 +27,16 @@ namespace dodo
                 HTP_RESPONSE,
                 HTP_MAX
             };
+
+            HttpFormat()
+            {
+                setStatus(HTTP_RESPONSE_STATUS::OK);
+            }
+
+            void        setStatus(HTTP_RESPONSE_STATUS status)
+            {
+                mStatus = status;
+            }
 
             void        setProtocol(HTTP_TYPE_PROTOCOL protocol)
             {
@@ -94,6 +111,19 @@ namespace dodo
                 }
 
                 ret += " HTTP/1.1";
+                if (mProtocol == HTP_RESPONSE)
+                {
+                    ret += " ";
+                    ret += std::to_string(static_cast<int>(mStatus));
+                    switch (mStatus)
+                    {
+                    case HTTP_RESPONSE_STATUS::OK:
+                        ret += " OK";
+                    default:
+                        break;
+                    }
+                }
+
                 ret += "\r\n";
 
                 for (auto& v : mHeadField)
@@ -123,7 +153,7 @@ namespace dodo
                 return ret;
             }
         private:
-
+            HTTP_RESPONSE_STATUS                mStatus;
             std::string                         mUrl;
             HTTP_TYPE_PROTOCOL                  mProtocol;
             std::string                         mParameter;

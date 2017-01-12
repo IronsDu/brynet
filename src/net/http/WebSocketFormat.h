@@ -37,7 +37,7 @@ namespace dodo
                 std::string base64Str = base64_encode((const unsigned char *)puDest, 20);
 
                 std::string response = "HTTP/1.1 101 Switching Protocols\r\n"
-                    "Upgrade: Websocket\r\n"
+                    "Upgrade: websocket\r\n"
                     "Connection: Upgrade\r\n"
                     "Sec-WebSocket-Accept: ";
 
@@ -47,13 +47,12 @@ namespace dodo
                 return response;
             }
 
-            static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool isFin = true, bool masking = false)
+            static bool wsFrameBuild(const char* payload, size_t payloadLen, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool isFin = true, bool masking = false)
             {
                 static_assert(std::is_same<std::string::value_type, char>::value, "");
 
                 uint8_t head = (uint8_t)frame_type | (isFin ? 0x80 : 0x00);
 
-                size_t payloadLen = payload.size();
                 frame.clear();
                 frame.push_back((char)head);
                 if (payloadLen <= 125)
@@ -87,20 +86,24 @@ namespace dodo
                         frame.push_back(mask[i]);
                     }
 
-                    std::string maskPayload;
-                    for (size_t i = 0; i < payload.size(); i++)
-                    {
-                        maskPayload.push_back((uint8_t)payload[i] ^ mask[i % 4]);
-                    }
+                    frame.reserve(frame.size() + payloadLen);
 
-                    frame.insert(frame.end(), maskPayload.begin(), maskPayload.end());
+                    for (size_t i = 0; i < payloadLen; i++)
+                    {
+                        frame.push_back((uint8_t)payload[i] ^ mask[i % 4]);
+                    }
                 }
                 else
                 {
-                    frame.insert(frame.end(), payload.begin(), payload.end());
+                    frame.append(payload, payloadLen);
                 }
 
                 return true;
+            }
+
+            static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool isFin = true, bool masking = false)
+            {
+                return wsFrameBuild(payload.c_str(), payload.size(), frame, frame_type, isFin, masking);
             }
 
             static bool wsFrameExtractBuffer(const char* inbuffer, const size_t bufferSize, std::string& payload, WebSocketFrameType& outopcode, size_t& frameSize, bool& outfin)
@@ -160,13 +163,13 @@ namespace dodo
 
                 if (isMasking)
                 {
-                    payload.resize(payloadlen, 0);
+                    payload.reserve(payloadlen);
                     for (size_t i = pos, j = 0; j < payloadlen; i++, j++)
-                        payload[j] = buffer[i] ^ mask[j % 4];
+                        payload.push_back(buffer[i] ^ mask[j % 4]);
                 }
                 else
                 {
-                    payload.append((const char*)buffer, pos, payloadlen);
+                    payload.append((const char*)(buffer + pos), payloadlen);
                 }
 
                 frameSize = payloadlen + pos;

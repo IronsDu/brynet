@@ -21,6 +21,7 @@ namespace dodo
             typedef std::function < void(HttpSession::PTR, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) > WS_CALLBACK;
 
             typedef std::function < void(HttpSession::PTR) > CLOSE_CALLBACK;
+            typedef std::function < void(HttpSession::PTR) > WS_CONNECTED_CALLBACK;
 
             HttpSession(TCPSession::PTR);
 
@@ -31,6 +32,8 @@ namespace dodo
             void                    setHttpCallback(const HTTPPARSER_CALLBACK& callback);
             void                    setCloseCallback(const CLOSE_CALLBACK& callback);
             void                    setWSCallback(const WS_CALLBACK& callback);
+
+            void                    setWSConnected(const WS_CONNECTED_CALLBACK& callback);
 
             HTTPPARSER_CALLBACK&    getHttpCallback();
             CLOSE_CALLBACK&         getCloseCallback();
@@ -54,6 +57,7 @@ namespace dodo
             HTTPPARSER_CALLBACK     mHttpRequestCallback;
             WS_CALLBACK             mWSCallback;
             CLOSE_CALLBACK          mCloseCallback;
+            WS_CONNECTED_CALLBACK   mWSConnectedCallback;
 
             friend class HttpServer;
         };
@@ -75,7 +79,8 @@ namespace dodo
                                                     const ENTER_CALLBACK& enterCallback,
                                                     const HttpSession::HTTPPARSER_CALLBACK& responseCallback,
                                                     const HttpSession::WS_CALLBACK& wsCallback = nullptr,
-                                                    const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr);
+                                                    const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr,
+                                                    const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback = nullptr);
 
             void                    startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
             void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
@@ -83,7 +88,8 @@ namespace dodo
             void                    setSessionCallback(HttpSession::PTR& httpSession, 
                                                         const HttpSession::HTTPPARSER_CALLBACK& callback, 
                                                         const HttpSession::WS_CALLBACK& wsCallback = nullptr, 
-                                                        const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr);
+                                                        const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr,
+                                                        const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback = nullptr);
 
         private:
             ENTER_CALLBACK          mOnEnter;

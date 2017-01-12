@@ -213,6 +213,11 @@ bool HTTPParser::isCompleted() const
     return mISCompleted;
 }
 
+bool HTTPParser::hasKey(const std::string& key) const
+{
+    return mHeadValues.find(key) != mHeadValues.end();
+}
+
 const std::string& HTTPParser::getValue(const std::string& key) const
 {
     static std::string emptystr("");
@@ -236,6 +241,11 @@ const std::string& HTTPParser::getBody() const
 std::string& HTTPParser::getWSCacheFrame()
 {
     return mWSCacheFrame;
+}
+
+std::string& HTTPParser::getWSParseString()
+{
+    return mParsePayload;
 }
 
 int HTTPParser::sChunkHeader(http_parser* hp)

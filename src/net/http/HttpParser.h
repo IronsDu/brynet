@@ -22,10 +22,12 @@ namespace dodo
             const std::string&                      getPath() const;
             const std::string&                      getQuery() const;
 
+            bool                                    hasKey(const std::string& key) const;
             const std::string&                      getValue(const std::string& key) const;
             const std::string&                      getBody() const;
 
             std::string&                            getWSCacheFrame();
+            std::string&                            getWSParseString();
 
         private:
             void                                    clearParse();
@@ -47,7 +49,7 @@ namespace dodo
             static int                              sBodyHandle(http_parser* hp, const char *at, size_t length);
 
         private:
-            const http_parser_type                  mParserType;
+            http_parser_type                        mParserType;
             http_parser                             mParser;
             http_parser_settings                    mSettings;
 
@@ -62,6 +64,7 @@ namespace dodo
             std::string                             mBody;
 
             std::string                             mWSCacheFrame;
+            std::string                             mParsePayload;
 
         private:
             const char*                             mTmpHeadStr;
