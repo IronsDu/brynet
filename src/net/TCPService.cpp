@@ -166,7 +166,7 @@ TcpService::TcpService()
     mLoops = nullptr;
     mLoopNum = 0;
     mIOThreads = nullptr;
-    mIds = nullptr;
+    mDataSockets = nullptr;
     mIncIds = nullptr;
 
     mEnterCallback = nullptr;
@@ -235,10 +235,10 @@ void TcpService::send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, con
     if (sid.data.loopIndex < mLoopNum)
     {
         /*  如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响),否则可使用postSessionAsyncProc */
-        if (mLoops[sid.data.loopIndex].isInLoopThread())
+        if (mLoops[sid.data.loopIndex]->isInLoopThread())
         {
             DataSocket::PTR tmp = nullptr;
-            if (mIds[sid.data.loopIndex].get(sid.data.index, tmp) &&
+            if (mDataSockets[sid.data.loopIndex].get(sid.data.index, tmp) &&
                 tmp != nullptr &&
                 tmp->getUserData() == sid.id)
             {
@@ -247,9 +247,9 @@ void TcpService::send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, con
         }
         else
         {
-            mLoops[sid.data.loopIndex].pushAsyncProc([=](){
+            mLoops[sid.data.loopIndex]->pushAsyncProc([=](){
                 DataSocket::PTR tmp = nullptr;
-                if (mIds[sid.data.loopIndex].get(sid.data.index, tmp) &&
+                if (mDataSockets[sid.data.loopIndex].get(sid.data.index, tmp) &&
                     tmp != nullptr &&
                     tmp->getUserData() == sid.id)
                 {
@@ -278,13 +278,13 @@ void TcpService::flushCachePackectList()
         if (!mCachePacketList[i]->empty())
         {
             auto& msgList = mCachePacketList[i];
-            mLoops[i].pushAsyncProc([=](){
+            mLoops[i]->pushAsyncProc([=](){
                 for (auto& v : *msgList)
                 {
                     union  SessionId sid;
                     sid.id = std::get<0>(v);
                     DataSocket::PTR tmp = nullptr;
-                    if (mIds[sid.data.loopIndex].get(sid.data.index, tmp))
+                    if (mDataSockets[sid.data.loopIndex].get(sid.data.index, tmp))
                     {
                         if (tmp != nullptr && tmp->getUserData() == sid.id)
                         {
@@ -327,10 +327,10 @@ void TcpService::postSessionAsyncProc(SESSION_TYPE id, const std::function<void(
     assert(sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex < mLoopNum)
     {
-        mLoops[sid.data.loopIndex].pushAsyncProc([=](){
+        mLoops[sid.data.loopIndex]->pushAsyncProc([=](){
             DataSocket::PTR tmp = nullptr;
             if (callback != nullptr &&
-                mIds[sid.data.loopIndex].get(sid.data.index, tmp) &&
+                mDataSockets[sid.data.loopIndex].get(sid.data.index, tmp) &&
                 tmp != nullptr &&
                 tmp->getUserData() == sid.id)
             {
@@ -359,8 +359,8 @@ void TcpService::closeWorkerThread()
     mLoops = nullptr;
     delete[] mIncIds;
     mIncIds = nullptr;
-    delete[] mIds;
-    mIds = nullptr;
+    delete[] mDataSockets;
+    mDataSockets = nullptr;
     delete[] mCachePacketList;
     mCachePacketList = nullptr;
 }
@@ -373,7 +373,7 @@ void TcpService::stopWorkerThread()
 
         for (size_t i = 0; i < mLoopNum; ++i)
         {
-            mLoops[i].wakeup();
+            mLoops[i]->wakeup();
         }
     }
 
@@ -429,10 +429,15 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
             mCachePacketList[i] = std::make_shared<MSG_LIST>();
         }
 
-        mLoops = new EventLoop[threadNum];
+        mLoops = new EventLoop::PTR[threadNum];
+        for (size_t i = 0; i < threadNum; ++i)
+        {
+            mLoops[i] = std::make_shared<EventLoop>();
+        }
+
         mIOThreads = new std::thread*[threadNum];
         mLoopNum = threadNum;
-        mIds = new TypeIDS<DataSocket::PTR>[threadNum];
+        mDataSockets = new TypeIDS<DataSocket::PTR>[threadNum];
         mIncIds = new int[threadNum];
         for (size_t i = 0; i < threadNum; ++i)
         {
@@ -441,14 +446,14 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
 
         for (size_t i = 0; i < mLoopNum; ++i)
         {
-            EventLoop& l = mLoops[i];
-            mIOThreads[i] = new std::thread([=,&l](){
+            EventLoop::PTR eventLoop = mLoops[i];
+            mIOThreads[i] = new std::thread([=](){
                 while (mRunIOLoop)
                 {
-                    l.loop(l.getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : l.getTimerMgr()->nearEndMs());
+                    eventLoop->loop(eventLoop->getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : eventLoop->getTimerMgr()->nearEndMs());
                     if (callback != nullptr)
                     {
-                        callback(l);
+                        callback(eventLoop);
                     }
                 }
             });
@@ -463,7 +468,7 @@ void TcpService::wakeup(SESSION_TYPE id) const
     assert(sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex < mLoopNum)
     {
-        mLoops[sid.data.loopIndex].wakeup();
+        mLoops[sid.data.loopIndex]->wakeup();
     }
 }
 
@@ -471,29 +476,29 @@ void TcpService::wakeupAll() const
 {
     for (size_t i = 0; i < mLoopNum; ++i)
     {
-        mLoops[i].wakeup();
+        mLoops[i]->wakeup();
     }
 }
 
-EventLoop* TcpService::getRandomEventLoop()
+EventLoop::PTR TcpService::getRandomEventLoop()
 {
-    EventLoop* ret = nullptr;
+    EventLoop::PTR ret;
     if (mLoopNum > 0)
     {
-        ret = &mLoops[rand() % mLoopNum];
+        ret = mLoops[rand() % mLoopNum];
     }
 
     return ret;
 }
 
-EventLoop* TcpService::getEventLoopBySocketID(SESSION_TYPE id)
+EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id)
 {
     union  SessionId sid;
     sid.id = id;
     assert(sid.data.loopIndex < mLoopNum);
     if (sid.data.loopIndex < mLoopNum)
     {
-        return &mLoops[sid.data.loopIndex];
+        return mLoops[sid.data.loopIndex];
     }
     else
     {
@@ -505,7 +510,7 @@ TcpService::SESSION_TYPE TcpService::MakeID(size_t loopIndex)
 {
     union SessionId sid;
     sid.data.loopIndex = loopIndex;
-    sid.data.index = mIds[loopIndex].claimID();
+    sid.data.index = mDataSockets[loopIndex].claimID();
     sid.data.iid = mIncIds[loopIndex]++;
 
     return sid.id;
@@ -516,8 +521,8 @@ void TcpService::procDataSocketClose(DataSocket::PTR ds)
     union SessionId sid;
     sid.id = ds->getUserData();
 
-    mIds[sid.data.loopIndex].set(nullptr, sid.data.index);
-    mIds[sid.data.loopIndex].reclaimID(sid.data.index);
+    mDataSockets[sid.data.loopIndex].set(nullptr, sid.data.index);
+    mDataSockets[sid.data.loopIndex].reclaimID(sid.data.index);
 }
 
 bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
@@ -535,7 +540,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
         bool find = false;
         for (size_t i = 0; i < mLoopNum; i++)
         {
-            if (mLoops[i].isInLoopThread())
+            if (mLoops[i]->isInLoopThread())
             {
                 loopIndex = i;
                 find = true;
@@ -553,13 +558,13 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
         loopIndex = rand() % mLoopNum;
     }
 
-    auto loop = mLoops + loopIndex;
+    auto loop = mLoops[loopIndex];
 
     channel->setEnterCallback([=](DataSocket::PTR dataSocket){
         auto id = MakeID(loopIndex);
         union SessionId sid;
         sid.id = id;
-        mIds[loopIndex].set(dataSocket, sid.data.index);
+        mDataSockets[loopIndex].set(dataSocket, sid.data.index);
         dataSocket->setUserData(id);
         dataSocket->setDataCallback([=](DataSocket::PTR ds, const char* buffer, size_t len){
             return dataCallback(id, buffer, len);
@@ -578,7 +583,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
     });
 
     loop->pushAsyncProc([=](){
-        if (!channel->onEnterEventLoop(loop))
+        if (!channel->onEnterEventLoop(loop.get()))
         {
             delete channel;
         }

@@ -9,28 +9,59 @@ namespace dodo
 {
     namespace net
     {
-        class WakeupChannel : public Channel, public NonCopyable
+#ifdef PLATFORM_WINDOWS
+        class WakeupChannel final : public Channel, public NonCopyable
+        {
+        public:
+            WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
+            {
+            }
+
+            void    wakeup()
+            {
+                PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)this, (OVERLAPPED*)&mWakeupOvl);
+            }
+
+        private:
+            void    canRecv() override
+            {
+            }
+
+            void    canSend() override
+            {
+            }
+
+            void    onClose() override
+            {
+            }
+
+        private:
+            HANDLE                  mIOCP;
+            EventLoop::ovl_ext_s    mWakeupOvl;
+        };
+#else
+        class WakeupChannel final : public Channel, public NonCopyable
         {
         public:
             explicit WakeupChannel(sock fd) : mFd(fd)
             {
             }
 
-        private:
-            ~WakeupChannel()
+            void    wakeup()
             {
-#ifdef PLATFORM_WINDOWS
-#else
-                close(mFd);
-                mFd = SOCKET_ERROR;
-#endif
+                uint64_t one = 1;
+                write(mFd, &one, sizeof one);
             }
 
+            ~WakeupChannel()
+            {
+                close(mFd);
+                mFd = SOCKET_ERROR;
+            }
+
+        private:
             void    canRecv() override
             {
-#ifdef PLATFORM_WINDOWS
-#else
-                /*  linux 下必须读完所有数据 */
                 char temp[1024 * 10];
                 while (true)
                 {
@@ -40,7 +71,6 @@ namespace dodo
                         break;
                     }
                 }
-#endif
             }
 
             void    canSend() override
@@ -54,31 +84,32 @@ namespace dodo
         private:
             sock    mFd;
         };
+#endif
     }
 }
 
 EventLoop::EventLoop()
 #ifdef PLATFORM_WINDOWS
-    : mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
+    : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
+#else
+    : mEpollFd = epoll_create(1)
 #endif
 {
 #ifdef PLATFORM_WINDOWS
     mPGetQueuedCompletionStatusEx = NULL;
-    HMODULE kernel32_module = GetModuleHandleA("kernel32.dll");
+    auto kernel32_module = GetModuleHandleA("kernel32.dll");
     if (kernel32_module != NULL) {
         mPGetQueuedCompletionStatusEx = (sGetQueuedCompletionStatusEx)GetProcAddress(
             kernel32_module,
             "GetQueuedCompletionStatusEx");
         FreeLibrary(kernel32_module);
     }
-    mIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1);
-    mWakeupChannel = new WakeupChannel(-1);
 #else
-    mEpollFd = epoll_create(1);
-    mWakeupFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    mWakeupChannel = new WakeupChannel(mWakeupFd);
-    linkChannel(mWakeupFd, mWakeupChannel);
+    auto eventfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    mWakeupChannel.reset(new WakeupChannel(eventfd));
+    linkChannel(eventfd, mWakeupChannel.get());
 #endif
+
     mIsAlreadyPostWakeup = false;
     mIsInBlock = true;
 
@@ -93,14 +124,10 @@ EventLoop::EventLoop()
 
 EventLoop::~EventLoop()
 {
-    delete mWakeupChannel;
-    mWakeupChannel = nullptr;
 #ifdef PLATFORM_WINDOWS
     CloseHandle(mIOCP);
     mIOCP = INVALID_HANDLE_VALUE;
 #else
-    close(mWakeupFd);
-    mWakeupFd = -1;
     close(mEpollFd);
     mEpollFd = -1;
 #endif
@@ -117,10 +144,9 @@ dodo::TimerMgr::PTR EventLoop::getTimerMgr()
 
 inline void EventLoop::tryInitThreadID()
 {
-    if (!mIsInitThreadID)
+    if (!mIsInitThreadID && !mIsInitThreadID.exchange(true))
     {
         mSelfThreadid = CurrentThread::tid();
-        mIsInitThreadID = true;
     }
 }
 
@@ -143,12 +169,10 @@ void EventLoop::loop(int64_t timeout)
     }
 
 #ifdef PLATFORM_WINDOWS
-
     ULONG numComplete = 0;
     if (mPGetQueuedCompletionStatusEx != nullptr)
     {
-        BOOL rc = mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, static_cast<ULONG>(mEventEntriesNum), &numComplete, static_cast<DWORD>(timeout), false);
-        if (!rc)
+        if (!mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, static_cast<ULONG>(mEventEntriesNum), &numComplete, static_cast<DWORD>(timeout), false))
         {
             numComplete = 0;
         }
@@ -156,32 +180,14 @@ void EventLoop::loop(int64_t timeout)
     else
     {
         /*对GQCS返回失败不予处理，正常流程下只存在于上层主动closesocket才发生此情况，且其会在onRecv中得到处理(最终释放会话资源)*/
-        GetQueuedCompletionStatus(mIOCP,
-                                            &mEventEntries[numComplete].dwNumberOfBytesTransferred,
-                                            &mEventEntries[numComplete].lpCompletionKey,
-                                            &mEventEntries[numComplete].lpOverlapped,
-                                            static_cast<DWORD>(timeout));
-
-        if (mEventEntries[numComplete].lpOverlapped != nullptr)
+        do
         {
-            numComplete++;
-            while (numComplete < mEventEntriesNum)
-            {
-                GetQueuedCompletionStatus(mIOCP,
-                                               &mEventEntries[numComplete].dwNumberOfBytesTransferred,
-                                               &mEventEntries[numComplete].lpCompletionKey,
-                                               &mEventEntries[numComplete].lpOverlapped,
-                                               0);
-                if (mEventEntries[numComplete].lpOverlapped != nullptr)
-                {
-                    numComplete++;
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }
+            GetQueuedCompletionStatus(mIOCP,
+                &mEventEntries[numComplete].dwNumberOfBytesTransferred,
+                &mEventEntries[numComplete].lpCompletionKey,
+                &mEventEntries[numComplete].lpOverlapped,
+                (numComplete == 0) ? static_cast<DWORD>(timeout) : 0);
+        } while (mEventEntries[numComplete].lpOverlapped != nullptr && ++numComplete < mEventEntriesNum);
     }
 
     mIsInBlock = false;
@@ -210,8 +216,8 @@ void EventLoop::loop(int64_t timeout)
 
     for (int i = 0; i < numComplete; ++i)
     {
-        Channel*    channel = (Channel*)(mEventEntries[i].data.ptr);
-        uint32_t    event_data = mEventEntries[i].events;
+        auto    channel = (Channel*)(mEventEntries[i].data.ptr);
+        auto    event_data = mEventEntries[i].events;
 
         if (event_data & EPOLLRDHUP)
         {
@@ -276,12 +282,7 @@ bool EventLoop::wakeup()
     bool ret = false;
     if (!isInLoopThread() && mIsInBlock && !mIsAlreadyPostWakeup.exchange(true))
     {
-#ifdef PLATFORM_WINDOWS
-        PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)mWakeupChannel, (OVERLAPPED*)&mWakeupOvl);
-#else
-        uint64_t one = 1;
-        ssize_t n = write(mWakeupFd, &one, sizeof one);
-#endif
+        mWakeupChannel->wakeup();
         ret = true;
     }
 
@@ -350,12 +351,7 @@ void EventLoop::pushAfterLoopProc(USER_PROC&& f)
     }
 }
 
-#ifdef PLATFORM_WINDOWS
-HANDLE EventLoop::getIOCPHandle() const
-{
-    return mIOCP;
-}
-#else
+#ifndef PLATFORM_WINDOWS
 int EventLoop::getEpollHandle() const
 {
     return mEpollFd;

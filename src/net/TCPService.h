@@ -60,7 +60,7 @@ namespace dodo
             typedef std::shared_ptr<TcpService>                                         PTR;
             typedef int64_t SESSION_TYPE;
 
-            typedef std::function<void(EventLoop&)>                                     FRAME_CALLBACK;
+            typedef std::function<void(EventLoop::PTR)>                                 FRAME_CALLBACK;
             typedef std::function<void(SESSION_TYPE, const std::string&)>               ENTER_CALLBACK;
             typedef std::function<void(SESSION_TYPE)>                                   DISCONNECT_CALLBACK;
             typedef std::function<size_t(SESSION_TYPE, const char* buffer, size_t len)> DATA_CALLBACK;
@@ -123,8 +123,8 @@ namespace dodo
             /*  wakeup 所有的网络工作线程:非线程安全  */
             void                                wakeupAll() const;
             /*  随机获取一个EventLoop:非线程安全   */
-            EventLoop*                          getRandomEventLoop();
-            EventLoop*                          getEventLoopBySocketID(SESSION_TYPE id);
+            EventLoop::PTR                      getRandomEventLoop();
+            EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id);
 
         private:
             bool                                helpAddChannel(DataSocket::PTR channel,
@@ -144,14 +144,14 @@ namespace dodo
             typedef std::vector<std::tuple<SESSION_TYPE, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
             std::shared_ptr<MSG_LIST>*          mCachePacketList;
 
-            EventLoop*                          mLoops;
+            EventLoop::PTR*                     mLoops;
             std::thread**                       mIOThreads;
             size_t                              mLoopNum;
             bool                                mRunIOLoop;
 
             ListenThread                        mListenThread;
 
-            TypeIDS<DataSocket::PTR>*           mIds;
+            TypeIDS<DataSocket::PTR>*           mDataSockets;
             int*                                mIncIds;
 
             /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
@@ -165,7 +165,7 @@ namespace dodo
                 struct
                 {
                     uint16_t    loopIndex;      /*  会话所属的eventloop的(在mLoops中的)索引  */
-                    uint16_t    index;          /*  会话在mIds[loopIndex]中的索引值 */
+                    uint16_t    index;          /*  会话在mDataSockets[loopIndex]中的索引值 */
                     uint32_t    iid;            /*  自增计数器   */
                 }data;  /*  warn::so,服务器最大支持0xFFFF(65536)个io loop线程，每一个io loop最大支持0xFFFF(65536)个链接。*/
 

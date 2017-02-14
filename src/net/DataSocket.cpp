@@ -81,48 +81,49 @@ bool DataSocket::onEnterEventLoop(EventLoop* eventLoop)
         return false;
     }
 
-    bool ret = false;
-
     assert(mEventLoop == nullptr);
-    if (mEventLoop == nullptr)
+    if (mEventLoop != nullptr)
     {
-        mEventLoop = eventLoop;
+        return false;
+    }
 
-        ox_socket_nonblock(mFD);
-        if (!mEventLoop->linkChannel(mFD, this))
+    mEventLoop = eventLoop;
+
+    ox_socket_nonblock(mFD);
+    if (!mEventLoop->linkChannel(mFD, this))
+    {
+        closeSocket();
+        return false;
+    }
+
+    bool ret = false;
+    auto isUseSSL = false;
+
+#ifdef USE_OPENSSL
+    isUseSSL = mSSL != nullptr;
+#endif
+
+    if (isUseSSL)
+    {
+#ifdef USE_OPENSSL
+        processSSLHandshake();
+        ret = true;
+#endif
+    }
+    else
+    {
+        if (checkRead())
         {
-            closeSocket();
+            if (mEnterCallback != nullptr)
+            {
+                mEnterCallback(this);
+                mEnterCallback = nullptr;
+            }
+            ret = true;
         }
         else
         {
-            auto isUseSSL = false;
-
-#ifdef USE_OPENSSL
-            isUseSSL = mSSL != nullptr;
-#endif
-            if (isUseSSL)
-            {
-#ifdef USE_OPENSSL
-                processSSLHandshake();
-                ret = true;
-#endif
-            }
-            else
-            {
-                if (checkRead())
-                {
-                    if (mEnterCallback != nullptr)
-                    {
-                        mEnterCallback(this);
-                        mEnterCallback = nullptr;
-                    }
-                    ret = true;
-                }
-                else
-                {
-                    closeSocket();
-                }
-            }
+            closeSocket();
         }
     }
 

@@ -19,6 +19,7 @@ namespace dodo
     {
         class Channel;
         class DataSocket;
+        class WakeupChannel;
 
         class EventLoop : public NonCopyable
         {
@@ -75,9 +76,7 @@ namespace dodo
             void                            processAfterLoopProcs();
             void                            processAsyncProcs();
 
-#ifdef PLATFORM_WINDOWS
-            HANDLE                          getIOCPHandle() const;
-#else
+#ifndef PLATFORM_WINDOWS
             int                             getEpollHandle() const;
 #endif
             bool                            linkChannel(sock fd, Channel* ptr);
@@ -85,19 +84,17 @@ namespace dodo
 
         private:
             size_t                          mEventEntriesNum;
+            std::unique_ptr<WakeupChannel>  mWakeupChannel;
+
 #ifdef PLATFORM_WINDOWS
             OVERLAPPED_ENTRY*               mEventEntries;
 
             typedef BOOL(WINAPI *sGetQueuedCompletionStatusEx) (HANDLE, LPOVERLAPPED_ENTRY, ULONG, PULONG, DWORD, BOOL);
             sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
             HANDLE                          mIOCP;
-            ovl_ext_s                       mWakeupOvl;
-            Channel*                        mWakeupChannel;
 #else
             epoll_event*                    mEventEntries;
             int                             mEpollFd;
-            int                             mWakeupFd;
-            Channel*                        mWakeupChannel;
 #endif
             std::atomic_bool                mIsInBlock;
             std::atomic_bool                mIsAlreadyPostWakeup;
@@ -110,7 +107,7 @@ namespace dodo
 
             std::mutex                      mAsyncProcsMutex;
 
-            bool                            mIsInitThreadID;
+            std::atomic_bool                mIsInitThreadID;
             CurrentThread::THREAD_ID_TYPE   mSelfThreadid;              /*  调用loop函数所在thread的id */
 
             TimerMgr::PTR                   mTimer;
