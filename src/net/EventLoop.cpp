@@ -92,7 +92,7 @@ EventLoop::EventLoop()
 #ifdef PLATFORM_WINDOWS
     : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
 #else
-    : mEpollFd = epoll_create(1)
+    : mEpollFd(epoll_create(1))
 #endif
 {
 #ifdef PLATFORM_WINDOWS
