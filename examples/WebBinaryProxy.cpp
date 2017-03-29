@@ -10,6 +10,10 @@ typedef  uint32_t PACKET_LEN_TYPE;
 
 const static PACKET_LEN_TYPE PACKET_HEAD_LEN = sizeof(PACKET_LEN_TYPE);
 
+using namespace std;
+using namespace dodo;
+using namespace dodo::net;
+
 int main(int argc, char **argv)
 {
     if (argc != 4)
@@ -24,7 +28,7 @@ int main(int argc, char **argv)
 
     HttpServer::PTR netService = std::make_shared<HttpServer>();
 
-    netService->startListen(bindPort);
+    netService->startListen(false, "0.0.0.0", bindPort);
     netService->startWorkThread(ox_getcpunum());
 
     netService->setEnterCallback([=](HttpSession::PTR clientWebSession){
@@ -33,7 +37,7 @@ int main(int argc, char **argv)
         std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
         /*链接后端服务器*/
-        sock fd = ox_socket_connect(backendIP.c_str(), backendPort);
+        sock fd = ox_socket_connect(false, backendIP.c_str(), backendPort);
         if (fd != SOCKET_ERROR)
         {
             netService->getServer()->addSession(fd, [=](TCPSession::PTR backendSession){
@@ -56,7 +60,7 @@ int main(int argc, char **argv)
                     *shareBackendSession = nullptr;
                     if (clientWebSession->getUD() != -1)
                     {
-                        clientWebSession->getSession()->postClose();
+                        clientWebSession->postClose();
                     }
                 });
 
@@ -79,7 +83,7 @@ int main(int argc, char **argv)
                                 std::string sendFrame;
                                 WebSocketFormat::wsFrameBuild(sendPayload, sendFrame);
 
-                                clientWebSession->getSession()->send(sendFrame.c_str(), sendFrame.size());
+                                clientWebSession->send(sendFrame.c_str(), sendFrame.size());
 
                                 totalProcLen += packet_len;
                                 parse_str += packet_len;
@@ -99,20 +103,17 @@ int main(int argc, char **argv)
             }, false, 32 * 1014, true);
         }
 
-        clientWebSession->setRequestCallback([=](const HTTPParser&, HttpSession::PTR, const char* websocketPacket, size_t websocketPacketLen){
-            if (websocketPacket != nullptr)
+        clientWebSession->setWSCallback([=](HttpSession::PTR, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload){
+            TCPSession::PTR backendSession = *shareBackendSession;
+            if (backendSession == nullptr)
             {
-                TCPSession::PTR backendSession = *shareBackendSession;
-                if (backendSession == nullptr)
-                {
-                    /*暂存起来*/
-                    cachePacket->push_back(string(websocketPacket, websocketPacketLen));
-                }
-                else
-                {
-                    /*转发给对应的后端服务器链接*/
-                    backendSession->send(websocketPacket, websocketPacketLen);
-                }
+                /*暂存起来*/
+                cachePacket->push_back(payload);
+            }
+            else
+            {
+                /*转发给对应的后端服务器链接*/
+                backendSession->send(payload.c_str(), payload.size());
             }
         });
 

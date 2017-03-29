@@ -115,8 +115,8 @@ namespace dodo
                     return false;
                 }
 
-                const bool isFinish = (buffer[0] & 0x80) != 0;
-                const WebSocketFrameType frameType = (WebSocketFrameType)(buffer[0] & 0x0F);
+                outfin = (buffer[0] & 0x80) != 0;
+                outopcode = (WebSocketFrameType)(buffer[0] & 0x0F);
                 const bool isMasking = (buffer[1] & 0x80) != 0;
                 uint32_t payloadlen = buffer[1] & 0x7F;
 
@@ -134,6 +134,19 @@ namespace dodo
                 else if (payloadlen == 127)
                 {
                     if (bufferSize < 10)
+                    {
+                        return false;
+                    }
+
+                    if (buffer[2] != 0 ||
+                        buffer[3] != 0 ||
+                        buffer[4] != 0 ||
+                        buffer[5] != 0)
+                    {
+                        return false;
+                    }
+
+                    if ((buffer[6] & 0x80) != 0)
                     {
                         return false;
                     }
@@ -173,8 +186,6 @@ namespace dodo
                 }
 
                 frameSize = payloadlen + pos;
-                outopcode = frameType;
-                outfin = isFinish;
 
                 return true;
             }

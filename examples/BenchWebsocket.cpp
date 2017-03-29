@@ -40,23 +40,18 @@ int main(int argc, char **argv)
     {
         sock fd = ox_socket_connect(false, "192.168.2.78", 8008);
         server.addConnection(fd, [](HttpSession::PTR session){
-            HttpFormat request;
-            if (true)
-            {
-                request.setProtocol(HttpFormat::HTP_GET);
-                request.setRequestUrl("/ws");
-                request.addHeadValue("Host", "192.168.2.78");
-                request.addHeadValue("Upgrade", "websocket");
-                request.addHeadValue("Connection", "Upgrade");
-                request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
-                request.addHeadValue("Sec-WebSocket-Version", "13");
-            }
+            HttpRequest request;
+            request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
+            request.setUrl("/ws");
+            request.addHeadValue("Host", "192.168.2.78");
+            request.addHeadValue("Upgrade", "websocket");
+            request.addHeadValue("Connection", "Upgrade");
+            request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
+            request.addHeadValue("Sec-WebSocket-Version", "13");
+
             std::string requestStr = request.getResult();
             session->send(requestStr.c_str(), requestStr.size());
         }, [](const HTTPParser& httpParser, HttpSession::PTR session){
-            std::cout << httpParser.getBody() << std::endl;
-            return;
-            /*´¦Àíresponse*/
         }, [](HttpSession::PTR session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
             sendPacket(session, "hello world", 10);
             count += 1;

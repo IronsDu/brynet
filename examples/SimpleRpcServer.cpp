@@ -134,11 +134,10 @@ static void processHTTPRPCRequest(RPCServiceMgr::PTR rpcServiceMgr, HttpSession:
                 std::string jsonMsg;
                 google::protobuf::util::MessageToJsonString(*responseMsg, &jsonMsg);
 
-                HttpFormat httpResponse;
-                httpResponse.setProtocol(HttpFormat::HTP_RESPONSE);
-                httpResponse.setStatus(HttpFormat::HTTP_RESPONSE_STATUS::OK);
+                HttpResponse httpResponse;
+                httpResponse.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
                 httpResponse.setContentType("application/json");
-                httpResponse.addParameter(jsonMsg.c_str());
+                httpResponse.setBody(jsonMsg.c_str());
 
                 auto result = httpResponse.getResult();
                 session->send(result.c_str(), result.size(), nullptr);
