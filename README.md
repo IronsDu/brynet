@@ -14,6 +14,10 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 * IPv6 support
 * [RPC Library](https://github.com/IronsDu/dodo/tree/master/src/rpc)
 
+## Usages
+* [Examples](#examples)
+* [Users](#users)
+
 ## Benchamrk
    Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 i5)
 * PingPong
@@ -32,11 +36,6 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
   ![Broadcast](image/broadcast.png "Broadcast")
 
 * Ab HTTP(1 network thread)
-
-        Server Software:
-        Server Hostname:        127.0.0.1
-        Server Port:            8080
-
         Document Path:          /
         Document Length:        18 bytes
 
@@ -79,9 +78,6 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 
 I suggest you use the second or thrid way above, because don't worry memory manager
 
-## Usage
-  About TCP Library ,Please see [examples](https://github.com/IronsDu/dodo/tree/master/examples);
-
 ## About RPC
   Use this RPC library, you not need any proto file sush as Protobuf and Thrift, because i use C++ Template Generic Programming do this work.
   
@@ -93,56 +89,38 @@ I suggest you use the second or thrid way above, because don't worry memory mana
 ```cpp
 static int add(int a, int b)
 {
-    //CenterServerRPCMgr::getRpcFromer()为调用者会话对象
     return a + b;
 }
 
 static void addNoneRet(int a, int b, dodo::rpc::RpcRequestInfo reqInfo)
 {
-    // 添加dodo::rpc::RpcRequestInfo reqInfo形参(不影响调用者调用)
-    // 这里本身不返回数据(函数返回类型为void),但RPC本身是具有返回值语义的
-    // 适用于需要调用其他异步操作之后(通过reqInfo)才能返回数据给调用者的情况
-    // 譬如:
+    // send reply when other async call completed
     /*
-        auto caller = CenterServerRPCMgr::getRpcFromer();
+        auto caller = RpcServer::getRpcFromer();
         redis->get("k", [caller, reqInfo](const std::string& value){
             caller->reply(reqInfo, value);
         });
     */
-
-    /*
-        //客户端:
-        centerServerConnectionRpc->call("test", 1, 2, [](const std::string& value){
-        });
-    */
 }
 
-void initCenterServerExt()
+void registerServices()
 {
-    CenterServerRPCMgr::def("test", [](int a, int b){
-        return a + b;
-    });
-
-    CenterServerRPCMgr::def("testNoneRet", [](int a, int b){
-    });
-
-    CenterServerRPCMgr::def("add", add);
-
-    CenterServerRPCMgr::def("addNoneRet", addNoneRet);
+    RpcServer::def("add", add);
+    RpcServer::def("add", addNoneRet);
 }
 ```
 
 On client side:
 
 ```cpp
-gLogicCenterServerClient->call("test", 1, 2);
-gLogicCenterServerClient->call("add", 1, 2);
-gLogicCenterServerClient->call("add", 1, 2, [](int result) {
+rpcClient->call("add", 1, 2);
+rpcClient->call("add", 1, 2, [](int result) {
     cout << result << endl;
 });
 ```
 
-## Example
+Examples
+----------------------------
 * [PingPongServer](https://github.com/IronsDu/dodo/blob/master/examples/PingPongServer.cpp)
 * [PingPongClient](https://github.com/IronsDu/dodo/blob/master/examples/PingPongClient.cpp)
 * [BroadCastServer](https://github.com/IronsDu/dodo/blob/master/examples/BroadCastServer.cpp)
@@ -151,8 +129,10 @@ gLogicCenterServerClient->call("add", 1, 2, [](int result) {
 * [BenchWebsocket](https://github.com/IronsDu/dodo/blob/master/examples/BenchWebsocket.cpp) benchmark websocket server
 * [WebSocketProxy](https://github.com/IronsDu/dodo/blob/master/examples/WebBinaryProxy.cpp) one proxy server between websocket client and binary protocol server
 * [SimpleRpcServer](https://github.com/IronsDu/dodo/blob/master/examples/SimpleRpcServer.cpp) rpc server use http and protobuf
+* more examples please see [examples](https://github.com/IronsDu/dodo/tree/master/examples);
 
-## Users
+Users
+----------------------------
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [Distributed game server framework](https://github.com/IronsDu/DServerFramework)
 * [Joynet - lua network library](https://github.com/IronsDu/Joynet)

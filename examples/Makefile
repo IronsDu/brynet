@@ -1,5 +1,5 @@
 CFLAGS = -O3 -std=c++0x
-LIBS = -lrt
+LIBS = -lrt -lpthread
 INCLUDES = -I./../src/net -I./../src/utils -I./../src/timer -I./../src/net/http
 COMMON_SRCS =	./../src/timer/Timer.cpp\
 		./../src/net/CurrentThread.cpp\
@@ -25,11 +25,14 @@ PINGPONGCLIENT_TARGETS = PingPongClient.o
 BROADCASTSERVER_TARGETS = BroadCastServer.o
 BROADCASTCLIENT_TARGETS = BroadCastClient.o
 TESTHTTP_TARGETS =	TestHttp.o
+BENCH_WEBSOCKET_TARGETS = BenchWebsocket.o
 			
 all :	pingpongserver\
 	pingpongclient\
 	broadcastserver\
-	broadcastclient
+	broadcastclient\
+	httpserver\
+	benchwebsocket
 
 pingpongserver: $(COMMON_TARGETS) $(PINGPONGSERVER_TARGETS)
 	$(CXX) $(COMMON_TARGETS) $(PINGPONGSERVER_TARGETS) $(LIBS) -o pingpongserver
@@ -39,8 +42,10 @@ broadcastserver: $(COMMON_TARGETS) $(BROADCASTSERVER_TARGETS)
 	$(CXX) $(COMMON_TARGETS) $(BROADCASTSERVER_TARGETS) $(LIBS) -o broadcastserver
 broadcastclient: $(COMMON_TARGETS) $(BROADCASTCLIENT_TARGETS)
 	$(CXX) $(COMMON_TARGETS) $(BROADCASTCLIENT_TARGETS) $(LIBS) -o broadcastclient
-testhttp: $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS)
-	$(CXX) $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS) $(LIBS) -o testhttp
+httpserver: $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS)
+	$(CXX) $(COMMON_TARGETS) $(TESTHTTP_TARGETS) $(HTTP_COMMON_TARGETS) $(LIBS) -o httpserver
+benchwebsocket: $(COMMON_TARGETS) $(BENCH_WEBSOCKET_TARGETS) $(HTTP_COMMON_TARGETS)
+	$(CXX) $(COMMON_TARGETS) $(BENCH_WEBSOCKET_TARGETS) $(HTTP_COMMON_TARGETS) $(LIBS) -o benchwebsocket
 
 %.o: %.cpp
 	$(CXX) $(CFLAGS) $(INCLUDES) -c $< -o $@

@@ -81,6 +81,11 @@ HttpSession::WS_CALLBACK& HttpSession::getWSCallback()
     return mWSCallback;
 }
 
+HttpSession::WS_CONNECTED_CALLBACK& HttpSession::getWSConnectedCallback()
+{
+    return mWSConnectedCallback;
+}
+
 void HttpSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback /* = nullptr */)
 {
     mSession->send(packet, callback);
@@ -136,9 +141,14 @@ void HttpServer::addConnection(sock fd,
     const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback)
 {
     mServer->addSession(fd, [this, enterCallback, responseCallback, wsCallback, closeCallback, wsConnectedCallback](TCPSession::PTR& session){
-        HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
+        auto httpSession = HttpSession::Create(session);
+        httpSession->setCloseCallback(closeCallback);
+        httpSession->setWSCallback(wsCallback);
+        httpSession->setHttpCallback(responseCallback);
+        httpSession->setWSConnected(wsConnectedCallback);
+
         enterCallback(httpSession);
-        setSessionCallback(httpSession, responseCallback, wsCallback, closeCallback, wsConnectedCallback);
+        handleHttp(httpSession);
     }, false, 32*1024 * 1024);
 }
 
@@ -154,38 +164,38 @@ void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const
         mListenThread = std::make_shared<ListenThread>();
         mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [this](sock fd){
             mServer->addSession(fd, [this](TCPSession::PTR& session){
-                HttpSession::PTR httpSession = std::make_shared<HttpSession>(session);
+                auto httpSession = HttpSession::Create(session);
                 if (mOnEnter != nullptr)
                 {
                     mOnEnter(httpSession);
                 }
-                setSessionCallback(httpSession, httpSession->getHttpCallback(), httpSession->getWSCallback(), httpSession->getCloseCallback());
+                handleHttp(httpSession);
             }, false, 32 * 1024 * 1024);
         });
     }
 }
 
-void HttpServer::setSessionCallback(HttpSession::PTR& httpSession, 
-    const HttpSession::HTTPPARSER_CALLBACK& httpCallback,
-    const HttpSession::WS_CALLBACK& wsCallback, 
-    const HttpSession::CLOSE_CALLBACK& closeCallback,
-    const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback)
+void HttpServer::handleHttp(HttpSession::PTR& httpSession)
 {
     /*TODO::keep alive and timeout close */
-    TCPSession::PTR& session = httpSession->getSession();
-    HTTPParser* httpParser = new HTTPParser(HTTP_BOTH);
+    auto& session = httpSession->getSession();
+    auto httpParser = new HTTPParser(HTTP_BOTH);
     session->setUD((int64_t)httpParser);
-    session->setCloseCallback([closeCallback, httpSession](TCPSession::PTR& session){
-        HTTPParser* httpParser = (HTTPParser*)session->getUD();
+
+    session->setCloseCallback([httpSession](TCPSession::PTR& session){
+        auto httpParser = (HTTPParser*)session->getUD();
         delete httpParser;
-        if (closeCallback != nullptr)
+
+        auto& tmp = httpSession->getCloseCallback();
+        if (tmp != nullptr)
         {
-            closeCallback(httpSession);
+            tmp(httpSession);
         }
     });
-    session->setDataCallback([this, httpCallback, wsCallback, wsConnectedCallback, httpSession](TCPSession::PTR& session, const char* buffer, size_t len){
+
+    session->setDataCallback([this, httpSession](TCPSession::PTR& session, const char* buffer, size_t len){
         size_t retlen = 0;
-        HTTPParser* httpParser = (HTTPParser*)session->getUD();
+        auto httpParser = (HTTPParser*)session->getUD();
         if (httpParser->isWebSocket())
         {
             const char* parse_str = buffer;
@@ -212,7 +222,7 @@ void HttpServer::setSessionCallback(HttpSession::PTR& httpSession,
                             cacheFrame.clear();
                         }
 
-                        assert(wsCallback != nullptr);
+                        auto& wsCallback = httpSession->getWSCallback();
                         if (wsCallback != nullptr)
                         {
                             wsCallback(httpSession, opcode, parseString);
@@ -227,7 +237,7 @@ void HttpServer::setSessionCallback(HttpSession::PTR& httpSession,
                             opcode == WebSocketFormat::WebSocketFrameType::PONG_FRAME ||
                             opcode == WebSocketFormat::WebSocketFrameType::CLOSE_FRAME)
                     {
-                        assert(wsCallback != nullptr);
+                        auto& wsCallback = httpSession->getWSCallback();
                         if (wsCallback != nullptr)
                         {
                             wsCallback(httpSession, opcode, parseString);
@@ -257,18 +267,19 @@ void HttpServer::setSessionCallback(HttpSession::PTR& httpSession,
                 {
                     if (httpParser->hasKey("Sec-WebSocket-Key"))
                     {
-                        std::string response = WebSocketFormat::wsHandshake(httpParser->getValue("Sec-WebSocket-Key"));
+                        auto response = WebSocketFormat::wsHandshake(httpParser->getValue("Sec-WebSocket-Key"));
                         session->send(response.c_str(), response.size());
                     }
                     
+                    auto& wsConnectedCallback = httpSession->getWSConnectedCallback();
                     if (wsConnectedCallback != nullptr)
                     {
-                        wsConnectedCallback(httpSession);
+                        wsConnectedCallback(httpSession, *httpParser);
                     }
                 }
                 else
                 {
-                    assert(httpCallback != nullptr);
+                    auto& httpCallback = httpSession->getHttpCallback();
                     if (httpCallback != nullptr)
                     {
                         httpCallback(*httpParser, httpSession);

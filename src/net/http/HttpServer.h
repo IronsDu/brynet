@@ -1,6 +1,8 @@
 #ifndef DODO_NET_HTTPSERVER_H_
 #define DODO_NET_HTTPSERVER_H_
 
+#include <memory>
+
 #include "WrapTCPService.h"
 #include "HttpParser.h"
 #include "NonCopyable.h"
@@ -12,7 +14,7 @@ namespace dodo
     {
         class HttpServer;
 
-        class HttpSession final : public NonCopyable
+        class HttpSession : public NonCopyable
         {
         public:
             typedef std::shared_ptr<HttpSession>    PTR;
@@ -21,10 +23,9 @@ namespace dodo
             typedef std::function < void(HttpSession::PTR, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) > WS_CALLBACK;
 
             typedef std::function < void(HttpSession::PTR) > CLOSE_CALLBACK;
-            typedef std::function < void(HttpSession::PTR) > WS_CONNECTED_CALLBACK;
+            typedef std::function < void(HttpSession::PTR, const HTTPParser&) > WS_CONNECTED_CALLBACK;
 
-            HttpSession(TCPSession::PTR);
-
+        public:
             void                    setHttpCallback(HTTPPARSER_CALLBACK&& callback);
             void                    setCloseCallback(CLOSE_CALLBACK&& callback);
             void                    setWSCallback(WS_CALLBACK&& callback);
@@ -35,10 +36,6 @@ namespace dodo
 
             void                    setWSConnected(const WS_CONNECTED_CALLBACK& callback);
 
-            HTTPPARSER_CALLBACK&    getHttpCallback();
-            CLOSE_CALLBACK&         getCloseCallback();
-            WS_CALLBACK&            getWSCallback();
-
             void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
             void                    send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
@@ -48,8 +45,30 @@ namespace dodo
             int64_t                 getUD() const;
             void                    setUD(int64_t userData);
 
+        protected:
+            virtual ~HttpSession()
+            {}
         private:
+            HttpSession(TCPSession::PTR);
+
+            static  PTR             Create(TCPSession::PTR session)
+            {
+                struct make_shared_enabler : public HttpSession
+                {
+                public:
+                    make_shared_enabler(TCPSession::PTR session) : HttpSession(session)
+                    {}
+                };
+
+                return std::make_shared<make_shared_enabler>(session);
+            }
+
             TCPSession::PTR&        getSession();
+
+            HTTPPARSER_CALLBACK&    getHttpCallback();
+            CLOSE_CALLBACK&         getCloseCallback();
+            WS_CALLBACK&            getWSCallback();
+            WS_CONNECTED_CALLBACK&  getWSConnectedCallback();
 
         private:
             TCPSession::PTR         mSession;
@@ -84,12 +103,9 @@ namespace dodo
 
             void                    startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
             void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
+        
         private:
-            void                    setSessionCallback(HttpSession::PTR& httpSession, 
-                                                        const HttpSession::HTTPPARSER_CALLBACK& callback, 
-                                                        const HttpSession::WS_CALLBACK& wsCallback = nullptr, 
-                                                        const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr,
-                                                        const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback = nullptr);
+            void                    handleHttp(HttpSession::PTR& httpSession);
 
         private:
             ENTER_CALLBACK          mOnEnter;

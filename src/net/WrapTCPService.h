@@ -24,6 +24,7 @@ namespace dodo
             typedef std::function<void(TCPSession::PTR&)>   CLOSE_CALLBACK;
             typedef std::function<size_t(TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
+        public:
             USER_TYPE               getUD() const;
             void                    setUD(USER_TYPE ud);
 
@@ -42,11 +43,9 @@ namespace dodo
             void                    setDataCallback(DATA_CALLBACK&& callback);
             void                    setDataCallback(const DATA_CALLBACK& callback);
 
-        protected:
-            virtual ~TCPSession();
-
         private:
             TCPSession();
+            virtual ~TCPSession();
 
             void                    setSocketID(TcpService::SESSION_TYPE id);
             void                    setIP(const std::string& ip);
@@ -54,7 +53,6 @@ namespace dodo
             void                    setService(TcpService::PTR& service);
 
             CLOSE_CALLBACK&         getCloseCallback();
-
             DATA_CALLBACK&          getDataCallback();
 
             static  PTR             Create()

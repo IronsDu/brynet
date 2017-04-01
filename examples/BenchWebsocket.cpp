@@ -56,7 +56,7 @@ int main(int argc, char **argv)
             sendPacket(session, "hello world", 10);
             count += 1;
         }, [](HttpSession::PTR session){
-        }, [](HttpSession::PTR session){
+        }, [](HttpSession::PTR session, const HTTPParser&){
             for (int i = 0; i < 200; i++)
             {
                 sendPacket(session, "hello world", 10);
