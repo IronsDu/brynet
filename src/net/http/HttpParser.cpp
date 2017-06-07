@@ -321,6 +321,7 @@ int HTTPParser::sStatusHandle(http_parser* hp, const char *at, size_t length)
     httpParser->mStatus = std::string(at, length);
     return 0;
 }
+
 int HTTPParser::sBodyHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;

@@ -80,9 +80,9 @@ int main(int argc, char** argv)
     MsgQueue<NetMsg*>  msgList;
     EventLoop       mainLoop;
 
-    TcpService t;
-    t.startListen(false, "0.0.0.0", port_num, 1024 * 1024, nullptr, nullptr);
-    t.startWorkerThread(2, [&](EventLoop::PTR l){
+    auto service = TcpService::Create();
+    service->startListen(false, "0.0.0.0", port_num, 1024 * 1024, nullptr, nullptr);
+    service->startWorkerThread(2, [&](EventLoop::PTR l){
         /*每帧回调函数里强制同步rwlist*/
         lockStatistics();
         msgList.forceSyncWrite();
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
         }
     });
 
-    t.setEnterCallback([&](int64_t id, std::string ip){
+    service->setEnterCallback([&](int64_t id, std::string ip){
         NetMsg* msg = new NetMsg(NMT_ENTER, id);
         lockStatistics();
         msgList.push(msg);
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
         mainLoop.wakeup();
     });
 
-    t.setDisconnectCallback([&](int64_t id){
+    service->setDisconnectCallback([&](int64_t id){
         NetMsg* msg = new NetMsg(NMT_CLOSE, id);
         lockStatistics();
         msgList.push(msg);
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
         mainLoop.wakeup();
     });
 
-    t.setDataCallback([&](int64_t id, const char* buffer, size_t len){
+    service->setDataCallback([&](int64_t id, const char* buffer, size_t len){
         const char* parse_str = buffer;
         size_t total_proc_len = 0;
         size_t left_len = len;
@@ -193,7 +193,7 @@ int main(int argc, char** argv)
 
                     for (size_t i = 0; i < sessions.size(); ++i)
                     {
-                        t.send(sessions[i], packet);
+                        service->send(sessions[i], packet);
                         send_packet_num++;
                         total_send_len += msg->mData.size();
                     }
@@ -224,5 +224,5 @@ int main(int argc, char** argv)
         }
     }
 
-    t.closeService();
+    service->closeService();
 }

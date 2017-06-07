@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     std::thread* ts = new std::thread([&mainLoop, client_num, packet_len, port_num, ip]{
         printf("start one client thread \n");
         /*  ¿Í»§¶Ëeventloop*/
-        EventLoop clientEventLoop;
+        auto clientEventLoop = std::make_shared<EventLoop>();
 
         char* senddata = (char*)malloc(packet_len);
 
@@ -119,8 +119,8 @@ int main(int argc, char** argv)
                 });
             });
 
-            clientEventLoop.pushAsyncProc([&, pClient](){
-                if (!pClient->onEnterEventLoop(&clientEventLoop))
+            clientEventLoop->pushAsyncProc([&, pClient](){
+                if (!pClient->onEnterEventLoop(clientEventLoop))
                 {
                     delete pClient;
                 }
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
         int64_t now = ox_getnowtime();
         while (true)
         {
-            clientEventLoop.loop(tm.nearEndMs());
+            clientEventLoop->loop(tm.nearEndMs());
             tm.schedule();
             if ((ox_getnowtime() - now) >= 1000)
             {

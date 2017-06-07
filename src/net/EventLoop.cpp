@@ -13,7 +13,7 @@ namespace dodo
         class WakeupChannel final : public Channel, public NonCopyable
         {
         public:
-            WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
+            explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
             {
             }
 

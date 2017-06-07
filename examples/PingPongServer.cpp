@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     }
 
     WrapServer::PTR server = std::make_shared<WrapServer>();
-    ListenThread::PTR listenThread = std::make_shared<ListenThread>();
+    auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
         std::cout << "enter" << std::endl;

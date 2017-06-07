@@ -1,6 +1,7 @@
 #ifndef DODO_NET_DATASOCKET_H_
 #define DODO_NET_DATASOCKET_H_
 
+#include <any>
 #include <memory>
 #include <functional>
 #include <deque>
@@ -44,11 +45,11 @@ namespace dodo
             typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
         public:
-            explicit DataSocket(sock fd, size_t maxRecvBufferSize);
+            DataSocket(sock fd, size_t maxRecvBufferSize);
             ~DataSocket();
 
             /*  仅在网络线程中调用才可能返回成功 */
-            bool                            onEnterEventLoop(EventLoop* eventLoop);
+            bool                            onEnterEventLoop(EventLoop::PTR eventLoop);
 
             void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
@@ -71,15 +72,15 @@ namespace dodo
             void                            postDisConnect();
             void                            postShutdown();
 
-            void                            setUserData(int64_t value);
-            int64_t                         getUserData() const;
+            void                            setUD(std::any value);
+            const std::any&                 getUD() const;
 
 #ifdef USE_OPENSSL
             bool                            initAcceptSSL(SSL_CTX*);
             bool                            initConnectSSL();
 #endif
 
-            static  PACKET_PTR              makePacket(const char* buffer, size_t len);
+            static  DataSocket::PACKET_PTR  makePacket(const char* buffer, size_t len);
 
         private:
             void                            growRecvBuffer();
@@ -126,7 +127,7 @@ namespace dodo
 
             bool                            mCanWrite;          /*  socket是否可写  */
 
-            EventLoop*                      mEventLoop;
+            EventLoop::PTR                  mEventLoop;
             buffer_s*                       mRecvBuffer;
             size_t                          mMaxRecvBufferSize;
 
@@ -146,7 +147,7 @@ namespace dodo
 
             bool                            mIsPostFlush;       /*  是否已经放置flush消息的回调    */
 
-            int64_t                         mUserData;          /*  链接的用户自定义数据  */
+            std::any                        mUD;                /*  链接的用户自定义数据  */
 
 #ifdef USE_OPENSSL
             SSL_CTX*                        mSSLCtx;            /*  mSSL不为null时，如果mSSLCtx不为null，则表示ssl的客户端链接，否则为accept链接  */

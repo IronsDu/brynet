@@ -32,14 +32,14 @@ static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
 
 int main(int argc, char **argv)
 {
-    HttpServer server;
+    auto server = HttpServer::Create();
 
-    server.startWorkThread(ox_getcpunum());
+    server->startWorkThread(ox_getcpunum());
 
     for (int i = 0; i < 200; i++)
     {
         sock fd = ox_socket_connect(false, "192.168.2.78", 8008);
-        server.addConnection(fd, [](HttpSession::PTR session){
+        server->addConnection(fd, [](HttpSession::PTR session){
             HttpRequest request;
             request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
             request.setUrl("/ws");

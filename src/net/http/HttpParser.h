@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <memory>
 
 #include "http_parser.h"
 
@@ -15,7 +16,9 @@ namespace dodo
         class HTTPParser
         {
         public:
-            HTTPParser(http_parser_type parserType);
+            typedef std::shared_ptr<HTTPParser> PTR;
+
+            explicit HTTPParser(http_parser_type parserType);
             bool                                    isWebSocket() const;
             bool                                    isKeepAlive() const;
 
@@ -70,7 +73,6 @@ namespace dodo
             const char*                             mTmpHeadStr;
             size_t                                  mTmpHeadLen;
 
-            friend int                              sHeadValue(http_parser* hp, const char *at, size_t length);
             friend class HttpServer;
         };
     }

@@ -10,6 +10,8 @@
 
 namespace dodo
 {
+    class TimerMgr;
+
     class Timer
     {
     public:
@@ -21,12 +23,16 @@ namespace dodo
 
         time_t                                  getEndMs() const;
         void                                    cancel();
+
+    private:
         void operator()                         ();
 
     private:
         bool                                    mActive;
         Callback                                mCallback;
         const time_t                            mEndTime;
+
+        friend class TimerMgr;
     };
 
     class TimerMgr

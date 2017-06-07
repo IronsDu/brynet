@@ -12,7 +12,6 @@ using namespace dodo::net;
 
 HttpSession::HttpSession(TCPSession::PTR session)
 {
-    mUserData = -1;
     mSession = session;
 }
 
@@ -21,14 +20,14 @@ TCPSession::PTR& HttpSession::getSession()
     return mSession;
 }
 
-int64_t HttpSession::getUD() const
+const std::any& HttpSession::getUD() const
 {
-    return mUserData;
+    return mUD;
 }
 
-void HttpSession::setUD(int64_t userData)
+void HttpSession::setUD(std::any ud)
 {
-    mUserData = userData;
+    mUD = ud;
 }
 
 void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK&& callback)
@@ -140,7 +139,7 @@ void HttpServer::addConnection(sock fd,
     const HttpSession::CLOSE_CALLBACK& closeCallback,
     const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback)
 {
-    mServer->addSession(fd, [this, enterCallback, responseCallback, wsCallback, closeCallback, wsConnectedCallback](TCPSession::PTR& session){
+    mServer->addSession(fd, [shared_this = shared_from_this(), enterCallback, responseCallback, wsCallback, closeCallback, wsConnectedCallback](TCPSession::PTR& session){
         auto httpSession = HttpSession::Create(session);
         httpSession->setCloseCallback(closeCallback);
         httpSession->setWSCallback(wsCallback);
@@ -148,7 +147,7 @@ void HttpServer::addConnection(sock fd,
         httpSession->setWSConnected(wsConnectedCallback);
 
         enterCallback(httpSession);
-        handleHttp(httpSession);
+        shared_this->handleHttp(httpSession);
     }, false, 32*1024 * 1024);
 }
 
@@ -161,31 +160,39 @@ void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const
 {
     if (mListenThread == nullptr)
     {
-        mListenThread = std::make_shared<ListenThread>();
-        mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [this](sock fd){
-            mServer->addSession(fd, [this](TCPSession::PTR& session){
+        mListenThread = ListenThread::Create();
+        mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [shared_this = shared_from_this()](sock fd){
+            shared_this->mServer->addSession(fd, [shared_this](TCPSession::PTR& session){
                 auto httpSession = HttpSession::Create(session);
-                if (mOnEnter != nullptr)
+                if (shared_this->mOnEnter != nullptr)
                 {
-                    mOnEnter(httpSession);
+                    shared_this->mOnEnter(httpSession);
                 }
-                handleHttp(httpSession);
+                shared_this->handleHttp(httpSession);
             }, false, 32 * 1024 * 1024);
         });
     }
+}
+
+static HTTPParser::PTR castHttpParse(TCPSession::PTR& session)
+{
+    auto ud = std::any_cast<HTTPParser::PTR>(&session->getUD());
+    if (ud == nullptr)
+    {
+        return nullptr;
+    }
+
+    return *ud;
 }
 
 void HttpServer::handleHttp(HttpSession::PTR& httpSession)
 {
     /*TODO::keep alive and timeout close */
     auto& session = httpSession->getSession();
-    auto httpParser = new HTTPParser(HTTP_BOTH);
-    session->setUD((int64_t)httpParser);
+    session->setUD(std::make_shared<HTTPParser>(HTTP_BOTH));
 
     session->setCloseCallback([httpSession](TCPSession::PTR& session){
-        auto httpParser = (HTTPParser*)session->getUD();
-        delete httpParser;
-
+        auto httpParser = castHttpParse(session);
         auto& tmp = httpSession->getCloseCallback();
         if (tmp != nullptr)
         {
@@ -193,9 +200,16 @@ void HttpServer::handleHttp(HttpSession::PTR& httpSession)
         }
     });
 
-    session->setDataCallback([this, httpSession](TCPSession::PTR& session, const char* buffer, size_t len){
+    session->setDataCallback([shared_this = shared_from_this(), httpSession](TCPSession::PTR& session, const char* buffer, size_t len){
         size_t retlen = 0;
-        auto httpParser = (HTTPParser*)session->getUD();
+
+        auto httpParser = castHttpParse(session);
+        assert(httpParser != nullptr);
+        if (httpParser == nullptr)
+        {
+            return retlen;
+        }
+
         if (httpParser->isWebSocket())
         {
             const char* parse_str = buffer;

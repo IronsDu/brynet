@@ -24,17 +24,22 @@ namespace dodo
             typedef std::shared_ptr<ListenThread>   PTR;
             typedef std::function<void(sock fd)> ACCEPT_CALLBACK;
 
-            ListenThread();
-            virtual ~ListenThread();
-
             /*  开启监听线程  */
             void                                startListen(bool isIPV6, const std::string& ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback);
             void                                closeListenThread();
 #ifdef USE_OPENSSL
             SSL_CTX*                            getOpenSSLCTX();
 #endif
+            static  PTR             Create()
+            {
+                struct make_shared_enabler : public ListenThread {};
+                return std::make_shared<make_shared_enabler>();
+            }
 
         private:
+            ListenThread();
+            virtual ~ListenThread();
+
             void                                runListen();
             void                                initSSL();
             void                                destroySSL();
@@ -45,7 +50,7 @@ namespace dodo
             std::string                         mIP;
             int                                 mPort;
             bool                                mRunListen;
-            std::thread*                        mListenThread;
+            std::shared_ptr<std::thread>        mListenThread;
             std::string                         mCertificate;
             std::string                         mPrivatekey;
 #ifdef USE_OPENSSL
@@ -54,7 +59,7 @@ namespace dodo
         };
 
         /*  以数字ID为网络会话标识的网络服务   */
-        class TcpService : public NonCopyable
+        class TcpService : public NonCopyable, public std::enable_shared_from_this<TcpService>
         {
         public:
             typedef std::shared_ptr<TcpService>                                         PTR;
@@ -66,9 +71,6 @@ namespace dodo
             typedef std::function<size_t(SESSION_TYPE, const char* buffer, size_t len)> DATA_CALLBACK;
 
         public:
-            TcpService();
-            virtual ~TcpService();
-
             /*  设置默认事件回调    */
             void                                setEnterCallback(TcpService::ENTER_CALLBACK&& callback);
             void                                setEnterCallback(const TcpService::ENTER_CALLBACK& callback);
@@ -124,9 +126,18 @@ namespace dodo
             void                                wakeupAll() const;
             /*  随机获取一个EventLoop:非线程安全   */
             EventLoop::PTR                      getRandomEventLoop();
-            EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id);
+            EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const noexcept;
+
+            static  PTR             Create()
+            {
+                struct make_shared_enabler : public TcpService {};
+                return std::make_shared<make_shared_enabler>();
+            }
 
         private:
+            TcpService();
+            virtual ~TcpService();
+
             bool                                helpAddChannel(DataSocket::PTR channel,
                                                                 const std::string& ip,
                                                                 const TcpService::ENTER_CALLBACK& enterCallback,
@@ -142,17 +153,21 @@ namespace dodo
 
         private:
             typedef std::vector<std::tuple<SESSION_TYPE, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
-            std::shared_ptr<MSG_LIST>*          mCachePacketList;
 
-            EventLoop::PTR*                     mLoops;
-            std::thread**                       mIOThreads;
-            size_t                              mLoopNum;
+            struct IOLoopData : public NonCopyable
+            {
+                EventLoop::PTR                  eventLoop;
+                std::shared_ptr<std::thread>    ioThread;
+                TypeIDS<DataSocket::PTR>        dataSockets;
+                int                             incId;
+                std::shared_ptr<MSG_LIST>       cachePacketList;
+            };
+
+            std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
+
             bool                                mRunIOLoop;
 
-            ListenThread                        mListenThread;
-
-            TypeIDS<DataSocket::PTR>*           mDataSockets;
-            int*                                mIncIds;
+            ListenThread::PTR                   mListenThread;
 
             /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
             TcpService::ENTER_CALLBACK          mEnterCallback;

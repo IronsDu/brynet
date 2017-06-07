@@ -10,7 +10,7 @@ namespace dodo
         class Channel
         {
         public:
-            virtual ~Channel(){}
+            virtual ~Channel() = default;
 
         private:
             virtual void    canSend() = 0;

@@ -68,7 +68,7 @@ namespace dodo
             }
         }
 
-        bool          get(size_t id, T& out)
+        bool          get(size_t id, T& out) const
         {
             assert(id < mValues.size());
             if (id < mValues.size())

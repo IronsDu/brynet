@@ -19,14 +19,13 @@ namespace dodo
         public:
             typedef std::shared_ptr<TCPSession>     PTR;
             typedef std::weak_ptr<TCPSession>       WEAK_PTR;
-            typedef int64_t USER_TYPE;
 
             typedef std::function<void(TCPSession::PTR&)>   CLOSE_CALLBACK;
             typedef std::function<size_t(TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
         public:
-            USER_TYPE               getUD() const;
-            void                    setUD(USER_TYPE ud);
+            const std::any&         getUD() const;
+            void                    setUD(std::any ud);
 
             const std::string&      getIP() const;
             TcpService::SESSION_TYPE    getSocketID() const;
@@ -65,7 +64,7 @@ namespace dodo
             TcpService::PTR             mService;
             TcpService::SESSION_TYPE    mSocketID;
             std::string                 mIP;
-            USER_TYPE                   mUserData;
+            std::any                    mUD;
 
             CLOSE_CALLBACK              mCloseCallback;
             DATA_CALLBACK               mDataCallback;

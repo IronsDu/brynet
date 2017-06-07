@@ -5,7 +5,6 @@ using namespace dodo::net;
 TCPSession::TCPSession()
 {
     mSocketID = -1;
-    mUserData = -1;
     mCloseCallback = nullptr;
     mDataCallback = nullptr;
     mService = nullptr;
@@ -14,17 +13,16 @@ TCPSession::TCPSession()
 TCPSession::~TCPSession()
 {
     mSocketID = -1;
-    mUserData = -1;
 }
 
-TCPSession::USER_TYPE TCPSession::getUD() const
+const std::any& TCPSession::getUD() const
 {
-    return mUserData;
+    return mUD;
 }
 
-void TCPSession::setUD(USER_TYPE ud)
+void TCPSession::setUD(std::any ud)
 {
-    mUserData = ud;
+    mUD = ud;
 }
 
 const std::string& TCPSession::getIP() const
@@ -104,7 +102,7 @@ TCPSession::DATA_CALLBACK& TCPSession::getDataCallback()
 
 WrapServer::WrapServer()
 {
-    mTCPService = std::make_shared<TcpService>();
+    mTCPService = TcpService::Create();
 }
 
 WrapServer::~WrapServer()
@@ -126,7 +124,7 @@ void WrapServer::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCall
     auto tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);
 
-    auto enterCallback = [=](TcpService::SESSION_TYPE id, std::string ip) mutable {
+    auto enterCallback = [tmpSession, userEnterCallback](TcpService::SESSION_TYPE id, std::string ip) mutable {
         tmpSession->setSocketID(id);
         tmpSession->setIP(ip);
         if (userEnterCallback != nullptr)
@@ -135,7 +133,7 @@ void WrapServer::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCall
         }
     };
 
-    auto closeCallback = [=](TcpService::SESSION_TYPE id) mutable {
+    auto closeCallback = [tmpSession](TcpService::SESSION_TYPE id) mutable {
         auto& callback = tmpSession->getCloseCallback();
         if (callback != nullptr)
         {
@@ -143,7 +141,7 @@ void WrapServer::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCall
         }
     };
 
-    auto msgCallback = [=](TcpService::SESSION_TYPE id, const char* buffer, size_t len) mutable {
+    auto msgCallback = [tmpSession](TcpService::SESSION_TYPE id, const char* buffer, size_t len) mutable {
         auto& callback = tmpSession->getDataCallback();
         if (callback != nullptr)
         {

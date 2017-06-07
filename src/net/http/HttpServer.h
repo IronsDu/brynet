@@ -2,6 +2,7 @@
 #define DODO_NET_HTTPSERVER_H_
 
 #include <memory>
+#include <any>
 
 #include "WrapTCPService.h"
 #include "HttpParser.h"
@@ -42,8 +43,8 @@ namespace dodo
             void                    postShutdown() const;
             void                    postClose() const;
 
-            int64_t                 getUD() const;
-            void                    setUD(int64_t userData);
+            const std::any&         getUD() const;
+            void                    setUD(std::any);
 
         protected:
             virtual ~HttpSession()
@@ -72,7 +73,7 @@ namespace dodo
 
         private:
             TCPSession::PTR         mSession;
-            int64_t                 mUserData;
+            std::any                mUD;
             HTTPPARSER_CALLBACK     mHttpRequestCallback;
             WS_CALLBACK             mWSCallback;
             CLOSE_CALLBACK          mCloseCallback;
@@ -81,15 +82,12 @@ namespace dodo
             friend class HttpServer;
         };
 
-        class HttpServer : public NonCopyable
+        class HttpServer : public NonCopyable, public std::enable_shared_from_this<HttpServer>
         {
         public:
             typedef std::shared_ptr<HttpServer> PTR;
-
             typedef std::function < void(HttpSession::PTR&) > ENTER_CALLBACK;
 
-            HttpServer();
-            ~HttpServer();
             WrapServer::PTR         getServer();
 
             void                    setEnterCallback(const ENTER_CALLBACK& callback);
@@ -103,8 +101,17 @@ namespace dodo
 
             void                    startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
             void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
-        
+            
+            static  PTR             Create()
+            {
+                struct make_shared_enabler : public HttpServer {};
+                return std::make_shared<make_shared_enabler>();
+            }
+
         private:
+            HttpServer();
+            virtual ~HttpServer();
+
             void                    handleHttp(HttpSession::PTR& httpSession);
 
         private:

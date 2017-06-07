@@ -18,7 +18,6 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
     mRecvData = false;
     mCheckTime = -1;
     mIsPostFinalClose = false;
-    mEventLoop = nullptr;
     mIsPostFlush = false;
     mFD = fd;
 
@@ -29,8 +28,6 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
     mPostRecvCheck = false;
     mPostWriteCheck = false;
 #endif
-
-    mUserData = -1;
     mRecvBuffer = nullptr;
     growRecvBuffer();
 
@@ -73,7 +70,7 @@ DataSocket::~DataSocket()
     }
 }
 
-bool DataSocket::onEnterEventLoop(EventLoop* eventLoop)
+bool DataSocket::onEnterEventLoop(EventLoop::PTR eventLoop)
 {
     assert(eventLoop->isInLoopThread());
     if (!eventLoop->isInLoopThread())
@@ -789,14 +786,14 @@ void DataSocket::postShutdown()
     }
 }
 
-void DataSocket::setUserData(int64_t value)
+void DataSocket::setUD(std::any value)
 {
-    mUserData = value;
+    mUD = value;
 }
 
-int64_t DataSocket::getUserData() const
+const std::any& DataSocket::getUD() const
 {
-    return mUserData;
+    return mUD;
 }
 
 #ifdef USE_OPENSSL
