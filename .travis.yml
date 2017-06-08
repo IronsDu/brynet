@@ -4,6 +4,6 @@ before_install:
     - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
     - sudo apt-get update -qq
 install:
-    - sudo apt-get install -qq g++-7.0
-    - export CXX="g++-7.0"
+    - sudo apt-get install -qq g++-7
+    - export CXX="g++-7"
 script: cd examples/ && make all
