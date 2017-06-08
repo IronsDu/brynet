@@ -1,5 +1,5 @@
-#ifndef DODO_NET_HTTPSERVER_H_
-#define DODO_NET_HTTPSERVER_H_
+#ifndef BRYNET_NET_HTTPSERVER_H_
+#define BRYNET_NET_HTTPSERVER_H_
 
 #include <memory>
 #include <any>
@@ -9,7 +9,7 @@
 #include "NonCopyable.h"
 #include "WebSocketFormat.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

@@ -1,5 +1,5 @@
-#ifndef DODO_NET_TCP_SERVICE_H_
-#define DODO_NET_TCP_SERVICE_H_
+#ifndef BRYNET_NET_TCP_SERVICE_H_
+#define BRYNET_NET_TCP_SERVICE_H_
 
 #include <vector>
 #include <string>
@@ -12,7 +12,7 @@
 #include "Typeids.h"
 #include "NonCopyable.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

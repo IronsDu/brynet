@@ -1,5 +1,5 @@
-#ifndef DODO_MSGQUEUE_H_
-#define DODO_MSGQUEUE_H_
+#ifndef BRYNET_MSGQUEUE_H_
+#define BRYNET_MSGQUEUE_H_
 
 #include <mutex>
 #include <condition_variable>
@@ -7,7 +7,7 @@
 
 #include "NonCopyable.h"
 
-namespace dodo
+namespace brynet
 {
     template<typename T>
     class MsgQueue : public NonCopyable

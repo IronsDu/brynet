@@ -1,5 +1,5 @@
-#ifndef DODO_TIMER_H_
-#define DODO_TIMER_H_
+#ifndef BRYNET_TIMER_H_
+#define BRYNET_TIMER_H_
 
 #include <functional>
 #include <queue>
@@ -8,7 +8,7 @@
 
 #include "systemlib.h"
 
-namespace dodo
+namespace brynet
 {
     class TimerMgr;
 

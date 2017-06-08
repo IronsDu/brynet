@@ -6,7 +6,7 @@
 
 static unsigned int sDefaultLoopTimeOutMS = 100;
 
-using namespace dodo::net;
+using namespace brynet::net;
 
 ListenThread::ListenThread()
 {

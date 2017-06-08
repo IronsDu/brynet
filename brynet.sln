@@ -3,15 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26228.9
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BroadCastClient", "vsproj-12\BroadCastClient.vcxproj", "{D5E6407E-D02C-4371-8FF9-F2639259DBFF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BroadCastClient", "vsproj-14\BroadCastClient.vcxproj", "{D5E6407E-D02C-4371-8FF9-F2639259DBFF}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BroadCastServer", "vsproj-12\BroadCastServer.vcxproj", "{61241063-E356-4C1D-8954-2D14F5E12FFC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BroadCastServer", "vsproj-14\BroadCastServer.vcxproj", "{61241063-E356-4C1D-8954-2D14F5E12FFC}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PingPongClient", "vsproj-12\PingPongClient.vcxproj", "{AE0A300F-BB68-4C9B-A35E-4F81CE275E87}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PingPongClient", "vsproj-14\PingPongClient.vcxproj", "{AE0A300F-BB68-4C9B-A35E-4F81CE275E87}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PingPongServer", "vsproj-12\PingPongServer.vcxproj", "{92850F11-2E93-41D8-95B7-864DF71D7082}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PingPongServer", "vsproj-14\PingPongServer.vcxproj", "{92850F11-2E93-41D8-95B7-864DF71D7082}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestHttp", "vsproj-12\TestHttp.vcxproj", "{52C469DD-F089-44A2-89A6-DB678FD662BE}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestHttp", "vsproj-14\TestHttp.vcxproj", "{52C469DD-F089-44A2-89A6-DB678FD662BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,7 +1,7 @@
-#ifndef DODO_NET_CHANNEL_H_
-#define DODO_NET_CHANNEL_H_
+#ifndef BRYNET_NET_CHANNEL_H_
+#define BRYNET_NET_CHANNEL_H_
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

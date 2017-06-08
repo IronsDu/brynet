@@ -18,8 +18,8 @@
 #include "Timer.h"
 
 using namespace std;
-using namespace dodo;
-using namespace dodo::net;
+using namespace brynet;
+using namespace brynet::net;
 
 int main(int argc, char** argv)
 {

@@ -8,7 +8,7 @@
 
 #include "HttpServer.h"
 
-using namespace dodo::net;
+using namespace brynet::net;
 
 HttpSession::HttpSession(TCPSession::PTR session)
 {

@@ -3,9 +3,9 @@
 #include "Channel.h"
 #include "EventLoop.h"
 
-using namespace dodo::net;
+using namespace brynet::net;
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {
@@ -135,7 +135,7 @@ EventLoop::~EventLoop()
     mEventEntries = nullptr;
 }
 
-dodo::TimerMgr::PTR EventLoop::getTimerMgr()
+brynet::TimerMgr::PTR EventLoop::getTimerMgr()
 {
     tryInitThreadID();
     assert(isInLoopThread());

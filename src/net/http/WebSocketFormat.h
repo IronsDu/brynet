@@ -1,5 +1,5 @@
-#ifndef DODO_NET_WEBSOCKETFORMAT_H_
-#define DODO_NET_WEBSOCKETFORMAT_H_
+#ifndef BRYNET_NET_WEBSOCKETFORMAT_H_
+#define BRYNET_NET_WEBSOCKETFORMAT_H_
 
 #include <string>
 #include <stdint.h>
@@ -7,7 +7,7 @@
 #include "SHA1.h"
 #include "base64.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

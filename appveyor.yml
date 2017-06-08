@@ -10,6 +10,6 @@ environment:
   - VS_VERSION: 14 2017
     VS_PLATFORM: x64
 build:
-  project: dodo.sln
+  project: brynet.sln
   parallel: true
   verbosity: minimal

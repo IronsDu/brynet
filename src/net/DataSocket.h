@@ -1,5 +1,5 @@
-#ifndef DODO_NET_DATASOCKET_H_
-#define DODO_NET_DATASOCKET_H_
+#ifndef BRYNET_NET_DATASOCKET_H_
+#define BRYNET_NET_DATASOCKET_H_
 
 #include <any>
 #include <memory>
@@ -28,7 +28,7 @@ struct buffer_s;
 
 /*  使用裸指针,且一旦投递到eventloop,只有在onEnterEventLoop失败或者断开回调中才能delete它(一个DataSocket的断开回调只会被调用一次)  */
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

@@ -1,11 +1,11 @@
-#ifndef DODO_NET_HTTPFORMAT_H_
-#define DODO_NET_HTTPFORMAT_H_
+#ifndef BRYNET_NET_HTTPFORMAT_H_
+#define BRYNET_NET_HTTPFORMAT_H_
 
 #include <string>
 #include <array>
 #include <unordered_map>
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

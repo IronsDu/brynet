@@ -1,5 +1,5 @@
-#ifndef DODO_NET_CURRENTTHREAD_H_
-#define DODO_NET_CURRENTTHREAD_H_
+#ifndef BRYNET_NET_CURRENTTHREAD_H_
+#define BRYNET_NET_CURRENTTHREAD_H_
 
 #include <thread>
 #include "Platform.h"
@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #endif
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

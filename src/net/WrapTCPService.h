@@ -1,5 +1,5 @@
-#ifndef DODO_NET_WRAPTCPSERVICE_H_
-#define DODO_NET_WRAPTCPSERVICE_H_
+#ifndef BRYNET_NET_WRAPTCPSERVICE_H_
+#define BRYNET_NET_WRAPTCPSERVICE_H_
 
 #include <string>
 #include <cstdint>
@@ -7,7 +7,7 @@
 #include "TCPService.h"
 #include "NonCopyable.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

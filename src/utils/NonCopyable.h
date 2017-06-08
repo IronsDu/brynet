@@ -1,7 +1,7 @@
-#ifndef DODO_NONCOPYABLE_H_
-#define DODO_NONCOPYABLE_H_
+#ifndef BRYNET_NONCOPYABLE_H_
+#define BRYNET_NONCOPYABLE_H_
 
-namespace dodo
+namespace brynet
 {
     class NonCopyable
     {

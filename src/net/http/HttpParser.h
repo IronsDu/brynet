@@ -1,5 +1,5 @@
-#ifndef DODO_NET_HTTPPARSER_H_
-#define DODO_NET_HTTPPARSER_H_
+#ifndef BRYNET_NET_HTTPPARSER_H_
+#define BRYNET_NET_HTTPPARSER_H_
 
 #include <string>
 #include <map>
@@ -7,7 +7,7 @@
 
 #include "http_parser.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

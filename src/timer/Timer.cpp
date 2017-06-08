@@ -1,6 +1,6 @@
 #include "Timer.h"
 
-using namespace dodo;
+using namespace brynet;
 
 time_t Timer::getEndMs() const
 {

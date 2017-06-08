@@ -4,7 +4,7 @@
 
 #include "HttpParser.h"
 
-using namespace dodo::net;
+using namespace brynet::net;
 
 HTTPParser::HTTPParser(http_parser_type parserType) : mParserType(parserType)
 {

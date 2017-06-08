@@ -7,7 +7,7 @@
 
 #include "DataSocket.h"
 
-using namespace dodo::net;
+using namespace brynet::net;
 
 DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
 #if defined PLATFORM_WINDOWS

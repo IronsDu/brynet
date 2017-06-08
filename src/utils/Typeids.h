@@ -1,5 +1,5 @@
-#ifndef DODO_TYPEIDS_H_
-#define DODO_TYPEIDS_H_
+#ifndef BRYNET_TYPEIDS_H_
+#define BRYNET_TYPEIDS_H_
 
 #include <cassert>
 #include <exception>
@@ -7,7 +7,7 @@
 
 /*采用ID管理对象的管理器*/
 
-namespace dodo
+namespace brynet
 {
     template<typename T>
     class TypeIDS

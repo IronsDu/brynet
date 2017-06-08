@@ -9,9 +9,9 @@
 #include <linux/unistd.h>
 #endif
 
-using namespace dodo::net::CurrentThread;
+using namespace brynet::net::CurrentThread;
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

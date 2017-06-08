@@ -1,5 +1,5 @@
-#ifndef DODO_NET_EVENTLOOP_H_
-#define DODO_NET_EVENTLOOP_H_
+#ifndef BRYNET_NET_EVENTLOOP_H_
+#define BRYNET_NET_EVENTLOOP_H_
 
 #include <cstdint>
 #include <functional>
@@ -13,7 +13,7 @@
 #include "Timer.h"
 #include "NonCopyable.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {

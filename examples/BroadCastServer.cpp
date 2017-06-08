@@ -17,8 +17,8 @@
 #include "TCPService.h"
 #include "MsgQueue.h"
 
-using namespace dodo;
-using namespace dodo::net;
+using namespace brynet;
+using namespace brynet::net;
 
 enum NetMsgType
 {

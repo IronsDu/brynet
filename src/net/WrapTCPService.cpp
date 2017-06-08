@@ -1,6 +1,6 @@
 #include "WrapTCPService.h"
 
-using namespace dodo::net;
+using namespace brynet::net;
 
 TCPSession::TCPSession()
 {
