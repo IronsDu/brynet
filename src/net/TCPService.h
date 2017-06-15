@@ -9,7 +9,6 @@
 #include <memory>
 
 #include "DataSocket.h"
-#include "Typeids.h"
 #include "NonCopyable.h"
 
 namespace brynet
@@ -30,15 +29,11 @@ namespace brynet
 #ifdef USE_OPENSSL
             SSL_CTX*                            getOpenSSLCTX();
 #endif
-            static  PTR             Create()
-            {
-                struct make_shared_enabler : public ListenThread {};
-                return std::make_shared<make_shared_enabler>();
-            }
+            static  PTR                         Create();
 
         private:
-            ListenThread();
-            virtual ~ListenThread();
+            ListenThread() noexcept;
+            virtual ~ListenThread() noexcept;
 
             void                                runListen();
             void                                initSSL();
@@ -58,6 +53,8 @@ namespace brynet
 #endif
         };
 
+        struct IOLoopData;
+
         /*  以数字ID为网络会话标识的网络服务   */
         class TcpService : public NonCopyable, public std::enable_shared_from_this<TcpService>
         {
@@ -69,6 +66,9 @@ namespace brynet
             typedef std::function<void(SESSION_TYPE, const std::string&)>               ENTER_CALLBACK;
             typedef std::function<void(SESSION_TYPE)>                                   DISCONNECT_CALLBACK;
             typedef std::function<size_t(SESSION_TYPE, const char* buffer, size_t len)> DATA_CALLBACK;
+
+        public:
+            static  PTR                         Create();
 
         public:
             /*  设置默认事件回调    */
@@ -128,15 +128,9 @@ namespace brynet
             EventLoop::PTR                      getRandomEventLoop();
             EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const noexcept;
 
-            static  PTR             Create()
-            {
-                struct make_shared_enabler : public TcpService {};
-                return std::make_shared<make_shared_enabler>();
-            }
-
         private:
-            TcpService();
-            virtual ~TcpService();
+            TcpService() noexcept;
+            virtual ~TcpService() noexcept;
 
             bool                                helpAddChannel(DataSocket::PTR channel,
                                                                 const std::string& ip,
@@ -146,23 +140,11 @@ namespace brynet
                                                                 bool forceSameThreadLoop = false);
         private:
             SESSION_TYPE                        MakeID(size_t loopIndex);
-
             void                                procDataSocketClose(DataSocket::PTR);
             /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
             void                                postSessionAsyncProc(SESSION_TYPE id, const std::function<void(DataSocket::PTR)>& callback) const;
 
         private:
-            typedef std::vector<std::tuple<SESSION_TYPE, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
-
-            struct IOLoopData : public NonCopyable
-            {
-                EventLoop::PTR                  eventLoop;
-                std::shared_ptr<std::thread>    ioThread;
-                TypeIDS<DataSocket::PTR>        dataSockets;
-                int                             incId;
-                std::shared_ptr<MSG_LIST>       cachePacketList;
-            };
-
             std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
 
             bool                                mRunIOLoop;
@@ -173,19 +155,6 @@ namespace brynet
             TcpService::ENTER_CALLBACK          mEnterCallback;
             TcpService::DISCONNECT_CALLBACK     mDisConnectCallback;
             TcpService::DATA_CALLBACK           mDataCallback;
-
-            /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
-            union SessionId
-            {
-                struct
-                {
-                    uint16_t    loopIndex;      /*  会话所属的eventloop的(在mLoops中的)索引  */
-                    uint16_t    index;          /*  会话在mDataSockets[loopIndex]中的索引值 */
-                    uint32_t    iid;            /*  自增计数器   */
-                }data;  /*  warn::so,服务器最大支持0xFFFF(65536)个io loop线程，每一个io loop最大支持0xFFFF(65536)个链接。*/
-
-                SESSION_TYPE id;
-            };
         };
     }
 }

@@ -1,4 +1,4 @@
-dodo
+Brynet
 =======
 Cross platform high performance TCP network library and RPC library using C++ 11.
 
@@ -12,7 +12,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 * SSL support
 * Support HTTP、HTTPS、WebSocket protocol
 * IPv6 support
-* [RPC Library](https://github.com/IronsDu/dodo/tree/master/src/rpc)
+* [RPC Library](https://github.com/IronsDu/brynet/tree/master/src/rpc)
 
 ## Usages
 * [Examples](#examples)
@@ -135,4 +135,4 @@ Users
 ----------------------------
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [Distributed game server framework](https://github.com/IronsDu/DServerFramework)
-* [Joynet - lua network library](https://github.com/IronsDu/Joynet)
+* [Joynet - Lua network library](https://github.com/IronsDu/Joynet)

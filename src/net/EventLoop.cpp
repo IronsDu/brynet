@@ -90,9 +90,9 @@ namespace brynet
 
 EventLoop::EventLoop()
 #ifdef PLATFORM_WINDOWS
-    : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
+noexcept : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
 #else
-    : mEpollFd(epoll_create(1))
+noexcept : mEpollFd(epoll_create(1))
 #endif
 {
 #ifdef PLATFORM_WINDOWS
@@ -117,12 +117,13 @@ EventLoop::EventLoop()
     mEventEntriesNum = 0;
 
     reallocEventSize(1024);
-    mSelfThreadid = -1;
+    mSelfThreadID = -1;
     mIsInitThreadID = false;
     mTimer = std::make_shared<TimerMgr>();
 }
 
-EventLoop::~EventLoop()
+
+EventLoop::~EventLoop() noexcept
 {
 #ifdef PLATFORM_WINDOWS
     CloseHandle(mIOCP);
@@ -146,7 +147,7 @@ inline void EventLoop::tryInitThreadID()
 {
     if (!mIsInitThreadID && !mIsInitThreadID.exchange(true))
     {
-        mSelfThreadid = CurrentThread::tid();
+        mSelfThreadID = CurrentThread::tid();
     }
 }
 
@@ -266,9 +267,10 @@ void EventLoop::processAfterLoopProcs()
 
 void EventLoop::processAsyncProcs()
 {
-    mAsyncProcsMutex.lock();
-    mCopyAsyncProcs.swap(mAsyncProcs);
-    mAsyncProcsMutex.unlock();
+    {
+        std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
+        mCopyAsyncProcs.swap(mAsyncProcs);
+    }
 
     for (auto& x : mCopyAsyncProcs)
     {
@@ -305,9 +307,10 @@ void EventLoop::pushAsyncProc(const USER_PROC& f)
 {
     if (!isInLoopThread())
     {
-        mAsyncProcsMutex.lock();
-        mAsyncProcs.push_back(f);
-        mAsyncProcsMutex.unlock();
+        {
+            std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
+            mAsyncProcs.push_back(f);
+        }
 
         wakeup();
     }
@@ -321,9 +324,10 @@ void EventLoop::pushAsyncProc(USER_PROC&& f)
 {
     if (!isInLoopThread())
     {
-        mAsyncProcsMutex.lock();
-        mAsyncProcs.push_back(std::move(f));
-        mAsyncProcsMutex.unlock();
+        {
+            std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
+            mAsyncProcs.push_back(std::move(f));
+        }
 
         wakeup();
     }

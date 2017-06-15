@@ -4,6 +4,7 @@
 #include <string>
 #include <array>
 #include <unordered_map>
+#include <cassert>
 
 namespace brynet
 {

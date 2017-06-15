@@ -1,3 +1,4 @@
+#include "Typeids.h"
 #include "SocketLibFunction.h"
 #include "EventLoop.h"
 #include "DataSocket.h"
@@ -8,7 +9,13 @@ static unsigned int sDefaultLoopTimeOutMS = 100;
 
 using namespace brynet::net;
 
-ListenThread::ListenThread()
+ListenThread::PTR ListenThread::Create()
+{
+    struct make_shared_enabler : public ListenThread {};
+    return std::make_shared<make_shared_enabler>();
+}
+
+ListenThread::ListenThread() noexcept
 {
     mIsIPV6 = false;
     mAcceptCallback = nullptr;
@@ -19,7 +26,7 @@ ListenThread::ListenThread()
 #endif
 }
 
-ListenThread::~ListenThread()
+ListenThread::~ListenThread() noexcept
 {
     closeListenThread();
 }
@@ -157,7 +164,37 @@ void ListenThread::runListen()
     }
 }
 
-TcpService::TcpService()
+namespace brynet
+{
+    namespace net
+    {
+        /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
+        union SessionId
+        {
+            struct
+            {
+                uint16_t    loopIndex;      /*  会话所属的eventloop的(在mLoops中的)索引  */
+                uint16_t    index;          /*  会话在mDataSockets[loopIndex]中的索引值 */
+                uint32_t    iid;            /*  自增计数器   */
+            }data;  /*  warn::so,服务器最大支持0xFFFF(65536)个io loop线程，每一个io loop最大支持0xFFFF(65536)个链接。*/
+
+            TcpService::SESSION_TYPE id;
+        };
+
+        struct IOLoopData : public NonCopyable
+        {
+            typedef std::vector<std::tuple<TcpService::SESSION_TYPE, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
+
+            EventLoop::PTR                  eventLoop;
+            std::shared_ptr<std::thread>    ioThread;
+            TypeIDS<DataSocket::PTR>        dataSockets;
+            int                             incId;
+            std::shared_ptr<MSG_LIST>       cachePacketList;
+        };
+    }
+}
+
+TcpService::TcpService() noexcept
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
 
@@ -169,7 +206,7 @@ TcpService::TcpService()
     mListenThread = ListenThread::Create();
 }
 
-TcpService::~TcpService()
+TcpService::~TcpService() noexcept
 {
     closeService();
 }
@@ -296,7 +333,7 @@ void TcpService::flushCachePackectList()
                 }
                 
             });
-            mIOLoopDatas[i]->cachePacketList = std::make_shared<MSG_LIST>();
+            mIOLoopDatas[i]->cachePacketList = std::make_shared<IOLoopData::MSG_LIST>();
         }
     }
 }
@@ -414,7 +451,7 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
         for (auto& v : mIOLoopDatas)
         {
             v = std::make_shared<IOLoopData>();
-            v->cachePacketList = std::make_shared<MSG_LIST>();
+            v->cachePacketList = std::make_shared<IOLoopData::MSG_LIST>();
             v->eventLoop = std::make_shared<EventLoop>();
             v->ioThread = std::make_shared<std::thread>([callback, shared_this = shared_from_this(), eventLoop = v->eventLoop]() {
                 while (shared_this->mRunIOLoop)
@@ -458,6 +495,12 @@ EventLoop::PTR TcpService::getRandomEventLoop()
     }
 
     return ret;
+}
+
+TcpService::PTR TcpService::Create()
+{
+    struct make_shared_enabler : public TcpService {};
+    return std::make_shared<make_shared_enabler>();
 }
 
 EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id) const noexcept

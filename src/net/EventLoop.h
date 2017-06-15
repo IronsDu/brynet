@@ -48,8 +48,8 @@ namespace brynet
 #endif
 
         public:
-            EventLoop();
-            virtual ~EventLoop();
+            EventLoop() noexcept;
+            virtual ~EventLoop() noexcept;
 
             void                            loop(int64_t timeout);
 
@@ -68,7 +68,7 @@ namespace brynet
 
             inline bool                     isInLoopThread() const
             {
-                return mSelfThreadid == CurrentThread::tid();
+                return mSelfThreadID == CurrentThread::tid();
             }
 
         private:
@@ -108,7 +108,7 @@ namespace brynet
             std::mutex                      mAsyncProcsMutex;
 
             std::atomic_bool                mIsInitThreadID;
-            CurrentThread::THREAD_ID_TYPE   mSelfThreadid;              /*  调用loop函数所在thread的id */
+            CurrentThread::THREAD_ID_TYPE   mSelfThreadID;              /*  调用loop函数所在thread的id */
 
             TimerMgr::PTR                   mTimer;
 

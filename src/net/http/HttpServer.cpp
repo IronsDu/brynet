@@ -1,5 +1,6 @@
 #include <string>
 #include <cstring>
+#include <cassert>
 
 #include "SHA1.h"
 #include "base64.h"

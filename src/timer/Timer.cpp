@@ -12,7 +12,7 @@ void Timer::cancel()
     mActive = false;
 }
 
-Timer::Timer(time_t ms, Callback callback) : mEndTime(ms), mCallback(callback)
+Timer::Timer(time_t ms, Callback callback) noexcept : mEndTime(ms), mCallback(callback)
 {
     mActive = true;
 }

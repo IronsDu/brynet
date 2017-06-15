@@ -17,8 +17,7 @@ int main(int argc, char **argv)
 
     std::string tmp(atoi(argv[5]), 'a');
 
-    WrapServer::PTR server = std::make_shared<WrapServer>();
-
+    auto server = std::make_shared<WrapServer>();
     server->startWorkThread(atoi(argv[3]));
 
     for (int i = 0; i < atoi(argv[4]); i++)

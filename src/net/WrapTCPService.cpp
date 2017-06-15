@@ -2,7 +2,7 @@
 
 using namespace brynet::net;
 
-TCPSession::TCPSession()
+TCPSession::TCPSession() noexcept
 {
     mSocketID = -1;
     mCloseCallback = nullptr;
@@ -10,7 +10,7 @@ TCPSession::TCPSession()
     mService = nullptr;
 }
 
-TCPSession::~TCPSession()
+TCPSession::~TCPSession() noexcept
 {
     mSocketID = -1;
 }
@@ -100,12 +100,18 @@ TCPSession::DATA_CALLBACK& TCPSession::getDataCallback()
     return mDataCallback;
 }
 
-WrapServer::WrapServer()
+TCPSession::PTR TCPSession::Create()
+{
+    struct make_shared_enabler : public TCPSession {};
+    return std::make_shared<make_shared_enabler>();
+}
+
+WrapServer::WrapServer() noexcept
 {
     mTCPService = TcpService::Create();
 }
 
-WrapServer::~WrapServer()
+WrapServer::~WrapServer() noexcept
 {
 }
 

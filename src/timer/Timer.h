@@ -19,7 +19,7 @@ namespace brynet
         typedef std::weak_ptr<Timer>            WeakPtr;
         typedef std::function<void(void)>       Callback;
 
-        Timer(time_t endTime, Callback f);
+        Timer(time_t endTime, Callback f) noexcept;
 
         time_t                                  getEndMs() const;
         void                                    cancel();

@@ -43,8 +43,8 @@ namespace brynet
             void                    setDataCallback(const DATA_CALLBACK& callback);
 
         private:
-            TCPSession();
-            virtual ~TCPSession();
+            TCPSession() noexcept;
+            virtual ~TCPSession() noexcept;
 
             void                    setSocketID(TcpService::SESSION_TYPE id);
             void                    setIP(const std::string& ip);
@@ -54,11 +54,7 @@ namespace brynet
             CLOSE_CALLBACK&         getCloseCallback();
             DATA_CALLBACK&          getDataCallback();
 
-            static  PTR             Create()
-            {
-                struct make_shared_enabler : public TCPSession {};
-                return std::make_shared<make_shared_enabler>();
-            }
+            static  PTR             Create();
 
         private:
             TcpService::PTR             mService;
@@ -80,13 +76,11 @@ namespace brynet
 
             typedef std::function<void(TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
-            WrapServer();
-            virtual ~WrapServer();
+            WrapServer() noexcept;
+            virtual ~WrapServer() noexcept;
 
             TcpService::PTR&        getService();
-
             void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
-
             void                    addSession(sock fd, 
                                                 const SESSION_ENTER_CALLBACK& userEnterCallback, 
                                                 bool isUseSSL, 

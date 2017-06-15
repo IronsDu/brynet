@@ -15,13 +15,7 @@ std::atomic_llong total_packet_num = ATOMIC_VAR_INIT(0);
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
-    {
-        fprintf(stderr, "Usage:  <listen port> <net work thread num>\n");
-        exit(-1);
-    }
-
-    WrapServer::PTR server = std::make_shared<WrapServer>();
+    auto server = std::make_shared<WrapServer>();
     auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){

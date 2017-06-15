@@ -2,82 +2,43 @@
 #define DODO_NET_CONNECTOR_H_
 
 #include <functional>
-#include <string>
 #include <memory>
+#include <any>
 
 #include "EventLoop.h"
-#include "MsgQueue.h"
 #include "NonCopyable.h"
 #include "SocketLibTypes.h"
 
-namespace dodo
+namespace brynet
 {
     namespace net
     {
-        class AsyncConnectAddr
-        {
-        public:
-            AsyncConnectAddr()
-            {
-                mPort = 0;
-                mTimeout = 0;
-                mUid = -1;
-            }
-
-            AsyncConnectAddr(const char* ip, int port, int timeout, int64_t uid) : mIP(ip), mPort(port), mTimeout(timeout), mUid(uid)
-            {
-            }
-
-            const std::string&  getIP() const
-            {
-                return mIP;
-            }
-
-            int                 getPort() const
-            {
-                return mPort;
-            }
-
-            int64_t             getUID() const
-            {
-                return mUid;
-            }
-
-            int                 getTimeout() const
-            {
-                return mTimeout;
-            }
-
-        private:
-            std::string         mIP;
-            int                 mPort;
-            int                 mTimeout;
-            int64_t             mUid;
-        };
-
         class ConnectorWorkThread;
+        class AsyncConnectAddr;
 
         class ThreadConnector : NonCopyable, public std::enable_shared_from_this<ThreadConnector>
         {
         public:
             typedef std::shared_ptr<ThreadConnector> PTR;
-            typedef std::function<void(sock, int64_t)> COMPLETED_CALLBACK;
+            /*  sock为-1表示失败, TODO::可单独添加Failed Callback   */
+            typedef std::function<void(sock, const std::any&)> COMPLETED_CALLBACK;
 
-            ThreadConnector();
-
-            virtual ~ThreadConnector();
             void                startThread(COMPLETED_CALLBACK callback);
             void                destroy();
-            void                asyncConnect(const char* ip, int port, int ms, int64_t uid);
+            void                asyncConnect(const char* ip, int port, int ms, std::any ud);
+
+            static  PTR         Create();
 
         private:
+            ThreadConnector();
+            virtual ~ThreadConnector();
             void                run(std::shared_ptr<ConnectorWorkThread>);
 
         private:
-            MsgQueue<AsyncConnectAddr>      mConnectRequests;     /*  请求列表    */
-            EventLoop                       mThreadEventloop;
+            std::shared_ptr<MsgQueue<AsyncConnectAddr>>      mConnectRequests;     /*  请求列表    */
+            EventLoop                       mEventLoop;
 
-            std::thread*                    mThread;
+            std::shared_ptr<std::thread>    mThread;
             bool                            mIsRun;
         };
     }

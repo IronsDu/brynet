@@ -1,6 +1,7 @@
 #ifndef BRYNET_TYPEIDS_H_
 #define BRYNET_TYPEIDS_H_
 
+#include <vector>
 #include <cassert>
 #include <exception>
 #include <algorithm>

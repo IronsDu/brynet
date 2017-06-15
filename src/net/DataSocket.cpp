@@ -9,7 +9,7 @@
 
 using namespace brynet::net;
 
-DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
+DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) noexcept
 #if defined PLATFORM_WINDOWS
     : mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), mOvlSend(EventLoop::OLV_VALUE::OVL_SEND)
 #endif
@@ -38,7 +38,7 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)
 #endif
 }
 
-DataSocket::~DataSocket()
+DataSocket::~DataSocket() noexcept
 {
     /*  断言检测,当DataSocket析构时,应该处于断开状态    */
     assert(mFD == SOCKET_ERROR);

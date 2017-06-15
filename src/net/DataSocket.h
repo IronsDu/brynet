@@ -45,8 +45,8 @@ namespace brynet
             typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
         public:
-            DataSocket(sock fd, size_t maxRecvBufferSize);
-            ~DataSocket();
+            DataSocket(sock fd, size_t maxRecvBufferSize) noexcept;
+            ~DataSocket() noexcept;
 
             /*  仅在网络线程中调用才可能返回成功 */
             bool                            onEnterEventLoop(EventLoop::PTR eventLoop);

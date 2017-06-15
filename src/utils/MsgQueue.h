@@ -26,11 +26,10 @@ namespace brynet
 
         void    clear()
         {
-            mMutex.lock();
+            std::lock_guard<std::mutex> lck(mMutex);
             mReadList.clear();
             mWriteList.clear();
             mSharedList.clear();
-            mMutex.unlock();
         }
 
         void    push(const T& t)
@@ -48,15 +47,12 @@ namespace brynet
         {
             if (!mWriteList.empty() && mSharedList.empty())
             {
-                mMutex.lock();
-
+                std::lock_guard<std::mutex> lck(mMutex);
                 if (!mWriteList.empty() && mSharedList.empty())
                 {
                     mSharedList.swap(mWriteList);
                     mCond.notify_one();
                 }
-
-                mMutex.unlock();
             }
         }
 
@@ -72,8 +68,7 @@ namespace brynet
                 }
                 else
                 {
-                    mMutex.lock();
-
+                    std::lock_guard<std::mutex> lck(mMutex);
                     if (!mWriteList.empty())
                     {
                         /*  «ø÷∆–¥»Î    */
@@ -83,7 +78,6 @@ namespace brynet
                             {
                                 mWriteList.push_front(std::move(*it));
                             }
-
                             mSharedList.clear();
                             mSharedList.swap(mWriteList);
                         }
@@ -93,14 +87,11 @@ namespace brynet
                             {
                                 mSharedList.push_back(std::move(x));
                             }
-
                             mWriteList.clear();
                         }
 
                         mCond.notify_one();
                     }
-
-                    mMutex.unlock();
                 }
             }
         }
@@ -146,14 +137,13 @@ namespace brynet
                     mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond));
                 }
 
-                mMutex.lock();
-
-                if (mReadList.empty() && !mSharedList.empty())
                 {
-                    mSharedList.swap(mReadList);
+                    std::lock_guard<std::mutex> lck(mMutex);
+                    if (mReadList.empty() && !mSharedList.empty())
+                    {
+                        mSharedList.swap(mReadList);
+                    }
                 }
-
-                mMutex.unlock();
             }
         }
 
