@@ -1,9 +1,26 @@
 language: cpp
 compiler: g++
+sudo: required
+addons:
+  apt:
+    sources:
+    - deadsnakes
+    - sourceline: 'ppa:ubuntu-toolchain-r/test'
+    - sourceline: 'deb https://packagecloud.io/chef/stable/ubuntu/precise main'
+      key_url: 'https://packagecloud.io/gpg.key'
+addons:
+  apt:
+    packages:
+    - cmake
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - g++-7 
 before_install:
-    - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-    - sudo apt-get update -qq
+    - cmake .
 install:
-    - sudo apt-get install -qq g++-7
     - export CXX="g++-7"
-script: cd examples/ && make all
+script: make

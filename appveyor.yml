@@ -13,3 +13,6 @@ build:
   project: brynet.sln
   parallel: true
   verbosity: minimal
+before_build:
+  - echo Running cmake...
+  - cmake -G "Visual Studio 15 2017"
