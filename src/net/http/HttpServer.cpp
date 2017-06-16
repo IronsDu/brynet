@@ -106,6 +106,24 @@ void HttpSession::postClose() const
     mSession->postClose();
 }
 
+HttpSession::PTR HttpSession::Create(TCPSession::PTR session)
+{
+    struct make_shared_enabler : public HttpSession
+    {
+    public:
+        make_shared_enabler(TCPSession::PTR session) : HttpSession(session)
+        {}
+    };
+
+    return std::make_shared<make_shared_enabler>(session);
+}
+
+HttpServer::PTR HttpServer::Create()
+{
+    struct make_shared_enabler : public HttpServer {};
+    return std::make_shared<make_shared_enabler>();
+}
+
 HttpServer::HttpServer()
 {
     mServer = std::make_shared<WrapServer>();
