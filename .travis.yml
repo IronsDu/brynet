@@ -2,9 +2,9 @@ language: cpp
 compiler: g++
 sudo: required
 before_install:
-    - sudo add-apt-repository ppa:jonathonf/gcc-7.1
-    - sudo apt-get update
-    - sudo apt install g++-7
+    - sudo add-apt-repository ppa:jonathonf/gcc-7.1 -y
+    - sudo apt-get update -y
+    - sudo apt install g++-7 -y
 install:
     - cmake .
     - export CXX="g++-7"
