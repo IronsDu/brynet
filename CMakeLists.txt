@@ -1,7 +1,11 @@
 cmake_minimum_required (VERSION 2.6)
 project(brynet)
 
+if(WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
+elseif(UNIX)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+endif()
 
 set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/net/EventLoop.cpp
@@ -13,7 +17,7 @@ set(net_src_list
 )
 
 set(timer_src_list
-	${PROJECT_SOURCE_DIR}/src/timer/timer.cpp
+	${PROJECT_SOURCE_DIR}/src/timer/Timer.cpp
 )
 
 set(utils_src_list

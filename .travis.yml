@@ -1,26 +1,11 @@
 language: cpp
 compiler: g++
 sudo: required
-addons:
-  apt:
-    sources:
-    - deadsnakes
-    - sourceline: 'ppa:ubuntu-toolchain-r/test'
-    - sourceline: 'deb https://packagecloud.io/chef/stable/ubuntu/precise main'
-      key_url: 'https://packagecloud.io/gpg.key'
-addons:
-  apt:
-    packages:
-    - cmake
-
-addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    packages:
-    - g++-7 
 before_install:
-    - cmake .
+    - sudo add-apt-repository ppa:jonathonf/gcc-7.1
+    - sudo apt-get update
+    - sudo apt install g++-7
 install:
+    - cmake .
     - export CXX="g++-7"
 script: make
