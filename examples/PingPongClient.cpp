@@ -3,6 +3,7 @@
 
 #include "SocketLibFunction.h"
 #include "WrapTCPService.h"
+#include "Connector.h"
 
 using namespace brynet;
 using namespace brynet::net;
@@ -20,16 +21,23 @@ int main(int argc, char **argv)
     auto server = std::make_shared<WrapServer>();
     server->startWorkThread(atoi(argv[3]));
 
-    for (int i = 0; i < atoi(argv[4]); i++)
+    auto connector = ThreadConnector::Create();
+    connector->startThread([server, tmp](sock fd, const std::any& ud) {
+        if (fd != -1)
+        {
+            server->addSession(fd, [tmp](TCPSession::PTR& session) {
+                session->setDataCallback([](TCPSession::PTR& session, const char* buffer, size_t len) {
+                    session->send(buffer, len);
+                    return len;
+                });
+                session->send(tmp.c_str(), tmp.size());
+            }, false, 1024 * 1024);
+        }
+    });
+
+    for (auto i = 0; i < atoi(argv[4]); i++)
     {
-        sock fd = ox_socket_connect(false, argv[1], atoi(argv[2]));
-        server->addSession(fd, [=](TCPSession::PTR& session){
-            session->setDataCallback([](TCPSession::PTR& session, const char* buffer, size_t len){
-                session->send(buffer, len);
-                return len;
-            });
-            session->send(tmp.c_str(), tmp.size());
-        }, false, 1024 * 1024);
+        connector->asyncConnect(argv[1], atoi(argv[2]), 10000, nullptr);
     }
 
     std::cin.get();

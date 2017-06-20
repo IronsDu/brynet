@@ -8,6 +8,7 @@
 #include "EventLoop.h"
 #include "NonCopyable.h"
 #include "SocketLibTypes.h"
+#include "MsgQueue.h"
 
 namespace brynet
 {

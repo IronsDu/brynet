@@ -14,6 +14,10 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 * IPv6 support
 * [RPC Library](https://github.com/IronsDu/brynet/tree/master/src/rpc)
 
+## Build
+1. `cmake .`
+2. If you use Windows, please open brynet.sln then build. If on Linux, only enter `make`.
+
 ## Usages
 * [Examples](#examples)
 * [Users](#users)

@@ -9,8 +9,8 @@
 #include "WebSocketFormat.h"
 #include "packet.h"
 
-using namespace dodo;
-using namespace dodo::net;
+using namespace brynet;
+using namespace brynet::net;
 
 std::atomic<int32_t> count;
 
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
         });
     }
 
-    dodo::net::EventLoop mainLoop;
+    brynet::net::EventLoop mainLoop;
     while (true)
     {
         mainLoop.loop(5000);

@@ -15,11 +15,16 @@ std::atomic_llong total_packet_num = ATOMIC_VAR_INIT(0);
 
 int main(int argc, char **argv)
 {
+    if (argc != 3)
+    {
+        fprintf(stderr, "Usage: <listen port> <net work thread num>\n");
+        exit(-1);
+    }
+
     auto server = std::make_shared<WrapServer>();
     auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
-        std::cout << "enter" << std::endl;
         server->addSession(fd, [](TCPSession::PTR& session){
             total_client_num++;
 
@@ -39,7 +44,6 @@ int main(int argc, char **argv)
     server->startWorkThread(atoi(argv[2]));
 
     EventLoop mainLoop;
-
     while (true)
     {
         mainLoop.loop(1000);
