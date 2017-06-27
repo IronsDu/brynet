@@ -31,39 +31,24 @@ void HttpSession::setUD(std::any ud)
     mUD = ud;
 }
 
-void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK&& callback)
+void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK callback)
 {
     mHttpRequestCallback = std::move(callback);
 }
 
-void HttpSession::setCloseCallback(CLOSE_CALLBACK&& callback)
+void HttpSession::setCloseCallback(CLOSE_CALLBACK callback)
 {
     mCloseCallback = std::move(callback);
 }
 
-void HttpSession::setWSCallback(WS_CALLBACK&& callback)
+void HttpSession::setWSCallback(WS_CALLBACK callback)
 {
     mWSCallback = std::move(callback);
 }
 
-void HttpSession::setHttpCallback(const HTTPPARSER_CALLBACK& callback)
+void HttpSession::setWSConnected(WS_CONNECTED_CALLBACK callback)
 {
-    mHttpRequestCallback = callback;
-}
-
-void HttpSession::setCloseCallback(const CLOSE_CALLBACK& callback)
-{
-    mCloseCallback = callback;
-}
-
-void HttpSession::setWSCallback(const WS_CALLBACK& callback)
-{
-    mWSCallback = callback;
-}
-
-void HttpSession::setWSConnected(const WS_CONNECTED_CALLBACK& callback)
-{
-    mWSConnectedCallback = callback;
+    mWSConnectedCallback = std::move(callback);
 }
 
 HttpSession::HTTPPARSER_CALLBACK& HttpSession::getHttpCallback()
@@ -146,26 +131,31 @@ WrapServer::PTR HttpServer::getServer()
     return mServer;
 }
 
-void HttpServer::setEnterCallback(const ENTER_CALLBACK& callback)
+void HttpServer::setEnterCallback(ENTER_CALLBACK callback)
 {
-    mOnEnter = callback;
+    mOnEnter = std::move(callback);
 }
 
 void HttpServer::addConnection(sock fd, 
-    const ENTER_CALLBACK& enterCallback, 
-    const HttpSession::HTTPPARSER_CALLBACK& responseCallback, 
-    const HttpSession::WS_CALLBACK& wsCallback, 
-    const HttpSession::CLOSE_CALLBACK& closeCallback,
-    const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback)
+    ENTER_CALLBACK enterCallback, 
+    HttpSession::HTTPPARSER_CALLBACK responseCallback, 
+    HttpSession::WS_CALLBACK wsCallback, 
+    HttpSession::CLOSE_CALLBACK closeCallback,
+    HttpSession::WS_CONNECTED_CALLBACK wsConnectedCallback)
 {
-    mServer->addSession(fd, [shared_this = shared_from_this(), enterCallback, responseCallback, wsCallback, closeCallback, wsConnectedCallback](TCPSession::PTR& session){
+    mServer->addSession(fd, [shared_this = shared_from_this(),
+        enterCallbackCapture = std::move(enterCallback),
+        responseCallbackCapture = std::move(responseCallback),
+        wsCallbackCapture = std::move(wsCallback),
+        closeCallbackCapture = std::move(closeCallback),
+        wsConnectedCallbackCapture = std::move(wsConnectedCallback)](TCPSession::PTR& session){
         auto httpSession = HttpSession::Create(session);
-        httpSession->setCloseCallback(closeCallback);
-        httpSession->setWSCallback(wsCallback);
-        httpSession->setHttpCallback(responseCallback);
-        httpSession->setWSConnected(wsConnectedCallback);
+        httpSession->setCloseCallback(std::move(closeCallbackCapture));
+        httpSession->setWSCallback(std::move(wsCallbackCapture));
+        httpSession->setHttpCallback(std::move(responseCallbackCapture));
+        httpSession->setWSConnected(std::move(wsConnectedCallbackCapture));
 
-        enterCallback(httpSession);
+        enterCallbackCapture(httpSession);
         shared_this->handleHttp(httpSession);
     }, false, 32*1024 * 1024);
 }

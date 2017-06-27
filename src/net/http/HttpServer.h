@@ -27,15 +27,10 @@ namespace brynet
             typedef std::function < void(HttpSession::PTR, const HTTPParser&) > WS_CONNECTED_CALLBACK;
 
         public:
-            void                    setHttpCallback(HTTPPARSER_CALLBACK&& callback);
-            void                    setCloseCallback(CLOSE_CALLBACK&& callback);
-            void                    setWSCallback(WS_CALLBACK&& callback);
-
-            void                    setHttpCallback(const HTTPPARSER_CALLBACK& callback);
-            void                    setCloseCallback(const CLOSE_CALLBACK& callback);
-            void                    setWSCallback(const WS_CALLBACK& callback);
-
-            void                    setWSConnected(const WS_CONNECTED_CALLBACK& callback);
+            void                    setHttpCallback(HTTPPARSER_CALLBACK callback);
+            void                    setCloseCallback(CLOSE_CALLBACK callback);
+            void                    setWSCallback(WS_CALLBACK callback);
+            void                    setWSConnected(WS_CONNECTED_CALLBACK callback);
 
             void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
             void                    send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
@@ -85,13 +80,13 @@ namespace brynet
             void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 
             WrapServer::PTR         getServer();
-            void                    setEnterCallback(const ENTER_CALLBACK& callback);
+            void                    setEnterCallback(ENTER_CALLBACK callback);
             void                    addConnection(sock fd, 
-                                                    const ENTER_CALLBACK& enterCallback,
-                                                    const HttpSession::HTTPPARSER_CALLBACK& responseCallback,
-                                                    const HttpSession::WS_CALLBACK& wsCallback = nullptr,
-                                                    const HttpSession::CLOSE_CALLBACK& closeCallback = nullptr,
-                                                    const HttpSession::WS_CONNECTED_CALLBACK& wsConnectedCallback = nullptr);
+                                                    ENTER_CALLBACK enterCallback,
+                                                    HttpSession::HTTPPARSER_CALLBACK responseCallback,
+                                                    HttpSession::WS_CALLBACK wsCallback = nullptr,
+                                                    HttpSession::CLOSE_CALLBACK closeCallback = nullptr,
+                                                    HttpSession::WS_CONNECTED_CALLBACK wsConnectedCallback = nullptr);
         private:
             HttpServer();
             virtual ~HttpServer();

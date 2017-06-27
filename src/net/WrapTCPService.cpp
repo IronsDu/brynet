@@ -55,24 +55,14 @@ void TCPSession::postClose() const
     mService->disConnect(mSocketID);
 }
 
-void TCPSession::setCloseCallback(CLOSE_CALLBACK&& callback)
+void TCPSession::setCloseCallback(CLOSE_CALLBACK callback)
 {
     mCloseCallback = std::move(callback);
 }
 
-void TCPSession::setCloseCallback(const CLOSE_CALLBACK& callback)
-{
-    mCloseCallback = callback;
-}
-
-void TCPSession::setDataCallback(DATA_CALLBACK&& callback)
+void TCPSession::setDataCallback(DATA_CALLBACK callback)
 {
     mDataCallback = std::move(callback);
-}
-
-void TCPSession::setDataCallback(const DATA_CALLBACK& callback)
-{
-    mDataCallback = callback;
 }
 
 void TCPSession::setSocketID(TcpService::SESSION_TYPE id)

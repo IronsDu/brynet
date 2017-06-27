@@ -669,34 +669,19 @@ void    DataSocket::removeCheckWrite()
 }
 #endif
 
-void DataSocket::setEnterCallback(ENTER_CALLBACK&& cb)
+void DataSocket::setEnterCallback(ENTER_CALLBACK cb)
 {
     mEnterCallback = std::move(cb);
 }
 
-void DataSocket::setEnterCallback(const ENTER_CALLBACK& cb)
-{
-    mEnterCallback = cb;
-}
-
-void DataSocket::setDataCallback(DATA_CALLBACK&& cb)
+void DataSocket::setDataCallback(DATA_CALLBACK cb)
 {
     mDataCallback = std::move(cb);
 }
 
-void DataSocket::setDataCallback(const DATA_CALLBACK& cb)
-{
-    mDataCallback = cb;
-}
-
-void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK&& cb)
+void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
 {
     mDisConnectCallback = std::move(cb);
-}
-
-void DataSocket::setDisConnectCallback(const DISCONNECT_CALLBACK& cb)
-{
-    mDisConnectCallback = cb;
 }
 
 const static size_t GROW_BUFFER_SIZE = 1024;

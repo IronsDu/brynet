@@ -52,19 +52,12 @@ namespace brynet
             bool                            onEnterEventLoop(EventLoop::PTR eventLoop);
 
             void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
-
             void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-
             void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-            void                            setEnterCallback(ENTER_CALLBACK&& cb);
-            void                            setEnterCallback(const ENTER_CALLBACK& cb);
-
-            void                            setDataCallback(DATA_CALLBACK&& cb);
-            void                            setDataCallback(const DATA_CALLBACK& cb);
-
-            void                            setDisConnectCallback(DISCONNECT_CALLBACK&& cb);
-            void                            setDisConnectCallback(const DISCONNECT_CALLBACK& cb);
+            void                            setEnterCallback(ENTER_CALLBACK cb);
+            void                            setDataCallback(DATA_CALLBACK cb);
+            void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
             /*  设置心跳检测时间,overtime为-1表示不检测   */
             void                            setCheckTime(int overtime);

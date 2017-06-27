@@ -211,34 +211,19 @@ TcpService::~TcpService() noexcept
     closeService();
 }
 
-void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK&& callback)
+void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK callback)
 {
     mEnterCallback = std::move(callback);
 }
 
-void TcpService::setEnterCallback(const TcpService::ENTER_CALLBACK& callback)
-{
-    mEnterCallback = callback;
-}
-
-void TcpService::setDisconnectCallback(TcpService::DISCONNECT_CALLBACK&& callback)
+void TcpService::setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback)
 {
     mDisConnectCallback = std::move(callback);
 }
 
-void TcpService::setDisconnectCallback(const TcpService::DISCONNECT_CALLBACK& callback)
-{
-    mDisConnectCallback = callback;
-}
-
-void TcpService::setDataCallback(TcpService::DATA_CALLBACK&& callback)
+void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
 {
     mDataCallback = std::move(callback);
-}
-
-void TcpService::setDataCallback(const TcpService::DATA_CALLBACK& callback)
-{
-    mDataCallback = callback;
 }
 
 const TcpService::ENTER_CALLBACK& TcpService::getEnterCallback() const
@@ -263,35 +248,9 @@ void TcpService::send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, con
     auto eventLoop = getEventLoopBySocketID(id);
     if (eventLoop != nullptr)
     {
-        /*  如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响),否则可使用postSessionAsyncProc */
-        if (eventLoop->isInLoopThread())
-        {
-            DataSocket::PTR tmp = nullptr;
-            if (mIOLoopDatas[sid.data.loopIndex]->dataSockets.get(sid.data.index, tmp) &&
-                tmp != nullptr)
-            {
-                auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
-                if (ud != nullptr && *ud == sid.id)
-                {
-                    tmp->sendPacketInLoop(packet, callback);
-                }
-            }
-        }
-        else
-        {
-            eventLoop->pushAsyncProc([packet, callback, sid, ioLoopData = mIOLoopDatas[sid.data.loopIndex]](){
-                DataSocket::PTR tmp = nullptr;
-                if (ioLoopData->dataSockets.get(sid.data.index, tmp) &&
-                    tmp != nullptr)
-                {
-                    auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
-                    if (ud != nullptr && *ud == sid.id)
-                    {
-                        tmp->sendPacketInLoop(packet, callback);
-                    }
-                }
-            });
-        }
+        postSessionAsyncProc(id, [packet, callback, sid, ioLoopData = mIOLoopDatas[sid.data.loopIndex]](DataSocket::PTR ds){
+            ds->sendPacketInLoop(packet, callback);
+        });
     }
 }
 
@@ -359,23 +318,23 @@ void TcpService::setPingCheckTime(SESSION_TYPE id, int checktime)
     });
 }
 
-void TcpService::postSessionAsyncProc(SESSION_TYPE id, const std::function<void(DataSocket::PTR)>& callback) const
+void TcpService::postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSocket::PTR)> callback) const
 {
     union  SessionId sid;
     sid.id = id;
     auto eventLoop = getEventLoopBySocketID(id);
     if (eventLoop != nullptr)
     {
-        eventLoop->pushAsyncProc([callback, sid, shared_this = shared_from_this()](){
+        eventLoop->pushAsyncProc([callbackCapture = std::move(callback), sid, shared_this = shared_from_this()](){
             DataSocket::PTR tmp = nullptr;
-            if (callback != nullptr &&
+            if (callbackCapture != nullptr &&
                 shared_this->mIOLoopDatas[sid.data.loopIndex]->dataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)
             {
                 auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
                 if (ud != nullptr && *ud == sid.id)
                 {
-                    callback(tmp);
+                    callbackCapture(tmp);
                 }
             }
         });

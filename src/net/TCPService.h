@@ -72,14 +72,9 @@ namespace brynet
 
         public:
             /*  设置默认事件回调    */
-            void                                setEnterCallback(TcpService::ENTER_CALLBACK&& callback);
-            void                                setEnterCallback(const TcpService::ENTER_CALLBACK& callback);
-
-            void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK&& callback);
-            void                                setDisconnectCallback(const TcpService::DISCONNECT_CALLBACK& callback);
-
-            void                                setDataCallback(TcpService::DATA_CALLBACK&& callback);
-            void                                setDataCallback(const TcpService::DATA_CALLBACK& callback);
+            void                                setEnterCallback(TcpService::ENTER_CALLBACK callback);
+            void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
+            void                                setDataCallback(TcpService::DATA_CALLBACK callback);
 
             const TcpService::ENTER_CALLBACK&       getEnterCallback() const;
             const TcpService::DISCONNECT_CALLBACK&  getDisconnectCallback() const;
@@ -142,7 +137,7 @@ namespace brynet
             SESSION_TYPE                        MakeID(size_t loopIndex);
             void                                procDataSocketClose(DataSocket::PTR);
             /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
-            void                                postSessionAsyncProc(SESSION_TYPE id, const std::function<void(DataSocket::PTR)>& callback) const;
+            void                                postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSocket::PTR)> callback) const;
 
         private:
             std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;

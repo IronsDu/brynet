@@ -98,7 +98,7 @@ namespace brynet
     }
 }
 
-ConnectorWorkThread::ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK callback) noexcept : mCallback(callback)
+ConnectorWorkThread::ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK callback) noexcept : mCallback(std::move(callback))
 {
     mFDSet.reset(ox_fdset_new());
 }
@@ -271,6 +271,7 @@ void ConnectorWorkThread::pollConnectRequest(std::shared_ptr<MsgQueue<AsyncConne
 ThreadConnector::ThreadConnector()
 {
     mIsRun = false;
+    mConnectRequests = std::make_shared<MsgQueue<AsyncConnectAddr>>();
 }
 
 ThreadConnector::~ThreadConnector()
@@ -298,7 +299,7 @@ void ThreadConnector::startThread(COMPLETED_CALLBACK callback)
     {
         mIsRun = true;
 
-        mThread = std::make_shared<std::thread>([shared_this = shared_from_this(), cwt = std::make_shared<ConnectorWorkThread>(callback)](){
+        mThread = std::make_shared<std::thread>([shared_this = shared_from_this(), cwt = std::make_shared<ConnectorWorkThread>(std::move(callback))](){
             shared_this->run(cwt);
         });
     }

@@ -36,11 +36,8 @@ namespace brynet
             void                    postShutdown() const;
             void                    postClose() const;
 
-            void                    setCloseCallback(CLOSE_CALLBACK&& callback);
-            void                    setCloseCallback(const CLOSE_CALLBACK& callback);
-
-            void                    setDataCallback(DATA_CALLBACK&& callback);
-            void                    setDataCallback(const DATA_CALLBACK& callback);
+            void                    setCloseCallback(CLOSE_CALLBACK callback);
+            void                    setDataCallback(DATA_CALLBACK callback);
 
         private:
             TCPSession() noexcept;

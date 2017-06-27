@@ -303,24 +303,7 @@ bool EventLoop::linkChannel(sock fd, Channel* ptr)
 #endif
 }
 
-void EventLoop::pushAsyncProc(const USER_PROC& f)
-{
-    if (!isInLoopThread())
-    {
-        {
-            std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
-            mAsyncProcs.push_back(f);
-        }
-
-        wakeup();
-    }
-    else
-    {
-        f();
-    }
-}
-
-void EventLoop::pushAsyncProc(USER_PROC&& f)
+void EventLoop::pushAsyncProc(USER_PROC f)
 {
     if (!isInLoopThread())
     {
@@ -337,16 +320,7 @@ void EventLoop::pushAsyncProc(USER_PROC&& f)
     }
 }
 
-void EventLoop::pushAfterLoopProc(const USER_PROC& f)
-{
-    assert(isInLoopThread());
-    if (isInLoopThread())
-    {
-        mAfterLoopProcs.push_back(f);
-    }
-}
-
-void EventLoop::pushAfterLoopProc(USER_PROC&& f)
+void EventLoop::pushAfterLoopProc(USER_PROC f)
 {
     assert(isInLoopThread());
     if (isInLoopThread())
