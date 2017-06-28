@@ -51,9 +51,9 @@ namespace brynet
             /*  仅在网络线程中调用才可能返回成功 */
             bool                            onEnterEventLoop(EventLoop::PTR eventLoop);
 
-            void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                            send(const char* buffer, size_t len, PACKED_SENDED_CALLBACK callback = nullptr);
+            void                            sendPacket(PACKET_PTR, PACKED_SENDED_CALLBACK callback = nullptr);
+            void                            sendPacketInLoop(PACKET_PTR, PACKED_SENDED_CALLBACK callback = nullptr);
 
             void                            setEnterCallback(ENTER_CALLBACK cb);
             void                            setDataCallback(DATA_CALLBACK cb);

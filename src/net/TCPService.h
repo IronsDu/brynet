@@ -80,10 +80,10 @@ namespace brynet
             const TcpService::DISCONNECT_CALLBACK&  getDisconnectCallback() const;
             const TcpService::DATA_CALLBACK&        getDataCallback() const;
 
-            void                                send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
+            void                                send(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr) const;
 
             /*  逻辑线程调用，将要发送的消息包缓存起来，再一次性通过flushCachePackectList放入到网络线程    */
-            void                                cacheSend(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                                cacheSend(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr);
 
             void                                flushCachePackectList();
 

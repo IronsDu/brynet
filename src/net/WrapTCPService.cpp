@@ -35,14 +35,14 @@ TcpService::SESSION_TYPE TCPSession::getSocketID() const
     return mSocketID;
 }
 
-void TCPSession::send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
+void TCPSession::send(const char* buffer, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback) const
 {
-    mService->send(mSocketID, DataSocket::makePacket(buffer, len), callback);
+    mService->send(mSocketID, DataSocket::makePacket(buffer, len), std::move(callback));
 }
 
-void TCPSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
+void TCPSession::send(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback) const
 {
-    mService->send(mSocketID, packet, callback);
+    mService->send(mSocketID, std::move(packet), std::move(callback));
 }
 
 void TCPSession::postShutdown() const

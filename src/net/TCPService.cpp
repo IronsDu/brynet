@@ -241,27 +241,53 @@ const TcpService::DATA_CALLBACK& TcpService::getDataCallback() const
     return mDataCallback;
 }
 
-void TcpService::send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
+void TcpService::send(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback) const
 {
     union  SessionId sid;
     sid.id = id;
     auto eventLoop = getEventLoopBySocketID(id);
     if (eventLoop != nullptr)
     {
-        postSessionAsyncProc(id, [packet, callback, sid, ioLoopData = mIOLoopDatas[sid.data.loopIndex]](DataSocket::PTR ds){
-            ds->sendPacketInLoop(packet, callback);
-        });
+        /*  如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响),否则可使用postSessionAsyncProc */
+        if (eventLoop->isInLoopThread())
+        {
+            DataSocket::PTR tmp = nullptr;
+            if (mIOLoopDatas[sid.data.loopIndex]->dataSockets.get(sid.data.index, tmp) &&
+                tmp != nullptr)
+            {
+                auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
+                if (ud != nullptr && *ud == sid.id)
+                {
+                    tmp->sendPacketInLoop(std::move(packet), std::move(callback));
+                }
+            }
+        }
+        else
+        {
+            eventLoop->pushAsyncProc([packetCapture = std::move(packet), callbackCapture = std::move(callback), sid, ioLoopData = mIOLoopDatas[sid.data.loopIndex]](){
+                DataSocket::PTR tmp = nullptr;
+                if (ioLoopData->dataSockets.get(sid.data.index, tmp) &&
+                    tmp != nullptr)
+                {
+                    auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
+                    if (ud != nullptr && *ud == sid.id)
+                    {
+                        tmp->sendPacketInLoop(std::move(packetCapture), std::move(callbackCapture));
+                    }
+                }
+            });
+        }
     }
 }
 
-void TcpService::cacheSend(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void TcpService::cacheSend(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback)
 {
     union  SessionId sid;
     sid.id = id;
     assert(sid.data.loopIndex < mIOLoopDatas.size());
     if (sid.data.loopIndex < mIOLoopDatas.size())
     {
-        mIOLoopDatas[sid.data.loopIndex]->cachePacketList->push_back(std::make_tuple(id, packet, callback));
+        mIOLoopDatas[sid.data.loopIndex]->cachePacketList->push_back(std::make_tuple(id, std::move(packet), std::move(callback)));
     }
 }
 

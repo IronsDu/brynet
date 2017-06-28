@@ -127,25 +127,27 @@ bool DataSocket::onEnterEventLoop(EventLoop::PTR eventLoop)
     return ret;
 }
 
-void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
+void DataSocket::send(const char* buffer, size_t len, PACKED_SENDED_CALLBACK callback)
 {
-    sendPacket(makePacket(buffer, len), callback);
+    sendPacket(makePacket(buffer, len), std::move(callback));
 }
 
-void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+void DataSocket::sendPacket(PACKET_PTR packet, PACKED_SENDED_CALLBACK callback)
 {
-    mEventLoop->pushAsyncProc([this, packet, callback](){
-        mSendList.push_back({ packet, packet->size(), callback });
+    mEventLoop->pushAsyncProc([this, packetCapture = std::move(packet), callbackCapture = std::move(callback)](){
+        auto len = packetCapture->size();
+        mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
         runAfterFlush();
     });
 }
 
-void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+void DataSocket::sendPacketInLoop(PACKET_PTR packet, PACKED_SENDED_CALLBACK callback)
 {
     assert(mEventLoop->isInLoopThread());
     if (mEventLoop->isInLoopThread())
     {
-        mSendList.push_back({ packet, packet->size(), callback });
+        auto len = packet->size();
+        mSendList.push_back({ std::move(packet), len, std::move(callback) });
         runAfterFlush();
     }
 }
