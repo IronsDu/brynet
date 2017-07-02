@@ -4,7 +4,7 @@
 #include <string>
 #include "WrapTCPService.h"
 
-using namespace dodo::net;
+using namespace brynet::net;
 
 /*应用服务器的网络层会话对象基类*/
 class BaseNetSession
@@ -23,14 +23,14 @@ public:
         mSocketID = 0;
     }
 
-    void    setSession(WrapServer::PTR server, int64_t socketID, const std::string& ip)
+    void    setSession(const WrapServer::PTR& server, int64_t socketID, const std::string& ip)
     {
         mServer = server;
         mSocketID = socketID;
         mIP = ip;
     }
 
-    WrapServer::PTR getServer()
+    const WrapServer::PTR& getServer()
     {
         return mServer;
     }
@@ -47,7 +47,7 @@ public:
         return mIP;
     }
 
-    int64_t         getSocketID() const
+    auto         getSocketID() const
     {
         return mSocketID;
     }
@@ -57,17 +57,17 @@ public:
         mServer->getService()->disConnect(mSocketID);
     }
 
-    void            sendPacket(const char* data, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
+    void            sendPacket(const char* data, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
     {
-        mServer->getService()->send(mSocketID, DataSocket::makePacket(data, len), callback);
+        mServer->getService()->send(mSocketID, DataSocket::makePacket(data, len), std::move(callback));
     }
 
-    void            sendPacket(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
+    void            sendPacket(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
     {
-        mServer->getService()->send(mSocketID, packet, callback);
+        mServer->getService()->send(mSocketID, std::move(packet), std::move(callback));
     }
 
-    EventLoop*      getEventLoop()
+    auto      getEventLoop()
     {
         return mServer->getService()->getEventLoopBySocketID(mSocketID);
     }
