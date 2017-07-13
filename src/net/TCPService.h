@@ -7,6 +7,7 @@
 #include <thread>
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 
 #include "DataSocket.h"
 #include "NonCopyable.h"
@@ -46,6 +47,7 @@ namespace brynet
             int                                 mPort;
             bool                                mRunListen;
             std::shared_ptr<std::thread>        mListenThread;
+            std::mutex                          mListenThreadGuard;
             std::string                         mCertificate;
             std::string                         mPrivatekey;
 #ifdef USE_OPENSSL
@@ -107,7 +109,6 @@ namespace brynet
             /*  开启IO工作线程    */
             void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
 
-            /*  关闭服务(且清理内存):非线程安全    */
             void                                closeService();
             void                                closeListenThread();
             void                                closeWorkerThread();
@@ -115,11 +116,8 @@ namespace brynet
             /*  仅仅是停止工作线程以及让每个EventLoop退出循环，但不释放EventLoop内存 */
             void                                stopWorkerThread();
 
-            /*  wakeup某id所在的网络工作线程:非线程安全    */
             void                                wakeup(SESSION_TYPE id) const;
-            /*  wakeup 所有的网络工作线程:非线程安全  */
             void                                wakeupAll() const;
-            /*  随机获取一个EventLoop:非线程安全   */
             EventLoop::PTR                      getRandomEventLoop();
             EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const noexcept;
 
@@ -134,17 +132,19 @@ namespace brynet
                                                                 const TcpService::DATA_CALLBACK& dataCallback,
                                                                 bool forceSameThreadLoop = false);
         private:
-            SESSION_TYPE                        MakeID(size_t loopIndex);
+            SESSION_TYPE                        MakeID(size_t loopIndex, const std::shared_ptr<IOLoopData>&);
             void                                procDataSocketClose(DataSocket::PTR);
             /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
             void                                postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSocket::PTR)> callback) const;
+            std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const noexcept;
 
         private:
             std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
-
+            mutable std::shared_mutex                   mIOLoopGuard;
             bool                                mRunIOLoop;
 
             ListenThread::PTR                   mListenThread;
+            std::mutex                          mServiceGuard;
 
             /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
             TcpService::ENTER_CALLBACK          mEnterCallback;

@@ -148,7 +148,7 @@ void HttpServer::addConnection(sock fd,
         responseCallbackCapture = std::move(responseCallback),
         wsCallbackCapture = std::move(wsCallback),
         closeCallbackCapture = std::move(closeCallback),
-        wsConnectedCallbackCapture = std::move(wsConnectedCallback)](TCPSession::PTR& session){
+        wsConnectedCallbackCapture = std::move(wsConnectedCallback)](const TCPSession::PTR& session){
         auto httpSession = HttpSession::Create(session);
         httpSession->setCloseCallback(std::move(closeCallbackCapture));
         httpSession->setWSCallback(std::move(wsCallbackCapture));
@@ -171,7 +171,7 @@ void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const
     {
         mListenThread = ListenThread::Create();
         mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [shared_this = shared_from_this()](sock fd){
-            shared_this->mServer->addSession(fd, [shared_this](TCPSession::PTR& session){
+            shared_this->mServer->addSession(fd, [shared_this](const TCPSession::PTR& session){
                 auto httpSession = HttpSession::Create(session);
                 if (shared_this->mOnEnter != nullptr)
                 {
@@ -183,7 +183,7 @@ void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const
     }
 }
 
-static HTTPParser::PTR castHttpParse(TCPSession::PTR& session)
+static HTTPParser::PTR castHttpParse(const TCPSession::PTR& session)
 {
     auto ud = std::any_cast<HTTPParser::PTR>(&session->getUD());
     if (ud == nullptr)
@@ -194,13 +194,13 @@ static HTTPParser::PTR castHttpParse(TCPSession::PTR& session)
     return *ud;
 }
 
-void HttpServer::handleHttp(HttpSession::PTR& httpSession)
+void HttpServer::handleHttp(const HttpSession::PTR& httpSession)
 {
     /*TODO::keep alive and timeout close */
     auto& session = httpSession->getSession();
     session->setUD(std::make_shared<HTTPParser>(HTTP_BOTH));
 
-    session->setCloseCallback([httpSession](TCPSession::PTR& session){
+    session->setCloseCallback([httpSession](const TCPSession::PTR& session){
         auto httpParser = castHttpParse(session);
         auto& tmp = httpSession->getCloseCallback();
         if (tmp != nullptr)
@@ -209,7 +209,7 @@ void HttpServer::handleHttp(HttpSession::PTR& httpSession)
         }
     });
 
-    session->setDataCallback([shared_this = shared_from_this(), httpSession](TCPSession::PTR& session, const char* buffer, size_t len){
+    session->setDataCallback([shared_this = shared_from_this(), httpSession](const TCPSession::PTR& session, const char* buffer, size_t len){
         size_t retlen = 0;
 
         auto httpParser = castHttpParse(session);

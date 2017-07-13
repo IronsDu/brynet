@@ -1,5 +1,5 @@
-#ifndef DODO_NET_CONNECTOR_H_
-#define DODO_NET_CONNECTOR_H_
+#ifndef BRYNET_NET_CONNECTOR_H_
+#define BRYNET_NET_CONNECTOR_H_
 
 #include <functional>
 #include <memory>

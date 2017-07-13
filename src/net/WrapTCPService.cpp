@@ -105,7 +105,7 @@ WrapServer::~WrapServer() noexcept
 {
 }
 
-TcpService::PTR& WrapServer::getService()
+const TcpService::PTR& WrapServer::getService() const
 {
     return mTCPService;
 }
@@ -120,7 +120,7 @@ void WrapServer::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCall
     auto tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);
 
-    auto enterCallback = [tmpSession, userEnterCallback](TcpService::SESSION_TYPE id, std::string ip) mutable {
+    auto enterCallback = [tmpSession, userEnterCallback](TcpService::SESSION_TYPE id, const std::string& ip) mutable {
         tmpSession->setSocketID(id);
         tmpSession->setIP(ip);
         if (userEnterCallback != nullptr)

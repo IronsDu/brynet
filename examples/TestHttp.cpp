@@ -20,8 +20,8 @@ int main(int argc, char **argv)
 
     std::string body = "<html>hello world </html>";
 
-    server->setEnterCallback([=](HttpSession::PTR& session){
-        session->setHttpCallback([=](const HTTPParser& httpParser, HttpSession::PTR session){
+    server->setEnterCallback([=](const HttpSession::PTR& session){
+        session->setHttpCallback([=](const HTTPParser& httpParser, const HttpSession::PTR& session){
             HttpResponse response;
             response.setBody(body);
             std::string result = response.getResult();
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     std::cin.get();
 
     sock fd = ox_socket_connect(false, "192.168.12.128", 8080);
-    server->addConnection(fd, [](HttpSession::PTR session){
+    server->addConnection(fd, [](const HttpSession::PTR& session){
         HttpRequest request;
         HttpQueryParameter parameter;
         parameter.add("value", "123456");
@@ -56,12 +56,12 @@ int main(int argc, char **argv)
         std::string requestStr = request.getResult();
         session->send(requestStr.c_str(), requestStr.size());
 
-    }, [](const HTTPParser& httpParser, HttpSession::PTR session){
+    }, [](const HTTPParser& httpParser, const HttpSession::PTR& session){
         //http response handle
         std::cout << httpParser.getBody() << std::endl;
-    }, [](HttpSession::PTR session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
+    }, [](const HttpSession::PTR& session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
         //websocket frame handle
-    },[](HttpSession::PTR){
+    },[](const HttpSession::PTR&){
         //ws connected handle
     });
 

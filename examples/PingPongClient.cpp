@@ -25,8 +25,8 @@ int main(int argc, char **argv)
     connector->startThread([server, tmp](sock fd, const std::any& ud) {
         if (fd != -1)
         {
-            server->addSession(fd, [tmp](TCPSession::PTR& session) {
-                session->setDataCallback([](TCPSession::PTR& session, const char* buffer, size_t len) {
+            server->addSession(fd, [tmp](const TCPSession::PTR& session) {
+                session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
                     session->send(buffer, len);
                     return len;
                 });

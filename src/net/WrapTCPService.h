@@ -20,8 +20,8 @@ namespace brynet
             typedef std::shared_ptr<TCPSession>     PTR;
             typedef std::weak_ptr<TCPSession>       WEAK_PTR;
 
-            typedef std::function<void(TCPSession::PTR&)>   CLOSE_CALLBACK;
-            typedef std::function<size_t(TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
+            typedef std::function<void(const TCPSession::PTR&)>   CLOSE_CALLBACK;
+            typedef std::function<size_t(const TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
         public:
             const std::any&         getUD() const;
@@ -71,12 +71,12 @@ namespace brynet
             typedef std::shared_ptr<WrapServer> PTR;
             typedef std::weak_ptr<WrapServer>   WEAK_PTR;
 
-            typedef std::function<void(TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
+            typedef std::function<void(const TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
             WrapServer() noexcept;
             virtual ~WrapServer() noexcept;
 
-            TcpService::PTR&        getService();
+            const TcpService::PTR&  getService() const;
             void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
             void                    addSession(sock fd, 
                                                 const SESSION_ENTER_CALLBACK& userEnterCallback, 

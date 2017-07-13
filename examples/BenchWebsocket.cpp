@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < 200; i++)
     {
         sock fd = ox_socket_connect(false, "192.168.2.78", 8008);
-        server->addConnection(fd, [](HttpSession::PTR session){
+        server->addConnection(fd, [](const HttpSession::PTR& session){
             HttpRequest request;
             request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
             request.setUrl("/ws");
@@ -51,12 +51,12 @@ int main(int argc, char **argv)
 
             std::string requestStr = request.getResult();
             session->send(requestStr.c_str(), requestStr.size());
-        }, [](const HTTPParser& httpParser, HttpSession::PTR session){
-        }, [](HttpSession::PTR session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
+        }, [](const HTTPParser& httpParser, const HttpSession::PTR& session){
+        }, [](const HttpSession::PTR& session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
             sendPacket(session, "hello world", 10);
             count += 1;
-        }, [](HttpSession::PTR session){
-        }, [](HttpSession::PTR session, const HTTPParser&){
+        }, [](const HttpSession::PTR& session){
+        }, [](const HttpSession::PTR& session, const HTTPParser&){
             for (int i = 0; i < 200; i++)
             {
                 sendPacket(session, "hello world", 10);

@@ -20,11 +20,11 @@ namespace brynet
         public:
             typedef std::shared_ptr<HttpSession>    PTR;
 
-            typedef std::function < void(const HTTPParser&, HttpSession::PTR) > HTTPPARSER_CALLBACK;
-            typedef std::function < void(HttpSession::PTR, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) > WS_CALLBACK;
+            typedef std::function < void(const HTTPParser&, const HttpSession::PTR&) > HTTPPARSER_CALLBACK;
+            typedef std::function < void(const HttpSession::PTR&, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) > WS_CALLBACK;
 
-            typedef std::function < void(HttpSession::PTR) > CLOSE_CALLBACK;
-            typedef std::function < void(HttpSession::PTR, const HTTPParser&) > WS_CONNECTED_CALLBACK;
+            typedef std::function < void(const HttpSession::PTR&) > CLOSE_CALLBACK;
+            typedef std::function < void(const HttpSession::PTR&, const HTTPParser&) > WS_CONNECTED_CALLBACK;
 
         public:
             void                    setHttpCallback(HTTPPARSER_CALLBACK callback);
@@ -71,7 +71,7 @@ namespace brynet
         {
         public:
             typedef std::shared_ptr<HttpServer> PTR;
-            typedef std::function < void(HttpSession::PTR&) > ENTER_CALLBACK;
+            typedef std::function < void(const HttpSession::PTR&) > ENTER_CALLBACK;
 
         public:
             static  PTR             Create();
@@ -91,7 +91,7 @@ namespace brynet
             HttpServer();
             virtual ~HttpServer();
 
-            void                    handleHttp(HttpSession::PTR& httpSession);
+            void                    handleHttp(const HttpSession::PTR& httpSession);
 
         private:
             ENTER_CALLBACK          mOnEnter;

@@ -25,17 +25,17 @@ int main(int argc, char **argv)
     auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
-        server->addSession(fd, [](TCPSession::PTR& session){
+        server->addSession(fd, [](const TCPSession::PTR& session){
             total_client_num++;
 
-            session->setDataCallback([](TCPSession::PTR& session, const char* buffer, size_t len){
+            session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len){
                 session->send(buffer, len);
                 total_recv += len;
                 total_packet_num++;
                 return len;
             });
 
-            session->setCloseCallback([](TCPSession::PTR& session){
+            session->setCloseCallback([](const TCPSession::PTR& session){
                 total_client_num--;
             });
         }, false, 1024*1024);
