@@ -9,7 +9,7 @@
 using namespace brynet;
 using namespace brynet::net;
 
-std::atomic_llong total_recv = ATOMIC_VAR_INIT(0);
+std::atomic_llong TotalRecvSize = ATOMIC_VAR_INIT(0);
 std::atomic_llong total_client_num = ATOMIC_VAR_INIT(0);
 std::atomic_llong total_packet_num = ATOMIC_VAR_INIT(0);
 
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    auto server = std::make_shared<WrapServer>();
+    auto server = std::make_shared<WrapTcpService>();
     auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 
             session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len){
                 session->send(buffer, len);
-                total_recv += len;
+                TotalRecvSize += len;
                 total_packet_num++;
                 return len;
             });
@@ -47,9 +47,9 @@ int main(int argc, char **argv)
     while (true)
     {
         mainLoop.loop(1000);
-        std::cout << "total recv : " << (total_recv / 1024) / 1024 << " M /s, of client num:" << total_client_num << std::endl;
+        std::cout << "total recv : " << (TotalRecvSize / 1024) / 1024 << " M /s, of client num:" << total_client_num << std::endl;
         std::cout << "packet num:" << total_packet_num << std::endl;
         total_packet_num = 0;
-        total_recv = 0;
+        TotalRecvSize = 0;
     }
 }

@@ -4,7 +4,7 @@
 #include <condition_variable>
 
 #include "SocketLibFunction.h"
-#include "HttpServer.h"
+#include "HttpService.h"
 #include "HttpFormat.h"
 #include "WebSocketFormat.h"
 
@@ -13,7 +13,7 @@ using namespace brynet::net;
 
 int main(int argc, char **argv)
 {
-    auto server = HttpServer::Create();
+    auto server = HttpService::Create();
 
     server->startListen(false, "0.0.0.0", 8080);
     server->startWorkThread(ox_getcpunum());

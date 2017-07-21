@@ -1,5 +1,5 @@
-#ifndef BRYNET_NET_HTTPSERVER_H_
-#define BRYNET_NET_HTTPSERVER_H_
+#ifndef BRYNET_NET_HTTPSERVICE_H_
+#define BRYNET_NET_HTTPSERVICE_H_
 
 #include <memory>
 #include <any>
@@ -13,7 +13,7 @@ namespace brynet
 {
     namespace net
     {
-        class HttpServer;
+        class HttpService;
 
         class HttpSession : public NonCopyable
         {
@@ -64,13 +64,13 @@ namespace brynet
             CLOSE_CALLBACK          mCloseCallback;
             WS_CONNECTED_CALLBACK   mWSConnectedCallback;
 
-            friend class HttpServer;
+            friend class HttpService;
         };
 
-        class HttpServer : public NonCopyable, public std::enable_shared_from_this<HttpServer>
+        class HttpService : public NonCopyable, public std::enable_shared_from_this<HttpService>
         {
         public:
-            typedef std::shared_ptr<HttpServer> PTR;
+            typedef std::shared_ptr<HttpService> PTR;
             typedef std::function < void(const HttpSession::PTR&) > ENTER_CALLBACK;
 
         public:
@@ -79,7 +79,7 @@ namespace brynet
             void                    startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
             void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
 
-            WrapServer::PTR         getServer();
+            WrapTcpService::PTR		getService();
             void                    setEnterCallback(ENTER_CALLBACK callback);
             void                    addConnection(sock fd, 
                                                     ENTER_CALLBACK enterCallback,
@@ -88,14 +88,14 @@ namespace brynet
                                                     HttpSession::CLOSE_CALLBACK closeCallback = nullptr,
                                                     HttpSession::WS_CONNECTED_CALLBACK wsConnectedCallback = nullptr);
         private:
-            HttpServer();
-            virtual ~HttpServer();
+            HttpService();
+            virtual ~HttpService();
 
             void                    handleHttp(const HttpSession::PTR& httpSession);
 
         private:
             ENTER_CALLBACK          mOnEnter;
-            WrapServer::PTR         mServer;
+            WrapTcpService::PTR		mService;
             ListenThread::PTR       mListenThread;
         };
     }

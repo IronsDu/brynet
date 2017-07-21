@@ -4,7 +4,7 @@
 #include <condition_variable>
 
 #include "SocketLibFunction.h"
-#include "HttpServer.h"
+#include "HttpService.h"
 #include "HttpFormat.h"
 #include "WebSocketFormat.h"
 #include "packet.h"
@@ -32,7 +32,7 @@ static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
 
 int main(int argc, char **argv)
 {
-    auto server = HttpServer::Create();
+    auto server = HttpService::Create();
 
     server->startWorkThread(ox_getcpunum());
 

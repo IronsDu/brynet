@@ -11,7 +11,7 @@ namespace brynet
 {
     namespace net
     {
-        class WrapServer;
+        class WrapTcpService;
 
         /*  以智能指针对象为网络会话标识的网络服务   */
         class TCPSession : public NonCopyable
@@ -62,19 +62,19 @@ namespace brynet
             CLOSE_CALLBACK              mCloseCallback;
             DATA_CALLBACK               mDataCallback;
 
-            friend class WrapServer;
+            friend class WrapTcpService;
         };
 
-        class WrapServer : public NonCopyable
+        class WrapTcpService : public NonCopyable
         {
         public:
-            typedef std::shared_ptr<WrapServer> PTR;
-            typedef std::weak_ptr<WrapServer>   WEAK_PTR;
+            typedef std::shared_ptr<WrapTcpService> PTR;
+            typedef std::weak_ptr<WrapTcpService>   WEAK_PTR;
 
             typedef std::function<void(const TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
-            WrapServer() noexcept;
-            virtual ~WrapServer() noexcept;
+            WrapTcpService() noexcept;
+            virtual ~WrapTcpService() noexcept;
 
             const TcpService::PTR&  getService() const;
             void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);

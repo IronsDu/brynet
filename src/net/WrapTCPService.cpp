@@ -96,26 +96,26 @@ TCPSession::PTR TCPSession::Create()
     return std::make_shared<make_shared_enabler>();
 }
 
-WrapServer::WrapServer() noexcept
+WrapTcpService::WrapTcpService() noexcept
 {
     mTCPService = TcpService::Create();
 }
 
-WrapServer::~WrapServer() noexcept
+WrapTcpService::~WrapTcpService() noexcept
 {
 }
 
-const TcpService::PTR& WrapServer::getService() const
+const TcpService::PTR& WrapTcpService::getService() const
 {
     return mTCPService;
 }
 
-void WrapServer::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback)
+void WrapTcpService::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback)
 {
     mTCPService->startWorkerThread(threadNum, callback);
 }
 
-void WrapServer::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL, size_t maxRecvBufferSize, bool forceSameThreadLoop)
+void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL, size_t maxRecvBufferSize, bool forceSameThreadLoop)
 {
     auto tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);

@@ -65,7 +65,7 @@ namespace brynet
         public:
             typedef std::shared_ptr<ConnectorWorkThread>    PTR;
 
-            ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK) noexcept;
+            ConnectorWorkThread(AsyncConnector::COMPLETED_CALLBACK, AsyncConnector::FAILED_CALLBACK) noexcept;
 
             void                checkConnectStatus(int timeout);
             bool                isConnectSuccess(sock clientfd) const;
@@ -73,7 +73,8 @@ namespace brynet
             void                pollConnectRequest(std::shared_ptr<MsgQueue<AsyncConnectAddr>>& connectRequests);
 
         private:
-            ThreadConnector::COMPLETED_CALLBACK    mCallback;
+            AsyncConnector::COMPLETED_CALLBACK      mCompletedCallback;
+            AsyncConnector::FAILED_CALLBACK         mFailedCallback;
 
             struct ConnectingInfo
             {
@@ -98,7 +99,9 @@ namespace brynet
     }
 }
 
-ConnectorWorkThread::ConnectorWorkThread(ThreadConnector::COMPLETED_CALLBACK callback) noexcept : mCallback(std::move(callback))
+ConnectorWorkThread::ConnectorWorkThread(AsyncConnector::COMPLETED_CALLBACK completedCallback,
+    AsyncConnector::FAILED_CALLBACK failedCallback) noexcept : 
+    mCompletedCallback(std::move(completedCallback)), mFailedCallback(std::move(failedCallback))
 {
     mFDSet.reset(ox_fdset_new());
 }
@@ -157,11 +160,14 @@ void ConnectorWorkThread::checkConnectStatus(int timeout)
             if (failed_fds.find(fd) != failed_fds.end())
             {
                 ox_socket_close(fd);
-                mCallback(-1, it->second.ud);
+                if (mFailedCallback != nullptr)
+                {
+                    mFailedCallback(it->second.ud);
+                }
             }
             else
             {
-                mCallback(fd, it->second.ud);
+                mCompletedCallback(fd, it->second.ud);
             }
 
             mConnectingInfos.erase(it);
@@ -188,8 +194,10 @@ void ConnectorWorkThread::checkTimeout()
             mConnectingInfos.erase(it++);
 
             ox_socket_close(fd);
-
-            mCallback(SOCKET_ERROR, uid);
+            if (mFailedCallback != nullptr)
+            {
+                mFailedCallback(uid);
+            }
         }
         else
         {
@@ -256,30 +264,30 @@ void ConnectorWorkThread::pollConnectRequest(std::shared_ptr<MsgQueue<AsyncConne
 
         if (connectSuccess)
         {
-            mCallback(clientfd, addr.getUD());
+            mCompletedCallback(clientfd, addr.getUD());
         }
         else
         {
-            if (!addToFDSet)
+            if (!addToFDSet && mFailedCallback != nullptr)
             {
-                mCallback(SOCKET_ERROR, addr.getUD());
+                mFailedCallback(addr.getUD());
             }
         }
     }
 }
 
-ThreadConnector::ThreadConnector()
+AsyncConnector::AsyncConnector()
 {
     mIsRun = false;
     mConnectRequests = std::make_shared<MsgQueue<AsyncConnectAddr>>();
 }
 
-ThreadConnector::~ThreadConnector()
+AsyncConnector::~AsyncConnector()
 {
     destroy();
 }
 
-void ThreadConnector::run(std::shared_ptr<ConnectorWorkThread> cwt)
+void AsyncConnector::run(std::shared_ptr<ConnectorWorkThread> cwt)
 {
     while (mIsRun)
     {
@@ -293,20 +301,23 @@ void ThreadConnector::run(std::shared_ptr<ConnectorWorkThread> cwt)
     }
 }
 
-void ThreadConnector::startThread(COMPLETED_CALLBACK callback)
+void AsyncConnector::startThread(COMPLETED_CALLBACK completedCallback, FAILED_CALLBACK failedCallback)
 {
+    std::lock_guard<std::mutex> lck(mThreadGuard);
     if (mThread == nullptr)
     {
         mIsRun = true;
 
-        mThread = std::make_shared<std::thread>([shared_this = shared_from_this(), cwt = std::make_shared<ConnectorWorkThread>(std::move(callback))](){
+        mThread = std::make_shared<std::thread>([shared_this = shared_from_this(),
+            cwt = std::make_shared<ConnectorWorkThread>(std::move(completedCallback), std::move(failedCallback))](){
             shared_this->run(cwt);
         });
     }
 }
 
-void ThreadConnector::destroy()
+void AsyncConnector::destroy()
 {
+    std::lock_guard<std::mutex> lck(mThreadGuard);
     if (mThread != nullptr)
     {
         mIsRun = false;
@@ -318,15 +329,15 @@ void ThreadConnector::destroy()
     }
 }
 
-void ThreadConnector::asyncConnect(const char* ip, int port, int ms, std::any ud)
+void AsyncConnector::asyncConnect(const char* ip, int port, int ms, std::any ud)
 {
     mConnectRequests->push(AsyncConnectAddr(ip, port, ms, ud));
     mConnectRequests->forceSyncWrite();
     mEventLoop.wakeup();
 }
 
-ThreadConnector::PTR ThreadConnector::Create()
+AsyncConnector::PTR AsyncConnector::Create()
 {
-    struct make_shared_enabler : public ThreadConnector {};
+    struct make_shared_enabler : public AsyncConnector {};
     return std::make_shared<make_shared_enabler>();
 }

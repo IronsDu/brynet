@@ -17,22 +17,22 @@ namespace brynet
         class ConnectorWorkThread;
         class AsyncConnectAddr;
 
-        class ThreadConnector : NonCopyable, public std::enable_shared_from_this<ThreadConnector>
+        class AsyncConnector : NonCopyable, public std::enable_shared_from_this<AsyncConnector>
         {
         public:
-            typedef std::shared_ptr<ThreadConnector> PTR;
-            /*  sock为-1表示失败, TODO::可单独添加Failed Callback   */
+            typedef std::shared_ptr<AsyncConnector> PTR;
             typedef std::function<void(sock, const std::any&)> COMPLETED_CALLBACK;
+            typedef std::function<void(const std::any&)> FAILED_CALLBACK;
 
-            void                startThread(COMPLETED_CALLBACK callback);
+            void                startThread(COMPLETED_CALLBACK completedCallback, FAILED_CALLBACK failedCallback);
             void                destroy();
             void                asyncConnect(const char* ip, int port, int ms, std::any ud);
 
             static  PTR         Create();
 
         private:
-            ThreadConnector();
-            virtual ~ThreadConnector();
+            AsyncConnector();
+            virtual ~AsyncConnector();
             void                run(std::shared_ptr<ConnectorWorkThread>);
 
         private:
@@ -40,6 +40,7 @@ namespace brynet
             EventLoop                       mEventLoop;
 
             std::shared_ptr<std::thread>    mThread;
+            std::mutex                      mThreadGuard;
             bool                            mIsRun;
         };
     }

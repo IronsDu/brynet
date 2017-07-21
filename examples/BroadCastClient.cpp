@@ -21,6 +21,9 @@ using namespace std;
 using namespace brynet;
 using namespace brynet::net;
 
+atomic_llong  TotalRecvPacketNum = ATOMIC_VAR_INIT(0);
+atomic_llong TotalRecvSize = ATOMIC_VAR_INIT(0);
+
 int main(int argc, char** argv)
 {
     if (argc != 5)
@@ -30,117 +33,101 @@ int main(int argc, char** argv)
     }
 
     std::string ip = argv[1];
-    int port_num = atoi(argv[2]);
-    int client_num = atoi(argv[3]);
-    int packet_len = atoi(argv[4]);
+    int port = atoi(argv[2]);
+    int clietNum = atoi(argv[3]);
+    int packetLen = atoi(argv[4]);
 
     ox_socket_init();
 
-    EventLoop       mainLoop;
+	auto clientEventLoop = std::make_shared<EventLoop>();
 
-    /*  客户端IO线程   */
+	for (int i = 0; i < clietNum; i++)
+	{
+		int fd = ox_socket_connect(false, ip.c_str(), port);
+		ox_socket_nodelay(fd);
 
-    std::thread* ts = new std::thread([&mainLoop, client_num, packet_len, port_num, ip]{
-        printf("start one client thread \n");
-        /*  客户端eventloop*/
-        auto clientEventLoop = std::make_shared<EventLoop>();
+		DataSocket::PTR datasSocket = new DataSocket(fd, 1024 * 1024);
+		datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {
+			static_assert(sizeof(datasSocket) <= sizeof(int64_t), "");
 
-        char* senddata = (char*)malloc(packet_len);
+			std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
+			sp->writeINT64((int64_t)datasSocket);
+			sp->writeBinary(std::string(packetLen, '_'));
 
-        /*  消息包大小定义 */
-        atomic_llong  packet_num = ATOMIC_VAR_INIT(0);
-        atomic_llong total_recv = ATOMIC_VAR_INIT(0);
-        TimerMgr tm;
-        for (int i = 0; i < client_num; i++)
-        {
-            int client = ox_socket_connect(false, ip.c_str(), port_num);
-            ox_socket_nodelay(client);
+			for (int i = 0; i < 1; ++i)
+			{
+				datasSocket->send(sp->getData(), sp->getLen());
+			}
 
-            DataSocket::PTR pClient = new DataSocket(client, 1024 * 1024);
-            pClient->setEnterCallback([&](DataSocket::PTR ds){
+			datasSocket->setDataCallback([](DataSocket::PTR datasSocket, const char* buffer, size_t len) {
+				const char* parseStr = buffer;
+				int totalProcLen = 0;
+				size_t leftLen = len;
 
-                std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
-                sp->writeINT64((int64_t)ds);
-                sp->writeBinary(senddata, packet_len);
+				while (true)
+				{
+					bool flag = false;
+					if (leftLen >= PACKET_HEAD_LEN)
+					{
+						ReadPacket rp(parseStr, leftLen);
+						PACKET_LEN_TYPE packet_len = rp.readPacketLen();
+						if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
+						{
+							TotalRecvSize += packet_len;
+							TotalRecvPacketNum++;
 
-                for (int i = 0; i < 1; ++i)
-                {
-                    ds->send(sp->getData(), sp->getLen());
-                }
+							ReadPacket rp(parseStr, packet_len);
+							rp.readPacketLen();
+							rp.readOP();
+							int64_t addr = rp.readINT64();
 
-                /*  可以放入消息队列，然后唤醒它主线程的eventloop，然后主线程通过消息队列去获取*/
-                ds->setDataCallback([&total_recv, &packet_num](DataSocket::PTR ds, const char* buffer, size_t len){
-                    const char* parse_str = buffer;
-                    int total_proc_len = 0;
-                    size_t left_len = len;
+							if (addr == (int64_t)(datasSocket))
+							{
+								datasSocket->send(parseStr, packet_len);
+							}
 
-                    while (true)
-                    {
-                        bool flag = false;
-                        if (left_len >= PACKET_HEAD_LEN)
-                        {
-                            ReadPacket rp(parse_str, left_len);
-                            PACKET_LEN_TYPE packet_len = rp.readPacketLen();
-                            if (left_len >= packet_len && packet_len >= PACKET_HEAD_LEN)
-                            {
-                                total_recv += packet_len;
-                                packet_num++;
+							totalProcLen += packet_len;
+							parseStr += packet_len;
+							leftLen -= packet_len;
+							flag = true;
+							rp.skipAll();
+						}
+						rp.skipAll();
+					}
 
-                                ReadPacket rp(parse_str, packet_len);
-                                rp.readPacketLen();
-                                rp.readOP();
-                                int64_t addr = rp.readINT64();
+					if (!flag)
+					{
+						break;
+					}
+				}
 
-                                if (addr == (int64_t)(ds))
-                                {
-                                    ds->send(parse_str, packet_len);
-                                }
+				return totalProcLen;
+			});
 
-                                total_proc_len += packet_len;
-                                parse_str += packet_len;
-                                left_len -= packet_len;
-                                flag = true;
-                                rp.skipAll();
-                            }
-                            rp.skipAll();
-                        }
+			datasSocket->setDisConnectCallback([](DataSocket::PTR datasSocket) {
+				delete datasSocket;
+			});
+		});
 
-                        if (!flag)
-                        {
-                            break;
-                        }
-                    }
+		clientEventLoop->pushAsyncProc([clientEventLoop, datasSocket]() {
+			if (!datasSocket->onEnterEventLoop(clientEventLoop))
+			{
+				delete datasSocket;
+			}
+		});
+	}
 
-                    return total_proc_len;
-                });
+	int64_t now = ox_getnowtime();
+	while (true)
+	{
+		clientEventLoop->loop(1000);
+		if ((ox_getnowtime() - now) >= 1000)
+		{
+			cout << "total recv:" << (TotalRecvSize / 1024) / 1024 << " M /s" << " , num " <<  TotalRecvPacketNum << endl;
 
-                ds->setDisConnectCallback([](DataSocket::PTR arg){
-                    delete arg;
-                });
-            });
-
-            clientEventLoop->pushAsyncProc([&, pClient](){
-                if (!pClient->onEnterEventLoop(clientEventLoop))
-                {
-                    delete pClient;
-                }
-            });
-        }
-
-        int64_t now = ox_getnowtime();
-        while (true)
-        {
-            clientEventLoop->loop(tm.nearEndMs());
-            tm.schedule();
-            if ((ox_getnowtime() - now) >= 1000)
-            {
-                cout << "total recv:" << (total_recv / 1024) / 1024 << " M /s" << " , num " << packet_num << endl;
-                now = ox_getnowtime();
-                total_recv = 0;
-                packet_num = 0;
-            }
-        }
-    });
-
-    ts->join();
+			now = ox_getnowtime();
+			TotalRecvSize = 0;
+			TotalRecvPacketNum = 0;
+		}
+	}
 }

@@ -1,5 +1,6 @@
 package sofa.pbrpc.test;
 option cc_generic_services = true;
+option go_package = "pb";
 
 // 定义请求消息
 message EchoRequest {

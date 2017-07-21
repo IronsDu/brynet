@@ -11,7 +11,7 @@ namespace brynet
 {
     namespace net
     {
-        class HttpServer;
+        class HttpService;
 
         class HTTPParser
         {
@@ -73,7 +73,7 @@ namespace brynet
             const char*                             mTmpHeadStr;
             size_t                                  mTmpHeadLen;
 
-            friend class HttpServer;
+            friend class HttpService;
         };
     }
 }

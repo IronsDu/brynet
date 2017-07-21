@@ -7,7 +7,7 @@
 #include "http_parser.h"
 #include "WebSocketFormat.h"
 
-#include "HttpServer.h"
+#include "HttpService.h"
 
 using namespace brynet::net;
 
@@ -103,47 +103,47 @@ HttpSession::PTR HttpSession::Create(TCPSession::PTR session)
     return std::make_shared<make_shared_enabler>(session);
 }
 
-HttpServer::PTR HttpServer::Create()
+HttpService::PTR HttpService::Create()
 {
-    struct make_shared_enabler : public HttpServer {};
+    struct make_shared_enabler : public HttpService {};
     return std::make_shared<make_shared_enabler>();
 }
 
-HttpServer::HttpServer()
+HttpService::HttpService()
 {
-    mServer = std::make_shared<WrapServer>();
+    mService = std::make_shared<WrapTcpService>();
 }
 
-HttpServer::~HttpServer()
+HttpService::~HttpService()
 {
     if (mListenThread != nullptr)
     {
         mListenThread->closeListenThread();
     }
-    if (mServer != nullptr)
+    if (mService != nullptr)
     {
-        mServer->getService()->closeService();
+        mService->getService()->closeService();
     }
 }
 
-WrapServer::PTR HttpServer::getServer()
+WrapTcpService::PTR HttpService::getService()
 {
-    return mServer;
+    return mService;
 }
 
-void HttpServer::setEnterCallback(ENTER_CALLBACK callback)
+void HttpService::setEnterCallback(ENTER_CALLBACK callback)
 {
     mOnEnter = std::move(callback);
 }
 
-void HttpServer::addConnection(sock fd, 
+void HttpService::addConnection(sock fd, 
     ENTER_CALLBACK enterCallback, 
     HttpSession::HTTPPARSER_CALLBACK responseCallback, 
     HttpSession::WS_CALLBACK wsCallback, 
     HttpSession::CLOSE_CALLBACK closeCallback,
     HttpSession::WS_CONNECTED_CALLBACK wsConnectedCallback)
 {
-    mServer->addSession(fd, [shared_this = shared_from_this(),
+    mService->addSession(fd, [shared_this = shared_from_this(),
         enterCallbackCapture = std::move(enterCallback),
         responseCallbackCapture = std::move(responseCallback),
         wsCallbackCapture = std::move(wsCallback),
@@ -160,18 +160,18 @@ void HttpServer::addConnection(sock fd,
     }, false, 32*1024 * 1024);
 }
 
-void HttpServer::startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback)
+void HttpService::startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback)
 {
-    mServer->startWorkThread(workthreadnum, callback);
+    mService->startWorkThread(workthreadnum, callback);
 }
 
-void HttpServer::startListen(bool isIPV6, const std::string& ip, int port, const char *certificate /* = nullptr */, const char *privatekey /* = nullptr */)
+void HttpService::startListen(bool isIPV6, const std::string& ip, int port, const char *certificate /* = nullptr */, const char *privatekey /* = nullptr */)
 {
     if (mListenThread == nullptr)
     {
         mListenThread = ListenThread::Create();
         mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [shared_this = shared_from_this()](sock fd){
-            shared_this->mServer->addSession(fd, [shared_this](const TCPSession::PTR& session){
+            shared_this->mService->addSession(fd, [shared_this](const TCPSession::PTR& session){
                 auto httpSession = HttpSession::Create(session);
                 if (shared_this->mOnEnter != nullptr)
                 {
@@ -194,7 +194,7 @@ static HTTPParser::PTR castHttpParse(const TCPSession::PTR& session)
     return *ud;
 }
 
-void HttpServer::handleHttp(const HttpSession::PTR& httpSession)
+void HttpService::handleHttp(const HttpSession::PTR& httpSession)
 {
     /*TODO::keep alive and timeout close */
     auto& session = httpSession->getSession();

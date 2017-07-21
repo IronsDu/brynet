@@ -18,22 +18,22 @@ int main(int argc, char **argv)
 
     std::string tmp(atoi(argv[5]), 'a');
 
-    auto server = std::make_shared<WrapServer>();
+    auto server = std::make_shared<WrapTcpService>();
     server->startWorkThread(atoi(argv[3]));
 
-    auto connector = ThreadConnector::Create();
+    auto connector = AsyncConnector::Create();
     connector->startThread([server, tmp](sock fd, const std::any& ud) {
-        if (fd != -1)
-        {
-            server->addSession(fd, [tmp](const TCPSession::PTR& session) {
-                session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
-                    session->send(buffer, len);
-                    return len;
-                });
-                session->send(tmp.c_str(), tmp.size());
-            }, false, 1024 * 1024);
-        }
-    });
+		std::cout << "connect success" << std::endl;
+		server->addSession(fd, [tmp](const TCPSession::PTR& session) {
+			session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
+				session->send(buffer, len);
+				return len;
+			});
+			session->send(tmp.c_str(), tmp.size());
+		}, false, 1024 * 1024);
+	}, [](const std::any&) {
+		std::cout << "connect failed" << std::endl;
+	});
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {

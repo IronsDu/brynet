@@ -15,7 +15,7 @@ set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/net/TCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/net/WrapTCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/net/Connector.cpp
-	${PROJECT_SOURCE_DIR}/src/utils/fdset.c
+	${PROJECT_SOURCE_DIR}/src/net/fdset.c
 )
 
 set(timer_src_list
@@ -31,7 +31,7 @@ set(base_src_list
 set(http_src_list
 	${PROJECT_SOURCE_DIR}/src/net/http/http_parser.c
 	${PROJECT_SOURCE_DIR}/src/net/http/HttpParser.cpp
-	${PROJECT_SOURCE_DIR}/src/net/http/HttpServer.cpp
+	${PROJECT_SOURCE_DIR}/src/net/http/HttpService.cpp
 )
 
 set(utils_src_list
@@ -91,4 +91,12 @@ if(WIN32)
 elseif(UNIX)
   find_package(Threads REQUIRED)
   target_link_libraries(benchwebsocket Threads::Threads)
+endif()
+
+add_executable(promisereceive ${net_src_list} ${timer_src_list} ${base_src_list} ${utils_src_list} ${http_src_list} ${PROJECT_SOURCE_DIR}/examples/TestPromiseReceive.cpp)
+if(WIN32)
+  target_link_libraries(promisereceive ws2_32)
+elseif(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(promisereceive Threads::Threads)
 endif()
