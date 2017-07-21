@@ -25,32 +25,32 @@ int main(int argc, char **argv)
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
         server->addSession(fd, [](const TCPSession::PTR& session){
 
-			auto promiseReceive = setupPromiseReceive(session);
-			auto contentLength = std::make_shared<size_t>();
+            auto promiseReceive = setupPromiseReceive(session);
+            auto contentLength = std::make_shared<size_t>();
 
-			promiseReceive->receiveUntil("\r\n", [](const char* buffer, size_t len) {
-				std::cout << std::string(buffer, len);
-				return false;
-			})->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
-				std::cout << std::string(buffer, len);
-				if (len > 2)
-				{
-					// 可以读取Content-Length
-					return true;
-				}
-				return false;
-			})->receive(contentLength, [session](const char* buffer, size_t len) {
-				HttpResponse response;
-				response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
-				response.setContentType("text/html; charset=utf-8");
-				response.setBody("<html>hello world </html>");
-				
-				auto result = response.getResult();
-				session->send(result.c_str(), result.size());
-				session->postShutdown();
+            promiseReceive->receiveUntil("\r\n", [](const char* buffer, size_t len) {
+                std::cout << std::string(buffer, len);
+                return false;
+            })->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
+                std::cout << std::string(buffer, len);
+                if (len > 2)
+                {
+                    // 可以读取Content-Length
+                    return true;
+                }
+                return false;
+            })->receive(contentLength, [session](const char* buffer, size_t len) {
+                HttpResponse response;
+                response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
+                response.setContentType("text/html; charset=utf-8");
+                response.setBody("<html>hello world </html>");
+                
+                auto result = response.getResult();
+                session->send(result.c_str(), result.size());
+                session->postShutdown();
 
-				return false;
-			});
+                return false;
+            });
         }, false, 1024*1024);
     });
 

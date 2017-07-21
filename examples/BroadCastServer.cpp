@@ -33,33 +33,33 @@ TcpService::PTR service;
 
 static void addClientID(TcpService::SESSION_TYPE id)
 {
-	std::unique_lock<std::shared_mutex> lock(clientGurad);
-	clients.push_back(id);
+    std::unique_lock<std::shared_mutex> lock(clientGurad);
+    clients.push_back(id);
 }
 
 static void removeClientID(TcpService::SESSION_TYPE id)
 {
-	std::unique_lock<std::shared_mutex> lock(clientGurad);
-	clients.erase(std::find(clients.begin(), clients.end(), id));
+    std::unique_lock<std::shared_mutex> lock(clientGurad);
+    clients.erase(std::find(clients.begin(), clients.end(), id));
 }
 
 static size_t getClientNum()
 {
-	std::shared_lock<std::shared_mutex> lock(clientGurad);
-	return clients.size();
+    std::shared_lock<std::shared_mutex> lock(clientGurad);
+    return clients.size();
 }
 
 static void broadCastPacket(const TcpService::PTR& service, DataSocket::PACKET_PTR packet)
 {
-	std::shared_lock<std::shared_mutex> lock(clientGurad);
-	auto packetLen = packet->size();
-	RecvPacketNum++;
-	TotalRecvLen += packetLen;
-	std::for_each(clients.begin(), clients.end(), [&](TcpService::SESSION_TYPE id) {
-		service->send(id, packet);
-		SendPacketNum++;
-		TotalSendLen += packetLen;
-	});
+    std::shared_lock<std::shared_mutex> lock(clientGurad);
+    auto packetLen = packet->size();
+    RecvPacketNum++;
+    TotalRecvLen += packetLen;
+    std::for_each(clients.begin(), clients.end(), [&](TcpService::SESSION_TYPE id) {
+        service->send(id, packet);
+        SendPacketNum++;
+        TotalSendLen += packetLen;
+    });
 }
 
 int main(int argc, char** argv)
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     int port = atoi(argv[1]);
     ox_socket_init();
 
-	service = TcpService::Create();
+    service = TcpService::Create();
     auto mainLoop = std::make_shared<EventLoop>();
     
     service->startListen(false, "0.0.0.0", port, 1024 * 1024, nullptr, nullptr);
@@ -81,11 +81,11 @@ int main(int argc, char** argv)
     });
 
     service->setEnterCallback([](int64_t id, std::string ip){
-		addClientID(id);
+        addClientID(id);
     });
 
     service->setDisconnectCallback([](int64_t id){
-		removeClientID(id);
+        removeClientID(id);
     });
 
     service->setDataCallback([mainLoop](int64_t id, const char* buffer, size_t len){
@@ -102,9 +102,9 @@ int main(int argc, char** argv)
                 PACKET_LEN_TYPE packet_len = rp.readPacketLen();
                 if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
                 {
-					mainLoop->pushAsyncProc([packet = DataSocket::makePacket(parseStr, packet_len)]() {
-						broadCastPacket(service, std::move(packet));
-					});
+                    mainLoop->pushAsyncProc([packet = DataSocket::makePacket(parseStr, packet_len)]() {
+                            broadCastPacket(service, std::move(packet));
+                    });
 
                     totalProcLen += packet_len;
                     parseStr += packet_len;
@@ -123,23 +123,23 @@ int main(int argc, char** argv)
         return totalProcLen;
     });
 
-	int64_t now = ox_getnowtime();
+    int64_t now = ox_getnowtime();
     while (true)
     {
         mainLoop->loop(1000);
-		if ((ox_getnowtime() - now) >= 1000)
-		{
-			std::cout << "clientnum:" << getClientNum() << ", recv" << (TotalRecvLen / 1024) << " K/s, " << "num : " << RecvPacketNum << ", send " <<
-				(TotalSendLen / 1024) / 1024 << " M/s, " << " num: " << SendPacketNum << std::endl;
-			TotalRecvLen = 0;
-			TotalSendLen = 0;
-			RecvPacketNum = 0;
-			SendPacketNum = 0;
-			now = ox_getnowtime();
-		}
+        if ((ox_getnowtime() - now) >= 1000)
+        {
+            std::cout << "clientnum:" << getClientNum() << ", recv" << (TotalRecvLen / 1024) << " K/s, " << "num : " << RecvPacketNum << ", send " <<
+                (TotalSendLen / 1024) / 1024 << " M/s, " << " num: " << SendPacketNum << std::endl;
+            TotalRecvLen = 0;
+            TotalSendLen = 0;
+            RecvPacketNum = 0;
+            SendPacketNum = 0;
+            now = ox_getnowtime();
+        }
     }
 
     service->closeService();
 
-	return 0;
+    return 0;
 }

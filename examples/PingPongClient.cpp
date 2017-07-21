@@ -23,17 +23,17 @@ int main(int argc, char **argv)
 
     auto connector = AsyncConnector::Create();
     connector->startThread([server, tmp](sock fd, const std::any& ud) {
-		std::cout << "connect success" << std::endl;
-		server->addSession(fd, [tmp](const TCPSession::PTR& session) {
-			session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
-				session->send(buffer, len);
-				return len;
-			});
-			session->send(tmp.c_str(), tmp.size());
-		}, false, 1024 * 1024);
-	}, [](const std::any&) {
-		std::cout << "connect failed" << std::endl;
-	});
+        std::cout << "connect success" << std::endl;
+        server->addSession(fd, [tmp](const TCPSession::PTR& session) {
+            session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
+                session->send(buffer, len);
+                return len;
+            });
+            session->send(tmp.c_str(), tmp.size());
+        }, false, 1024 * 1024);
+    }, [](const std::any&) {
+        std::cout << "connect failed" << std::endl;
+    });
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {

@@ -39,95 +39,95 @@ int main(int argc, char** argv)
 
     ox_socket_init();
 
-	auto clientEventLoop = std::make_shared<EventLoop>();
+    auto clientEventLoop = std::make_shared<EventLoop>();
 
-	for (int i = 0; i < clietNum; i++)
-	{
-		int fd = ox_socket_connect(false, ip.c_str(), port);
-		ox_socket_nodelay(fd);
+    for (int i = 0; i < clietNum; i++)
+    {
+        int fd = ox_socket_connect(false, ip.c_str(), port);
+        ox_socket_nodelay(fd);
 
-		DataSocket::PTR datasSocket = new DataSocket(fd, 1024 * 1024);
-		datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {
-			static_assert(sizeof(datasSocket) <= sizeof(int64_t), "");
+        DataSocket::PTR datasSocket = new DataSocket(fd, 1024 * 1024);
+        datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {
+            static_assert(sizeof(datasSocket) <= sizeof(int64_t), "");
 
-			std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
-			sp->writeINT64((int64_t)datasSocket);
-			sp->writeBinary(std::string(packetLen, '_'));
+            std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
+            sp->writeINT64((int64_t)datasSocket);
+            sp->writeBinary(std::string(packetLen, '_'));
 
-			for (int i = 0; i < 1; ++i)
-			{
-				datasSocket->send(sp->getData(), sp->getLen());
-			}
+            for (int i = 0; i < 1; ++i)
+            {
+                datasSocket->send(sp->getData(), sp->getLen());
+            }
 
-			datasSocket->setDataCallback([](DataSocket::PTR datasSocket, const char* buffer, size_t len) {
-				const char* parseStr = buffer;
-				int totalProcLen = 0;
-				size_t leftLen = len;
+            datasSocket->setDataCallback([](DataSocket::PTR datasSocket, const char* buffer, size_t len) {
+                const char* parseStr = buffer;
+                int totalProcLen = 0;
+                size_t leftLen = len;
 
-				while (true)
-				{
-					bool flag = false;
-					if (leftLen >= PACKET_HEAD_LEN)
-					{
-						ReadPacket rp(parseStr, leftLen);
-						PACKET_LEN_TYPE packet_len = rp.readPacketLen();
-						if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
-						{
-							TotalRecvSize += packet_len;
-							TotalRecvPacketNum++;
+                while (true)
+                {
+                    bool flag = false;
+                    if (leftLen >= PACKET_HEAD_LEN)
+                    {
+                        ReadPacket rp(parseStr, leftLen);
+                        PACKET_LEN_TYPE packet_len = rp.readPacketLen();
+                        if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
+                        {
+                            TotalRecvSize += packet_len;
+                            TotalRecvPacketNum++;
 
-							ReadPacket rp(parseStr, packet_len);
-							rp.readPacketLen();
-							rp.readOP();
-							int64_t addr = rp.readINT64();
+                            ReadPacket rp(parseStr, packet_len);
+                            rp.readPacketLen();
+                            rp.readOP();
+                            int64_t addr = rp.readINT64();
 
-							if (addr == (int64_t)(datasSocket))
-							{
-								datasSocket->send(parseStr, packet_len);
-							}
+                            if (addr == (int64_t)(datasSocket))
+                            {
+                                datasSocket->send(parseStr, packet_len);
+                            }
 
-							totalProcLen += packet_len;
-							parseStr += packet_len;
-							leftLen -= packet_len;
-							flag = true;
-							rp.skipAll();
-						}
-						rp.skipAll();
-					}
+                            totalProcLen += packet_len;
+                            parseStr += packet_len;
+                            leftLen -= packet_len;
+                            flag = true;
+                            rp.skipAll();
+                        }
+                        rp.skipAll();
+                    }
 
-					if (!flag)
-					{
-						break;
-					}
-				}
+                    if (!flag)
+                    {
+                        break;
+                    }
+                }
 
-				return totalProcLen;
-			});
+                return totalProcLen;
+            });
 
-			datasSocket->setDisConnectCallback([](DataSocket::PTR datasSocket) {
-				delete datasSocket;
-			});
-		});
+            datasSocket->setDisConnectCallback([](DataSocket::PTR datasSocket) {
+                delete datasSocket;
+            });
+        });
 
-		clientEventLoop->pushAsyncProc([clientEventLoop, datasSocket]() {
-			if (!datasSocket->onEnterEventLoop(clientEventLoop))
-			{
-				delete datasSocket;
-			}
-		});
-	}
+        clientEventLoop->pushAsyncProc([clientEventLoop, datasSocket]() {
+            if (!datasSocket->onEnterEventLoop(clientEventLoop))
+            {
+                delete datasSocket;
+            }
+        });
+    }
 
-	int64_t now = ox_getnowtime();
-	while (true)
-	{
-		clientEventLoop->loop(1000);
-		if ((ox_getnowtime() - now) >= 1000)
-		{
-			cout << "total recv:" << (TotalRecvSize / 1024) / 1024 << " M /s" << " , num " <<  TotalRecvPacketNum << endl;
+    int64_t now = ox_getnowtime();
+    while (true)
+    {
+        clientEventLoop->loop(1000);
+        if ((ox_getnowtime() - now) >= 1000)
+        {
+            cout << "total recv:" << (TotalRecvSize / 1024) / 1024 << " M /s" << " , num " <<  TotalRecvPacketNum << endl;
 
-			now = ox_getnowtime();
-			TotalRecvSize = 0;
-			TotalRecvPacketNum = 0;
-		}
-	}
+            now = ox_getnowtime();
+            TotalRecvSize = 0;
+            TotalRecvPacketNum = 0;
+        }
+    }
 }
