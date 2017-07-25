@@ -81,8 +81,6 @@ namespace brynet
             void                            tryInitThreadID();
 
         private:
-            size_t                          mEventEntriesNum;
-            std::unique_ptr<WakeupChannel>  mWakeupChannel;
 
 #ifdef PLATFORM_WINDOWS
             OVERLAPPED_ENTRY*               mEventEntries;
@@ -94,6 +92,9 @@ namespace brynet
             epoll_event*                    mEventEntries;
             int                             mEpollFd;
 #endif
+            size_t                          mEventEntriesNum;
+            std::unique_ptr<WakeupChannel>  mWakeupChannel;
+
             std::atomic_bool                mIsInBlock;
             std::atomic_bool                mIsAlreadyPostWakeup;
 
