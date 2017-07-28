@@ -15,7 +15,7 @@ public:
 
     BaseNetSession()
     {
-        mServer = nullptr;
+        mService = nullptr;
     }
 
     virtual ~BaseNetSession()
@@ -23,16 +23,16 @@ public:
         mSocketID = 0;
     }
 
-    void    setSession(const WrapServer::PTR& server, int64_t socketID, const std::string& ip)
+    void    setSession(const WrapTcpService::PTR& service, int64_t socketID, const std::string& ip)
     {
-        mServer = server;
+        mService = service;
         mSocketID = socketID;
         mIP = ip;
     }
 
-    const WrapServer::PTR& getServer()
+    const WrapTcpService::PTR& getService()
     {
-        return mServer;
+        return mService;
     }
 
     /*处理收到的数据*/
@@ -54,30 +54,30 @@ public:
 
     void            postClose()
     {
-        mServer->getService()->disConnect(mSocketID);
+        mService->getService()->disConnect(mSocketID);
     }
 
     void            sendPacket(const char* data, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
     {
-        mServer->getService()->send(mSocketID, DataSocket::makePacket(data, len), std::move(callback));
+        mService->getService()->send(mSocketID, DataSocket::makePacket(data, len), std::move(callback));
     }
 
     void            sendPacket(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
     {
-        mServer->getService()->send(mSocketID, std::move(packet), std::move(callback));
+        mService->getService()->send(mSocketID, std::move(packet), std::move(callback));
     }
 
     auto      getEventLoop()
     {
-        return mServer->getService()->getEventLoopBySocketID(mSocketID);
+        return mService->getService()->getEventLoopBySocketID(mSocketID);
     }
 
 private:
     std::string         mIP;
-    WrapServer::PTR     mServer;
+    WrapTcpService::PTR mService;
     int64_t             mSocketID;
 };
 
-void WrapAddNetSession(WrapServer::PTR server, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, size_t maxRecvBufferSize);
+void WrapAddNetSession(WrapTcpService::PTR service, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, size_t maxRecvBufferSize);
 
 #endif
