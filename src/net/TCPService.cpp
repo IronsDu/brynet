@@ -288,7 +288,7 @@ void TcpService::send(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket
 
 void TcpService::cacheSend(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback)
 {
-    std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     union  SessionId sid;
     sid.id = id;
@@ -301,7 +301,7 @@ void TcpService::cacheSend(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataS
 
 void TcpService::flushCachePackectList()
 {
-    std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     for (const auto& ioLoopData : mIOLoopDatas)
     {
@@ -401,7 +401,7 @@ void TcpService::closeWorkerThread()
 void TcpService::stopWorkerThread()
 {
     std::lock_guard<std::mutex> lck(mServiceGuard);
-    std::unique_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     mRunIOLoop = false;
 
@@ -446,7 +446,7 @@ void TcpService::startListen(bool isIPV6, const std::string& ip, int port, int m
 void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
 {
     std::lock_guard<std::mutex> lck(mServiceGuard);
-    std::unique_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     if (mIOLoopDatas.empty())
     {
@@ -485,7 +485,7 @@ void TcpService::wakeup(SESSION_TYPE id) const
 
 void TcpService::wakeupAll() const
 {
-    std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     for (const auto& v : mIOLoopDatas)
     {
@@ -497,10 +497,11 @@ EventLoop::PTR TcpService::getRandomEventLoop()
 {
     EventLoop::PTR ret;
     {
-        std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+        auto randNum = rand();
+        std::lock_guard<std::mutex> lock(mIOLoopGuard);
         if (!mIOLoopDatas.empty())
         {
-            ret = mIOLoopDatas[rand() % mIOLoopDatas.size()]->eventLoop;
+            ret = mIOLoopDatas[randNum % mIOLoopDatas.size()]->eventLoop;
         }
     }
 
@@ -515,7 +516,7 @@ TcpService::PTR TcpService::Create()
 
 EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id) const noexcept
 {
-    std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     union  SessionId sid;
     sid.id = id;
@@ -532,7 +533,7 @@ EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id) const noexcep
 
 std::shared_ptr<IOLoopData> TcpService::getIOLoopDataBySocketID(SESSION_TYPE id) const noexcept
 {
-    std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+    std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
     union  SessionId sid;
     sid.id = id;
@@ -577,7 +578,8 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
     std::shared_ptr<IOLoopData> ioLoopData;
     size_t loopIndex = 0;
     {
-        std::shared_lock<std::shared_mutex> lock(mIOLoopGuard);
+        auto randNum = rand();
+        std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
         if (mIOLoopDatas.empty())
         {
@@ -604,7 +606,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
         else
         {
             /*  随机为此链接分配一个eventloop */
-            loopIndex = rand() % mIOLoopDatas.size();
+            loopIndex = randNum % mIOLoopDatas.size();
         }
 
         ioLoopData = mIOLoopDatas[loopIndex];

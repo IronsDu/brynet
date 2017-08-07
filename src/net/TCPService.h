@@ -140,7 +140,7 @@ namespace brynet
 
         private:
             std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
-            mutable std::shared_mutex                   mIOLoopGuard;
+            mutable std::mutex                  mIOLoopGuard;
             bool                                mRunIOLoop;
 
             ListenThread::PTR                   mListenThread;
