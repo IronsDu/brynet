@@ -20,13 +20,12 @@ public:
 
     virtual ~BaseNetSession()
     {
-        mSocketID = 0;
     }
 
-    void    setSession(const WrapTcpService::PTR& service, int64_t socketID, const std::string& ip)
+    void    setSession(const WrapTcpService::PTR& service, const TCPSession::PTR& session, const std::string& ip)
     {
         mService = service;
-        mSocketID = socketID;
+        mSession = session;
         mIP = ip;
     }
 
@@ -49,33 +48,33 @@ public:
 
     auto         getSocketID() const
     {
-        return mSocketID;
+        return mSession->getSocketID();
     }
 
     void            postClose()
     {
-        mService->getService()->disConnect(mSocketID);
+        mSession->postClose();
     }
 
     void            sendPacket(const char* data, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
     {
-        mService->getService()->send(mSocketID, DataSocket::makePacket(data, len), std::move(callback));
+        mSession->send(DataSocket::makePacket(data, len), std::move(callback));
     }
 
     void            sendPacket(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
     {
-        mService->getService()->send(mSocketID, std::move(packet), std::move(callback));
+        mSession->send(std::move(packet), std::move(callback));
     }
 
-    auto      getEventLoop()
+    const auto&      getEventLoop()
     {
-        return mService->getService()->getEventLoopBySocketID(mSocketID);
+        return mSession->getEventLoop();
     }
 
 private:
     std::string         mIP;
     WrapTcpService::PTR mService;
-    int64_t             mSocketID;
+    TCPSession::PTR     mSession;
 };
 
 void WrapAddNetSession(WrapTcpService::PTR service, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, size_t maxRecvBufferSize);

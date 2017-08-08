@@ -38,6 +38,8 @@ namespace brynet
 
             void                    setCloseCallback(CLOSE_CALLBACK callback);
             void                    setDataCallback(DATA_CALLBACK callback);
+            void                    setIOLoopData(std::shared_ptr<IOLoopData> ioLoopData);
+            const EventLoop::PTR&   getEventLoop() const;
 
         private:
             TCPSession() noexcept;
@@ -55,6 +57,7 @@ namespace brynet
 
         private:
             TcpService::PTR             mService;
+            std::shared_ptr<IOLoopData> mIoLoopData;
             TcpService::SESSION_TYPE    mSocketID;
             std::string                 mIP;
             std::any                    mUD;

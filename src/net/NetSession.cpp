@@ -3,7 +3,7 @@
 void WrapAddNetSession(WrapTcpService::PTR service, sock fd, BaseNetSession::PTR connection, int pingCheckTime, size_t maxRecvBufferSize)
 {
     service->addSession(fd, [connection, service, pingCheckTime](const TCPSession::PTR& session){
-        connection->setSession(service, session->getSocketID(), session->getIP());
+        connection->setSession(service, session, session->getIP());
         connection->onEnter();
 
         service->getService()->setPingCheckTime(session->getSocketID(), pingCheckTime);

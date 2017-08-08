@@ -37,12 +37,12 @@ TcpService::SESSION_TYPE TCPSession::getSocketID() const
 
 void TCPSession::send(const char* buffer, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback) const
 {
-    mService->send(mSocketID, DataSocket::makePacket(buffer, len), std::move(callback));
+    mIoLoopData->send(mSocketID, DataSocket::makePacket(buffer, len), std::move(callback));
 }
 
 void TCPSession::send(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback) const
 {
-    mService->send(mSocketID, std::move(packet), std::move(callback));
+    mIoLoopData->send(mSocketID, std::move(packet), std::move(callback));
 }
 
 void TCPSession::postShutdown() const
@@ -63,6 +63,16 @@ void TCPSession::setCloseCallback(CLOSE_CALLBACK callback)
 void TCPSession::setDataCallback(DATA_CALLBACK callback)
 {
     mDataCallback = std::move(callback);
+}
+
+void TCPSession::setIOLoopData(std::shared_ptr<IOLoopData> ioLoopData)
+{
+    mIoLoopData = std::move(ioLoopData);
+}
+
+const EventLoop::PTR& TCPSession::getEventLoop() const
+{
+    return mIoLoopData->getEventLoop();
 }
 
 void TCPSession::setSocketID(TcpService::SESSION_TYPE id)
@@ -120,7 +130,8 @@ void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnter
     auto tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);
 
-    auto enterCallback = [tmpSession, userEnterCallback](TcpService::SESSION_TYPE id, const std::string& ip) mutable {
+    auto enterCallback = [sharedTCPService = mTCPService, tmpSession, userEnterCallback](TcpService::SESSION_TYPE id, const std::string& ip) mutable {
+        tmpSession->setIOLoopData(sharedTCPService->getIOLoopDataBySocketID(id));
         tmpSession->setSocketID(id);
         tmpSession->setIP(ip);
         if (userEnterCallback != nullptr)

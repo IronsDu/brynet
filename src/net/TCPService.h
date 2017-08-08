@@ -11,6 +11,7 @@
 
 #include "DataSocket.h"
 #include "NonCopyable.h"
+#include "Typeids.h"
 
 namespace brynet
 {
@@ -55,7 +56,7 @@ namespace brynet
 #endif
         };
 
-        struct IOLoopData;
+        class IOLoopData;
 
         /*  以数字ID为网络会话标识的网络服务   */
         class TcpService : public NonCopyable, public std::enable_shared_from_this<TcpService>
@@ -120,6 +121,7 @@ namespace brynet
             void                                wakeupAll() const;
             EventLoop::PTR                      getRandomEventLoop();
             EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const noexcept;
+            std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const noexcept;
 
         private:
             TcpService() noexcept;
@@ -136,7 +138,6 @@ namespace brynet
             void                                procDataSocketClose(DataSocket::PTR);
             /*  对id标识的DataSocket投递一个异步操作(放在网络线程执行)(会验证ID的有效性)  */
             void                                postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSocket::PTR)> callback) const;
-            std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const noexcept;
 
         private:
             std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
@@ -150,6 +151,41 @@ namespace brynet
             TcpService::ENTER_CALLBACK          mEnterCallback;
             TcpService::DISCONNECT_CALLBACK     mDisConnectCallback;
             TcpService::DATA_CALLBACK           mDataCallback;
+        };
+
+        class IOLoopData : public NonCopyable, public std::enable_shared_from_this<IOLoopData>
+        {
+        public:
+            typedef std::shared_ptr<IOLoopData> PTR;
+            typedef std::vector<std::tuple<TcpService::SESSION_TYPE, DataSocket::PACKET_PTR, DataSocket::PACKED_SENDED_CALLBACK>> MSG_LIST;
+
+        public:
+            static  PTR                         Create(EventLoop::PTR eventLoop, std::shared_ptr<std::thread> ioThread);
+
+        public:
+            void send(TcpService::SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback);
+            const EventLoop::PTR&           getEventLoop() const;
+
+        private:
+            std::shared_ptr<MSG_LIST>&      getPacketList();
+            void                            resetPacketList();
+            TypeIDS<DataSocket::PTR>&       getDataSockets();
+            std::shared_ptr<std::thread>&   getIOThread();
+            int                             incID();
+
+        private:
+            explicit IOLoopData(EventLoop::PTR eventLoop,
+                std::shared_ptr<std::thread> ioThread);
+
+        private:
+            const EventLoop::PTR            mEventLoop;
+            std::shared_ptr<std::thread>    mIOThread;
+
+            TypeIDS<DataSocket::PTR>        mDataSockets;
+            int                             incId;
+            std::shared_ptr<MSG_LIST>       cachePacketList;
+
+            friend class TcpService;
         };
     }
 }
