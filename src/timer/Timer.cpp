@@ -2,7 +2,7 @@
 
 using namespace brynet;
 
-time_t Timer::getEndMs() const
+const std::chrono::steady_clock::time_point& Timer::getEndMs() const
 {
     return mEndTime;
 }
@@ -12,7 +12,7 @@ void Timer::cancel()
     mActive = false;
 }
 
-Timer::Timer(time_t ms, Callback callback) noexcept : mEndTime(ms), mCallback(callback)
+Timer::Timer(std::chrono::steady_clock::time_point endTime, Callback callback) noexcept : mEndTime(endTime), mCallback(callback)
 {
     mActive = true;
 }
@@ -31,7 +31,7 @@ void TimerMgr::schedule()
     {
         auto tmp = mTimers.top();
 
-        if (tmp->getEndMs() < ox_getnowtime())
+        if (tmp->getEndMs() < std::chrono::steady_clock::now())
         {
             mTimers.pop();
             tmp->operator() ();
@@ -43,22 +43,26 @@ void TimerMgr::schedule()
     }
 }
 
-bool TimerMgr::isEmpty()
+bool TimerMgr::isEmpty() const
 {
     return mTimers.empty();
 }
 
-time_t TimerMgr::nearEndMs()
+/* 返回定时器管理器中最近的一个定时器还需多久到期(如果定时器为空或已经到期则返回0) */
+std::chrono::milliseconds TimerMgr::nearEndMs() const
 {
     if (mTimers.empty())
     {
-        return 0;
+        return std::chrono::milliseconds();
     }
-    else
+
+    auto result = std::chrono::duration_cast<std::chrono::milliseconds>(mTimers.top()->getEndMs() - std::chrono::steady_clock::now());
+    if (result.count() < 0)
     {
-        auto tmp = mTimers.top()->getEndMs() - ox_getnowtime();
-        return (tmp < 0 ? 0 : tmp);
+        return std::chrono::milliseconds();
     }
+
+    return result;
 }
 
 void TimerMgr::clear()

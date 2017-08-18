@@ -134,7 +134,7 @@ namespace brynet
                 if (waitMicroSecond > 0)
                 {
                     std::unique_lock<std::mutex>    tmp(mMutex);
-                    mCond.wait_for(tmp, std::chrono::microseconds(waitMicroSecond));
+                    mCond.wait_until(tmp, std::chrono::steady_clock::now() + std::chrono::microseconds(waitMicroSecond));
                 }
 
                 {

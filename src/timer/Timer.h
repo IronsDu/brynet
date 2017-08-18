@@ -5,6 +5,7 @@
 #include <queue>
 #include <memory>
 #include <vector>
+#include <chrono>
 
 #include "systemlib.h"
 
@@ -19,9 +20,9 @@ namespace brynet
         typedef std::weak_ptr<Timer>            WeakPtr;
         typedef std::function<void(void)>       Callback;
 
-        Timer(time_t endTime, Callback f) noexcept;
+        Timer(std::chrono::steady_clock::time_point endTime, Callback f) noexcept;
 
-        time_t                                  getEndMs() const;
+        const std::chrono::steady_clock::time_point&    getEndMs() const;
         void                                    cancel();
 
     private:
@@ -30,7 +31,7 @@ namespace brynet
     private:
         bool                                    mActive;
         Callback                                mCallback;
-        const time_t                            mEndTime;
+        const std::chrono::steady_clock::time_point mEndTime;
 
         friend class TimerMgr;
     };
@@ -43,7 +44,7 @@ namespace brynet
         template<typename F, typename ...TArgs>
         Timer::WeakPtr                          addTimer(time_t delayMs, F callback, TArgs&& ...args)
         {
-            auto timer = std::make_shared<Timer>(delayMs + static_cast<time_t>(ox_getnowtime()),
+            auto timer = std::make_shared<Timer>(std::chrono::steady_clock::now() + std::chrono::microseconds(delayMs),
                                                 std::bind(callback, std::forward<TArgs>(args)...));
             mTimers.push(timer);
 
@@ -51,8 +52,8 @@ namespace brynet
         }
 
         void                                    schedule();
-        bool                                    isEmpty();
-        time_t                                  nearEndMs();
+        bool                                    isEmpty() const;
+        std::chrono::milliseconds               nearEndMs() const;
         void                                    clear();
 
     private:

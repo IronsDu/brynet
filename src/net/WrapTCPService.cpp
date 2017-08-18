@@ -22,7 +22,7 @@ const std::any& TCPSession::getUD() const
 
 void TCPSession::setUD(std::any ud)
 {
-    mUD = ud;
+    mUD = std::move(ud);
 }
 
 const std::string& TCPSession::getIP() const

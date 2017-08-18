@@ -117,15 +117,15 @@ int main(int argc, char** argv)
         });
     }
 
-    int64_t now = ox_getnowtime();
+    auto now = std::chrono::steady_clock::now();
     while (true)
     {
         clientEventLoop->loop(1000);
-        if ((ox_getnowtime() - now) >= 1000)
+        if ((std::chrono::steady_clock::now() - now) >= std::chrono::seconds(1))
         {
             cout << "total recv:" << (TotalRecvSize / 1024) / 1024 << " M /s" << " , num " <<  TotalRecvPacketNum << endl;
 
-            now = ox_getnowtime();
+            now = std::chrono::steady_clock::now();
             TotalRecvSize = 0;
             TotalRecvPacketNum = 0;
         }

@@ -775,7 +775,7 @@ void DataSocket::postShutdown()
 
 void DataSocket::setUD(std::any value)
 {
-    mUD = value;
+    mUD = std::move(value);
 }
 
 const std::any& DataSocket::getUD() const

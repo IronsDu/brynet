@@ -421,7 +421,7 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
                 eventLoop]() {
                 while (shared_this->mRunIOLoop)
                 {
-                    eventLoop->loop(eventLoop->getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : eventLoop->getTimerMgr()->nearEndMs());
+                    eventLoop->loop(eventLoop->getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : eventLoop->getTimerMgr()->nearEndMs().count());
                     if (callback != nullptr)
                     {
                         callback(eventLoop);

@@ -7,7 +7,6 @@
 extern "C" {
 #endif
 
-int64_t ox_getnowtime(void);
 int ox_getcpunum(void);
 
 #ifdef  __cplusplus

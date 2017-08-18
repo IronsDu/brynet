@@ -26,10 +26,9 @@ namespace brynet
             AsyncConnectAddr() noexcept
             {
                 mPort = 0;
-                mTimeout = 0;
             }
 
-            AsyncConnectAddr(const char* ip, int port, int timeout, std::any ud) : mIP(ip), mPort(port), mTimeout(timeout), mUD(ud)
+            AsyncConnectAddr(const char* ip, int port, std::chrono::milliseconds timeout, std::any ud) : mIP(ip), mPort(port), mTimeout(timeout), mUD(std::move(ud))
             {
             }
 
@@ -56,7 +55,7 @@ namespace brynet
         private:
             std::string         mIP;
             int                 mPort;
-            int                 mTimeout;
+            std::chrono::milliseconds   mTimeout;
             std::any            mUD;
         };
 
@@ -78,8 +77,8 @@ namespace brynet
 
             struct ConnectingInfo
             {
-                int64_t startConnectTime;
-                int     timeout;
+                std::chrono::steady_clock::time_point startConnectTime;
+                std::chrono::milliseconds     timeout;
                 std::any ud;
             };
 
@@ -179,11 +178,10 @@ void ConnectorWorkThread::checkConnectStatus(int timeout)
 
 void ConnectorWorkThread::checkTimeout()
 {
-    int64_t now_time = ox_getnowtime();
-
     for (auto it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
     {
-        if ((now_time - it->second.startConnectTime) >= it->second.timeout)
+        auto now = std::chrono::steady_clock::now();
+        if ((now - it->second.startConnectTime) >= it->second.timeout)
         {
             auto fd = it->first;
             auto uid = it->second.ud;
@@ -245,7 +243,7 @@ void ConnectorWorkThread::pollConnectRequest(std::shared_ptr<MsgQueue<AsyncConne
                 else
                 {
                     ConnectingInfo ci;
-                    ci.startConnectTime = ox_getnowtime();
+                    ci.startConnectTime = std::chrono::steady_clock::now();
                     ci.ud = addr.getUD();
                     ci.timeout = addr.getTimeout();
 
@@ -331,7 +329,7 @@ void AsyncConnector::destroy()
 
 void AsyncConnector::asyncConnect(const char* ip, int port, int ms, std::any ud)
 {
-    mConnectRequests->push(AsyncConnectAddr(ip, port, ms, ud));
+    mConnectRequests->push(AsyncConnectAddr(ip, port, std::chrono::milliseconds(ms), ud));
     mConnectRequests->forceSyncWrite();
     mEventLoop.wakeup();
 }
