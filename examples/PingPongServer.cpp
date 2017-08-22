@@ -2,9 +2,9 @@
 #include <mutex>
 #include <atomic>
 
-#include "SocketLibFunction.h"
-#include "EventLoop.h"
-#include "WrapTCPService.h"
+#include <brynet/net/SocketLibFunction.h>
+#include <brynet/net/EventLoop.h>
+#include <brynet/net/WrapTCPService.h>
 
 using namespace brynet;
 using namespace brynet::net;

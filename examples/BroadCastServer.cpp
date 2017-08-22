@@ -9,14 +9,13 @@
 #include <atomic>
 #include <shared_mutex>
 
-#include "packet.h"
-#include "systemlib.h"
-#include "SocketLibFunction.h"
+#include <brynet/utils/packet.h>
+#include <brynet/utils/systemlib.h>
+#include <brynet/net/SocketLibFunction.h>
 
-#include "EventLoop.h"
-#include "DataSocket.h"
-#include "TCPService.h"
-#include "MsgQueue.h"
+#include <brynet/net/EventLoop.h>
+#include <brynet/net/DataSocket.h>
+#include <brynet/net/TCPService.h>
 
 using namespace brynet;
 using namespace brynet::net;

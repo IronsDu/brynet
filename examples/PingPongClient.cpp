@@ -1,9 +1,9 @@
 #include <iostream>
 #include <string>
 
-#include "SocketLibFunction.h"
-#include "WrapTCPService.h"
-#include "Connector.h"
+#include <brynet/net/SocketLibFunction.h>
+#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/Connector.h>
 
 using namespace brynet;
 using namespace brynet::net;

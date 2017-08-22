@@ -8,42 +8,39 @@ elseif(UNIX)
 endif()
 
 set(net_src_list
-	${PROJECT_SOURCE_DIR}/src/net/EventLoop.cpp
-	${PROJECT_SOURCE_DIR}/src/net/CurrentThread.cpp
-	${PROJECT_SOURCE_DIR}/src/net/DataSocket.cpp
-	${PROJECT_SOURCE_DIR}/src/net/SocketLibFunction.c
-	${PROJECT_SOURCE_DIR}/src/net/TCPService.cpp
-	${PROJECT_SOURCE_DIR}/src/net/WrapTCPService.cpp
-	${PROJECT_SOURCE_DIR}/src/net/Connector.cpp
-	${PROJECT_SOURCE_DIR}/src/net/fdset.c
+	${PROJECT_SOURCE_DIR}/src/brynet/net/EventLoop.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/CurrentThread.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/DataSocket.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.c
+	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/WrapTCPService.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/fdset.c
 )
 
 set(timer_src_list
-	${PROJECT_SOURCE_DIR}/src/timer/Timer.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/timer/Timer.cpp
 )
 
 set(base_src_list
-	${PROJECT_SOURCE_DIR}/src/utils/array.c
-	${PROJECT_SOURCE_DIR}/src/utils/buffer.c
-	${PROJECT_SOURCE_DIR}/src/utils/systemlib.c
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/systemlib.c
 )
 
 set(http_src_list
-	${PROJECT_SOURCE_DIR}/src/net/http/http_parser.c
-	${PROJECT_SOURCE_DIR}/src/net/http/HttpParser.cpp
-	${PROJECT_SOURCE_DIR}/src/net/http/HttpService.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/http/http_parser.c
+	${PROJECT_SOURCE_DIR}/src/brynet/net/http/HttpParser.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/http/HttpService.cpp
 )
 
 set(utils_src_list
-	${PROJECT_SOURCE_DIR}/src/utils/base64.cpp
-	${PROJECT_SOURCE_DIR}/src/utils/md5calc.cpp
-	${PROJECT_SOURCE_DIR}/src/utils/SHA1.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/base64.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/md5calc.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/SHA1.cpp
 )
 
-include_directories("${PROJECT_SOURCE_DIR}/src/net")
-include_directories("${PROJECT_SOURCE_DIR}/src/timer")
-include_directories("${PROJECT_SOURCE_DIR}/src/utils")
-include_directories("${PROJECT_SOURCE_DIR}/src/net/http")
+include_directories("${PROJECT_SOURCE_DIR}/src/")
 
 add_executable(pingpongserver ${net_src_list} ${timer_src_list} ${base_src_list} ${PROJECT_SOURCE_DIR}/examples/PingPongServer.cpp)
 if(WIN32)

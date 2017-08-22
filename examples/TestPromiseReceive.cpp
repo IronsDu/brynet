@@ -2,11 +2,11 @@
 #include <mutex>
 #include <atomic>
 
-#include "SocketLibFunction.h"
-#include "EventLoop.h"
-#include "WrapTCPService.h"
-#include "PromiseReceive.h"
-#include "HttpFormat.h"
+#include <brynet/net/SocketLibFunction.h>
+#include <brynet/net/EventLoop.h>
+#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/PromiseReceive.h>
+#include <brynet/net/http/HttpFormat.h>
 
 using namespace brynet;
 using namespace brynet::net;

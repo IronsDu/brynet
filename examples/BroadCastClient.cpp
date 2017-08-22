@@ -9,13 +9,13 @@
 #include <thread>
 #include <atomic>
 
-#include "packet.h"
+#include <brynet/utils/packet.h>
 
-#include "SocketLibFunction.h"
+#include <brynet/net/SocketLibFunction.h>
 
-#include "EventLoop.h"
-#include "DataSocket.h"
-#include "Timer.h"
+#include <brynet/net/EventLoop.h>
+#include <brynet/net/DataSocket.h>
+#include <brynet/timer/Timer.h>
 
 using namespace std;
 using namespace brynet;
