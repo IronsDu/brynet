@@ -21,7 +21,6 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) noexcept
     mIsPostFlush = false;
     mFD = fd;
 
-    /*  Ä¬ÈÏ¿ÉÐ´    */
     mCanWrite = true;
 
 #ifdef PLATFORM_WINDOWS
@@ -40,7 +39,6 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) noexcept
 
 DataSocket::~DataSocket() noexcept
 {
-    /*  ¶ÏÑÔ¼ì²â,µ±DataSocketÎö¹¹Ê±,Ó¦¸Ã´¦ÓÚ¶Ï¿ª×´Ì¬    */
     assert(mFD == SOCKET_ERROR);
 
     if (mRecvBuffer != nullptr)
@@ -70,7 +68,7 @@ DataSocket::~DataSocket() noexcept
     }
 }
 
-bool DataSocket::onEnterEventLoop(EventLoop::PTR eventLoop)
+bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
 {
     assert(eventLoop->isInLoopThread());
     if (!eventLoop->isInLoopThread())
@@ -86,7 +84,11 @@ bool DataSocket::onEnterEventLoop(EventLoop::PTR eventLoop)
 
     mEventLoop = eventLoop;
 
-    ox_socket_nonblock(mFD);
+    if (!ox_socket_nonblock(mFD))
+    {
+        closeSocket();
+        return false;
+    }
     if (!mEventLoop->linkChannel(mFD, this))
     {
         closeSocket();
@@ -127,27 +129,27 @@ bool DataSocket::onEnterEventLoop(EventLoop::PTR eventLoop)
     return ret;
 }
 
-void DataSocket::send(const char* buffer, size_t len, PACKED_SENDED_CALLBACK callback)
+void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
 {
-    sendPacket(makePacket(buffer, len), std::move(callback));
+    sendPacket(makePacket(buffer, len), callback);
 }
 
-void DataSocket::sendPacket(PACKET_PTR packet, PACKED_SENDED_CALLBACK callback)
+void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
-    mEventLoop->pushAsyncProc([this, packetCapture = std::move(packet), callbackCapture = std::move(callback)](){
+    mEventLoop->pushAsyncProc([this, packetCapture = packet, callbackCapture = callback](){
         auto len = packetCapture->size();
         mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
         runAfterFlush();
     });
 }
 
-void DataSocket::sendPacketInLoop(PACKET_PTR packet, PACKED_SENDED_CALLBACK callback)
+void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
     if (mEventLoop->isInLoopThread())
     {
         auto len = packet->size();
-        mSendList.push_back({ std::move(packet), len, std::move(callback) });
+        mSendList.push_back({ packet, len, callback });
         runAfterFlush();
     }
 }
@@ -299,7 +301,6 @@ void DataSocket::recv()
 
     if (must_close)
     {
-        /*  »Øµ÷µ½ÓÃ»§²ã  */
         procCloseInLoop();
     }
 }
@@ -335,8 +336,6 @@ __thread char* threadLocalSendBuf = nullptr;
 
 void DataSocket::normalFlush()
 {
-    bool must_close = false;
-
     static  const   int SENDBUF_SIZE = 1024 * 32;
     if (threadLocalSendBuf == nullptr)
     {
@@ -360,7 +359,6 @@ SEND_PROC:
         }
         else
         {
-            /*Èç¹ûÎÞ·¨×°ÈëºÏ²¢»º³åÇø£¬Ôòµ¥¶À·¢ËÍ´ËÏûÏ¢°ü*/
             if (it == mSendList.begin())
             {
                 sendptr = packetLeftBuf;
@@ -370,82 +368,84 @@ SEND_PROC:
         }
     }
 
-    if (wait_send_size > 0)
+    if (wait_send_size <= 0)
     {
-        int send_retlen = 0;
+        return;
+    }
+    
+    bool must_close = false;
+
+    int send_retlen = 0;
 #ifdef USE_OPENSSL
-        if (mSSL != nullptr)
-        {
-            send_retlen = SSL_write(mSSL, sendptr, wait_send_size);
-        }
-        else
-        {
-            send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
-        }
+    if (mSSL != nullptr)
+    {
+        send_retlen = SSL_write(mSSL, sendptr, wait_send_size);
+    }
+    else
+    {
+        send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
+    }
 #else
-        send_retlen = ::send(mFD, sendptr, static_cast<int>(wait_send_size), 0);
+    send_retlen = ::send(mFD, sendptr, static_cast<int>(wait_send_size), 0);
 #endif
 
-        if (send_retlen > 0)
+    if (send_retlen > 0)
+    {
+        auto tmp_len = static_cast<size_t>(send_retlen);
+        for (auto it = mSendList.begin(); it != mSendList.end();)
         {
-            auto tmp_len = static_cast<size_t>(send_retlen);
-            for (auto it = mSendList.begin(); it != mSendList.end();)
+            auto& packet = *it;
+            if (packet.left > tmp_len)
             {
-                auto& packet = *it;
-                if (packet.left <= tmp_len)
-                {
-                    tmp_len -= packet.left;
-                    if (packet.mCompleteCallback != nullptr)
-                    {
-                        (*packet.mCompleteCallback)();
-                    }
-                    it = mSendList.erase(it);
-                }
-                else
-                {
-                    packet.left -= tmp_len;
-                    break;
-                }
+                packet.left -= tmp_len;
+                break;
             }
 
-            if (send_retlen == wait_send_size)
+            tmp_len -= packet.left;
+            if (packet.mCompleteCallback != nullptr)
             {
-                if (!mSendList.empty())
-                {
-                    goto SEND_PROC;
-                }
+                (*packet.mCompleteCallback)();
             }
-            else
+            it = mSendList.erase(it);
+        }
+
+        if (send_retlen == wait_send_size)
+        {
+            if (!mSendList.empty())
             {
-                mCanWrite = false;
-                must_close = !checkWrite();
+                goto SEND_PROC;
             }
         }
         else
         {
-#ifdef USE_OPENSSL
-            if ((mSSL != nullptr && SSL_get_error(mSSL, send_retlen) == SSL_ERROR_WANT_WRITE) ||
-                (sErrno == S_EWOULDBLOCK))
-            {
-                mCanWrite = false;
-                must_close = !checkWrite();
-            }
-            else
-            {
-                must_close = true;
-            }
-#else
-            if (sErrno == S_EWOULDBLOCK)
-            {
-                mCanWrite = false;
-                must_close = !checkWrite();
-            }
-            else
-            {
-                must_close = true;
-            }
-#endif
+            mCanWrite = false;
+            must_close = !checkWrite();
         }
+    }
+    else
+    {
+#ifdef USE_OPENSSL
+        if ((mSSL != nullptr && SSL_get_error(mSSL, send_retlen) == SSL_ERROR_WANT_WRITE) ||
+            (sErrno == S_EWOULDBLOCK))
+        {
+            mCanWrite = false;
+            must_close = !checkWrite();
+        }
+        else
+        {
+            must_close = true;
+        }
+#else
+        if (sErrno == S_EWOULDBLOCK)
+        {
+            mCanWrite = false;
+            must_close = !checkWrite();
+        }
+        else
+        {
+            must_close = true;
+        }
+#endif
     }
 
     if (must_close)
@@ -481,55 +481,55 @@ SEND_PROC:
         }
     }
 
-    if (num > 0)
+    if (num == 0)
     {
-        int send_len = writev(mFD, iov, num);
-        if (send_len > 0)
+        return;
+    }
+
+    int send_len = writev(mFD, iov, num);
+    if (send_len > 0)
+    {
+        int tmp_len = send_len;
+        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
-            int tmp_len = send_len;
-            for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+            pending_packet& b = *it;
+            if (b.left > tmp_len)
             {
-                pending_packet& b = *it;
-                if (b.left <= tmp_len)
-                {
-                    tmp_len -= b.left;
-                    if(b.mCompleteCallback != nullptr)
-                    {
-                        (*b.mCompleteCallback)();
-                    }
-                    it = mSendList.erase(it);
-                }
-                else
-                {
-                    b.left -= tmp_len;
-                    break;
-                }
+                b.left -= tmp_len;
+                break;
             }
 
-            if(send_len == ready_send_len)
+            tmp_len -= b.left;
+            if (b.mCompleteCallback != nullptr)
             {
-                if (!mSendList.empty())
-                {
-                    goto SEND_PROC;
-                }
+                (*b.mCompleteCallback)();
             }
-            else
+            it = mSendList.erase(it);
+        }
+
+        if (send_len == ready_send_len)
+        {
+            if (!mSendList.empty())
             {
-                mCanWrite = false;
-                must_close = !checkWrite();
+                goto SEND_PROC;
             }
         }
         else
         {
-            if (sErrno == S_EWOULDBLOCK)
-            {
-                mCanWrite = false;
-                must_close = !checkWrite();
-            }
-            else
-            {
-                must_close = true;
-            }
+            mCanWrite = false;
+            must_close = !checkWrite();
+        }
+    }
+    else
+    {
+        if (sErrno == S_EWOULDBLOCK)
+        {
+            mCanWrite = false;
+            must_close = !checkWrite();
+        }
+        else
+        {
+            must_close = true;
         }
     }
 
@@ -540,24 +540,25 @@ SEND_PROC:
 #endif
 }
 
-/*´¦Àí¶ÁÐ´Ê±µÃµ½ÍøÂç¶Ï¿ª(ÒÔ¼°Ç¿ÖÆ¶Ï¿ªÍøÂç)*/
 void DataSocket::procCloseInLoop()
 {
-    if (mFD != SOCKET_ERROR)
+    if (mFD == SOCKET_ERROR)
     {
-#ifdef PLATFORM_WINDOWS
-        if (mPostWriteCheck || mPostRecvCheck)  //Èç¹ûÍ¶µÝÁËIOCPÇëÇó£¬ÄÇÃ´ÐèÒªÍ¶µÝclose£¬¶ø²»ÄÜÖ±½Óµ÷ÓÃonClose
-        {
-            closeSocket();
-        }
-        else
-        {
-            onClose();
-        }
-#else
-        onClose();
-#endif
+        return;
     }
+
+#ifdef PLATFORM_WINDOWS
+    if (mPostWriteCheck || mPostRecvCheck)
+    {
+        closeSocket();
+    }
+    else
+    {
+        onClose();
+    }
+#else
+    onClose();
+#endif
 }
 
 void DataSocket::procShutdownInLoop()
@@ -573,22 +574,22 @@ void DataSocket::procShutdownInLoop()
     }
 }
 
-/*µ±ÊÕµ½ÍøÂç¶Ï¿ª(»òÕßIOCPÏÂÊÕµ½Ä£ÄâµÄ¶Ï¿ªÍ¨Öª)ºóµÄ´¦Àí(´Ëº¯ÊýÀïµÄÖ÷ÌåÂß¼­Ö»ÄÜ±»Ö´ÐÐÒ»´Î)*/
 void DataSocket::onClose()
 {
-    if (!mIsPostFinalClose)
+    if (mIsPostFinalClose)
     {
-        /*  Ê¹ÓÃpushAfterLoopProcÀ´Ö´ÐÐ¶Ï¿ª»Øµ÷,¿ÉÒÔ±£Ö¤Ëü×ÜÊÇÔÚÆäËû´ËDataSocketÏà¹ØµÄAfter CallbackÖ®ºóÖ´ÐÐ,½ø¶ø¿ÉÒÔ°²È«µÄdelete DataSocket¶ÔÏó   */
-        mEventLoop->pushAfterLoopProc([=](){
-            if (mDisConnectCallback != nullptr)
-            {
-                mDisConnectCallback(this);
-            }
-        });
-
-        closeSocket();
-        mIsPostFinalClose = true;
+        return;
     }
+
+    mEventLoop->pushAfterLoopProc([=]() {
+        if (mDisConnectCallback != nullptr)
+        {
+            mDisConnectCallback(this);
+        }
+    });
+
+    closeSocket();
+    mIsPostFinalClose = true;
 }
 
 void DataSocket::closeSocket()
@@ -608,20 +609,22 @@ bool    DataSocket::checkRead()
     static CHAR temp[] = { 0 };
     static WSABUF  in_buf = { 0, temp };
 
-    if (!mPostRecvCheck)
+    if (mPostRecvCheck)
     {
-        DWORD   dwBytes = 0;
-        DWORD   flag = 0;
-        int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
-        if (ret == -1)
-        {
-            check_ret = (sErrno == WSA_IO_PENDING);
-        }
+        return check_ret;
+    }
 
-        if (check_ret)
-        {
-            mPostRecvCheck = true;
-        }
+    DWORD   dwBytes = 0;
+    DWORD   flag = 0;
+    int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
+    if (ret == -1)
+    {
+        check_ret = (sErrno == WSA_IO_PENDING);
+    }
+
+    if (check_ret)
+    {
+        mPostRecvCheck = true;
     }
 #endif
     
@@ -634,19 +637,21 @@ bool    DataSocket::checkWrite()
 #ifdef PLATFORM_WINDOWS
     static WSABUF wsendbuf[1] = { {NULL, 0} };
 
-    if (!mPostWriteCheck)
+    if (mPostWriteCheck)
     {
-        DWORD send_len = 0;
-        int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
-        if (ret == -1)
-        {
-            check_ret = (sErrno == WSA_IO_PENDING);
-        }
+        return check_ret;
+    }
 
-        if (check_ret)
-        {
-            mPostWriteCheck = true;
-        }
+    DWORD send_len = 0;
+    int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
+    if (ret == -1)
+    {
+        check_ret = (sErrno == WSA_IO_PENDING);
+    }
+
+    if (check_ret)
+    {
+        mPostWriteCheck = true;
     }
 #else
     struct epoll_event ev = { 0, { 0 } };
@@ -728,22 +733,24 @@ void DataSocket::startPingCheckTimer()
 void DataSocket::setCheckTime(int overtime)
 {
     assert(mEventLoop->isInLoopThread());
-    if (mEventLoop->isInLoopThread())
+    if (!mEventLoop->isInLoopThread())
     {
-        if (overtime > 0)
-        {
-            mCheckTime = overtime;
-            startPingCheckTimer();
-        }
-        else if (overtime == -1)
-        {
-            if (mTimer.lock())
-            {
-                mTimer.lock()->cancel();
-            }
+        return;
+    }
 
-            mCheckTime = -1;
+    if (overtime > 0)
+    {
+        mCheckTime = overtime;
+        startPingCheckTimer();
+    }
+    else if (overtime == -1)
+    {
+        if (mTimer.lock())
+        {
+            mTimer.lock()->cancel();
         }
+
+        mCheckTime = -1;
     }
 }
 
@@ -759,18 +766,19 @@ void DataSocket::postDisConnect()
 
 void DataSocket::postShutdown()
 {
-    if (mEventLoop != nullptr)
+    if (mEventLoop == nullptr)
     {
-        mEventLoop->pushAsyncProc([=](){
-            if (mFD != SOCKET_ERROR)
-            {
-                /*  Ê¹ÓÃpushAfterLoopProcÊÇÒòÎª¾¡Á¿±£Ö¤ÔÚ´¦ÀíÍêsendÖ®ºóÔÙshutdown£¬ÕâÔÚÊµÏÖhttp serverÖÐºÜÖØÒª   */
-                mEventLoop->pushAfterLoopProc([=](){
-                    procShutdownInLoop();
-                });
-            }
-        });
+        return;
     }
+
+    mEventLoop->pushAsyncProc([=]() {
+        if (mFD != SOCKET_ERROR)
+        {
+            mEventLoop->pushAfterLoopProc([=]() {
+                procShutdownInLoop();
+            });
+        }
+    });
 }
 
 void DataSocket::setUD(std::any value)
@@ -881,7 +889,6 @@ void DataSocket::processSSLHandshake()
 
     if (mustClose)
     {
-        /*  ´¥·¢Ò»´ÎenterÔÙ´¥·¢close,ÉÏ²ã¿ÉÒÔdelete "this"£¬·½±ã×ÊÔ´¹ÜÀí    */
         if (mEnterCallback != nullptr)
         {
             mEnterCallback(this);

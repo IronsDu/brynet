@@ -8,6 +8,7 @@
 #include <brynet/net/http/HttpParser.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/http/WebSocketFormat.h>
+#include <brynet/net/ListenThread.h>
 
 namespace brynet
 {
@@ -20,6 +21,7 @@ namespace brynet
         public:
             typedef std::shared_ptr<HttpSession>    PTR;
 
+            typedef std::function < void(const HttpSession::PTR&) > ENTER_CALLBACK;
             typedef std::function < void(const HTTPParser&, const HttpSession::PTR&) > HTTPPARSER_CALLBACK;
             typedef std::function < void(const HttpSession::PTR&, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) > WS_CALLBACK;
 
@@ -51,10 +53,10 @@ namespace brynet
 
             TCPSession::PTR&        getSession();
 
-            HTTPPARSER_CALLBACK&    getHttpCallback();
-            CLOSE_CALLBACK&         getCloseCallback();
-            WS_CALLBACK&            getWSCallback();
-            WS_CONNECTED_CALLBACK&  getWSConnectedCallback();
+            const HTTPPARSER_CALLBACK&      getHttpCallback();
+            const CLOSE_CALLBACK&           getCloseCallback();
+            const WS_CALLBACK&              getWSCallback();
+            const WS_CONNECTED_CALLBACK&    getWSConnectedCallback();
 
         private:
             TCPSession::PTR         mSession;
@@ -67,36 +69,21 @@ namespace brynet
             friend class HttpService;
         };
 
-        class HttpService : public NonCopyable, public std::enable_shared_from_this<HttpService>
+        class HttpService
         {
         public:
-            typedef std::shared_ptr<HttpService> PTR;
-            typedef std::function < void(const HttpSession::PTR&) > ENTER_CALLBACK;
-
-        public:
-            static  PTR             Create();
-
-            void                    startWorkThread(size_t workthreadnum, TcpService::FRAME_CALLBACK callback = nullptr);
-            void                    startListen(bool isIPV6, const std::string& ip, int port, const char *certificate = nullptr, const char *privatekey = nullptr);
-
-            WrapTcpService::PTR		getService();
-            void                    setEnterCallback(ENTER_CALLBACK callback);
-            void                    addConnection(sock fd, 
-                                                    ENTER_CALLBACK enterCallback,
-                                                    HttpSession::HTTPPARSER_CALLBACK responseCallback,
-                                                    HttpSession::WS_CALLBACK wsCallback = nullptr,
-                                                    HttpSession::CLOSE_CALLBACK closeCallback = nullptr,
-                                                    HttpSession::WS_CONNECTED_CALLBACK wsConnectedCallback = nullptr);
-        private:
-            HttpService();
-            virtual ~HttpService();
-
-            void                    handleHttp(const HttpSession::PTR& httpSession);
+            static void setup(const TCPSession::PTR& session, const HttpSession::ENTER_CALLBACK& enterCallback);
+            static void handle(const HttpSession::PTR& httpSession);
 
         private:
-            ENTER_CALLBACK          mOnEnter;
-            WrapTcpService::PTR		mService;
-            ListenThread::PTR       mListenThread;
+            static size_t ProcessWebSocket(const char* buffer,
+                size_t len, 
+                const HTTPParser::PTR& httpParser,
+                const HttpSession::PTR& httpSession);
+            static size_t ProcessHttp(const char* buffer,
+                size_t len,
+                const HTTPParser::PTR& httpParser,
+                const HttpSession::PTR& httpSession);
         };
     }
 }

@@ -15,6 +15,7 @@ set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/WrapTCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/ListenThread.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/fdset.c
 )
 

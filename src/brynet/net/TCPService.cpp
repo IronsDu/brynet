@@ -1,171 +1,12 @@
 #include <iostream>
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
-
+#include <brynet/net/ListenThread.h>
 #include <brynet/net/TCPService.h>
 
-static unsigned int sDefaultLoopTimeOutMS = 100;
-
+const static unsigned int sDefaultLoopTimeOutMS = 100;
+using namespace brynet;
 using namespace brynet::net;
-
-ListenThread::PTR ListenThread::Create()
-{
-    struct make_shared_enabler : public ListenThread {};
-    return std::make_shared<make_shared_enabler>();
-}
-
-ListenThread::ListenThread() noexcept
-{
-    mIsIPV6 = false;
-    mAcceptCallback = nullptr;
-    mPort = 0;
-    mRunListen = false;
-#ifdef USE_OPENSSL
-    mOpenSSLCTX = nullptr;
-#endif
-}
-
-ListenThread::~ListenThread() noexcept
-{
-    closeListenThread();
-}
-
-void ListenThread::startListen(bool isIPV6, const std::string& ip, int port, const char *certificate, const char *privatekey, ACCEPT_CALLBACK callback)
-{
-    std::lock_guard<std::mutex> lck(mListenThreadGuard);
-
-    if (mListenThread == nullptr)
-    {
-        mIsIPV6 = isIPV6;
-        mRunListen = true;
-        mIP = ip;
-        mPort = port;
-        mAcceptCallback = callback;
-        if (certificate != nullptr)
-        {
-            mCertificate = certificate;
-        }
-        if (privatekey != nullptr)
-        {
-            mPrivatekey = privatekey;
-        }
-
-        mListenThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
-            shared_this->runListen();
-        });
-    }
-}
-
-void ListenThread::closeListenThread()
-{
-    std::lock_guard<std::mutex> lck(mListenThreadGuard);
-
-    if (mListenThread != nullptr)
-    {
-        mRunListen = false;
-
-        sock tmp = ox_socket_connect(mIsIPV6, mIP.c_str(), mPort);
-        ox_socket_close(tmp);
-        tmp = SOCKET_ERROR;
-
-        if (mListenThread->joinable())
-        {
-            mListenThread->join();
-        }
-        mListenThread = nullptr;
-    }
-}
-
-#ifdef USE_OPENSSL
-SSL_CTX* ListenThread::getOpenSSLCTX()
-{
-    return mOpenSSLCTX;
-}
-#endif
-
-void ListenThread::initSSL()
-{
-#ifdef USE_OPENSSL
-    mOpenSSLCTX = nullptr;
-
-    if (!mCertificate.empty() && !mPrivatekey.empty())
-    {
-        mOpenSSLCTX = SSL_CTX_new(SSLv23_server_method());
-        if (SSL_CTX_use_certificate_file(mOpenSSLCTX, mCertificate.c_str(), SSL_FILETYPE_PEM) <= 0) {
-            SSL_CTX_free(mOpenSSLCTX);
-            mOpenSSLCTX = nullptr;
-        }
-        /* 载入用户私钥 */
-        if (SSL_CTX_use_PrivateKey_file(mOpenSSLCTX, mPrivatekey.c_str(), SSL_FILETYPE_PEM) <= 0) {
-            SSL_CTX_free(mOpenSSLCTX);
-            mOpenSSLCTX = nullptr;
-        }
-        /* 检查用户私钥是否正确 */
-        if (!SSL_CTX_check_private_key(mOpenSSLCTX)) {
-            SSL_CTX_free(mOpenSSLCTX);
-            mOpenSSLCTX = nullptr;
-        }
-    }
-#endif
-}
-
-void ListenThread::destroySSL()
-{
-#ifdef USE_OPENSSL
-    if(mOpenSSLCTX != nullptr)
-    {
-        SSL_CTX_free(mOpenSSLCTX);
-        mOpenSSLCTX = nullptr;
-    }
-#endif
-}
-
-void ListenThread::runListen()
-{
-    sock client_fd = SOCKET_ERROR;
-    struct sockaddr_in socketaddress;
-    struct sockaddr_in6 ip6Addr;
-    socklen_t addrLen = sizeof(struct sockaddr);
-    sockaddr_in* pAddr = &socketaddress;
-
-    if (mIsIPV6)
-    {
-        addrLen = sizeof(ip6Addr);
-        pAddr = (sockaddr_in*)&ip6Addr;
-    }
-
-    sock listen_fd = ox_socket_listen(mIsIPV6, mIP.c_str(), mPort, 512);
-    initSSL();
-
-    if (SOCKET_ERROR != listen_fd)
-    {
-        printf("listen : %d \n", mPort);
-        for (; mRunListen;)
-        {
-            while ((client_fd = ox_socket_accept(listen_fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
-            {
-                if (EINTR == sErrno)
-                {
-                    continue;
-                }
-            }
-
-            if (SOCKET_ERROR != client_fd && mRunListen)
-            {
-                ox_socket_nodelay(client_fd);
-                ox_socket_setsdsize(client_fd, 32 * 1024);
-                mAcceptCallback(client_fd);
-            }
-        }
-
-        ox_socket_close(listen_fd);
-        listen_fd = SOCKET_ERROR;
-    }
-    else
-    {
-        printf("listen failed, error:%d \n", sErrno);
-    }
-}
 
 namespace brynet
 {
@@ -183,6 +24,47 @@ namespace brynet
 
             TcpService::SESSION_TYPE id;
         };
+
+        class IOLoopData : public brynet::NonCopyable, public std::enable_shared_from_this<IOLoopData>
+        {
+        public:
+            typedef std::shared_ptr<IOLoopData> PTR;
+
+        public:
+            static  PTR                         Create(EventLoop::PTR eventLoop, std::shared_ptr<std::thread> ioThread);
+
+        public:
+            void send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback);
+            const EventLoop::PTR&           getEventLoop() const;
+
+        private:
+            TypeIDS<DataSocket::PTR>&       getDataSockets();
+            std::shared_ptr<std::thread>&   getIOThread();
+            int                             incID();
+
+        private:
+            explicit IOLoopData(EventLoop::PTR eventLoop,
+                std::shared_ptr<std::thread> ioThread);
+
+        private:
+            const EventLoop::PTR            mEventLoop;
+            std::shared_ptr<std::thread>    mIOThread;
+
+            TypeIDS<DataSocket::PTR>        mDataSockets;
+            int                             incId;
+
+            friend class TcpService;
+        };
+
+        void IOLoopDataSend(const std::shared_ptr<IOLoopData>& ioLoopData, TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+        {
+            ioLoopData->send(id, packet, callback);
+        }
+
+        const EventLoop::PTR& IOLoopDataGetEventLoop(const std::shared_ptr<IOLoopData>& ioLoopData)
+        {
+            return ioLoopData->getEventLoop();
+        }
     }
 }
 
@@ -195,12 +77,11 @@ TcpService::TcpService() noexcept
     mDataCallback = nullptr;
 
     mRunIOLoop = false;
-    mListenThread = ListenThread::Create();
 }
 
 TcpService::~TcpService() noexcept
 {
-    closeService();
+    stopWorkerThread();
 }
 
 void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK callback)
@@ -233,60 +114,14 @@ const TcpService::DATA_CALLBACK& TcpService::getDataCallback() const
     return mDataCallback;
 }
 
-void TcpService::send(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback) const
+void TcpService::send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     union  SessionId sid;
     sid.id = id;
     auto ioLoopData = getIOLoopDataBySocketID(id);
     if (ioLoopData != nullptr)
     {
-        ioLoopData->send(id, std::move(packet), std::move(callback));
-    }
-}
-
-void TcpService::cacheSend(SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback)
-{
-    std::lock_guard<std::mutex> lock(mIOLoopGuard);
-
-    union  SessionId sid;
-    sid.id = id;
-    assert(sid.data.loopIndex < mIOLoopDatas.size());
-    if (sid.data.loopIndex < mIOLoopDatas.size())
-    {
-        mIOLoopDatas[sid.data.loopIndex]->getPacketList()->push_back(std::make_tuple(id, std::move(packet), std::move(callback)));
-    }
-}
-
-void TcpService::flushCachePackectList()
-{
-    std::lock_guard<std::mutex> lock(mIOLoopGuard);
-
-    for (const auto& ioLoopData : mIOLoopDatas)
-    {
-        if (!ioLoopData->getPacketList()->empty())
-        {
-            ioLoopData->getEventLoop()->pushAsyncProc([msgListCapture = std::move(ioLoopData->getPacketList()), shared_this = shared_from_this(), ioLoopDataCapture = ioLoopData](){
-                for (const auto& v : *msgListCapture)
-                {
-                    union  SessionId sid;
-                    sid.id = std::get<0>(v);
-                    DataSocket::PTR tmp = nullptr;
-                    if (ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp))
-                    {
-                        if (tmp != nullptr)
-                        {
-                            auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
-                            if (ud != nullptr && *ud == sid.id)
-                            {
-                                tmp->sendPacket(std::get<1>(v), std::get<2>(v));
-                            }
-                        }
-                    }
-                }
-                
-            });
-            ioLoopData->resetPacketList();
-        }
+        ioLoopData->send(id, packet, callback);
     }
 }
 
@@ -316,44 +151,25 @@ void TcpService::postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSo
     union  SessionId sid;
     sid.id = id;
     auto ioLoopData = getIOLoopDataBySocketID(id);
-    if (ioLoopData != nullptr)
+    if (ioLoopData == nullptr)
     {
-        const auto& eventLoop = ioLoopData->getEventLoop();
-        eventLoop->pushAsyncProc([callbackCapture = std::move(callback), sid, shared_this = shared_from_this(), ioLoopDataCapture = std::move(ioLoopData)](){
-            DataSocket::PTR tmp = nullptr;
-            if (callbackCapture != nullptr &&
-                ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp) &&
-                tmp != nullptr)
+        return;
+    }
+
+    const auto& eventLoop = ioLoopData->getEventLoop();
+    eventLoop->pushAsyncProc([callbackCapture = std::move(callback), sid, shared_this = shared_from_this(), ioLoopDataCapture = std::move(ioLoopData)](){
+        DataSocket::PTR tmp = nullptr;
+        if (callbackCapture != nullptr &&
+            ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp) &&
+            tmp != nullptr)
+        {
+            auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
+            if (ud != nullptr && *ud == sid.id)
             {
-                auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
-                if (ud != nullptr && *ud == sid.id)
-                {
-                    callbackCapture(tmp);
-                }
+                callbackCapture(tmp);
             }
-        });
-    }
-}
-
-void TcpService::closeService()
-{
-    closeListenThread();
-    closeWorkerThread();
-}
-
-void TcpService::closeListenThread()
-{
-    std::lock_guard<std::mutex> lck(mServiceGuard);
-
-    if (mListenThread != nullptr)
-    {
-        mListenThread->closeListenThread();
-    }
-}
-
-void TcpService::closeWorkerThread()
-{
-    stopWorkerThread();
+        }
+    });
 }
 
 void TcpService::stopWorkerThread()
@@ -374,60 +190,34 @@ void TcpService::stopWorkerThread()
     mIOLoopDatas.clear();
 }
 
-void TcpService::startListen(bool isIPV6, const std::string& ip, int port, int maxSessionRecvBufferSize, const char *certificate, const char *privatekey)
-{
-    std::lock_guard<std::mutex> lck(mServiceGuard);
-
-    mListenThread->startListen(isIPV6, ip, port, certificate, privatekey, [maxSessionRecvBufferSize, shared_this = shared_from_this()](sock fd){
-        std::string ip = ox_socket_getipoffd(fd);
-        auto channel = new DataSocket(fd, maxSessionRecvBufferSize);
-        bool ret = true;
-#ifdef USE_OPENSSL
-        if (mListenThread.getOpenSSLCTX() != nullptr)
-        {
-            ret = channel->initAcceptSSL(mListenThread.getOpenSSLCTX());
-        }
-#endif
-        if (ret)
-        {
-            ret = shared_this->helpAddChannel(channel, ip, shared_this->mEnterCallback, shared_this->mDisConnectCallback, shared_this->mDataCallback);
-        }
-        
-        if (!ret)
-        {
-            delete channel;
-            channel = nullptr;
-        }
-    });
-}
-
 void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
 {
     std::lock_guard<std::mutex> lck(mServiceGuard);
     std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
-    if (mIOLoopDatas.empty())
+    if (!mIOLoopDatas.empty())
     {
-        mRunIOLoop = true;
+        return;
+    }
 
-        mIOLoopDatas.resize(threadNum);
-        for (auto& v : mIOLoopDatas)
-        {
-            auto eventLoop = std::make_shared<EventLoop>();
-            v = IOLoopData::Create(eventLoop, std::make_shared<std::thread>([callback,
-                shared_this = shared_from_this(),
-                eventLoop]() {
-                while (shared_this->mRunIOLoop)
+    mRunIOLoop = true;
+
+    mIOLoopDatas.resize(threadNum);
+    for (auto& v : mIOLoopDatas)
+    {
+        auto eventLoop = std::make_shared<EventLoop>();
+        v = IOLoopData::Create(eventLoop, std::make_shared<std::thread>([callback,
+            shared_this = shared_from_this(),
+            eventLoop]() {
+            while (shared_this->mRunIOLoop)
+            {
+                eventLoop->loop(eventLoop->getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : eventLoop->getTimerMgr()->nearEndMs().count());
+                if (callback != nullptr)
                 {
-                    eventLoop->loop(eventLoop->getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : eventLoop->getTimerMgr()->nearEndMs().count());
-                    if (callback != nullptr)
-                    {
-                        callback(eventLoop);
-                    }
+                    callback(eventLoop);
                 }
-            }));
-            v->resetPacketList();
-        }
+            }
+        }));
     }
 }
 
@@ -606,13 +396,14 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
     return true;
 }
 
-bool TcpService::addDataSocket( sock fd,
-                                const TcpService::ENTER_CALLBACK& enterCallback,
-                                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
-                                const TcpService::DATA_CALLBACK& dataCallback,
-                                bool isUseSSL,
-                                size_t maxRecvBufferSize,
-                                bool forceSameThreadLoop)
+bool TcpService::addDataSocket(sock fd,
+    const std::shared_ptr<ListenThread>& listenThread,
+    const TcpService::ENTER_CALLBACK& enterCallback,
+    const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
+    const TcpService::DATA_CALLBACK& dataCallback,
+    bool isUseSSL,
+    size_t maxRecvBufferSize,
+    bool forceSameThreadLoop)
 {
     std::string ip = ox_socket_getipoffd(fd);
     DataSocket::PTR channel = nullptr;
@@ -621,7 +412,21 @@ bool TcpService::addDataSocket( sock fd,
     channel = new DataSocket(fd, maxRecvBufferSize);
     if (isUseSSL)
     {
-        ret = channel->initConnectSSL();
+        if (listenThread != nullptr)
+        {
+            if (listenThread.getOpenSSLCTX() != nullptr)
+            {
+                ret = channel->initAcceptSSL(listenThread.getOpenSSLCTX());
+            }
+            else
+            {
+                ret = false;
+            }
+        }
+        else
+        {
+            ret = channel->initConnectSSL();
+        }
     }
 #else
     bool ret = false;
@@ -673,16 +478,6 @@ const EventLoop::PTR& IOLoopData::getEventLoop() const
     return mEventLoop;
 }
 
-std::shared_ptr<IOLoopData::MSG_LIST>& IOLoopData::getPacketList()
-{
-    return cachePacketList;
-}
-
-void IOLoopData::resetPacketList()
-{
-    cachePacketList = std::make_shared<MSG_LIST>();
-}
-
 brynet::TypeIDS<DataSocket::PTR>& IOLoopData::getDataSockets()
 {
     return mDataSockets;
@@ -698,7 +493,7 @@ int IOLoopData::incID()
     return incId++;
 }
 
-void IOLoopData::send(TcpService::SESSION_TYPE id, DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback)
+void IOLoopData::send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     union  SessionId sid;
     sid.id = id;
@@ -712,13 +507,13 @@ void IOLoopData::send(TcpService::SESSION_TYPE id, DataSocket::PACKET_PTR packet
             auto ud = std::any_cast<TcpService::SESSION_TYPE>(&tmp->getUD());
             if (ud != nullptr && *ud == sid.id)
             {
-                tmp->sendPacketInLoop(std::move(packet), std::move(callback));
+                tmp->sendPacketInLoop(packet, callback);
             }
         }
     }
     else
     {
-        mEventLoop->pushAsyncProc([packetCapture = std::move(packet), callbackCapture = std::move(callback), sid, ioLoopDataCapture = shared_from_this()](){
+        mEventLoop->pushAsyncProc([packetCapture = packet, callbackCapture = callback, sid, ioLoopDataCapture = shared_from_this()](){
             DataSocket::PTR tmp = nullptr;
             if (ioLoopDataCapture->mDataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)
@@ -726,7 +521,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id, DataSocket::PACKET_PTR packet
                 auto ud = std::any_cast<TcpService::SESSION_TYPE>(&tmp->getUD());
                 if (ud != nullptr && *ud == sid.id)
                 {
-                    tmp->sendPacketInLoop(std::move(packetCapture), std::move(callbackCapture));
+                    tmp->sendPacketInLoop(packetCapture, callbackCapture);
                 }
             }
         });

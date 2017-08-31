@@ -44,6 +44,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < clietNum; i++)
     {
         int fd = ox_socket_connect(false, ip.c_str(), port);
+        ox_socket_setsdsize(fd, 32 * 1024);
         ox_socket_nodelay(fd);
 
         DataSocket::PTR datasSocket = new DataSocket(fd, 1024 * 1024);
@@ -120,7 +121,7 @@ int main(int argc, char** argv)
     auto now = std::chrono::steady_clock::now();
     while (true)
     {
-        clientEventLoop->loop(1000);
+        clientEventLoop->loop(10);
         if ((std::chrono::steady_clock::now() - now) >= std::chrono::seconds(1))
         {
             cout << "total recv:" << (TotalRecvSize / 1024) / 1024 << " M /s" << " , num " <<  TotalRecvPacketNum << endl;

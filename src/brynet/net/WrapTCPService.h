@@ -12,6 +12,7 @@ namespace brynet
     namespace net
     {
         class WrapTcpService;
+        class IOLoopData;
 
         /*  以智能指针对象为网络会话标识的网络服务   */
         class TCPSession : public NonCopyable
@@ -30,15 +31,14 @@ namespace brynet
             const std::string&      getIP() const;
             TcpService::SESSION_TYPE    getSocketID() const;
 
-            void                    send(const char* buffer, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr) const;
-            void                    send(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback = nullptr) const;
+            void                    send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
+            void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
             void                    postShutdown() const;
             void                    postClose() const;
 
             void                    setCloseCallback(CLOSE_CALLBACK callback);
             void                    setDataCallback(DATA_CALLBACK callback);
-            void                    setIOLoopData(std::shared_ptr<IOLoopData> ioLoopData);
             const EventLoop::PTR&   getEventLoop() const;
 
         private:
@@ -48,10 +48,11 @@ namespace brynet
             void                    setSocketID(TcpService::SESSION_TYPE id);
             void                    setIP(const std::string& ip);
 
-            void                    setService(TcpService::PTR& service);
+            void                    setIOLoopData(std::shared_ptr<IOLoopData> ioLoopData);
+            void                    setService(const TcpService::PTR& service);
 
-            CLOSE_CALLBACK&         getCloseCallback();
-            DATA_CALLBACK&          getDataCallback();
+            const CLOSE_CALLBACK&   getCloseCallback();
+            const DATA_CALLBACK&    getDataCallback();
 
             static  PTR             Create();
 
@@ -79,11 +80,14 @@ namespace brynet
             WrapTcpService() noexcept;
             virtual ~WrapTcpService() noexcept;
 
-            const TcpService::PTR&  getService() const;
             void                    startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback = nullptr);
+            void                    stopWorkThread();
+            
+            //TODO::改掉 ssl和listenThread的使用方式
             void                    addSession(sock fd, 
                                                 const SESSION_ENTER_CALLBACK& userEnterCallback, 
-                                                bool isUseSSL, 
+                                                bool isUseSSL,
+                                                const std::shared_ptr<ListenThread>& listenThread,
                                                 size_t maxRecvBufferSize, 
                                                 bool forceSameThreadLoop = false);
 

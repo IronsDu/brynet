@@ -35,14 +35,14 @@ TcpService::SESSION_TYPE TCPSession::getSocketID() const
     return mSocketID;
 }
 
-void TCPSession::send(const char* buffer, size_t len, DataSocket::PACKED_SENDED_CALLBACK callback) const
+void TCPSession::send(const char* buffer, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
-    mIoLoopData->send(mSocketID, DataSocket::makePacket(buffer, len), std::move(callback));
+    IOLoopDataSend(mIoLoopData, mSocketID, DataSocket::makePacket(buffer, len), callback);
 }
 
-void TCPSession::send(DataSocket::PACKET_PTR packet, DataSocket::PACKED_SENDED_CALLBACK callback) const
+void TCPSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
-    mIoLoopData->send(mSocketID, std::move(packet), std::move(callback));
+    IOLoopDataSend(mIoLoopData, mSocketID, packet, callback);
 }
 
 void TCPSession::postShutdown() const
@@ -72,7 +72,7 @@ void TCPSession::setIOLoopData(std::shared_ptr<IOLoopData> ioLoopData)
 
 const EventLoop::PTR& TCPSession::getEventLoop() const
 {
-    return mIoLoopData->getEventLoop();
+    return IOLoopDataGetEventLoop(mIoLoopData);
 }
 
 void TCPSession::setSocketID(TcpService::SESSION_TYPE id)
@@ -85,17 +85,17 @@ void TCPSession::setIP(const std::string& ip)
     mIP = ip;
 }
 
-void TCPSession::setService(TcpService::PTR& service)
+void TCPSession::setService(const TcpService::PTR& service)
 {
     mService = service;
 }
 
-TCPSession::CLOSE_CALLBACK& TCPSession::getCloseCallback()
+const TCPSession::CLOSE_CALLBACK& TCPSession::getCloseCallback()
 {
     return mCloseCallback;
 }
 
-TCPSession::DATA_CALLBACK& TCPSession::getDataCallback()
+const TCPSession::DATA_CALLBACK& TCPSession::getDataCallback()
 {
     return mDataCallback;
 }
@@ -113,11 +113,12 @@ WrapTcpService::WrapTcpService() noexcept
 
 WrapTcpService::~WrapTcpService() noexcept
 {
+    stopWorkThread();
 }
 
-const TcpService::PTR& WrapTcpService::getService() const
+void WrapTcpService::stopWorkThread()
 {
-    return mTCPService;
+    mTCPService->stopWorkerThread();
 }
 
 void WrapTcpService::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback)
@@ -125,7 +126,9 @@ void WrapTcpService::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBAC
     mTCPService->startWorkerThread(threadNum, callback);
 }
 
-void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL, size_t maxRecvBufferSize, bool forceSameThreadLoop)
+void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnterCallback, bool isUseSSL,
+    const std::shared_ptr<ListenThread>& listenThread,
+    size_t maxRecvBufferSize, bool forceSameThreadLoop)
 {
     auto tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);
@@ -141,7 +144,7 @@ void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnter
     };
 
     auto closeCallback = [tmpSession](TcpService::SESSION_TYPE id) mutable {
-        auto& callback = tmpSession->getCloseCallback();
+        const auto& callback = tmpSession->getCloseCallback();
         if (callback != nullptr)
         {
             callback(tmpSession);
@@ -149,7 +152,7 @@ void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnter
     };
 
     auto msgCallback = [tmpSession](TcpService::SESSION_TYPE id, const char* buffer, size_t len) mutable {
-        auto& callback = tmpSession->getDataCallback();
+        const auto& callback = tmpSession->getDataCallback();
         if (callback != nullptr)
         {
             return callback(tmpSession, buffer, len);
@@ -160,5 +163,5 @@ void WrapTcpService::addSession(sock fd, const SESSION_ENTER_CALLBACK& userEnter
         }
     };
 
-    mTCPService->addDataSocket(fd, enterCallback, closeCallback, msgCallback, isUseSSL, maxRecvBufferSize, forceSameThreadLoop);
+    mTCPService->addDataSocket(fd, listenThread, enterCallback, closeCallback, msgCallback, isUseSSL, maxRecvBufferSize, forceSameThreadLoop);
 }

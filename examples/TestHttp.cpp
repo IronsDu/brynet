@@ -14,57 +14,58 @@ using namespace brynet::net;
 
 int main(int argc, char **argv)
 {
-    auto server = HttpService::Create();
-
-    server->startListen(false, "0.0.0.0", 8080);
-    server->startWorkThread(ox_getcpunum());
-
     std::string body = "<html>hello world </html>";
 
-    server->setEnterCallback([=](const HttpSession::PTR& session){
-        session->setHttpCallback([=](const HTTPParser& httpParser, const HttpSession::PTR& session){
-            HttpResponse response;
-            response.setBody(body);
-            std::string result = response.getResult();
-            session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session](){
-                session->postShutdown();
-            }));
-        });
+    auto service = std::make_shared<WrapTcpService>();
+    service->startWorkThread(2);
+
+    auto listenThread = ListenThread::Create();
+    listenThread->startListen(false, "0.0.0.0", 8080, [service, body](sock fd) {
+        service->addSession(fd, [body](const TCPSession::PTR& session) {
+            HttpService::setup(session, [body](const HttpSession::PTR& httpSession) {
+                httpSession->setHttpCallback([body](const HTTPParser& httpParser, const HttpSession::PTR& session) {
+                    HttpResponse response;
+                    response.setBody(body);
+                    std::string result = response.getResult();
+                    session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session]() {
+                        session->postShutdown();
+                    }));
+                });
+            });
+        }, false, nullptr, 1024 * 1024, false);
     });
 
     std::cin.get();
 
     sock fd = ox_socket_connect(false, "192.168.12.128", 8080);
-    server->addConnection(fd, [](const HttpSession::PTR& session){
-        HttpRequest request;
-        HttpQueryParameter parameter;
-        parameter.add("value", "123456");
+    service->addSession(fd, [](const TCPSession::PTR& session) {
+        HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
+            HttpRequest request;
+            HttpQueryParameter parameter;
+            parameter.add("value", "123456");
 
-        if (false)
-        {
-            request.addHeadValue("Accept", "*/*");
-            request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_PUT);
-            request.setUrl("/v2/keys/asea/aagee");
-            request.setContentType("application/x-www-form-urlencoded");
-            request.setBody(parameter.getResult());
-        }
-        else
-        {
-            request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-            request.setUrl("/v2/keys/asea/aagee");
-            request.setQuery(parameter.getResult());
-        }
-        std::string requestStr = request.getResult();
-        session->send(requestStr.c_str(), requestStr.size());
-
-    }, [](const HTTPParser& httpParser, const HttpSession::PTR& session){
-        //http response handle
-        std::cout << httpParser.getBody() << std::endl;
-    }, [](const HttpSession::PTR& session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
-        //websocket frame handle
-    },[](const HttpSession::PTR&){
-        //ws connected handle
-    });
+            if (false)
+            {
+                request.addHeadValue("Accept", "*/*");
+                request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_PUT);
+                request.setUrl("/v2/keys/asea/aagee");
+                request.setContentType("application/x-www-form-urlencoded");
+                request.setBody(parameter.getResult());
+            }
+            else
+            {
+                request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
+                request.setUrl("/v2/keys/asea/aagee");
+                request.setQuery(parameter.getResult());
+            }
+            std::string requestStr = request.getResult();
+            httpSession->send(requestStr.c_str(), requestStr.size());
+            httpSession->setHttpCallback([](const HTTPParser& httpParser, const HttpSession::PTR& session) {
+                //http response handle
+                std::cout << httpParser.getBody() << std::endl;
+            });
+        });
+    }, false, nullptr, 1024*1024, false);
 
     std::cin.get();
 }

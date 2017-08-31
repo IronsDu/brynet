@@ -7,7 +7,6 @@
 #include <chrono>
 #include <vector>
 #include <atomic>
-#include <shared_mutex>
 
 #include <brynet/utils/packet.h>
 #include <brynet/utils/systemlib.h>
@@ -15,7 +14,8 @@
 
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/DataSocket.h>
-#include <brynet/net/TCPService.h>
+#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/ListenThread.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -26,39 +26,44 @@ std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
 std::atomic_llong  SendPacketNum = ATOMIC_VAR_INIT(0);
 std::atomic_llong  RecvPacketNum = ATOMIC_VAR_INIT(0);
 
-std::vector<TcpService::SESSION_TYPE> clients;
-std::shared_mutex clientGurad;
-TcpService::PTR service;
+std::vector<TCPSession::PTR> clients;
+WrapTcpService::PTR service;
 
-static void addClientID(TcpService::SESSION_TYPE id)
+static void addClientID(const TCPSession::PTR& session)
 {
-    std::unique_lock<std::shared_mutex> lock(clientGurad);
-    clients.push_back(id);
+    clients.push_back(session);
 }
 
-static void removeClientID(TcpService::SESSION_TYPE id)
+static void removeClientID(const TCPSession::PTR& session)
 {
-    std::unique_lock<std::shared_mutex> lock(clientGurad);
-    clients.erase(std::find(clients.begin(), clients.end(), id));
+    for (auto it = clients.begin(); it != clients.end(); ++it)
+    {
+        if ((*it)->getSocketID() == session->getSocketID())
+        {
+            clients.erase(it);
+            break;
+        }
+    }
 }
 
 static size_t getClientNum()
 {
-    std::shared_lock<std::shared_mutex> lock(clientGurad);
     return clients.size();
 }
 
-static void broadCastPacket(const TcpService::PTR& service, DataSocket::PACKET_PTR packet)
+static void broadCastPacket(const DataSocket::PACKET_PTR& packet)
 {
-    std::shared_lock<std::shared_mutex> lock(clientGurad);
     auto packetLen = packet->size();
     RecvPacketNum++;
     TotalRecvLen += packetLen;
-    std::for_each(clients.begin(), clients.end(), [&](TcpService::SESSION_TYPE id) {
-        service->send(id, packet);
-        SendPacketNum++;
-        TotalSendLen += packetLen;
-    });
+
+    for (const auto& session : clients)
+    {
+        session->send(packet);
+    }
+
+    SendPacketNum += clients.size();
+    TotalSendLen += (clients.size() * packetLen);
 }
 
 int main(int argc, char** argv)
@@ -72,64 +77,73 @@ int main(int argc, char** argv)
     int port = atoi(argv[1]);
     ox_socket_init();
 
-    service = TcpService::Create();
+    service = std::make_shared<WrapTcpService>();
     auto mainLoop = std::make_shared<EventLoop>();
-    
-    service->startListen(false, "0.0.0.0", port, 1024 * 1024, nullptr, nullptr);
-    service->startWorkerThread(2, [](EventLoop::PTR l){
-    });
+    auto listenThrean = ListenThread::Create();
 
-    service->setEnterCallback([](int64_t id, std::string ip){
-        addClientID(id);
-    });
+    listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](sock fd) {
+        ox_socket_nodelay(fd);
+        ox_socket_setsdsize(fd, 32 * 1024);
+        service->addSession(fd, [mainLoop](const TCPSession::PTR& session) {
+            mainLoop->pushAsyncProc([session]() {
+                addClientID(session);
+            });
 
-    service->setDisconnectCallback([](int64_t id){
-        removeClientID(id);
-    });
+            session->setCloseCallback([mainLoop](const TCPSession::PTR& session) {
+                mainLoop->pushAsyncProc([session]() {
+                    removeClientID(session);
+                });
+            });
 
-    service->setDataCallback([mainLoop](int64_t id, const char* buffer, size_t len){
-        const char* parseStr = buffer;
-        size_t totalProcLen = 0;
-        size_t leftLen = len;
+            session->setDataCallback([mainLoop](const TCPSession::PTR& session, const char* buffer, size_t len) {
+                const char* parseStr = buffer;
+                size_t totalProcLen = 0;
+                size_t leftLen = len;
 
-        while (true)
-        {
-            bool flag = false;
-            if (leftLen >= PACKET_HEAD_LEN)
-            {
-                ReadPacket rp(parseStr, leftLen);
-                PACKET_LEN_TYPE packet_len = rp.readPacketLen();
-                if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
+                while (true)
                 {
-                    mainLoop->pushAsyncProc([packet = DataSocket::makePacket(parseStr, packet_len)]() {
-                            broadCastPacket(service, std::move(packet));
-                    });
+                    bool flag = false;
+                    if (leftLen >= PACKET_HEAD_LEN)
+                    {
+                        ReadPacket rp(parseStr, leftLen);
+                        PACKET_LEN_TYPE packet_len = rp.readPacketLen();
+                        if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
+                        {
+                            mainLoop->pushAsyncProc([packet = DataSocket::makePacket(parseStr, packet_len)]() {
+                                broadCastPacket(packet);
+                            });
 
-                    totalProcLen += packet_len;
-                    parseStr += packet_len;
-                    leftLen -= packet_len;
-                    flag = true;
+                            totalProcLen += packet_len;
+                            parseStr += packet_len;
+                            leftLen -= packet_len;
+                            flag = true;
+                        }
+                        rp.skipAll();
+                    }
+
+                    if (!flag)
+                    {
+                        break;
+                    }
                 }
-                rp.skipAll();
-            }
 
-            if (!flag)
-            {
-                break;
-            }
-        }
-
-        return totalProcLen;
+                return totalProcLen;
+            });
+        }, false, listenThrean, 1024 * 1024, false);
     });
+
+    service->startWorkThread(2);
 
     auto now = std::chrono::steady_clock::now();
     while (true)
     {
-        mainLoop->loop(1000);
-        if ((std::chrono::steady_clock::now() - now) >= std::chrono::seconds(1))
+        mainLoop->loop(10);
+        auto diff = std::chrono::steady_clock::now() - now;
+        if (diff >= std::chrono::seconds(1))
         {
-            std::cout << "clientnum:" << getClientNum() << ", recv" << (TotalRecvLen / 1024) << " K/s, " << "num : " << RecvPacketNum << ", send " <<
-                (TotalSendLen / 1024) / 1024 << " M/s, " << " num: " << SendPacketNum << std::endl;
+            auto msDiff = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
+            std::cout << "cost " << msDiff << " ms, clientnum:" << getClientNum() << ", recv" << (TotalRecvLen / 1024) * 1000 / msDiff  << " K/s, " << "num : " << RecvPacketNum * 1000 / msDiff << ", send " <<
+                (TotalSendLen / 1024) / 1024 * 1000 / msDiff << " M/s, " << " num: " << SendPacketNum * 1000 / msDiff << std::endl;
             TotalRecvLen = 0;
             TotalSendLen = 0;
             RecvPacketNum = 0;
@@ -138,7 +152,7 @@ int main(int argc, char** argv)
         }
     }
 
-    service->closeService();
+    service->stopWorkThread();
 
     return 0;
 }

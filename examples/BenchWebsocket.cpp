@@ -33,36 +33,41 @@ static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
 
 int main(int argc, char **argv)
 {
-    auto server = HttpService::Create();
-
-    server->startWorkThread(ox_getcpunum());
+    auto service = std::make_shared<WrapTcpService>();
+    service->startWorkThread(ox_getcpunum());
 
     for (int i = 0; i < 200; i++)
     {
         sock fd = ox_socket_connect(false, "192.168.2.78", 8008);
-        server->addConnection(fd, [](const HttpSession::PTR& session){
-            HttpRequest request;
-            request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-            request.setUrl("/ws");
-            request.addHeadValue("Host", "192.168.2.78");
-            request.addHeadValue("Upgrade", "websocket");
-            request.addHeadValue("Connection", "Upgrade");
-            request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
-            request.addHeadValue("Sec-WebSocket-Version", "13");
+        ox_socket_nodelay(fd);
+        service->addSession(fd, [](const TCPSession::PTR& session) {
+            HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
+                HttpRequest request;
+                request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
+                request.setUrl("/ws");
+                request.addHeadValue("Host", "192.168.2.78");
+                request.addHeadValue("Upgrade", "websocket");
+                request.addHeadValue("Connection", "Upgrade");
+                request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
+                request.addHeadValue("Sec-WebSocket-Version", "13");
 
-            std::string requestStr = request.getResult();
-            session->send(requestStr.c_str(), requestStr.size());
-        }, [](const HTTPParser& httpParser, const HttpSession::PTR& session){
-        }, [](const HttpSession::PTR& session, WebSocketFormat::WebSocketFrameType, const std::string& payload){
-            sendPacket(session, "hello world", 10);
-            count += 1;
-        }, [](const HttpSession::PTR& session){
-        }, [](const HttpSession::PTR& session, const HTTPParser&){
-            for (int i = 0; i < 200; i++)
-            {
-                sendPacket(session, "hello world", 10);
-            }
-        });
+                std::string requestStr = request.getResult();
+                httpSession->send(requestStr.c_str(), requestStr.size());
+
+                httpSession->setWSConnected([](const HttpSession::PTR& session, const HTTPParser&) {
+                    for (int i = 0; i < 200; i++)
+                    {
+                        sendPacket(session, "hello world", 10);
+                    }
+                });
+
+                httpSession->setWSCallback([](const HttpSession::PTR& session,
+                    WebSocketFormat::WebSocketFrameType, const std::string& payload) {
+                    sendPacket(session, "hello world", 10);
+                    count += 1;
+                });
+            });
+        }, false, nullptr, 1024 * 1024, false);
     }
 
     brynet::net::EventLoop mainLoop;

@@ -7,6 +7,7 @@
 #include <brynet/net/WrapTCPService.h>
 #include <brynet/net/PromiseReceive.h>
 #include <brynet/net/http/HttpFormat.h>
+#include <brynet/net/ListenThread.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -22,7 +23,8 @@ int main(int argc, char **argv)
     auto server = std::make_shared<WrapTcpService>();
     auto listenThread = ListenThread::Create();
 
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), nullptr, nullptr, [=](int fd){
+    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](int fd){
+        ox_socket_nodelay(fd);
         server->addSession(fd, [](const TCPSession::PTR& session){
 
             auto promiseReceive = setupPromiseReceive(session);
@@ -51,7 +53,7 @@ int main(int argc, char **argv)
 
                 return false;
             });
-        }, false, 1024*1024);
+        }, false, nullptr, 1024*1024);
     });
 
     server->startWorkThread(atoi(argv[2]));
