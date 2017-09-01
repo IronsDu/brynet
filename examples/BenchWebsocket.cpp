@@ -41,12 +41,12 @@ int main(int argc, char **argv)
     const char* host = argv[1];
     int port = std::atoi(argv[2]);
     int connections = argc > 3 ? std::atoi(argv[3]) : 200;
-    size_t cpu_num = argc > 4 ? std::atoi(argv[4]) : ox_getcpunum();
+    size_t workers = argc > 4 ? std::atoi(argv[4]) : ox_getcpunum();
     
-    std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << cpu_num << std::endl;
+    std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << workers << std::endl;
     
     auto service = std::make_shared<WrapTcpService>();
-    service->startWorkThread(cpu_num);
+    service->startWorkThread(workers);
 
     for (int i = 0; i < connections; i++)
     {
