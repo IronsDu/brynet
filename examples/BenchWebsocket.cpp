@@ -20,10 +20,9 @@ static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
     char buff[1024];
     BasePacketWriter bw(buff, sizeof(buff), true, true);
     bw.writeINT8('{');
-    bw.writeINT32(len + 14);
-    bw.writeINT32(10000);
-    bw.writeINT32(0);
+    bw.writeBuffer("\"data\":\"", 8);
     bw.writeBuffer(data, len);
+    bw.writeINT8('"');
     bw.writeINT8('}');
 
     auto frame = std::make_shared<std::string>();
@@ -33,19 +32,32 @@ static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
 
 int main(int argc, char **argv)
 {
-    auto service = std::make_shared<WrapTcpService>();
-    service->startWorkThread(ox_getcpunum());
-
-    for (int i = 0; i < 200; i++)
+    if (argc < 3)
     {
-        sock fd = ox_socket_connect(false, "192.168.2.78", 8008);
+        std::cout << "./benchwebsocket host port [ connections workers ]";
+        return 1;
+    }
+    
+    const char* host = argv[1];
+    int port = std::atoi(argv[2]);
+    int connections = argc > 3 ? std::atoi(argv[3]) : 200;
+    size_t cpu_num = argc > 4 ? std::atoi(argv[4]) : ox_getcpunum();
+    
+    std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << cpu_num << std::endl;
+    
+    auto service = std::make_shared<WrapTcpService>();
+    service->startWorkThread(cpu_num);
+
+    for (int i = 0; i < connections; i++)
+    {
+        sock fd = ox_socket_connect(false, host, port);
         ox_socket_nodelay(fd);
-        service->addSession(fd, [](const TCPSession::PTR& session) {
-            HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
+        service->addSession(fd, [host](const TCPSession::PTR& session) {
+            HttpService::setup(session, [host](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
                 request.setUrl("/ws");
-                request.addHeadValue("Host", "192.168.2.78");
+                request.addHeadValue("Host", host);
                 request.addHeadValue("Upgrade", "websocket");
                 request.addHeadValue("Connection", "Upgrade");
                 request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
@@ -57,13 +69,13 @@ int main(int argc, char **argv)
                 httpSession->setWSConnected([](const HttpSession::PTR& session, const HTTPParser&) {
                     for (int i = 0; i < 200; i++)
                     {
-                        sendPacket(session, "hello world", 10);
+                        sendPacket(session, "hello, world!", 13);
                     }
                 });
 
                 httpSession->setWSCallback([](const HttpSession::PTR& session,
                     WebSocketFormat::WebSocketFrameType, const std::string& payload) {
-                    sendPacket(session, "hello world", 10);
+                    sendPacket(session, "hello, world!", 13);
                     count += 1;
                 });
             });
