@@ -26,7 +26,7 @@ namespace brynet
                 mPort = 0;
             }
 
-            AsyncConnectAddr(const char* ip, int port, std::chrono::milliseconds timeout, std::any ud) : mIP(ip), mPort(port), mTimeout(timeout), mUD(std::move(ud))
+            AsyncConnectAddr(const char* ip, int port, std::chrono::milliseconds timeout, BrynetAny ud) : mIP(ip), mPort(port), mTimeout(timeout), mUD(std::move(ud))
             {
             }
 
@@ -54,7 +54,7 @@ namespace brynet
             std::string         mIP;
             int                 mPort;
             std::chrono::milliseconds   mTimeout;
-            std::any            mUD;
+            BrynetAny           mUD;
         };
 
         class ConnectorWorkInfo final : public NonCopyable
@@ -77,7 +77,7 @@ namespace brynet
             {
                 std::chrono::steady_clock::time_point startConnectTime;
                 std::chrono::milliseconds     timeout;
-                std::any ud;
+                BrynetAny ud;
             };
 
             std::map<sock, ConnectingInfo>  mConnectingInfos;
@@ -316,7 +316,7 @@ void AsyncConnector::destroy()
 }
 
 //TODO::处理已经销毁了工作线程，再投递异步链接请求的问题（无限等待）
-void AsyncConnector::asyncConnect(const char* ip, int port, int ms, std::any ud)
+void AsyncConnector::asyncConnect(const char* ip, int port, int ms, BrynetAny ud)
 {
     mEventLoop.pushAsyncProc([shared_this = shared_from_this(), address = AsyncConnectAddr(ip, port, std::chrono::milliseconds(ms), ud)]() {
         shared_this->mWorkInfo->processConnect(address);

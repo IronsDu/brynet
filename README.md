@@ -83,45 +83,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 I suggest you use the second or thrid way above, because don't worry memory manager
 
 ## About RPC
-  Use this RPC library, you not need any proto file sush as Protobuf and Thrift, because i use C++ Template Generic Programming do this work.
-  
-  you can [click here](https://github.com/IronsDu/DServerFramework/blob/master/DDServerFramework/src/test/CenterServerExt.cpp) see example.
-  
-  The RPC support any C++ base type, sush as int、string、vector、map, and support Protobuf Message Type; Of course, RPC can use async callback mode, when you need process RPC reply msg return from server.
-  
-  On server side:
-```cpp
-static int add(int a, int b)
-{
-    return a + b;
-}
-
-static void addNoneRet(int a, int b, dodo::rpc::RpcRequestInfo reqInfo)
-{
-    // send reply when other async call completed
-    /*
-        auto caller = RpcServer::getRpcFromer();
-        redis->get("k", [caller, reqInfo](const std::string& value){
-            caller->reply(reqInfo, value);
-        });
-    */
-}
-
-void registerServices()
-{
-    RpcServer::def("add", add);
-    RpcServer::def("add", addNoneRet);
-}
-```
-
-On client side:
-
-```cpp
-rpcClient->call("add", 1, 2);
-rpcClient->call("add", 1, 2, [](int result) {
-    cout << result << endl;
-});
-```
+  moved to [DRPC](https://github.com/IronsDu/drpc)
 
 Examples
 ----------------------------

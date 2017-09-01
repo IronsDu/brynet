@@ -6,6 +6,7 @@
 
 #include <brynet/net/TCPService.h>
 #include <brynet/utils/NonCopyable.h>
+#include <brynet/net/Any.h>
 
 namespace brynet
 {
@@ -25,7 +26,7 @@ namespace brynet
             typedef std::function<size_t(const TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
         public:
-            const std::any&         getUD() const;
+            const BrynetAny&        getUD() const;
             void                    setUD(std::any ud);
 
             const std::string&      getIP() const;

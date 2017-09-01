@@ -163,7 +163,7 @@ void TcpService::postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSo
             ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp) &&
             tmp != nullptr)
         {
-            auto ud = std::any_cast<SESSION_TYPE>(&tmp->getUD());
+            auto ud = brynet::net::cast<SESSION_TYPE>(tmp->getUD());
             if (ud != nullptr && *ud == sid.id)
             {
                 callbackCapture(tmp);
@@ -309,7 +309,7 @@ TcpService::SESSION_TYPE TcpService::MakeID(size_t loopIndex, const std::shared_
 
 void TcpService::procDataSocketClose(DataSocket::PTR ds)
 {
-    auto ud = std::any_cast<SESSION_TYPE>(&ds->getUD());
+    auto ud = brynet::net::cast<SESSION_TYPE>(ds->getUD());
     if (ud != nullptr)
     {
         union SessionId sid;
@@ -504,7 +504,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR&
         if (mDataSockets.get(sid.data.index, tmp) &&
             tmp != nullptr)
         {
-            auto ud = std::any_cast<TcpService::SESSION_TYPE>(&tmp->getUD());
+            auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
             if (ud != nullptr && *ud == sid.id)
             {
                 tmp->sendPacketInLoop(packet, callback);
@@ -518,7 +518,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR&
             if (ioLoopDataCapture->mDataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)
             {
-                auto ud = std::any_cast<TcpService::SESSION_TYPE>(&tmp->getUD());
+                auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
                 if (ud != nullptr && *ud == sid.id)
                 {
                     tmp->sendPacketInLoop(packetCapture, callbackCapture);

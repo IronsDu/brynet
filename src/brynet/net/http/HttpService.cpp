@@ -21,12 +21,12 @@ TCPSession::PTR& HttpSession::getSession()
     return mSession;
 }
 
-const std::any& HttpSession::getUD() const
+const BrynetAny& HttpSession::getUD() const
 {
     return mUD;
 }
 
-void HttpSession::setUD(std::any ud)
+void HttpSession::setUD(BrynetAny ud)
 {
     mUD = ud;
 }

@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     server->startWorkThread(atoi(argv[3]));
 
     auto connector = AsyncConnector::Create();
-    connector->startThread([server, tmp](sock fd, const std::any& ud) {
+    connector->startThread([server, tmp](sock fd, const BrynetAny& ud) {
         std::cout << "connect success" << std::endl;
         ox_socket_nodelay(fd);
         server->addSession(fd, [tmp](const TCPSession::PTR& session) {
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
             });
             session->send(tmp.c_str(), tmp.size());
         }, false, nullptr, 1024 * 1024);
-    }, [](const std::any&) {
+    }, [](const BrynetAny&) {
         std::cout << "connect failed" << std::endl;
     });
 

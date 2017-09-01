@@ -3,11 +3,11 @@
 
 #include <functional>
 #include <memory>
-#include <any>
 
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/SocketLibTypes.h>
 #include <brynet/utils/NonCopyable.h>
+#include <brynet/net/Any.h>
 
 namespace brynet
 {
@@ -19,12 +19,12 @@ namespace brynet
         {
         public:
             typedef std::shared_ptr<AsyncConnector> PTR;
-            typedef std::function<void(sock, const std::any&)> COMPLETED_CALLBACK;
-            typedef std::function<void(const std::any&)> FAILED_CALLBACK;
+            typedef std::function<void(sock, const BrynetAny&)> COMPLETED_CALLBACK;
+            typedef std::function<void(const BrynetAny&)> FAILED_CALLBACK;
 
             void                startThread(COMPLETED_CALLBACK completedCallback, FAILED_CALLBACK failedCallback);
             void                destroy();
-            void                asyncConnect(const char* ip, int port, int ms, std::any ud);
+            void                asyncConnect(const char* ip, int port, int ms, BrynetAny ud);
 
             static  PTR         Create();
 

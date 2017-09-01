@@ -2,13 +2,13 @@
 #define BRYNET_NET_HTTPSERVICE_H_
 
 #include <memory>
-#include <any>
 
 #include <brynet/net/WrapTCPService.h>
 #include <brynet/net/http/HttpParser.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/http/WebSocketFormat.h>
 #include <brynet/net/ListenThread.h>
+#include <brynet/net/Any.h>
 
 namespace brynet
 {
@@ -40,8 +40,8 @@ namespace brynet
             void                    postShutdown() const;
             void                    postClose() const;
 
-            const std::any&         getUD() const;
-            void                    setUD(std::any);
+            const BrynetAny&        getUD() const;
+            void                    setUD(BrynetAny);
 
         protected:
             virtual ~HttpSession() = default;
@@ -60,7 +60,7 @@ namespace brynet
 
         private:
             TCPSession::PTR         mSession;
-            std::any                mUD;
+            BrynetAny               mUD;
             HTTPPARSER_CALLBACK     mHttpRequestCallback;
             WS_CALLBACK             mWSCallback;
             CLOSE_CALLBACK          mCloseCallback;
