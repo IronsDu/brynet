@@ -46,7 +46,8 @@ void upstepPollfd(struct fdset_s* self, int upSize)
 static
 struct pollfd* findPollfd(struct fdset_s* self, sock fd)
 {
-    for (int i = 0; i < self->nfds; i++)
+    int i = 0;
+    for (; i < self->nfds; i++)
     {
         if(self->pollFds[i].fd == fd)
         {
@@ -61,7 +62,8 @@ static
 void TryRemovePollFd(struct fdset_s* self, sock fd)
 {
     int pos = -1;
-    for (int i = 0; i < self->nfds; i++)
+    int i = 0;
+    for (; i < self->nfds; i++)
     {
         if(self->pollFds[i].fd == fd)
         {
@@ -193,7 +195,8 @@ ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type)
 {
     bool active = false;
 
-    for (int i = 0; i < self->nfds; i++)
+    int i = 0;
+    for (; i < self->nfds; i++)
     {
         struct pollfd* pf = self->pollFds + i;
         if (pf->fd == fd)

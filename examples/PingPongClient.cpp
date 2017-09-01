@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {
-        connector->asyncConnect(argv[1], atoi(argv[2]), 10000, nullptr);
+        connector->asyncConnect(argv[1], atoi(argv[2]), 10000, 0);
     }
 
     std::cin.get();

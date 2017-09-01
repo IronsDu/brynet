@@ -27,7 +27,7 @@ namespace brynet
 
         public:
             const BrynetAny&        getUD() const;
-            void                    setUD(std::any ud);
+            void                    setUD(BrynetAny ud);
 
             const std::string&      getIP() const;
             TcpService::SESSION_TYPE    getSocketID() const;
@@ -62,7 +62,7 @@ namespace brynet
             std::shared_ptr<IOLoopData> mIoLoopData;
             TcpService::SESSION_TYPE    mSocketID;
             std::string                 mIP;
-            std::any                    mUD;
+            BrynetAny                   mUD;
 
             CLOSE_CALLBACK              mCloseCallback;
             DATA_CALLBACK               mDataCallback;

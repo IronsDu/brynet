@@ -222,7 +222,6 @@ ox_socket_listen(bool isIPV6, const char* ip, int port, int back_num)
         }
     }
 
-    printf("error:%d\n", sErrno);
     return socketfd;
 }
 
