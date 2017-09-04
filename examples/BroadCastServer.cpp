@@ -84,6 +84,7 @@ int main(int argc, char** argv)
     listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](sock fd) {
         ox_socket_nodelay(fd);
         ox_socket_setsdsize(fd, 32 * 1024);
+        ox_socket_setrdsize(fd, 32 * 1024);
         service->addSession(fd, [mainLoop](const TCPSession::PTR& session) {
             mainLoop->pushAsyncProc([session]() {
                 addClientID(session);

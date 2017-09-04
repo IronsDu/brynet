@@ -26,7 +26,15 @@ namespace brynet
                 mPort = 0;
             }
 
-            AsyncConnectAddr(const char* ip, int port, std::chrono::milliseconds timeout, BrynetAny ud) : mIP(ip), mPort(port), mTimeout(timeout), mUD(std::move(ud))
+            AsyncConnectAddr(const char* ip, 
+                int port, 
+                std::chrono::milliseconds timeout, 
+                AsyncConnector::COMPLETED_CALLBACK successCB,
+                AsyncConnector::FAILED_CALLBACK failedCB) : mIP(ip),
+                mPort(port), 
+                mTimeout(timeout), 
+                mSuccessCB(successCB),
+                mFailedCB(failedCB)
             {
             }
 
@@ -40,9 +48,14 @@ namespace brynet
                 return mPort;
             }
 
-            const auto&         getUD() const
+            const auto&         getSuccessCB() const
             {
-                return mUD;
+                return mSuccessCB;
+            }
+
+            const auto&         getFailedCB() const
+            {
+                return mFailedCB;
             }
 
             auto                getTimeout() const
@@ -54,7 +67,8 @@ namespace brynet
             std::string         mIP;
             int                 mPort;
             std::chrono::milliseconds   mTimeout;
-            BrynetAny           mUD;
+            AsyncConnector::COMPLETED_CALLBACK mSuccessCB;
+            AsyncConnector::FAILED_CALLBACK mFailedCB;
         };
 
         class ConnectorWorkInfo final : public NonCopyable
@@ -62,7 +76,7 @@ namespace brynet
         public:
             typedef std::shared_ptr<ConnectorWorkInfo>    PTR;
 
-            ConnectorWorkInfo(AsyncConnector::COMPLETED_CALLBACK, AsyncConnector::FAILED_CALLBACK) noexcept;
+            ConnectorWorkInfo() noexcept;
 
             void                checkConnectStatus(int timeout);
             bool                isConnectSuccess(sock clientfd) const;
@@ -70,14 +84,13 @@ namespace brynet
             void                processConnect(AsyncConnectAddr);
 
         private:
-            AsyncConnector::COMPLETED_CALLBACK      mCompletedCallback;
-            AsyncConnector::FAILED_CALLBACK         mFailedCallback;
 
             struct ConnectingInfo
             {
                 std::chrono::steady_clock::time_point startConnectTime;
                 std::chrono::milliseconds     timeout;
-                BrynetAny ud;
+                AsyncConnector::COMPLETED_CALLBACK successCB;
+                AsyncConnector::FAILED_CALLBACK failedCB;
             };
 
             std::map<sock, ConnectingInfo>  mConnectingInfos;
@@ -96,9 +109,7 @@ namespace brynet
     }
 }
 
-ConnectorWorkInfo::ConnectorWorkInfo(AsyncConnector::COMPLETED_CALLBACK completedCallback,
-    AsyncConnector::FAILED_CALLBACK failedCallback) noexcept : 
-    mCompletedCallback(std::move(completedCallback)), mFailedCallback(std::move(failedCallback))
+ConnectorWorkInfo::ConnectorWorkInfo() noexcept
 {
     mFDSet.reset(ox_fdset_new());
 }
@@ -157,14 +168,17 @@ void ConnectorWorkInfo::checkConnectStatus(int timeout)
             if (failed_fds.find(fd) != failed_fds.end())
             {
                 ox_socket_close(fd);
-                if (mFailedCallback != nullptr)
+                if (it->second.failedCB != nullptr)
                 {
-                    mFailedCallback(it->second.ud);
+                    it->second.failedCB();
                 }
             }
             else
             {
-                mCompletedCallback(fd, it->second.ud);
+                if (it->second.successCB != nullptr)
+                {
+                    it->second.successCB(fd);
+                }
             }
 
             mConnectingInfos.erase(it);
@@ -186,7 +200,7 @@ void ConnectorWorkInfo::checkTimeout()
         }
 
         auto fd = it->first;
-        auto uid = it->second.ud;
+        auto cb = it->second.failedCB;
 
         ox_fdset_del(mFDSet.get(), fd, WriteCheck | ErrorCheck);
 
@@ -194,9 +208,9 @@ void ConnectorWorkInfo::checkTimeout()
         mConnectingInfos.erase(it++);
 
         ox_socket_close(fd);
-        if (mFailedCallback != nullptr)
+        if (cb != nullptr)
         {
-            mFailedCallback(uid);
+            cb();
         }
     }
 }
@@ -238,7 +252,8 @@ void ConnectorWorkInfo::processConnect(AsyncConnectAddr addr)
             {
                 ConnectingInfo ci;
                 ci.startConnectTime = std::chrono::steady_clock::now();
-                ci.ud = addr.getUD();
+                ci.successCB = addr.getSuccessCB();
+                ci.failedCB = addr.getFailedCB();
                 ci.timeout = addr.getTimeout();
 
                 mConnectingInfos[clientfd] = ci;
@@ -256,13 +271,16 @@ void ConnectorWorkInfo::processConnect(AsyncConnectAddr addr)
 
     if (connectSuccess)
     {
-        mCompletedCallback(clientfd, addr.getUD());
+        if (addr.getSuccessCB() != nullptr)
+        {
+            addr.getSuccessCB()(clientfd);
+        }
     }
     else
     {
-        if (!addToFDSet && mFailedCallback != nullptr)
+        if (!addToFDSet && addr.getFailedCB() != nullptr)
         {
-            mFailedCallback(addr.getUD());
+            addr.getFailedCB()();
         }
     }
 }
@@ -287,13 +305,13 @@ void AsyncConnector::run()
     }
 }
 
-void AsyncConnector::startThread(COMPLETED_CALLBACK completedCallback, FAILED_CALLBACK failedCallback)
+void AsyncConnector::startThread()
 {
     std::lock_guard<std::mutex> lck(mThreadGuard);
     if (mThread == nullptr)
     {
         mIsRun = true;
-        mWorkInfo = std::make_shared<ConnectorWorkInfo>(std::move(completedCallback), std::move(failedCallback));
+        mWorkInfo = std::make_shared<ConnectorWorkInfo>();
         mThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
             shared_this->run();
         });
@@ -316,9 +334,12 @@ void AsyncConnector::destroy()
 }
 
 //TODO::处理已经销毁了工作线程，再投递异步链接请求的问题（无限等待）
-void AsyncConnector::asyncConnect(const char* ip, int port, int ms, BrynetAny ud)
+void AsyncConnector::asyncConnect(const char* ip, int port, int ms, COMPLETED_CALLBACK successCB, FAILED_CALLBACK failedCB)
 {
-    mEventLoop.pushAsyncProc([shared_this = shared_from_this(), address = AsyncConnectAddr(ip, port, std::chrono::milliseconds(ms), ud)]() {
+    mEventLoop.pushAsyncProc([shared_this = shared_from_this(), 
+        address = AsyncConnectAddr(ip, port, std::chrono::milliseconds(ms), 
+            successCB, 
+            failedCB)]() {
         shared_this->mWorkInfo->processConnect(address);
     });
 }

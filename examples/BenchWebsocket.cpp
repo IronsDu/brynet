@@ -75,6 +75,7 @@ int main(int argc, char **argv)
 
                 httpSession->setWSCallback([](const HttpSession::PTR& session,
                     WebSocketFormat::WebSocketFrameType, const std::string& payload) {
+                    std::cout << payload << std::endl;
                     sendPacket(session, "hello, world!", 13);
                     count += 1;
                 });

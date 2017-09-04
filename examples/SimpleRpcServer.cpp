@@ -1,18 +1,20 @@
 #include <iostream>
 #include <string>
 
-#include "SocketLibFunction.h"
-#include "HttpServer.h"
-#include "HttpFormat.h"
-#include "WebSocketFormat.h"
+#include <brynet/net/SocketLibFunction.h>
+#include <brynet/net/http/HttpService.h>
+#include <brynet/net/http/HttpFormat.h>
+#include <brynet/net/http/WebSocketFormat.h>  
+#include <brynet/net/WrapTCPService.h>
+#include <brynet/utils/systemlib.h>
+
 #include "google/protobuf/service.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/util/json_util.h"
 #include "echo_service.pb.h"
-#include "WrapTCPService.h"
 
-using namespace dodo;
-using namespace dodo::net;
+using namespace brynet;
+using namespace brynet::net;
 
 class TypeService
 {
@@ -114,45 +116,53 @@ private:
     bool                        mValid;
 };
 
-static void processHTTPRPCRequest(RPCServiceMgr::PTR rpcServiceMgr, HttpSession::PTR session, const std::string & serviceName, const std::string& methodName, const std::string& body)
+static void processHTTPRPCRequest(RPCServiceMgr::PTR rpcServiceMgr, 
+    HttpSession::PTR session, 
+    const std::string & serviceName, 
+    const std::string& methodName, 
+    const std::string& body)
 {
     auto typeService = rpcServiceMgr->findService(serviceName);
-    if (typeService != nullptr)
+    if (typeService == nullptr)
     {
-        auto method = typeService->findMethod(methodName);
-        if (method != nullptr)
-        {
-            auto requestMsg = typeService->getService()->GetRequestPrototype(method).New();
-            requestMsg->ParseFromArray(body.c_str(), body.size());
-
-            auto responseMsg = typeService->getService()->GetResponsePrototype(method).New();
-
-            auto clouse = new MyClosure([=](){
-                //将结果通过HTTP协议返回给客户端
-                //TODO::delete clouse
-
-                std::string jsonMsg;
-                google::protobuf::util::MessageToJsonString(*responseMsg, &jsonMsg);
-
-                HttpResponse httpResponse;
-                httpResponse.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
-                httpResponse.setContentType("application/json");
-                httpResponse.setBody(jsonMsg.c_str());
-
-                auto result = httpResponse.getResult();
-                session->send(result.c_str(), result.size(), nullptr);
-
-                /*  TODO::不断开连接,由可信客户端主动断开,或者底层开始心跳检测(断开恶意连接) */
-                session->postShutdown();
-
-                delete requestMsg;
-                delete responseMsg;
-            });
-
-            //TODO::support controller(超时以及错误处理)
-            typeService->getService()->CallMethod(method, nullptr, requestMsg, responseMsg, clouse);
-        }
+        return;
     }
+
+    auto method = typeService->findMethod(methodName);
+    if (method == nullptr)
+    {
+        return;
+    }
+
+    auto requestMsg = typeService->getService()->GetRequestPrototype(method).New();
+    requestMsg->ParseFromArray(body.c_str(), body.size());
+
+    auto responseMsg = typeService->getService()->GetResponsePrototype(method).New();
+
+    auto clouse = new MyClosure([=]() {
+        //将结果通过HTTP协议返回给客户端
+        //TODO::delete clouse
+
+        std::string jsonMsg;
+        google::protobuf::util::MessageToJsonString(*responseMsg, &jsonMsg);
+
+        HttpResponse httpResponse;
+        httpResponse.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
+        httpResponse.setContentType("application/json");
+        httpResponse.setBody(jsonMsg.c_str());
+
+        auto result = httpResponse.getResult();
+        session->send(result.c_str(), result.size(), nullptr);
+
+        /*  TODO::不断开连接,由可信客户端主动断开,或者底层开始心跳检测(断开恶意连接) */
+        session->postShutdown();
+
+        delete requestMsg;
+        delete responseMsg;
+    });
+
+    //TODO::support controller(超时以及错误处理)
+    typeService->getService()->CallMethod(method, nullptr, requestMsg, responseMsg, clouse);
 }
 
 //  实现Echo服务
@@ -183,26 +193,29 @@ int main(int argc, char **argv)
     RPCServiceMgr::PTR rpcServiceMgr = std::make_shared<RPCServiceMgr>();
     rpcServiceMgr->registerService(std::make_shared<MyEchoService>());
 
-    HttpServer server;
+    auto tcpService = std::make_shared<WrapTcpService> ();
+    tcpService->startWorkThread(ox_getcpunum());
 
-    server.startListen(false, "0.0.0.0", 8080);
-    server.startWorkThread(ox_getcpunum());
+    auto listenThread = ListenThread::Create();
+    listenThread->startListen(false, "0.0.0.0", 8080, [tcpService, rpcServiceMgr](sock fd) {
+        tcpService->addSession(fd, [rpcServiceMgr](const TCPSession::PTR& session) {
+            HttpService::setup(session, [rpcServiceMgr](const HttpSession::PTR& httpSession) {
+                httpSession->setHttpCallback([=](const HTTPParser& httpParser, HttpSession::PTR session) {
+                    auto queryPath = httpParser.getPath();
+                    std::string::size_type pos = queryPath.rfind('.');
+                    if (pos != std::string::npos)
+                    {
+                        auto serviceName = queryPath.substr(1, pos - 1);
+                        auto methodName = queryPath.substr(pos + 1);
+                        processHTTPRPCRequest(rpcServiceMgr, session, serviceName, methodName, httpParser.getBody());
+                    }
+                });
 
-    server.setEnterCallback([=](HttpSession::PTR& session){
-        session->setHttpCallback([=](const HTTPParser& httpParser, HttpSession::PTR session){
-            auto queryPath = httpParser.getPath();
-            std::string::size_type pos = queryPath.rfind('.');
-            if (pos != std::string::npos)
-            {
-                auto serviceName = queryPath.substr(1, pos - 1);
-                auto methodName = queryPath.substr(pos + 1);
-                processHTTPRPCRequest(rpcServiceMgr, session, serviceName, methodName, httpParser.getBody());
-            }
-        });
-
-        session->setWSCallback([=](HttpSession::PTR session, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload){
-            //TODO::support websocket协议,payload和二进制协议一样
-        });
+                httpSession->setWSCallback([=](HttpSession::PTR session, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) {
+                    //TODO::support websocket协议,payload和二进制协议一样
+                });
+            });
+        }, false, nullptr, 1024 * 1024);
     });
 
     std::cin.get();

@@ -42,6 +42,8 @@ namespace brynet
             void                    setDataCallback(DATA_CALLBACK callback);
             const EventLoop::PTR&   getEventLoop() const;
 
+            void                    setPingCheckTime(int ms);
+
         private:
             TCPSession() noexcept;
             virtual ~TCPSession() noexcept;

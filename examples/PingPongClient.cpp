@@ -22,23 +22,23 @@ int main(int argc, char **argv)
     server->startWorkThread(atoi(argv[3]));
 
     auto connector = AsyncConnector::Create();
-    connector->startThread([server, tmp](sock fd, const BrynetAny& ud) {
-        std::cout << "connect success" << std::endl;
-        ox_socket_nodelay(fd);
-        server->addSession(fd, [tmp](const TCPSession::PTR& session) {
-            session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
-                session->send(buffer, len);
-                return len;
-            });
-            session->send(tmp.c_str(), tmp.size());
-        }, false, nullptr, 1024 * 1024);
-    }, [](const BrynetAny&) {
-        std::cout << "connect failed" << std::endl;
-    });
+    connector->startThread();
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {
-        connector->asyncConnect(argv[1], atoi(argv[2]), 10000, 0);
+        connector->asyncConnect(argv[1], atoi(argv[2]), 10000, [server, tmp](sock fd) {
+            std::cout << "connect success" << std::endl;
+            ox_socket_nodelay(fd);
+            server->addSession(fd, [tmp](const TCPSession::PTR& session) {
+                session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
+                    session->send(buffer, len);
+                    return len;
+                });
+                session->send(tmp.c_str(), tmp.size());
+            }, false, nullptr, 1024 * 1024);
+        }, []() {
+            std::cout << "connect failed" << std::endl;
+        });
     }
 
     std::cin.get();

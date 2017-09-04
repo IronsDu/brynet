@@ -91,8 +91,9 @@ Examples
 * [PingPongClient](https://github.com/IronsDu/dodo/blob/master/examples/PingPongClient.cpp)
 * [BroadCastServer](https://github.com/IronsDu/dodo/blob/master/examples/BroadCastServer.cpp)
 * [BroadCastClient](https://github.com/IronsDu/dodo/blob/master/examples/BroadCastClient.cpp)
-* [SimpleHttpServer](https://github.com/IronsDu/dodo/blob/master/examples/TestHttp.cpp) show how to start http service and request http
-* [BenchWebsocket](https://github.com/IronsDu/dodo/blob/master/examples/BenchWebsocket.cpp) benchmark websocket server
+* [SimpleHttpServer](https://github.com/IronsDu/dodo/blob/master/examples/TestHttp.cpp) show how to start http/ws service and request http
+* [BenchWebsocket](https://github.com/IronsDu/dodo/blob/master/examples/BenchWebsocket.cpp) benchmark websocket client
+* [PromiseReceive](https://github.com/IronsDu/brynet/blob/master/examples/TestPromiseReceive.cpp) use the promise style receive http response
 * [WebSocketProxy](https://github.com/IronsDu/dodo/blob/master/examples/WebBinaryProxy.cpp) one proxy server between websocket client and binary protocol server
 * [SimpleRpcServer](https://github.com/IronsDu/dodo/blob/master/examples/SimpleRpcServer.cpp) rpc server use http and protobuf
 * more examples please see [examples](https://github.com/IronsDu/dodo/tree/master/examples);

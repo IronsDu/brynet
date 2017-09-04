@@ -19,12 +19,12 @@ namespace brynet
         {
         public:
             typedef std::shared_ptr<AsyncConnector> PTR;
-            typedef std::function<void(sock, const BrynetAny&)> COMPLETED_CALLBACK;
-            typedef std::function<void(const BrynetAny&)> FAILED_CALLBACK;
+            typedef std::function<void(sock)> COMPLETED_CALLBACK;
+            typedef std::function<void()> FAILED_CALLBACK;
 
-            void                startThread(COMPLETED_CALLBACK completedCallback, FAILED_CALLBACK failedCallback);
+            void                startThread();
             void                destroy();
-            void                asyncConnect(const char* ip, int port, int ms, BrynetAny ud);
+            void                asyncConnect(const char* ip, int port, int ms, COMPLETED_CALLBACK, FAILED_CALLBACK);
 
             static  PTR         Create();
 

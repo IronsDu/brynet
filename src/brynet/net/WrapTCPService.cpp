@@ -75,6 +75,11 @@ const EventLoop::PTR& TCPSession::getEventLoop() const
     return IOLoopDataGetEventLoop(mIoLoopData);
 }
 
+void TCPSession::setPingCheckTime(int ms)
+{
+    mService->setPingCheckTime(mSocketID, ms);
+}
+
 void TCPSession::setSocketID(TcpService::SESSION_TYPE id)
 {
     mSocketID = id;

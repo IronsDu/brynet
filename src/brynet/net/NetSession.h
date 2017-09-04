@@ -54,14 +54,14 @@ public:
         mSession->postClose();
     }
 
-    void            sendPacket(const char* data, size_t len, brynet::net::DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
+    void            sendPacket(const char* data, size_t len, const brynet::net::DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
     {
-        mSession->send(brynet::net::DataSocket::makePacket(data, len), std::move(callback));
+        mSession->send(brynet::net::DataSocket::makePacket(data, len), callback);
     }
 
-    void            sendPacket(brynet::net::DataSocket::PACKET_PTR packet, brynet::net::DataSocket::PACKED_SENDED_CALLBACK callback = nullptr)
+    void            sendPacket(const brynet::net::DataSocket::PACKET_PTR& packet, const brynet::net::DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
     {
-        mSession->send(std::move(packet), std::move(callback));
+        mSession->send(packet, callback);
     }
 
     const auto&      getEventLoop()
