@@ -23,7 +23,9 @@ namespace brynet
 
             typedef std::function < void(const HttpSession::PTR&) > ENTER_CALLBACK;
             typedef std::function < void(const HTTPParser&, const HttpSession::PTR&) > HTTPPARSER_CALLBACK;
-            typedef std::function < void(const HttpSession::PTR&, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) > WS_CALLBACK;
+            typedef std::function < void(const HttpSession::PTR&, 
+                                        WebSocketFormat::WebSocketFrameType opcode, 
+                                        const std::string& payload) > WS_CALLBACK;
 
             typedef std::function < void(const HttpSession::PTR&) > CLOSE_CALLBACK;
             typedef std::function < void(const HttpSession::PTR&, const HTTPParser&) > WS_CONNECTED_CALLBACK;
@@ -34,8 +36,11 @@ namespace brynet
             void                    setWSCallback(WS_CALLBACK callback);
             void                    setWSConnected(WS_CONNECTED_CALLBACK callback);
 
-            void                    send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                    send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                    send(const DataSocket::PACKET_PTR& packet, 
+                                         const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                    send(const char* packet, 
+                                         size_t len, 
+                                         const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr);
 
             void                    postShutdown() const;
             void                    postClose() const;

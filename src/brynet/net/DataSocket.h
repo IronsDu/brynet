@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <deque>
+#include <chrono>
 
 #include <brynet/net/Channel.h>
 #include <brynet/net/EventLoop.h>
@@ -59,8 +60,8 @@ namespace brynet
             void                            setDataCallback(DATA_CALLBACK cb);
             void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
-            /*  设置心跳检测时间,overtime为-1表示不检测   */
-            void                            setCheckTime(int overtime);
+            /*  设置心跳检测时间,overtime为zero表示取消心跳检测   */
+            void                            setCheckTime(std::chrono::nanoseconds checkTime);
             /*  主动(投递)断开连接,如果成功主动断开(表明底层没有先触发被动断开)则会触发断开回调  */
             void                            postDisConnect();
             void                            postShutdown();
@@ -149,7 +150,7 @@ namespace brynet
 #endif
 
             bool                            mRecvData;
-            int                             mCheckTime;
+            std::chrono::nanoseconds        mCheckTime;
             Timer::WeakPtr                  mTimer;
         };
     }

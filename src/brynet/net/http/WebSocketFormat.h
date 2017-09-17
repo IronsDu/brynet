@@ -47,7 +47,12 @@ namespace brynet
                 return response;
             }
 
-            static bool wsFrameBuild(const char* payload, size_t payloadLen, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool isFin = true, bool masking = false)
+            static bool wsFrameBuild(const char* payload, 
+                size_t payloadLen, 
+                std::string& frame, 
+                WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, 
+                bool isFin = true, 
+                bool masking = false)
             {
                 static_assert(std::is_same<std::string::value_type, char>::value, "");
 
@@ -56,16 +61,22 @@ namespace brynet
                 frame.clear();
                 frame.push_back((char)head);
                 if (payloadLen <= 125)
-                    frame.push_back((uint8_t)payloadLen); // mask << 7 | payloadLen, mask = 0
+                {
+                    // mask << 7 | payloadLen, mask = 0
+                    frame.push_back((uint8_t)payloadLen);
+                }
                 else if (payloadLen <= 0xFFFF)
                 {
-                    frame.push_back(126);                       // 126 + 16bit len
+                    // 126 + 16bit len
+                    frame.push_back(126);                       
                     frame.push_back((payloadLen & 0xFF00) >> 8);
                     frame.push_back(payloadLen & 0x00FF);
                 }
                 else
-                {                                               // 127 + 64bit len
-                    frame.push_back(127);                       // assume payload len is less than u_int32_max
+                {                                               
+                    // 127 + 64bit len
+                    frame.push_back(127);                       
+                    // assume payload len is less than u_int32_max
                     frame.push_back(0x00);
                     frame.push_back(0x00);
                     frame.push_back(0x00);
@@ -101,12 +112,21 @@ namespace brynet
                 return true;
             }
 
-            static bool wsFrameBuild(const std::string& payload, std::string& frame, WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, bool isFin = true, bool masking = false)
+            static bool wsFrameBuild(const std::string& payload, 
+                std::string& frame, 
+                WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME, 
+                bool isFin = true, 
+                bool masking = false)
             {
                 return wsFrameBuild(payload.c_str(), payload.size(), frame, frame_type, isFin, masking);
             }
 
-            static bool wsFrameExtractBuffer(const char* inbuffer, const size_t bufferSize, std::string& payload, WebSocketFrameType& outopcode, size_t& frameSize, bool& outfin)
+            static bool wsFrameExtractBuffer(const char* inbuffer, 
+                const size_t bufferSize, 
+                std::string& payload, 
+                WebSocketFrameType& outopcode, 
+                size_t& frameSize, 
+                bool& outfin)
             {
                 const unsigned char* buffer = (const unsigned char*)inbuffer;
 
@@ -190,7 +210,10 @@ namespace brynet
                 return true;
             }
 
-            static bool wsFrameExtractString(const std::string& buffer, std::string& payload, WebSocketFrameType& opcode, size_t& frameSize, bool& isFin)
+            static bool wsFrameExtractString(const std::string& buffer, 
+                std::string& payload, 
+                WebSocketFrameType& opcode, 
+                size_t& frameSize, bool& isFin)
             {
                 return wsFrameExtractBuffer(buffer.c_str(), buffer.size(), payload, opcode, frameSize, isFin);
             }

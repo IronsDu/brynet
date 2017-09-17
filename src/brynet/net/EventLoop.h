@@ -52,7 +52,7 @@ namespace brynet
             virtual ~EventLoop() noexcept;
 
             /*  timeout单位为毫秒    */
-            void                            loop(int64_t timeout);
+            void                            loop(int64_t milliseconds);
 
             bool                            wakeup();
 
@@ -100,14 +100,18 @@ namespace brynet
             std::atomic_bool                mIsAlreadyPostWakeup;
 
             std::mutex                      mAsyncProcsMutex;
-            std::vector<USER_PROC>          mAsyncProcs;                /*  投递到此eventloop的异步function队列    */
+            /*  投递到此eventloop的异步function队列    */
+            std::vector<USER_PROC>          mAsyncProcs;                
             std::vector<USER_PROC>          mCopyAsyncProcs;
 
-            std::vector<USER_PROC>          mAfterLoopProcs;            /*  eventloop每次循环的末尾要执行的一系列函数   */
-            std::vector<USER_PROC>          mCopyAfterLoopProcs;        /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
+            /*  eventloop每次循环的末尾要执行的一系列函数   */
+            std::vector<USER_PROC>          mAfterLoopProcs; 
+            /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
+            std::vector<USER_PROC>          mCopyAfterLoopProcs;        
 
+            /*  调用loop函数所在thread的id */
             std::once_flag                  mOnceInitThreadID;
-            CurrentThread::THREAD_ID_TYPE   mSelfThreadID;              /*  调用loop函数所在thread的id */
+            CurrentThread::THREAD_ID_TYPE   mSelfThreadID;             
 
             TimerMgr::PTR                   mTimer;
 

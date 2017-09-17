@@ -2,6 +2,7 @@
 #define _NETSESSION_H
 
 #include <string>
+#include <chrono>
 #include <brynet/net/WrapTCPService.h>
 
 /*应用服务器的网络层会话对象基类*/
@@ -20,7 +21,9 @@ public:
     {
     }
 
-    void    setSession(const brynet::net::WrapTcpService::PTR& service, const brynet::net::TCPSession::PTR& session, const std::string& ip)
+    void    setSession(const brynet::net::WrapTcpService::PTR& service, 
+        const brynet::net::TCPSession::PTR& session, 
+        const std::string& ip)
     {
         mService = service;
         mSession = session;
@@ -54,12 +57,15 @@ public:
         mSession->postClose();
     }
 
-    void            sendPacket(const char* data, size_t len, const brynet::net::DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
+    void            sendPacket(const char* data, 
+        size_t len, 
+        const brynet::net::DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
     {
         mSession->send(brynet::net::DataSocket::makePacket(data, len), callback);
     }
 
-    void            sendPacket(const brynet::net::DataSocket::PACKET_PTR& packet, const brynet::net::DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
+    void            sendPacket(const brynet::net::DataSocket::PACKET_PTR& packet, 
+        const brynet::net::DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr)
     {
         mSession->send(packet, callback);
     }
@@ -70,11 +76,15 @@ public:
     }
 
 private:
-    std::string         mIP;
-    brynet::net::WrapTcpService::PTR mService;
-    brynet::net::TCPSession::PTR     mSession;
+    std::string                         mIP;
+    brynet::net::WrapTcpService::PTR    mService;
+    brynet::net::TCPSession::PTR        mSession;
 };
 
-void WrapAddNetSession(brynet::net::WrapTcpService::PTR service, sock fd, BaseNetSession::PTR pClient, int pingCheckTime, size_t maxRecvBufferSize);
+void WrapAddNetSession(brynet::net::WrapTcpService::PTR service, 
+    sock fd, 
+    BaseNetSession::PTR pClient, 
+    std::chrono::nanoseconds pingCheckTime, 
+    size_t maxRecvBufferSize);
 
 #endif

@@ -7,12 +7,16 @@
 const static unsigned int sDefaultLoopTimeOutMS = 100;
 using namespace brynet;
 using namespace brynet::net;
+using namespace std::chrono;
 
 namespace brynet
 {
     namespace net
     {
-        /*  此结构用于标示一个回话，逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  */
+        /*  
+            此结构用于标示一个回话
+            逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  
+        */
         union SessionId
         {
             struct
@@ -20,7 +24,11 @@ namespace brynet
                 uint16_t    loopIndex;      /*  会话所属的eventloop的(在mLoops中的)索引  */
                 uint16_t    index;          /*  会话在mDataSockets[loopIndex]中的索引值 */
                 uint32_t    iid;            /*  自增计数器   */
-            }data;  /*  warn::so,服务器最大支持0xFFFF(65536)个io loop线程，每一个io loop最大支持0xFFFF(65536)个链接。*/
+            }data;  
+            /*  
+                warn::so,服务器最大支持0xFFFF(65536)个io loop线程
+                每一个io loop最大支持0xFFFF(65536)个链接。
+            */
 
             TcpService::SESSION_TYPE id;
         };
@@ -31,10 +39,13 @@ namespace brynet
             typedef std::shared_ptr<IOLoopData> PTR;
 
         public:
-            static  PTR                         Create(EventLoop::PTR eventLoop, std::shared_ptr<std::thread> ioThread);
+            static  PTR                     Create(EventLoop::PTR eventLoop, 
+                                                   std::shared_ptr<std::thread> ioThread);
 
         public:
-            void send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback);
+            void                            send(TcpService::SESSION_TYPE id, 
+                                                 const DataSocket::PACKET_PTR& packet, 
+                                                 const DataSocket::PACKED_SENDED_CALLBACK& callback);
             const EventLoop::PTR&           getEventLoop() const;
 
         private:
@@ -43,8 +54,8 @@ namespace brynet
             int                             incID();
 
         private:
-            explicit IOLoopData(EventLoop::PTR eventLoop,
-                std::shared_ptr<std::thread> ioThread);
+            explicit                        IOLoopData(EventLoop::PTR eventLoop,
+                                                       std::shared_ptr<std::thread> ioThread);
 
         private:
             const EventLoop::PTR            mEventLoop;
@@ -56,7 +67,10 @@ namespace brynet
             friend class TcpService;
         };
 
-        void IOLoopDataSend(const std::shared_ptr<IOLoopData>& ioLoopData, TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+        void IOLoopDataSend(const std::shared_ptr<IOLoopData>& ioLoopData, 
+                            TcpService::SESSION_TYPE id, 
+                            const DataSocket::PACKET_PTR& packet, 
+                            const DataSocket::PACKED_SENDED_CALLBACK& callback)
         {
             ioLoopData->send(id, packet, callback);
         }
@@ -70,7 +84,8 @@ namespace brynet
 
 TcpService::TcpService() noexcept
 {
-    static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), "sizeof SessionId must equal int64_t");
+    static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), 
+        "sizeof SessionId must equal int64_t");
 
     mEnterCallback = nullptr;
     mDisConnectCallback = nullptr;
@@ -114,7 +129,9 @@ const TcpService::DATA_CALLBACK& TcpService::getDataCallback() const
     return mDataCallback;
 }
 
-void TcpService::send(SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback) const
+void TcpService::send(SESSION_TYPE id, 
+    const DataSocket::PACKET_PTR& packet, 
+    const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
     union  SessionId sid;
     sid.id = id;
@@ -139,14 +156,16 @@ void TcpService::disConnect(SESSION_TYPE id) const
     });
 }
 
-void TcpService::setPingCheckTime(SESSION_TYPE id, int checktime)
+void TcpService::setPingCheckTime(SESSION_TYPE id, 
+    std::chrono::nanoseconds checktime)
 {
     postSessionAsyncProc(id, [checktime](DataSocket::PTR ds){
         ds->setCheckTime(checktime);
     });
 }
 
-void TcpService::postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSocket::PTR)> callback) const
+void TcpService::postSessionAsyncProc(SESSION_TYPE id, 
+    std::function<void(DataSocket::PTR)> callback) const
 {
     union  SessionId sid;
     sid.id = id;
@@ -157,7 +176,10 @@ void TcpService::postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSo
     }
 
     const auto& eventLoop = ioLoopData->getEventLoop();
-    eventLoop->pushAsyncProc([callbackCapture = std::move(callback), sid, shared_this = shared_from_this(), ioLoopDataCapture = std::move(ioLoopData)](){
+    eventLoop->pushAsyncProc([callbackCapture = std::move(callback), 
+        sid, 
+        shared_this = shared_from_this(), 
+        ioLoopDataCapture = std::move(ioLoopData)](){
         DataSocket::PTR tmp = nullptr;
         if (callbackCapture != nullptr &&
             ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp) &&
@@ -211,7 +233,12 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
             eventLoop]() {
             while (shared_this->mRunIOLoop)
             {
-                eventLoop->loop(eventLoop->getTimerMgr()->isEmpty() ? sDefaultLoopTimeOutMS : eventLoop->getTimerMgr()->nearEndMs().count());
+                auto timeout = std::chrono::milliseconds(sDefaultLoopTimeOutMS);
+                if (!eventLoop->getTimerMgr()->isEmpty())
+                {
+                    timeout = duration_cast<milliseconds>(eventLoop->getTimerMgr()->nearLeftTime());
+                }
+                eventLoop->loop(timeout.count());
                 if (callback != nullptr)
                 {
                     callback(eventLoop);
@@ -297,7 +324,8 @@ std::shared_ptr<IOLoopData> TcpService::getIOLoopDataBySocketID(SESSION_TYPE id)
     }
 }
 
-TcpService::SESSION_TYPE TcpService::MakeID(size_t loopIndex, const std::shared_ptr<IOLoopData>& loopData)
+TcpService::SESSION_TYPE TcpService::MakeID(size_t loopIndex, 
+    const std::shared_ptr<IOLoopData>& loopData)
 {
     union SessionId sid;
     sid.data.loopIndex = static_cast<uint16_t>(loopIndex);
@@ -320,8 +348,11 @@ void TcpService::procDataSocketClose(DataSocket::PTR ds)
     }
 }
 
-bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip, 
-    const TcpService::ENTER_CALLBACK& enterCallback, const TcpService::DISCONNECT_CALLBACK& disConnectCallback, const TcpService::DATA_CALLBACK& dataCallback,
+bool TcpService::helpAddChannel(DataSocket::PTR channel, 
+    const std::string& ip, 
+    const TcpService::ENTER_CALLBACK& enterCallback, 
+    const TcpService::DISCONNECT_CALLBACK& disConnectCallback, 
+    const TcpService::DATA_CALLBACK& dataCallback,
     bool forceSameThreadLoop)
 {
     std::shared_ptr<IOLoopData> ioLoopData;
@@ -364,17 +395,26 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
 
     const auto& loop = ioLoopData->getEventLoop();
 
-    channel->setEnterCallback([ip, loopIndex, enterCallback, disConnectCallback, dataCallback, shared_this = shared_from_this(), loopDataCapture = std::move(ioLoopData)](DataSocket::PTR dataSocket){
+    channel->setEnterCallback([ip, 
+        loopIndex, 
+        enterCallback, 
+        disConnectCallback, 
+        dataCallback, 
+        shared_this = shared_from_this(), 
+        loopDataCapture = std::move(ioLoopData)](DataSocket::PTR dataSocket){
         auto id = shared_this->MakeID(loopIndex, loopDataCapture);
         union SessionId sid;
         sid.id = id;
         loopDataCapture->getDataSockets().set(dataSocket, sid.data.index);
         dataSocket->setUD(id);
-        dataSocket->setDataCallback([dataCallback, id](DataSocket::PTR ds, const char* buffer, size_t len){
+        dataSocket->setDataCallback([dataCallback, 
+            id](DataSocket::PTR ds, const char* buffer, size_t len){
             return dataCallback(id, buffer, len);
         });
 
-        dataSocket->setDisConnectCallback([disConnectCallback, id, shared_this](DataSocket::PTR arg){
+        dataSocket->setDisConnectCallback([disConnectCallback, 
+            id, 
+            shared_this](DataSocket::PTR arg){
             shared_this->procDataSocketClose(arg);
             disConnectCallback(id);
             delete arg;
@@ -396,6 +436,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel, const std::string& ip,
     return true;
 }
 
+// TODO::
 bool TcpService::addDataSocket(sock fd,
     const std::shared_ptr<ListenThread>& listenThread,
     const TcpService::ENTER_CALLBACK& enterCallback,
@@ -438,7 +479,12 @@ bool TcpService::addDataSocket(sock fd,
 #endif
     if (ret)
     {
-        ret = helpAddChannel(channel, ip, enterCallback, disConnectCallback, dataCallback, forceSameThreadLoop);
+        ret = helpAddChannel(channel, 
+            ip, 
+            enterCallback, 
+            disConnectCallback, 
+            dataCallback, 
+            forceSameThreadLoop);
     }
 
     if (!ret)
@@ -493,11 +539,16 @@ int IOLoopData::incID()
     return incId++;
 }
 
-void IOLoopData::send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void IOLoopData::send(TcpService::SESSION_TYPE id, 
+    const DataSocket::PACKET_PTR& packet, 
+    const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     union  SessionId sid;
     sid.id = id;
-    /*  如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响),否则可使用postSessionAsyncProc */
+    /*  
+        如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响)
+        否则可使用postSessionAsyncProc 
+    */
     if (mEventLoop->isInLoopThread())
     {
         DataSocket::PTR tmp = nullptr;
@@ -513,7 +564,10 @@ void IOLoopData::send(TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR&
     }
     else
     {
-        mEventLoop->pushAsyncProc([packetCapture = packet, callbackCapture = callback, sid, ioLoopDataCapture = shared_from_this()](){
+        mEventLoop->pushAsyncProc([packetCapture = packet, 
+            callbackCapture = callback, 
+            sid, 
+            ioLoopDataCapture = shared_from_this()](){
             DataSocket::PTR tmp = nullptr;
             if (ioLoopDataCapture->mDataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)

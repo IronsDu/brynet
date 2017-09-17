@@ -26,11 +26,12 @@ namespace brynet
                 mPort = 0;
             }
 
-            AsyncConnectAddr(const char* ip, 
+            AsyncConnectAddr(const std::string& ip, 
                 int port, 
-                std::chrono::milliseconds timeout, 
-                AsyncConnector::COMPLETED_CALLBACK successCB,
-                AsyncConnector::FAILED_CALLBACK failedCB) : mIP(ip),
+                std::chrono::nanoseconds timeout, 
+                const AsyncConnector::COMPLETED_CALLBACK& successCB,
+                const AsyncConnector::FAILED_CALLBACK& failedCB) : 
+                mIP(ip),
                 mPort(port), 
                 mTimeout(timeout), 
                 mSuccessCB(successCB),
@@ -38,7 +39,7 @@ namespace brynet
             {
             }
 
-            const auto&     getIP() const
+            const auto&         getIP() const
             {
                 return mIP;
             }
@@ -64,11 +65,11 @@ namespace brynet
             }
 
         private:
-            std::string         mIP;
-            int                 mPort;
-            std::chrono::milliseconds   mTimeout;
-            AsyncConnector::COMPLETED_CALLBACK mSuccessCB;
-            AsyncConnector::FAILED_CALLBACK mFailedCB;
+            std::string                         mIP;
+            int                                 mPort;
+            std::chrono::nanoseconds            mTimeout;
+            AsyncConnector::COMPLETED_CALLBACK  mSuccessCB;
+            AsyncConnector::FAILED_CALLBACK     mFailedCB;
         };
 
         class ConnectorWorkInfo final : public NonCopyable
@@ -78,19 +79,19 @@ namespace brynet
 
             ConnectorWorkInfo() noexcept;
 
-            void                checkConnectStatus(int timeout);
+            void                checkConnectStatus(int millsecond);
             bool                isConnectSuccess(sock clientfd) const;
             void                checkTimeout();
-            void                processConnect(AsyncConnectAddr);
+            void                processConnect(const AsyncConnectAddr&);
 
         private:
 
             struct ConnectingInfo
             {
-                std::chrono::steady_clock::time_point startConnectTime;
-                std::chrono::milliseconds     timeout;
-                AsyncConnector::COMPLETED_CALLBACK successCB;
-                AsyncConnector::FAILED_CALLBACK failedCB;
+                std::chrono::steady_clock::time_point   startConnectTime;
+                std::chrono::nanoseconds                timeout;
+                AsyncConnector::COMPLETED_CALLBACK      successCB;
+                AsyncConnector::FAILED_CALLBACK         failedCB;
             };
 
             std::map<sock, ConnectingInfo>  mConnectingInfos;
@@ -116,75 +117,75 @@ ConnectorWorkInfo::ConnectorWorkInfo() noexcept
 
 bool ConnectorWorkInfo::isConnectSuccess(sock clientfd) const
 {
-    bool connect_ret = false;
-
-    if (ox_fdset_check(mFDSet.get(), clientfd, WriteCheck))
+    if (!ox_fdset_check(mFDSet.get(), clientfd, WriteCheck))
     {
-        int error;
-        int len = sizeof(error);
-        if (getsockopt(clientfd, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len) != -1)
-        {
-            connect_ret = error == 0;
-        }
+        return false;
     }
 
-    return connect_ret;
+    int error;
+    int len = sizeof(error);
+    if (getsockopt(clientfd, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len) == -1)
+    {
+        return false;
+    }
+
+    return error == 0;
 }
 
-void ConnectorWorkInfo::checkConnectStatus(int timeout)
+void ConnectorWorkInfo::checkConnectStatus(int millsecond)
 {
-    if (ox_fdset_poll(mFDSet.get(), timeout) <= 0)
+    if (ox_fdset_poll(mFDSet.get(), millsecond) <= 0)
     {
         return;
     }
 
-    std::set<sock>       complete_fds;   /*  完成队列    */
-    std::set<sock>       failed_fds;     /*  失败队列    */
+    std::set<sock>  total_fds;     /*  成功或失败  */
+    std::set<sock>  success_fds;   /*  成功队列    */
 
     for (auto& v : mConnectingFds)
     {
         if (ox_fdset_check(mFDSet.get(), v, ErrorCheck))
         {
-            complete_fds.insert(v);
-            failed_fds.insert(v);
+            total_fds.insert(v);
         } 
         else if (ox_fdset_check(mFDSet.get(), v, WriteCheck))
         {
-            complete_fds.insert(v);
-            if (!isConnectSuccess(v))
+            total_fds.insert(v);
+            if (isConnectSuccess(v))
             {
-                failed_fds.insert(v);
+                success_fds.insert(v);
             }
         }
     }
 
-    for (auto fd : complete_fds)
+    for (auto fd : total_fds)
     {
         ox_fdset_del(mFDSet.get(), fd, WriteCheck | ErrorCheck);
+        mConnectingFds.erase(fd);
 
         auto it = mConnectingInfos.find(fd);
-        if (it != mConnectingInfos.end())
+        if (it == mConnectingInfos.end())
         {
-            if (failed_fds.find(fd) != failed_fds.end())
-            {
-                ox_socket_close(fd);
-                if (it->second.failedCB != nullptr)
-                {
-                    it->second.failedCB();
-                }
-            }
-            else
-            {
-                if (it->second.successCB != nullptr)
-                {
-                    it->second.successCB(fd);
-                }
-            }
-
-            mConnectingInfos.erase(it);
+            continue;
         }
 
-        mConnectingFds.erase(fd);
+        if (success_fds.find(fd) != success_fds.end())
+        {
+            if (it->second.successCB != nullptr)
+            {
+                it->second.successCB(fd);
+            }
+        }
+        else
+        {
+            ox_socket_close(fd);
+            if (it->second.failedCB != nullptr)
+            {
+                it->second.failedCB();
+            }
+        }
+        
+        mConnectingInfos.erase(it);
     }
 }
 
@@ -215,73 +216,66 @@ void ConnectorWorkInfo::checkTimeout()
     }
 }
 
-void ConnectorWorkInfo::processConnect(AsyncConnectAddr addr)
+void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 {
-    bool addToFDSet = false;
-    bool connectSuccess = false;
-
     struct sockaddr_in server_addr;
     sock clientfd = SOCKET_ERROR;
+    ConnectingInfo ci;
+
+#if defined PLATFORM_WINDOWS
+    int check_error = WSAEWOULDBLOCK;
+#else
+    int check_error = EINPROGRESS;
+#endif
+    int n = 0;
 
     ox_socket_init();
 
     clientfd = ox_socket_create(AF_INET, SOCK_STREAM, 0);
+    if (clientfd == SOCKET_ERROR)
+    {
+        goto FAILED;
+    }
+
     ox_socket_nonblock(clientfd);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr(addr.getIP().c_str());
+    server_addr.sin_port = htons(addr.getPort());
 
-    if (clientfd != SOCKET_ERROR)
+    n = connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+    if (n == 0)
     {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_addr.s_addr = inet_addr(addr.getIP().c_str());
-        server_addr.sin_port = htons(addr.getPort());
-
-        int n = connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
-        if (n < 0)
-        {
-            int check_error = 0;
-#if defined PLATFORM_WINDOWS
-            check_error = WSAEWOULDBLOCK;
-#else
-            check_error = EINPROGRESS;
-#endif
-            if (check_error != sErrno)
-            {
-                ox_socket_close(clientfd);
-                clientfd = SOCKET_ERROR;
-            }
-            else
-            {
-                ConnectingInfo ci;
-                ci.startConnectTime = std::chrono::steady_clock::now();
-                ci.successCB = addr.getSuccessCB();
-                ci.failedCB = addr.getFailedCB();
-                ci.timeout = addr.getTimeout();
-
-                mConnectingInfos[clientfd] = ci;
-                mConnectingFds.insert(clientfd);
-
-                ox_fdset_add(mFDSet.get(), clientfd, WriteCheck | ErrorCheck);
-                addToFDSet = true;
-            }
-        }
-        else if (n == 0)
-        {
-            connectSuccess = true;
-        }
+        goto SUCCESS;
     }
 
-    if (connectSuccess)
+    if (check_error != sErrno)
     {
-        if (addr.getSuccessCB() != nullptr)
-        {
-            addr.getSuccessCB()(clientfd);
-        }
+        ox_socket_close(clientfd);
+        clientfd = SOCKET_ERROR;
+        goto FAILED;
     }
-    else
+
+    ci.startConnectTime = std::chrono::steady_clock::now();
+    ci.successCB = addr.getSuccessCB();
+    ci.failedCB = addr.getFailedCB();
+    ci.timeout = addr.getTimeout();
+
+    mConnectingInfos[clientfd] = ci;
+    mConnectingFds.insert(clientfd);
+    ox_fdset_add(mFDSet.get(), clientfd, WriteCheck | ErrorCheck);
+    return;
+
+SUCCESS:
+    if (addr.getSuccessCB() != nullptr)
     {
-        if (!addToFDSet && addr.getFailedCB() != nullptr)
-        {
-            addr.getFailedCB()();
-        }
+        addr.getSuccessCB()(clientfd);
+    }
+    return;
+
+FAILED:
+    if (addr.getFailedCB() != nullptr)
+    {
+        addr.getFailedCB()();
     }
 }
 
@@ -308,36 +302,49 @@ void AsyncConnector::run()
 void AsyncConnector::startThread()
 {
     std::lock_guard<std::mutex> lck(mThreadGuard);
-    if (mThread == nullptr)
+
+    if (mThread != nullptr)
     {
-        mIsRun = true;
-        mWorkInfo = std::make_shared<ConnectorWorkInfo>();
-        mThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
-            shared_this->run();
-        });
+        return;
     }
+
+    mIsRun = true;
+    mWorkInfo = std::make_shared<ConnectorWorkInfo>();
+    mThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
+        shared_this->run();
+    });
 }
 
 void AsyncConnector::destroy()
 {
     std::lock_guard<std::mutex> lck(mThreadGuard);
-    if (mThread != nullptr)
+
+    if (mThread = nullptr)
     {
-        mIsRun = false;
-        if (mThread->joinable())
-        {
-            mThread->join();
-        }
-        mThread = nullptr;
-        mWorkInfo = nullptr;
+        return;
     }
+
+    mEventLoop.wakeup();
+    mIsRun = false;
+    if (mThread->joinable())
+    {
+        mThread->join();
+    }
+    mThread = nullptr;
+    mWorkInfo = nullptr;
 }
 
 //TODO::处理已经销毁了工作线程，再投递异步链接请求的问题（无限等待）
-void AsyncConnector::asyncConnect(const char* ip, int port, int ms, COMPLETED_CALLBACK successCB, FAILED_CALLBACK failedCB)
+void AsyncConnector::asyncConnect(const std::string& ip, 
+    int port, 
+    std::chrono::nanoseconds timeout,
+    COMPLETED_CALLBACK successCB, 
+    FAILED_CALLBACK failedCB)
 {
     mEventLoop.pushAsyncProc([shared_this = shared_from_this(), 
-        address = AsyncConnectAddr(ip, port, std::chrono::milliseconds(ms), 
+        address = AsyncConnectAddr(ip, 
+            port, 
+            timeout,
             successCB, 
             failedCB)]() {
         shared_this->mWorkInfo->processConnect(address);

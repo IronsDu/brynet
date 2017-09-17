@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {
-        connector->asyncConnect(argv[1], atoi(argv[2]), 10000, [server, tmp](sock fd) {
+        connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](sock fd) {
             std::cout << "connect success" << std::endl;
             ox_socket_nodelay(fd);
             server->addSession(fd, [tmp](const TCPSession::PTR& session) {

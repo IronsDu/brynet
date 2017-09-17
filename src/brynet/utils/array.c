@@ -17,25 +17,24 @@ ox_array_new(int num, int element_size)
 {
     int buffer_size = num * element_size;
     struct array_s* ret = (struct array_s*)malloc(sizeof(struct array_s));
-
-    if(ret != NULL)
+    if(ret == NULL)
     {
-        memset(ret, 0, sizeof(*ret));
+        return NULL;
+    }
 
-        ret->buffer = (char*)malloc(buffer_size);
-
-        if(ret->buffer != NULL)
-        {
-            memset(ret->buffer, 0, buffer_size);
-            ret->element_size = element_size;
-            ret->element_num = num;
-            ret->buffer_size = buffer_size;
-        }
-        else
-        {
-            ox_array_delete(ret);
-            ret = NULL;
-        }
+    memset(ret, 0, sizeof(*ret));
+    ret->buffer = (char*)malloc(buffer_size);
+    if (ret->buffer != NULL)
+    {
+        memset(ret->buffer, 0, buffer_size);
+        ret->element_size = element_size;
+        ret->element_num = num;
+        ret->buffer_size = buffer_size;
+    }
+    else
+    {
+        ox_array_delete(ret);
+        ret = NULL;
     }
 
     return ret;
@@ -44,18 +43,20 @@ ox_array_new(int num, int element_size)
 void 
 ox_array_delete(struct array_s* self)
 {
-    if(self != NULL)
+    if(self == NULL)
     {
-        if(self->buffer != NULL)
-        {
-            free(self->buffer);
-            self->buffer = NULL;
-        }
-
-        self->element_num = 0;
-        free(self);
-        self = NULL;
+        return;
     }
+
+    if (self->buffer != NULL)
+    {
+        free(self->buffer);
+        self->buffer = NULL;
+    }
+
+    self->element_num = 0;
+    free(self);
+    self = NULL;
 }
 
 char* 

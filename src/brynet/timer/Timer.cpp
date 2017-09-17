@@ -1,8 +1,9 @@
 #include <brynet/timer/Timer.h>
 
+using namespace std::chrono;
 using namespace brynet;
 
-const std::chrono::steady_clock::time_point& Timer::getEndMs() const
+const steady_clock::time_point& Timer::getEndTime() const
 {
     return mEndTime;
 }
@@ -12,9 +13,11 @@ void Timer::cancel()
     mActive = false;
 }
 
-Timer::Timer(std::chrono::steady_clock::time_point endTime, Callback callback) noexcept : mEndTime(std::move(endTime)), mCallback(std::move(callback))
+Timer::Timer(steady_clock::time_point endTime, Callback callback) noexcept : 
+    mEndTime(std::move(endTime)), 
+    mCallback(std::move(callback)),
+    mActive(true)
 {
-    mActive = true;
 }
 
 void Timer::operator() ()
@@ -30,8 +33,7 @@ void TimerMgr::schedule()
     while (!mTimers.empty())
     {
         auto tmp = mTimers.top();
-
-        if (tmp->getEndMs() > std::chrono::steady_clock::now())
+        if (tmp->getEndTime() > steady_clock::now())
         {
             break;
         }
@@ -46,18 +48,18 @@ bool TimerMgr::isEmpty() const
     return mTimers.empty();
 }
 
-/* 返回定时器管理器中最近的一个定时器还需多久到期(如果定时器为空或已经到期则返回0) */
-std::chrono::milliseconds TimerMgr::nearEndMs() const
+/* 返回定时器管理器中最近的一个定时器还需多久到期(如果定时器为空或已经到期则返回zero) */
+nanoseconds TimerMgr::nearLeftTime() const
 {
     if (mTimers.empty())
     {
-        return std::chrono::milliseconds();
+        return nanoseconds::zero();
     }
 
-    auto result = std::chrono::duration_cast<std::chrono::milliseconds>(mTimers.top()->getEndMs() - std::chrono::steady_clock::now());
+    auto result = mTimers.top()->getEndTime() - steady_clock::now();
     if (result.count() < 0)
     {
-        return std::chrono::milliseconds();
+        return nanoseconds::zero();
     }
 
     return result;

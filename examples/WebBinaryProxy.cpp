@@ -45,9 +45,9 @@ int main(int argc, char **argv)
                 std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
                 /* new connect to backend server */
-                asyncConnector->asyncConnect(backendIP.c_str(), backendPort, 10000, [tcpService, clientWebSession, shareBackendSession, cachePacket](sock fd) {
+                asyncConnector->asyncConnect(backendIP.c_str(), backendPort, std::chrono::seconds(10), [tcpService, clientWebSession, shareBackendSession, cachePacket](sock fd) {
                     tcpService->addSession(fd, [=](const TCPSession::PTR& backendSession) {
-                        auto ud = brynet::net::cast<int>(clientWebSession->getUD());
+                        auto ud = brynet::net::cast<int64_t>(clientWebSession->getUD());
                         if (*ud == -1)   /*if http client already close*/
                         {
                             backendSession->postClose();
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 
                         backendSession->setCloseCallback([=](const TCPSession::PTR& backendSession) {
                             *shareBackendSession = nullptr;
-                            auto ud = brynet::net::cast<int>(clientWebSession->getUD());
+                            auto ud = brynet::net::cast<int64_t>(clientWebSession->getUD());
                             if (*ud != -1)
                             {
                                 clientWebSession->postClose();

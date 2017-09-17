@@ -26,21 +26,25 @@ struct fdset_s
 static
 void upstepPollfd(struct fdset_s* self, int upSize)
 {
-    if (upSize > 0)
+    if (upSize <= 0)
     {
-        struct pollfd* newPollfds = (struct pollfd*)malloc(sizeof(struct pollfd)*(self->limitSize+upSize));
-        if (newPollfds != NULL)
-        {
-            if (self->pollFds != NULL)
-            {
-                memcpy(newPollfds, self->pollFds, sizeof(struct pollfd)*self->nfds);
-                free(self->pollFds);
-                self->pollFds = NULL;
-            }
-            self->pollFds = newPollfds;
-            self->limitSize += upSize;
-        }
+        return;
     }
+
+    struct pollfd* newPollfds = (struct pollfd*)malloc(sizeof(struct pollfd)*(self->limitSize + upSize));
+    if (newPollfds == NULL)
+    {
+        return;
+    }
+
+    if (self->pollFds != NULL)
+    {
+        memcpy(newPollfds, self->pollFds, sizeof(struct pollfd)*self->nfds);
+        free(self->pollFds);
+        self->pollFds = NULL;
+    }
+    self->pollFds = newPollfds;
+    self->limitSize += upSize;
 }
 
 static
@@ -115,33 +119,35 @@ ox_fdset_add(struct fdset_s* self, sock fd, int type)
         upstepPollfd(self, 128);
     }
 
-    if (self->limitSize > self->nfds)
+    if (self->limitSize <= self->nfds)
     {
-        struct pollfd* pf = findPollfd(self, fd);
-        if (pf == NULL)
-        {
-            /*real add*/
-            pf = self->pollFds + self->nfds;
-            pf->events = 0;
-            pf->fd = fd;
+        return;
+    }
 
-            self->nfds++;
-        }
+    struct pollfd* pf = findPollfd(self, fd);
+    if (pf == NULL)
+    {
+        /*real add*/
+        pf = self->pollFds + self->nfds;
+        pf->events = 0;
+        pf->fd = fd;
 
-        if (type & ReadCheck)
-        {
-            pf->events |= CHECK_READ_FLAG;
-        }
+        self->nfds++;
+    }
 
-        if (type & WriteCheck)
-        {
-            pf->events |= CHECK_WRITE_FLAG;
-        }
+    if (type & ReadCheck)
+    {
+        pf->events |= CHECK_READ_FLAG;
+    }
 
-        if (type & ErrorCheck)
-        {
-            //pf->events |= CHECK_ERROR_FLAG;   TODO::on windows, not supports
-        }
+    if (type & WriteCheck)
+    {
+        pf->events |= CHECK_WRITE_FLAG;
+    }
+
+    if (type & ErrorCheck)
+    {
+        //pf->events |= CHECK_ERROR_FLAG;   TODO::on windows, not supports
     }
 }
 
@@ -149,27 +155,29 @@ void
 ox_fdset_del(struct fdset_s* self, sock fd, int type)
 {
     struct pollfd* pf = findPollfd(self, fd);
-    if (pf != NULL)
+    if (pf == NULL)
     {
-        if (type & ReadCheck)
-        {
-            pf->events &= ~CHECK_READ_FLAG;
-        }
+        return;
+    }
 
-        if (type & WriteCheck)
-        {
-            pf->events &= ~CHECK_WRITE_FLAG;
-        }
+    if (type & ReadCheck)
+    {
+        pf->events &= ~CHECK_READ_FLAG;
+    }
 
-        if (type & ErrorCheck)
-        {
-            pf->events &= ~CHECK_ERROR_FLAG;
-        }
+    if (type & WriteCheck)
+    {
+        pf->events &= ~CHECK_WRITE_FLAG;
+    }
 
-        if (pf->events == 0)
-        {
-            TryRemovePollFd(self, fd);
-        }
+    if (type & ErrorCheck)
+    {
+        pf->events &= ~CHECK_ERROR_FLAG;
+    }
+
+    if (pf->events == 0)
+    {
+        TryRemovePollFd(self, fd);
     }
 }
 
@@ -193,44 +201,35 @@ ox_fdset_poll(struct fdset_s* self, long overtime)
 bool 
 ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type)
 {
-    bool active = false;
-
     int i = 0;
     for (; i < self->nfds; i++)
     {
         struct pollfd* pf = self->pollFds + i;
-        if (pf->fd == fd)
+        if (pf->fd != fd)
         {
-            do
-            {
-                if (type & ReadCheck)
-                {
-                    if (active = (pf->revents & CHECK_READ_FLAG))
-                    {
-                        break;
-                    }
-                }
+            continue;
+        }
 
-                if (type & WriteCheck)
-                {
-                    if (active = (pf->revents & CHECK_WRITE_FLAG))
-                    {
-                        break;
-                    }
-                }
-
-                if (type & ErrorCheck)
-                {
-                    if (active = (pf->revents & CHECK_ERROR_FLAG))
-                    {
-                        break;
-                    }
-                }
-            } while (0);
-
-            break;
+        if ((type & ReadCheck) &&
+            (pf->revents & CHECK_READ_FLAG))
+        {
+            return true;
+        }
+        else if ((type & WriteCheck) &&
+                (pf->revents & CHECK_WRITE_FLAG))
+        {
+            return true;
+        }
+        else if ((type & ErrorCheck) &&
+                (pf->revents & CHECK_ERROR_FLAG))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
         }
     }
 
-    return active;
+    return false;
 }

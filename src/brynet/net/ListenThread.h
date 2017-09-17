@@ -29,7 +29,8 @@ namespace brynet
 
             //TODO::将SSL换一个地方
 #ifdef USE_OPENSSL
-            bool                                initSSL(const std::string& certificate, const std::string& privatekey);
+            bool                                initSSL(const std::string& certificate, 
+                                                        const std::string& privatekey);
             void                                destroySSL();
             SSL_CTX*                            getOpenSSLCTX();
 #endif

@@ -20,7 +20,7 @@ namespace brynet
 
         Timer(std::chrono::steady_clock::time_point endTime, Callback f) noexcept;
 
-        const std::chrono::steady_clock::time_point&    getEndMs() const;
+        const std::chrono::steady_clock::time_point&    getEndTime() const;
         void                                    cancel();
 
     private:
@@ -40,10 +40,12 @@ namespace brynet
         typedef std::shared_ptr<TimerMgr>   PTR;
 
         template<typename F, typename ...TArgs>
-        Timer::WeakPtr                          addTimer(time_t delayMs, F callback, TArgs&& ...args)
+        Timer::WeakPtr                          addTimer(std::chrono::nanoseconds timeout, 
+                                                         F callback, 
+                                                         TArgs&& ...args)
         {
-            auto timer = std::make_shared<Timer>(std::chrono::steady_clock::now() + std::chrono::microseconds(delayMs),
-                                                std::bind(callback, std::forward<TArgs>(args)...));
+            auto timer = std::make_shared<Timer>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(timeout),
+                                                std::bind(std::move(callback), std::forward<TArgs>(args)...));
             mTimers.push(timer);
 
             return timer;
@@ -51,7 +53,8 @@ namespace brynet
 
         void                                    schedule();
         bool                                    isEmpty() const;
-        std::chrono::milliseconds               nearEndMs() const;
+        // 最近的定时器的剩余超时时间(如果没有则为zero)
+        std::chrono::nanoseconds                nearLeftTime() const;
         void                                    clear();
 
     private:
@@ -60,7 +63,7 @@ namespace brynet
         public:
             bool operator() (const Timer::Ptr& left, const Timer::Ptr& right) const
             {
-                return left->getEndMs() > right->getEndMs();
+                return left->getEndTime() > right->getEndTime();
             }
         };
 

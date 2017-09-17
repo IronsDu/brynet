@@ -150,7 +150,7 @@ inline void EventLoop::tryInitThreadID()
     });
 }
 
-void EventLoop::loop(int64_t timeout)
+void EventLoop::loop(int64_t milliseconds)
 {
     tryInitThreadID();
 
@@ -162,31 +162,43 @@ void EventLoop::loop(int64_t timeout)
         return;
     }
 
-    /*  warn::如果mAfterLoopProcs不为空（目前仅当第一次loop(时）之前就添加了回调或者某会话断开处理中又向其他会话发送消息而新产生callback），将timeout改为0，表示不阻塞iocp/epoll wait   */
+    /*  warn::
+        如果mAfterLoopProcs不为空（目前仅当第一次loop(时）
+        之前就添加了回调或者某会话断开处理中又向其他会话发送消息而新产生callback）
+        将timeout改为0，表示不阻塞iocp/epoll wait   
+    */
     if (!mAfterLoopProcs.empty())
     {
-        timeout = 0;
+        milliseconds = 0;
     }
 
 #ifdef PLATFORM_WINDOWS
     ULONG numComplete = 0;
     if (mPGetQueuedCompletionStatusEx != nullptr)
     {
-        if (!mPGetQueuedCompletionStatusEx(mIOCP, mEventEntries, static_cast<ULONG>(mEventEntriesNum), &numComplete, static_cast<DWORD>(timeout), false))
+        if (!mPGetQueuedCompletionStatusEx(mIOCP, 
+                                           mEventEntries, 
+                                           static_cast<ULONG>(mEventEntriesNum), 
+                                           &numComplete, 
+                                           static_cast<DWORD>(milliseconds), 
+                                           false))
         {
             numComplete = 0;
         }
     }
     else
     {
-        /*对GQCS返回失败不予处理，正常流程下只存在于上层主动closesocket才发生此情况，且其会在onRecv中得到处理(最终释放会话资源)*/
+        /*  
+            对GQCS返回失败不予处理，正常流程下只存在于上层主动closesocket才发生此情况
+            且其会在onRecv中得到处理(最终释放会话资源)
+        */
         do
         {
             GetQueuedCompletionStatus(mIOCP,
                 &mEventEntries[numComplete].dwNumberOfBytesTransferred,
                 &mEventEntries[numComplete].lpCompletionKey,
                 &mEventEntries[numComplete].lpOverlapped,
-                (numComplete == 0) ? static_cast<DWORD>(timeout) : 0);
+                (numComplete == 0) ? static_cast<DWORD>(milliseconds) : 0);
         } while (mEventEntries[numComplete].lpOverlapped != nullptr && ++numComplete < mEventEntriesNum);
     }
 
@@ -210,7 +222,7 @@ void EventLoop::loop(int64_t timeout)
         }
     }
 #else
-    int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, timeout);
+    int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, milliseconds);
 
     mIsInBlock = false;
 
@@ -222,19 +234,19 @@ void EventLoop::loop(int64_t timeout)
         if (event_data & EPOLLRDHUP)
         {
             channel->canRecv();
-            channel->onClose();   /*  无条件调用断开处理(安全的，不会造成重复close)，以防canRecv里没有recv 断开通知*/
+            /*  无条件调用断开处理(安全的，不会造成重复close)，以防canRecv里没有recv 断开通知*/
+            channel->onClose();
+            continue;
         }
-        else
-        {
-            if (event_data & EPOLLIN)
-            {
-                channel->canRecv();
-            }
 
-            if (event_data & EPOLLOUT)
-            {
-                channel->canSend();
-            }
+        if (event_data & EPOLLIN)
+        {
+            channel->canRecv();
+        }
+
+        if (event_data & EPOLLOUT)
+        {
+            channel->canSend();
         }
     }
 #endif
@@ -280,14 +292,13 @@ void EventLoop::processAsyncProcs()
 
 bool EventLoop::wakeup()
 {
-    bool ret = false;
     if (!isInLoopThread() && mIsInBlock && !mIsAlreadyPostWakeup.exchange(true))
     {
         mWakeupChannel->wakeup();
-        ret = true;
+        return true;
     }
 
-    return ret;
+    return false;
 }
 
 bool EventLoop::linkChannel(sock fd, Channel* ptr)
@@ -304,18 +315,17 @@ bool EventLoop::linkChannel(sock fd, Channel* ptr)
 
 void EventLoop::pushAsyncProc(USER_PROC f)
 {
-    if (!isInLoopThread())
+    if (isInLoopThread())
+    {
+        f();
+    }
+    else
     {
         {
             std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
             mAsyncProcs.push_back(std::move(f));
         }
-
         wakeup();
-    }
-    else
-    {
-        f();
     }
 }
 

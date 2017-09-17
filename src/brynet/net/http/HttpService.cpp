@@ -71,12 +71,15 @@ const HttpSession::WS_CONNECTED_CALLBACK& HttpSession::getWSConnectedCallback()
     return mWSConnectedCallback;
 }
 
-void HttpSession::send(const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback /* = nullptr */)
+void HttpSession::send(const DataSocket::PACKET_PTR& packet, 
+    const DataSocket::PACKED_SENDED_CALLBACK& callback /* = nullptr */)
 {
     mSession->send(packet, callback);
 }
 
-void HttpSession::send(const char* packet, size_t len, const DataSocket::PACKED_SENDED_CALLBACK& callback)
+void HttpSession::send(const char* packet, 
+    size_t len, 
+    const DataSocket::PACKED_SENDED_CALLBACK& callback)
 {
     mSession->send(packet, len, callback);
 }
@@ -103,7 +106,8 @@ HttpSession::PTR HttpSession::Create(TCPSession::PTR session)
     return std::make_shared<make_shared_enabler>(std::move(session));
 }
 
-void HttpService::setup(const TCPSession::PTR& session, const HttpSession::ENTER_CALLBACK& enterCallback)
+void HttpService::setup(const TCPSession::PTR& session, 
+    const HttpSession::ENTER_CALLBACK& enterCallback)
 {
     auto httpSession = HttpSession::Create(session);
     if (enterCallback != nullptr)
@@ -133,51 +137,51 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
         auto opcode = WebSocketFormat::WebSocketFrameType::ERROR_FRAME; /*TODO::opcode是否回传给回调函数*/
         size_t frameSize = 0;
         bool isFin = false;
-        if (WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
-        {
-            if (isFin && (opcode == WebSocketFormat::WebSocketFrameType::TEXT_FRAME || opcode == WebSocketFormat::WebSocketFrameType::BINARY_FRAME))
-            {
-                if (!cacheFrame.empty())
-                {
-                    cacheFrame += parseString;
-                    parseString = std::move(cacheFrame);
-                    cacheFrame.clear();
-                }
-
-                const auto& wsCallback = httpSession->getWSCallback();
-                if (wsCallback != nullptr)
-                {
-                    wsCallback(httpSession, opcode, parseString);
-                }
-            }
-            else if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
-            {
-                cacheFrame += parseString;
-                parseString.clear();
-            }
-            else if (opcode == WebSocketFormat::WebSocketFrameType::PING_FRAME ||
-                opcode == WebSocketFormat::WebSocketFrameType::PONG_FRAME ||
-                opcode == WebSocketFormat::WebSocketFrameType::CLOSE_FRAME)
-            {
-                const auto& wsCallback = httpSession->getWSCallback();
-                if (wsCallback != nullptr)
-                {
-                    wsCallback(httpSession, opcode, parseString);
-                }
-            }
-            else
-            {
-                assert(false);
-            }
-
-            leftLen -= frameSize;
-            retlen += frameSize;
-            parse_str += frameSize;
-        }
-        else
+        if (!WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
         {
             break;
         }
+
+        if ( isFin &&
+            (opcode == WebSocketFormat::WebSocketFrameType::TEXT_FRAME ||
+             opcode == WebSocketFormat::WebSocketFrameType::BINARY_FRAME))
+        {
+            if (!cacheFrame.empty())
+            {
+                cacheFrame += parseString;
+                parseString = std::move(cacheFrame);
+                cacheFrame.clear();
+            }
+
+            const auto& wsCallback = httpSession->getWSCallback();
+            if (wsCallback != nullptr)
+            {
+                wsCallback(httpSession, opcode, parseString);
+            }
+        }
+        else if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
+        {
+            cacheFrame += parseString;
+            parseString.clear();
+        }
+        else if (opcode == WebSocketFormat::WebSocketFrameType::PING_FRAME ||
+            opcode == WebSocketFormat::WebSocketFrameType::PONG_FRAME ||
+            opcode == WebSocketFormat::WebSocketFrameType::CLOSE_FRAME)
+        {
+            const auto& wsCallback = httpSession->getWSCallback();
+            if (wsCallback != nullptr)
+            {
+                wsCallback(httpSession, opcode, parseString);
+            }
+        }
+        else
+        {
+            assert(false);
+        }
+
+        leftLen -= frameSize;
+        retlen += frameSize;
+        parse_str += frameSize;
     }
 
     return retlen;
@@ -188,35 +192,37 @@ size_t HttpService::ProcessHttp(const char* buffer,
     const HTTPParser::PTR& httpParser,
     const HttpSession::PTR& httpSession)
 {
-    auto retlen = httpParser->tryParse(buffer, len);
-    if (httpParser->isCompleted())
+    const auto retlen = httpParser->tryParse(buffer, len);
+    if (!httpParser->isCompleted())
     {
-        if (httpParser->isWebSocket())
-        {
-            if (httpParser->hasKey("Sec-WebSocket-Key"))
-            {
-                auto response = WebSocketFormat::wsHandshake(httpParser->getValue("Sec-WebSocket-Key"));
-                httpSession->send(response.c_str(), response.size());
-            }
+        return retlen;
+    }
 
-            const auto& wsConnectedCallback = httpSession->getWSConnectedCallback();
-            if (wsConnectedCallback != nullptr)
-            {
-                wsConnectedCallback(httpSession, *httpParser);
-            }
-        }
-        else
+    if (httpParser->isWebSocket())
+    {
+        if (httpParser->hasKey("Sec-WebSocket-Key"))
         {
-            const auto& httpCallback = httpSession->getHttpCallback();
-            if (httpCallback != nullptr)
-            {
-                httpCallback(*httpParser, httpSession);
-            }
-            if (httpParser->isKeepAlive())
-            {
-                /*清除本次http报文数据，为下一次http报文准备*/
-                httpParser->clearParse();
-            }
+            auto response = WebSocketFormat::wsHandshake(httpParser->getValue("Sec-WebSocket-Key"));
+            httpSession->send(response.c_str(), response.size());
+        }
+
+        const auto& wsConnectedCallback = httpSession->getWSConnectedCallback();
+        if (wsConnectedCallback != nullptr)
+        {
+            wsConnectedCallback(httpSession, *httpParser);
+        }
+    }
+    else
+    {
+        const auto& httpCallback = httpSession->getHttpCallback();
+        if (httpCallback != nullptr)
+        {
+            httpCallback(*httpParser, httpSession);
+        }
+        if (httpParser->isKeepAlive())
+        {
+            /*清除本次http报文数据，为下一次http报文准备*/
+            httpParser->clearParse();
         }
     }
 

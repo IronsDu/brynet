@@ -15,37 +15,40 @@ struct buffer_s
 void 
 ox_buffer_delete(struct buffer_s* self)
 {
-    if(self != NULL)
+    if(self == NULL)
     {
-        if(self->data != NULL)
-        {
-            free(self->data);
-            self->data = NULL;
-        }
-
-        free(self);
-        self = NULL;
+        return;
     }
+
+    if (self->data != NULL)
+    {
+        free(self->data);
+        self->data = NULL;
+    }
+
+    free(self);
+    self = NULL;
 }
 
 struct buffer_s* 
 ox_buffer_new(size_t buffer_size)
 {
     struct buffer_s* ret = (struct buffer_s*)malloc(sizeof(struct buffer_s));
-
-    if(ret != NULL)
+    if(ret == NULL)
     {
-        if((ret->data = (char*)malloc(sizeof(char)*buffer_size)) != NULL)
-        {
-            ret->data_len = buffer_size;
-            ret->read_pos = 0;
-            ret->write_pos = 0;
-        }
-        else
-        {
-            ox_buffer_delete(ret);
-            ret = NULL;
-        }
+        return NULL;
+    }
+
+    if ((ret->data = (char*)malloc(sizeof(char)*buffer_size)) != NULL)
+    {
+        ret->data_len = buffer_size;
+        ret->read_pos = 0;
+        ret->write_pos = 0;
+    }
+    else
+    {
+        ox_buffer_delete(ret);
+        ret = NULL;
     }
 
     return ret;
@@ -56,17 +59,19 @@ ox_buffer_adjustto_head(struct buffer_s* self)
 {
     size_t len = 0;
 
-    if(self->read_pos > 0)
+    if(self->read_pos <= 0)
     {
-        len = ox_buffer_getreadvalidcount(self);
-        if(len > 0 )
-        {
-            memmove(self->data, self->data+self->read_pos, len);
-        }
-        
-        self->read_pos = 0;
-        self->write_pos = len;
+        return;
     }
+
+    len = ox_buffer_getreadvalidcount(self);
+    if (len > 0)
+    {
+        memmove(self->data, self->data + self->read_pos, len);
+    }
+
+    self->read_pos = 0;
+    self->write_pos = len;
 }
 
 void 

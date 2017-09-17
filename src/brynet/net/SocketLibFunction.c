@@ -15,16 +15,17 @@ ox_socket_init(void)
     bool ret = true;
     #if defined PLATFORM_WINDOWS
     static bool WinSockIsInit = false;
-    if(!WinSockIsInit)
+    if(WinSockIsInit)
     {
-        if(WSAStartup(MAKEWORD(2,2), &g_WSAData) == 0)
-        {
-            WinSockIsInit = true;
-        }
-        else
-        {
-            ret = false;
-        }
+        return true;
+    }
+    if (WSAStartup(MAKEWORD(2, 2), &g_WSAData) == 0)
+    {
+        WinSockIsInit = true;
+    }
+    else
+    {
+        ret = false;
     }
     #else
     signal(SIGPIPE, SIG_IGN);
@@ -99,73 +100,50 @@ ox_socket_connect(bool isIPV6, const char* server_ip, int port)
     sock clientfd = SOCKET_ERROR;
     ox_socket_init();
 
-    clientfd = isIPV6 ? ox_socket_create(AF_INET6, SOCK_STREAM, 0) : ox_socket_create(AF_INET, SOCK_STREAM, 0);
+    clientfd = isIPV6 ? 
+        ox_socket_create(AF_INET6, SOCK_STREAM, 0) : 
+        ox_socket_create(AF_INET, SOCK_STREAM, 0);
 
-    if(clientfd != SOCKET_ERROR)
+    if(clientfd == SOCKET_ERROR)
     {
-        bool ptonResult = false;
-        if (isIPV6)
-        {
-            memset(&ip6Addr, 0, sizeof(ip6Addr));
-            ip6Addr.sin6_family = AF_INET6;
-            ip6Addr.sin6_port = htons(port);
-            ptonResult = inet_pton(AF_INET6, server_ip, &ip6Addr.sin6_addr) > 0;
-            paddr = (struct sockaddr_in*)&ip6Addr;
-            addrLen = sizeof(ip6Addr);
-        }
-        else
-        {
-            ip4Addr.sin_family = AF_INET;
-            ip4Addr.sin_port = htons(port);
-            ptonResult = inet_pton(AF_INET, server_ip, &ip4Addr.sin_addr) > 0;
-        }
-
-        while (connect(clientfd, (struct sockaddr*)paddr, addrLen) < 0)
-        {
-            int e = sErrno;
-            if(EINTR == sErrno)
-            {
-                continue;
-            }
-            else
-            {
-                ox_socket_close(clientfd);
-                clientfd = SOCKET_ERROR;
-                break;
-            }
-        }
+        return clientfd;
     }
 
-    return clientfd;
-}
-
-sock
-ox_socket_nonblockconnect(const char* server_ip, int port, int timeout)
-{
-    ox_socket_init();
-
-    struct sockaddr_in server_addr;
-    sock  clientfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (clientfd != SOCKET_ERROR)
+    bool ptonResult = false;
+    if (isIPV6)
     {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_addr.s_addr = inet_addr(server_ip);
-        server_addr.sin_port = htons(port);
-        ox_socket_nonblock(clientfd);
-        connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
+        memset(&ip6Addr, 0, sizeof(ip6Addr));
+        ip6Addr.sin6_family = AF_INET6;
+        ip6Addr.sin6_port = htons(port);
+        ptonResult = inet_pton(AF_INET6, server_ip, &ip6Addr.sin6_addr) > 0;
+        paddr = (struct sockaddr_in*)&ip6Addr;
+        addrLen = sizeof(ip6Addr);
+    }
+    else
+    {
+        ip4Addr.sin_family = AF_INET;
+        ip4Addr.sin_port = htons(port);
+        ptonResult = inet_pton(AF_INET, server_ip, &ip4Addr.sin_addr) > 0;
+    }
 
-#ifdef PLATFORM_WINDOWS
-        WSAPOLLFD pfd;
-        pfd.fd = clientfd;
-        pfd.events = POLLOUT;
-        if (WSAPoll(&pfd, 1, timeout) != 1 || pfd.revents != POLLOUT)
+    if (!ptonResult)
+    {
+        ox_socket_close(clientfd);
+        clientfd = SOCKET_ERROR;
+        return SOCKET_ERROR;
+    }
+
+    while (connect(clientfd, (struct sockaddr*)paddr, addrLen) < 0)
+    {
+        int e = sErrno;
+        if (EINTR == sErrno)
         {
-            ox_socket_close(clientfd);
-            clientfd = SOCKET_ERROR;
+            continue;
         }
-#else
-#endif
+
+        ox_socket_close(clientfd);
+        clientfd = SOCKET_ERROR;
+        break;
     }
 
     return clientfd;
@@ -182,44 +160,52 @@ ox_socket_listen(bool isIPV6, const char* ip, int port, int back_num)
 
     ox_socket_init();
 
-    socketfd = isIPV6 ? socket(AF_INET6, SOCK_STREAM, 0) : socket(AF_INET, SOCK_STREAM, 0);
-
-    if(socketfd != SOCKET_ERROR)
+    socketfd = isIPV6 ? 
+        socket(AF_INET6, SOCK_STREAM, 0) : 
+        socket(AF_INET, SOCK_STREAM, 0);
+    if(socketfd == SOCKET_ERROR)
     {
-        bool ptonResult = false;
-        if (isIPV6)
-        {
-            memset(&ip6Addr, 0, sizeof(ip6Addr));
-            ip6Addr.sin6_family = AF_INET6;
-            ip6Addr.sin6_port = htons(port);
-            ptonResult = inet_pton(AF_INET6, ip, &ip6Addr.sin6_addr) > 0;
-            paddr = (struct sockaddr_in*)&ip6Addr;
-            addrLen = sizeof(ip6Addr);
-        }
-        else
-        {
-            ip4Addr.sin_family = AF_INET;
-            ip4Addr.sin_port = htons(port);
-            ip4Addr.sin_addr.s_addr = INADDR_ANY;
-            ptonResult = inet_pton(AF_INET, ip, &ip4Addr.sin_addr) > 0;
-        }
+        return SOCKET_ERROR;
+    }
 
-        int reuseaddr_value = 1;
-        if (ptonResult && setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseaddr_value, sizeof(int)) >= 0)
-        {
-            int bindRet = bind(socketfd, (struct sockaddr*)paddr, addrLen);
-            if (bindRet == SOCKET_ERROR ||
-                listen(socketfd, back_num) == SOCKET_ERROR)
-            {
-                ox_socket_close(socketfd);
-                socketfd = SOCKET_ERROR;
-            }
-        }
-        else
-        {
-            ox_socket_close(socketfd);
-            socketfd = SOCKET_ERROR;
-        }
+    bool ptonResult = false;
+    if (isIPV6)
+    {
+        memset(&ip6Addr, 0, sizeof(ip6Addr));
+        ip6Addr.sin6_family = AF_INET6;
+        ip6Addr.sin6_port = htons(port);
+        ptonResult = inet_pton(AF_INET6, ip, &ip6Addr.sin6_addr) > 0;
+        paddr = (struct sockaddr_in*)&ip6Addr;
+        addrLen = sizeof(ip6Addr);
+    }
+    else
+    {
+        ip4Addr.sin_family = AF_INET;
+        ip4Addr.sin_port = htons(port);
+        ip4Addr.sin_addr.s_addr = INADDR_ANY;
+        ptonResult = inet_pton(AF_INET, ip, &ip4Addr.sin_addr) > 0;
+    }
+
+    int reuseaddr_value = 1;
+    if (!ptonResult || 
+        setsockopt(socketfd, 
+            SOL_SOCKET, 
+            SO_REUSEADDR, 
+            (const char *)&reuseaddr_value, 
+            sizeof(int)) < 0)
+    {
+        ox_socket_close(socketfd);
+        socketfd = SOCKET_ERROR;
+        return SOCKET_ERROR;
+    }
+
+    int bindRet = bind(socketfd, (struct sockaddr*)paddr, addrLen);
+    if (bindRet == SOCKET_ERROR ||
+        listen(socketfd, back_num) == SOCKET_ERROR)
+    {
+        ox_socket_close(socketfd);
+        socketfd = SOCKET_ERROR;
+        return SOCKET_ERROR;
     }
 
     return socketfd;

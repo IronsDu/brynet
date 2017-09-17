@@ -24,7 +24,11 @@ namespace brynet
 
             void                startThread();
             void                destroy();
-            void                asyncConnect(const char* ip, int port, int ms, COMPLETED_CALLBACK, FAILED_CALLBACK);
+            void                asyncConnect(const std::string& ip, 
+                                             int port, 
+                                             std::chrono::nanoseconds timeout,
+                                             COMPLETED_CALLBACK, 
+                                             FAILED_CALLBACK);
 
             static  PTR         Create();
 

@@ -54,7 +54,8 @@ namespace brynet
             /*主动断开此id链接，但仍然会收到此id的断开回调，需要上层逻辑自己处理这个"问题"(尽量统一在断开回调函数里做清理等工作) */
             void                                disConnect(SESSION_TYPE id) const;
 
-            void                                setPingCheckTime(SESSION_TYPE id, int checktime);
+            void                                setPingCheckTime(SESSION_TYPE id, 
+                                                                 std::chrono::nanoseconds checktime);
             
             // TODO:: 改掉 SSL和listenThread的使用
             bool                                addDataSocket(sock fd,

@@ -146,7 +146,9 @@ namespace brynet
         std::shared_ptr<PromiseRecieve> setupPromiseReceive(const TCPSession::PTR& session)
         {
             auto promiseReceive = std::make_shared<PromiseRecieve>();
-            session->setDataCallback([promiseReceive](const TCPSession::PTR& session, const char* buffer, size_t len) {
+            session->setDataCallback([promiseReceive](const TCPSession::PTR& session, 
+                const char* buffer, 
+                size_t len) {
                 return promiseReceive->process(buffer, len);
             });
 

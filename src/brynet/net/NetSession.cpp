@@ -2,7 +2,11 @@
 
 using namespace brynet::net;
 
-void WrapAddNetSession(WrapTcpService::PTR service, sock fd, BaseNetSession::PTR connection, int pingCheckTime, size_t maxRecvBufferSize)
+void WrapAddNetSession(WrapTcpService::PTR service, 
+    sock fd, 
+    BaseNetSession::PTR connection, 
+    std::chrono::nanoseconds pingCheckTime,
+    size_t maxRecvBufferSize)
 {
     service->addSession(fd, [connection, service, pingCheckTime](const TCPSession::PTR& session) {
         connection->setSession(service, session, session->getIP());
