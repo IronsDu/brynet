@@ -36,15 +36,6 @@ namespace brynet
             static  PTR                         Create();
 
         public:
-            /*  设置默认事件回调    */
-            void                                setEnterCallback(TcpService::ENTER_CALLBACK callback);
-            void                                setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
-            void                                setDataCallback(TcpService::DATA_CALLBACK callback);
-
-            const TcpService::ENTER_CALLBACK&       getEnterCallback() const;
-            const TcpService::DISCONNECT_CALLBACK&  getDisconnectCallback() const;
-            const TcpService::DATA_CALLBACK&        getDataCallback() const;
-
             void                                send(SESSION_TYPE id, 
                                                     const DataSocket::PACKET_PTR& packet, 
                                                     const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
@@ -98,11 +89,6 @@ namespace brynet
             bool                                mRunIOLoop;
 
             std::mutex                          mServiceGuard;
-
-            /*  以下三个回调函数会在多线程中调用(每个线程即一个eventloop驱动的io loop)(见：RunListen中的使用)   */
-            TcpService::ENTER_CALLBACK          mEnterCallback;
-            TcpService::DISCONNECT_CALLBACK     mDisConnectCallback;
-            TcpService::DATA_CALLBACK           mDataCallback;
         };
 
         void IOLoopDataSend(const std::shared_ptr<IOLoopData>&, TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback);

@@ -1,12 +1,12 @@
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/http/HttpService.h>
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/http/WebSocketFormat.h>
 #include <brynet/net/Connector.h>
-#include <brynet/utils/systemlib.h>
 
 typedef  uint32_t PACKET_LEN_TYPE;
 
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     int backendPort = atoi(argv[3]);
 
     auto tcpService = std::make_shared<WrapTcpService>();
-    tcpService->startWorkThread(ox_getcpunum());
+    tcpService->startWorkThread(std::thread::hardware_concurrency());
 
     auto asyncConnector = AsyncConnector::Create();
     asyncConnector->startThread();
@@ -39,15 +39,16 @@ int main(int argc, char **argv)
     // listen for front http client
     listenThread->startListen(false, "0.0.0.0", bindPort, [tcpService, asyncConnector, backendIP, backendPort](sock fd) {
         tcpService->addSession(fd, [tcpService, asyncConnector, backendIP, backendPort](const TCPSession::PTR& session) {
-            HttpService::setup(session, [tcpService, asyncConnector, backendIP, backendPort](const HttpSession::PTR& clientWebSession) {
-                clientWebSession->setUD(static_cast<int>(1));
-                std::shared_ptr<TCPSession::PTR> shareBackendSession = std::make_shared<TCPSession::PTR>(nullptr);
-                std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
+            session->setUD(static_cast<int64_t>(1));
+            std::shared_ptr<TCPSession::PTR> shareBackendSession = std::make_shared<TCPSession::PTR>(nullptr);
+            std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
-                /* new connect to backend server */
-                asyncConnector->asyncConnect(backendIP.c_str(), backendPort, std::chrono::seconds(10), [tcpService, clientWebSession, shareBackendSession, cachePacket](sock fd) {
+            /* new connect to backend server */
+            asyncConnector->asyncConnect(backendIP.c_str(), backendPort, std::chrono::seconds(10), [tcpService, session, shareBackendSession, cachePacket](sock fd) {
+                if (true)
+                {
                     tcpService->addSession(fd, [=](const TCPSession::PTR& backendSession) {
-                        auto ud = brynet::net::cast<int64_t>(clientWebSession->getUD());
+                        auto ud = brynet::net::cast<int64_t>(session->getUD());
                         if (*ud == -1)   /*if http client already close*/
                         {
                             backendSession->postClose();
@@ -64,78 +65,49 @@ int main(int argc, char **argv)
 
                         backendSession->setCloseCallback([=](const TCPSession::PTR& backendSession) {
                             *shareBackendSession = nullptr;
-                            auto ud = brynet::net::cast<int64_t>(clientWebSession->getUD());
+                            auto ud = brynet::net::cast<int64_t>(session->getUD());
                             if (*ud != -1)
                             {
-                                clientWebSession->postClose();
+                                session->postClose();
                             }
                         });
 
                         backendSession->setDataCallback([=](const TCPSession::PTR& backendSession, const char* buffer, size_t size) {
                             /* recieve data from backend server, then send to http client */
-                            size_t totalProcLen = 0;
-
-                            const char* parse_str = buffer;
-                            PACKET_LEN_TYPE left_len = size;
-
-                            while (true)
-                            {
-                                bool flag = false;
-                                if (left_len >= PACKET_HEAD_LEN)
-                                {
-                                    PACKET_LEN_TYPE packet_len = (*(PACKET_LEN_TYPE*)parse_str);
-                                    if (left_len >= packet_len && packet_len >= PACKET_HEAD_LEN)
-                                    {
-                                        std::string sendPayload(parse_str, packet_len);
-                                        std::string sendFrame;
-                                        WebSocketFormat::wsFrameBuild(sendPayload, sendFrame);
-
-                                        clientWebSession->send(sendFrame.c_str(), sendFrame.size());
-
-                                        totalProcLen += packet_len;
-                                        parse_str += packet_len;
-                                        left_len -= packet_len;
-                                        flag = true;
-                                    }
-                                }
-
-                                if (!flag)
-                                {
-                                    break;
-                                }
-                            }
-
-                            return totalProcLen;
+                            session->send(buffer, size);
+                            return size;
                         });
-                    }, false, nullptr, 32*1024, true); //TODO
-                }, nullptr);
+                    }, false, nullptr, 32 * 1024, false); //TODO
+                }
+            }, nullptr);
 
-                clientWebSession->setWSCallback([=](const HttpSession::PTR&, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) {
-                    TCPSession::PTR backendSession = *shareBackendSession;
-                    if (backendSession == nullptr)
-                    {
-                        /*cache it*/
-                        cachePacket->push_back(payload);
-                    }
-                    else
-                    {
-                        /* receive data from http client, then send to backend server */
-                        backendSession->send(payload.c_str(), payload.size());
-                    }
-                });
+            session->setDataCallback([=](const TCPSession::PTR&, const char* buffer, size_t size) {
+                TCPSession::PTR backendSession = *shareBackendSession;
+                if (backendSession == nullptr)
+                {
+                    /*cache it*/
+                    cachePacket->push_back(std::string(buffer, size));
+                }
+                else
+                {
+                    /* receive data from http client, then send to backend server */
+                    backendSession->send(buffer, size);
+                }
 
-                clientWebSession->setCloseCallback([=](const HttpSession::PTR& clientWebSession) {
-                    /*if http client close, then close it's backend server */
-                    TCPSession::PTR backendSession = *shareBackendSession;
-                    if (backendSession != nullptr)
-                    {
-                        backendSession->postClose();
-                    }
-
-                    clientWebSession->setUD(-1);
-                });
+                return size;
             });
-        }, false, nullptr, 1024*1024);
+
+            session->setCloseCallback([=](const TCPSession::PTR& session) {
+                /*if http client close, then close it's backend server */
+                TCPSession::PTR backendSession = *shareBackendSession;
+                if (backendSession != nullptr)
+                {
+                    backendSession->postClose();
+                }
+
+                session->setUD(-1);
+            });
+        }, false, nullptr, 32 * 1024);
     });
     
     std::cin.get();

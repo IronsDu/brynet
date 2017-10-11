@@ -7,7 +7,6 @@
 #include <brynet/net/http/HttpService.h>
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/http/WebSocketFormat.h>
-#include <brynet/utils/systemlib.h>
 
 using namespace brynet;
 using namespace brynet::net;

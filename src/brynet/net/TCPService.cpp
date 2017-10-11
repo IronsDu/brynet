@@ -62,7 +62,7 @@ namespace brynet
             std::shared_ptr<std::thread>    mIOThread;
 
             TypeIDS<DataSocket::PTR>        mDataSockets;
-            int                             incId;
+            int                             mNextId;
 
             friend class TcpService;
         };
@@ -86,47 +86,12 @@ TcpService::TcpService() noexcept
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), 
         "sizeof SessionId must equal int64_t");
-
-    mEnterCallback = nullptr;
-    mDisConnectCallback = nullptr;
-    mDataCallback = nullptr;
-
     mRunIOLoop = false;
 }
 
 TcpService::~TcpService() noexcept
 {
     stopWorkerThread();
-}
-
-void TcpService::setEnterCallback(TcpService::ENTER_CALLBACK callback)
-{
-    mEnterCallback = std::move(callback);
-}
-
-void TcpService::setDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback)
-{
-    mDisConnectCallback = std::move(callback);
-}
-
-void TcpService::setDataCallback(TcpService::DATA_CALLBACK callback)
-{
-    mDataCallback = std::move(callback);
-}
-
-const TcpService::ENTER_CALLBACK& TcpService::getEnterCallback() const
-{
-    return mEnterCallback;
-}
-
-const TcpService::DISCONNECT_CALLBACK& TcpService::getDisconnectCallback() const
-{
-    return mDisConnectCallback;
-}
-
-const TcpService::DATA_CALLBACK& TcpService::getDataCallback() const
-{
-    return mDataCallback;
 }
 
 void TcpService::send(SESSION_TYPE id, 
@@ -185,7 +150,7 @@ void TcpService::postSessionAsyncProc(SESSION_TYPE id,
             ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp) &&
             tmp != nullptr)
         {
-            auto ud = brynet::net::cast<SESSION_TYPE>(tmp->getUD());
+            const auto ud = brynet::net::cast<SESSION_TYPE>(tmp->getUD());
             if (ud != nullptr && *ud == sid.id)
             {
                 callbackCapture(tmp);
@@ -516,7 +481,7 @@ IOLoopData::PTR IOLoopData::Create(EventLoop::PTR eventLoop, std::shared_ptr<std
 }
 
 IOLoopData::IOLoopData(EventLoop::PTR eventLoop, std::shared_ptr<std::thread> ioThread)
-    : mEventLoop(std::move(eventLoop)), mIOThread(std::move(ioThread))
+    : mEventLoop(std::move(eventLoop)), mIOThread(std::move(ioThread)), mNextId(0)
 {}
 
 const EventLoop::PTR& IOLoopData::getEventLoop() const
@@ -536,7 +501,7 @@ std::shared_ptr<std::thread>& IOLoopData::getIOThread()
 
 int IOLoopData::incID()
 {
-    return incId++;
+    return mNextId++;
 }
 
 void IOLoopData::send(TcpService::SESSION_TYPE id, 
@@ -555,7 +520,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
         if (mDataSockets.get(sid.data.index, tmp) &&
             tmp != nullptr)
         {
-            auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
+            const auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
             if (ud != nullptr && *ud == sid.id)
             {
                 tmp->sendPacketInLoop(packet, callback);
@@ -572,7 +537,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
             if (ioLoopDataCapture->mDataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)
             {
-                auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
+                const auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
                 if (ud != nullptr && *ud == sid.id)
                 {
                     tmp->sendPacketInLoop(packetCapture, callbackCapture);

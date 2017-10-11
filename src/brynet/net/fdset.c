@@ -204,7 +204,7 @@ ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type)
     int i = 0;
     for (; i < self->nfds; i++)
     {
-        struct pollfd* pf = self->pollFds + i;
+        const struct pollfd* pf = self->pollFds + i;
         if (pf->fd != fd)
         {
             continue;

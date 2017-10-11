@@ -207,7 +207,7 @@ void EventLoop::loop(int64_t milliseconds)
     for (ULONG i = 0; i < numComplete; ++i)
     {
         auto channel = (Channel*)mEventEntries[i].lpCompletionKey;
-        auto ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
+        const auto ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
         if (ovl->OP == EventLoop::OLV_VALUE::OVL_RECV)
         {
             channel->canRecv();
@@ -323,7 +323,7 @@ void EventLoop::pushAsyncProc(USER_PROC f)
     {
         {
             std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
-            mAsyncProcs.push_back(std::move(f));
+            mAsyncProcs.emplace_back(std::move(f));
         }
         wakeup();
     }
@@ -334,7 +334,7 @@ void EventLoop::pushAfterLoopProc(USER_PROC f)
     assert(isInLoopThread());
     if (isInLoopThread())
     {
-        mAfterLoopProcs.push_back(std::move(f));
+        mAfterLoopProcs.emplace_back(std::move(f));
     }
 }
 
@@ -350,6 +350,7 @@ void EventLoop::reallocEventSize(size_t size)
     if (mEventEntries != nullptr)
     {
         delete[] mEventEntries;
+        mEventEntries = nullptr;
     }
 
 #ifdef PLATFORM_WINDOWS

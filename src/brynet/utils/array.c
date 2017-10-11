@@ -125,7 +125,7 @@ ox_array_increase(struct array_s* self, int increase_num)
 }
 
 int 
-ox_array_num(struct array_s* self)
+ox_array_num(const struct array_s* self)
 {
     return self->element_num;
 }

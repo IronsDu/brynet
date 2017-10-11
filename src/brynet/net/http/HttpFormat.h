@@ -157,9 +157,8 @@ namespace brynet
                 OK = 200,
             };
 
-            HttpResponse()
+            HttpResponse() : mStatus(HTTP_RESPONSE_STATUS::OK)
             {
-                setStatus(HTTP_RESPONSE_STATUS::OK);
             }
 
             void        setStatus(HTTP_RESPONSE_STATUS status)

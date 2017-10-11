@@ -30,7 +30,6 @@ set(timer_src_list
 set(base_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/systemlib.c
 )
 
 set(http_src_list

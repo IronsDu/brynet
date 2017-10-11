@@ -110,8 +110,7 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
     while (len_flag != nullptr)
     {
         std::string numstr(tmp, len_flag);
-        int    nValude = 0;
-        sscanf(numstr.c_str(), "%x", &nValude);
+        auto nValude = std::stoi(numstr, nullptr, 10);
 
         /*Ìø¹ýLen×Ö¶ÎºóµÄRL*/
         len_flag += (RL_LEN);

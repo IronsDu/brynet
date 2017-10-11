@@ -45,7 +45,7 @@ ox_socket_destroy(void)
 int
 ox_socket_nodelay(sock fd)
 {
-    int flag = 1;
+    const int flag = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
 }
 
@@ -186,7 +186,7 @@ ox_socket_listen(bool isIPV6, const char* ip, int port, int back_num)
         ptonResult = inet_pton(AF_INET, ip, &ip4Addr.sin_addr) > 0;
     }
 
-    int reuseaddr_value = 1;
+    const int reuseaddr_value = 1;
     if (!ptonResult || 
         setsockopt(socketfd, 
             SOL_SOCKET, 

@@ -21,7 +21,7 @@ namespace brynet
         class AsyncConnectAddr
         {
         public:
-            AsyncConnectAddr() noexcept
+            AsyncConnectAddr() noexcept : mTimeout(std::chrono::nanoseconds::zero())
             {
                 mPort = 0;
             }
@@ -88,6 +88,11 @@ namespace brynet
 
             struct ConnectingInfo
             {
+                ConnectingInfo()
+                {
+                    timeout = std::chrono::nanoseconds::zero();
+                }
+
                 std::chrono::steady_clock::time_point   startConnectTime;
                 std::chrono::nanoseconds                timeout;
                 AsyncConnector::COMPLETED_CALLBACK      successCB;

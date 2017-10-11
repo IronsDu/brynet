@@ -2,13 +2,13 @@
 #include <string>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/http/HttpService.h>
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/http/WebSocketFormat.h>
 #include <brynet/utils/packet.h>
-#include <brynet/utils/systemlib.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     const char* host = argv[1];
     int port = std::atoi(argv[2]);
     int connections = argc > 3 ? std::atoi(argv[3]) : 200;
-    size_t workers = argc > 4 ? std::atoi(argv[4]) : ox_getcpunum();
+    size_t workers = argc > 4 ? std::atoi(argv[4]) : std::thread::hardware_concurrency();
     
     std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << workers << std::endl;
     
