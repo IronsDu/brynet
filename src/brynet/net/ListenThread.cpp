@@ -95,13 +95,13 @@ bool ListenThread::initSSL(const std::string& certificate, const std::string& pr
         SSL_CTX_free(mOpenSSLCTX);
         mOpenSSLCTX = nullptr;
     }
-    /* 载入用户私钥 */
+
     if (SSL_CTX_use_PrivateKey_file(mOpenSSLCTX, privatekey.c_str(), SSL_FILETYPE_PEM) <= 0)
     {
         SSL_CTX_free(mOpenSSLCTX);
         mOpenSSLCTX = nullptr;
     }
-    /* 检查用户私钥是否正确 */
+
     if (!SSL_CTX_check_private_key(mOpenSSLCTX))
     {
         SSL_CTX_free(mOpenSSLCTX);

@@ -51,18 +51,13 @@ namespace brynet
             EventLoop() noexcept;
             virtual ~EventLoop() noexcept;
 
-            /*  timeout单位为毫秒    */
             void                            loop(int64_t milliseconds);
-
             bool                            wakeup();
 
-            /*  投递一个异步回调，在EventLoop::loop被唤醒后执行 */
             void                            pushAsyncProc(USER_PROC f);
-
-            /*  (网络线程中调用才会成功)投递回调放置在单次loop结尾时执行   */
             void                            pushAfterLoopProc(USER_PROC f);
 
-            /*  非网络线程调用时返回nullptr   */
+            /* return nullptr if not called in net thread*/
             TimerMgr::PTR                   getTimerMgr();
 
             inline bool                     isInLoopThread() const
@@ -100,16 +95,12 @@ namespace brynet
             std::atomic_bool                mIsAlreadyPostWakeup;
 
             std::mutex                      mAsyncProcsMutex;
-            /*  投递到此eventloop的异步function队列    */
             std::vector<USER_PROC>          mAsyncProcs;                
             std::vector<USER_PROC>          mCopyAsyncProcs;
 
-            /*  eventloop每次循环的末尾要执行的一系列函数   */
-            std::vector<USER_PROC>          mAfterLoopProcs; 
-            /*  用于在loop中代替mAfterLoopProcs进行遍历，避免遍历途中又添加新元素  */
-            std::vector<USER_PROC>          mCopyAfterLoopProcs;        
+            std::vector<USER_PROC>          mAfterLoopProcs;
+            std::vector<USER_PROC>          mCopyAfterLoopProcs;
 
-            /*  调用loop函数所在thread的id */
             std::once_flag                  mOnceInitThreadID;
             CurrentThread::THREAD_ID_TYPE   mSelfThreadID;             
 

@@ -13,22 +13,14 @@ namespace brynet
 {
     namespace net
     {
-        /*  
-            此结构用于标示一个回话
-            逻辑线程和网络线程通信中通过此结构对回话进行相关操作(而不是直接传递Channel/DataSocket指针)  
-        */
         union SessionId
         {
             struct
             {
-                uint16_t    loopIndex;      /*  会话所属的eventloop的(在mLoops中的)索引  */
-                uint16_t    index;          /*  会话在mDataSockets[loopIndex]中的索引值 */
-                uint32_t    iid;            /*  自增计数器   */
+                uint16_t    loopIndex;
+                uint16_t    index;
+                uint32_t    iid;
             }data;  
-            /*  
-                warn::so,服务器最大支持0xFFFF(65536)个io loop线程
-                每一个io loop最大支持0xFFFF(65536)个链接。
-            */
 
             TcpService::SESSION_TYPE id;
         };
@@ -350,7 +342,6 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
         }
         else
         {
-            /*  随机为此链接分配一个eventloop */
             loopIndex = randNum % mIOLoopDatas.size();
         }
 
@@ -510,10 +501,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
 {
     union  SessionId sid;
     sid.id = id;
-    /*  
-        如果当前处于网络线程则直接send,避免使用pushAsyncProc构造lambda(对速度有影响)
-        否则可使用postSessionAsyncProc 
-    */
+
     if (mEventLoop->isInLoopThread())
     {
         DataSocket::PTR tmp = nullptr;

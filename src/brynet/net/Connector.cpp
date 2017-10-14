@@ -144,8 +144,8 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
         return;
     }
 
-    std::set<sock>  total_fds;     /*  成功或失败  */
-    std::set<sock>  success_fds;   /*  成功队列    */
+    std::set<sock>  total_fds;
+    std::set<sock>  success_fds;
 
     for (auto& v : mConnectingFds)
     {
@@ -339,7 +339,7 @@ void AsyncConnector::destroy()
     mWorkInfo = nullptr;
 }
 
-//TODO::处理已经销毁了工作线程，再投递异步链接请求的问题（无限等待）
+//TODO::if work thread stop, will not have result forever
 void AsyncConnector::asyncConnect(const std::string& ip, 
     int port, 
     std::chrono::nanoseconds timeout,

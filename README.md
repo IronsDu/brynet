@@ -1,6 +1,6 @@
 Brynet
 =======
-Cross platform high performance TCP network library and RPC library using C++ 11.
+Cross platform high performance TCP network library using C++ 11.
 
 Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyqlw3ekua/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/dodo/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/dodo.svg?branch=master)](https://travis-ci.org/IronsDu/dodo)
 
@@ -10,9 +10,8 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 * None depend
 * Multi-threaded
 * SSL support
-* Support HTTP、HTTPS、WebSocket protocol
+* Support HTTP、HTTPS、WebSocket
 * IPv6 support
-* [RPC Library](https://github.com/IronsDu/brynet/tree/master/src/rpc)
 
 ## Build
 1. `cmake .`
@@ -82,9 +81,6 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 
 I suggest you use the second or thrid way above, because don't worry memory manager
 
-## About RPC
-  moved to [DRPC](https://github.com/IronsDu/drpc)
-
 Examples
 ----------------------------
 * [PingPongServer](https://github.com/IronsDu/dodo/blob/master/examples/PingPongServer.cpp)
@@ -95,7 +91,6 @@ Examples
 * [BenchWebsocket](https://github.com/IronsDu/dodo/blob/master/examples/BenchWebsocket.cpp) benchmark websocket client
 * [PromiseReceive](https://github.com/IronsDu/brynet/blob/master/examples/TestPromiseReceive.cpp) use the promise style receive http response
 * [WebSocketProxy](https://github.com/IronsDu/dodo/blob/master/examples/WebBinaryProxy.cpp) one proxy server between websocket client and binary protocol server
-* [SimpleRpcServer](https://github.com/IronsDu/dodo/blob/master/examples/SimpleRpcServer.cpp) rpc server use http and protobuf
 * more examples please see [examples](https://github.com/IronsDu/dodo/tree/master/examples);
 
 Users
@@ -103,3 +98,5 @@ Users
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [Distributed game server framework](https://github.com/IronsDu/DServerFramework)
 * [Joynet - Lua network library](https://github.com/IronsDu/Joynet)
+* [HTTP-RPC](https://github.com/IronsDu/http-rpc)
+* [grpc-gateway](https://github.com/IronsDu/grpc-gateway)

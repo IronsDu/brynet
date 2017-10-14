@@ -17,13 +17,12 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
 
     HttpServer server;
     dodo::Timer::WeakPtr timer;
-    server.startWorkThread(1);  /*必须为1个线程*/
+    server.startWorkThread(1);
 
     sock fd = ox_socket_connect(false, ip.c_str(), port);
     if (fd != SOCKET_ERROR)
     {
         server.addConnection(fd, [kv, url, &mtx, &cv, &server, &timer, timeout, protocol](HttpSession::PTR session){
-            /*注册超时定时器*/
             timer = server.getServer()->getService()->getRandomEventLoop()->getTimerMgr()->addTimer(timeout, [session](){
                 session->postClose();
             });
@@ -48,14 +47,12 @@ static HTTPParser etcdHelp(const std::string& ip, int port, HttpFormat::HTTP_TYP
 
         }, [&cv, &result, &timer](const HTTPParser& httpParser, HttpSession::PTR session){
             result = httpParser;
-            /*关闭连接,并删除超时定时器*/
             session->postClose();
             if (timer.lock() != nullptr)
             {
                 timer.lock()->cancel();
             }
         }, nullptr, [&cv, &timer](HttpSession::PTR session){
-            /*收到断开通知,通知等待线程*/
             if (timer.lock() != nullptr)
             {
                 timer.lock()->cancel();

@@ -8,9 +8,9 @@ namespace brynet
     namespace net
     {
         /* binary search in memory */
-        int memsearch(const char *hay, int haysize, const char *needle, int needlesize)
+        void memsearch(const char *hay, size_t haysize, const char *needle, size_t needlesize, size_t& result, bool& isOK)
         {
-            int haypos, needlepos;
+            size_t haypos, needlepos;
             haysize -= needlesize;
 
             for (haypos = 0; haypos <= haysize; haypos++)
@@ -25,11 +25,13 @@ namespace brynet
                 }
                 if (needlepos == needlesize)
                 {
-                    return haypos;
+                    result = haypos;
+                    isOK = true;
+                    return;
                 }
             }
 
-            return -1;
+            isOK = false;
         }
 
         class PromiseRecieve;
@@ -103,12 +105,16 @@ namespace brynet
                     }
                     else if (!pendingReceive->str.empty())
                     {
-                        auto pos = memsearch(buffer + procLen,
+                        size_t pos = 0;
+                        bool isOK = false;
+                        memsearch(buffer + procLen,
                             len-procLen, 
                             pendingReceive->str.c_str(), 
-                            pendingReceive->str.size());
+                            pendingReceive->str.size(),
+                            pos,
+                            isOK);
 
-                        if (pos < 0)
+                        if (!isOK)
                         {
                             break;
                         }

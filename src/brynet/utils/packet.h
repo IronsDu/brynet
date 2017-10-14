@@ -116,7 +116,12 @@ namespace socketendian
 class BasePacketWriter
 {
 public:
-    BasePacketWriter(char* buffer, size_t len, bool useBigEndian = true, bool isAutoMalloc = false) : mBigEndian(useBigEndian), mIsAutoMalloc(isAutoMalloc)
+    BasePacketWriter(char* buffer, 
+        size_t len, 
+        bool useBigEndian = true, 
+        bool isAutoMalloc = false) : 
+        mBigEndian(useBigEndian), 
+        mIsAutoMalloc(isAutoMalloc)
     {
         mMaxLen = len;
         mPos = 0;
@@ -225,7 +230,6 @@ public:
         }
     }
 
-    /*writev接口写入可变参数*/
     template<typename Arg1, typename... Args>
     void            writev(const Arg1& arg1, const Args&... args)
     {
@@ -291,7 +295,7 @@ public:
         writeBinary(v);
         return *this;
     }
-    /*写入自定义类型对象的内存区，消息包里不记录其长度，反序列方则使用ReadPacket::read<T>(v)进行读取*/
+
     template<typename T>
     BasePacketWriter & operator << (const T& v)
     {
@@ -305,24 +309,28 @@ public:
 protected:
     void        growBuffer(size_t len)
     {
-        if (mIsAutoMalloc && (mPos + len) > mMaxLen)
+        if (!mIsAutoMalloc || (mPos + len) <= mMaxLen)
         {
-            char* newBuffer = (char*)malloc(mMaxLen + len);
-            if (newBuffer != nullptr)
-            {
-                memcpy(newBuffer, mBuffer, mPos);
-
-                if (mMallocBuffer != nullptr)
-                {
-                    free(mMallocBuffer);
-                    mMallocBuffer = nullptr;
-                }
-
-                mMaxLen += len;
-                mMallocBuffer = newBuffer;
-                mBuffer = newBuffer;
-            }
+            return;
         }
+
+        char* newBuffer = (char*)malloc(mMaxLen + len);
+        if (newBuffer == nullptr)
+        {
+            return;
+        }
+
+        memcpy(newBuffer, mBuffer, mPos);
+
+        if (mMallocBuffer != nullptr)
+        {
+            free(mMallocBuffer);
+            mMallocBuffer = nullptr;
+        }
+
+        mMaxLen += len;
+        mMallocBuffer = newBuffer;
+        mBuffer = newBuffer;
     }
 
 protected:
@@ -334,11 +342,14 @@ protected:
     char*       mMallocBuffer;
 };
 
-/*  使用传统二进制封包协议的Packet Writer   */
 class Packet : public BasePacketWriter
 {
 public:
-    Packet(char* buffer, size_t len, bool useBigEndian = true, bool isAutoMalloc = false) : BasePacketWriter(buffer, len, useBigEndian, isAutoMalloc)
+    Packet(char* buffer, 
+        size_t len, 
+        bool useBigEndian = true, 
+        bool isAutoMalloc = false) : 
+        BasePacketWriter(buffer, len, useBigEndian, isAutoMalloc)
     {
         mIsFinish = false;
     }
@@ -364,7 +375,6 @@ public:
         }
     }
 
-    /*写入二进制字符串，并记录其长度，反序列方使用ReadPacket::readBinary()读取*/
     void    writeBinary(const std::string& binary)
     {
         writeUINT32(static_cast<uint32_t>(binary.size()));
@@ -402,18 +412,20 @@ public:
 private:
     void        end()
     {
-        if (!mIsFinish)
+        if (mIsFinish)
         {
-            PACKET_LEN_TYPE len = socketendian::hostToNetwork32(static_cast<uint32_t>(mPos));
-            if (sizeof(len) <= mMaxLen)
-            {
-                memcpy(mBuffer, &len, sizeof(len));
-                mIsFinish = true;
-            }
-            else
-            {
-                assert(false);
-            }
+            return;
+        }
+
+        PACKET_LEN_TYPE len = socketendian::hostToNetwork32(static_cast<uint32_t>(mPos));
+        if (sizeof(len) <= mMaxLen)
+        {
+            memcpy(mBuffer, &len, sizeof(len));
+            mIsFinish = true;
+        }
+        else
+        {
+            assert(false);
         }
     }
 
@@ -424,7 +436,11 @@ private:
 class BasePacketReader
 {
 public:
-    BasePacketReader(const char* buffer, size_t len, bool useBigEndian = true) : mMaxLen(len), mBigEndian(useBigEndian)
+    BasePacketReader(const char* buffer, 
+        size_t len, 
+        bool useBigEndian = true) : 
+        mMaxLen(len), 
+        mBigEndian(useBigEndian)
     {
         mPos = 0;
         mBuffer = buffer;
@@ -523,7 +539,6 @@ public:
         return socketendian::networkToHost64(value, mBigEndian);
     }
 
-    /*读取某自定义类型*/
     template<typename T>
     void            read(T& value)
     {
@@ -548,7 +563,6 @@ protected:
     const char*     mBuffer;
 };
 
-/*  使用传统二进制封包协议的packet reader   */
 class ReadPacket : public BasePacketReader
 {
 public:
@@ -566,7 +580,6 @@ public:
         return readUINT16();
     }
     
-    /*读取二进制字符串*/
     std::string     readBinary()
     {
         std::string ret;
@@ -579,7 +592,7 @@ public:
         
         return ret;
     }
-    /*  调用方不可管理str内存，只能读操作*/
+
     bool            readBinary(const char*& str, size_t& outLen)
     {
         bool ret = false;
@@ -599,7 +612,12 @@ public:
 class SendPacket : public Packet
 {
 public:
-    SendPacket(PACKET_OP_TYPE op, char* buffer, size_t len, bool useBigEndian = true, bool isAutoMalloc = false) : Packet(buffer, len, useBigEndian, isAutoMalloc)
+    SendPacket(PACKET_OP_TYPE op, 
+        char* buffer, 
+        size_t len, 
+        bool useBigEndian = true, 
+        bool isAutoMalloc = false) : 
+        Packet(buffer, len, useBigEndian, isAutoMalloc)
     {
         setOP(op);
     }
@@ -631,7 +649,6 @@ typedef FixedPacket<256>        ShortPacket;
 typedef FixedPacket<512>        MiddlePacket;
 typedef FixedPacket<1024>       LongPacket;
 typedef AutoMallocPacket<32 * 1024>    BigPacket;
-
 
 template<typename T>
 static bool serializePBMsgToPacket(T& pbObj, Packet& packet)

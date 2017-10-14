@@ -20,14 +20,12 @@ namespace brynet
             typedef std::shared_ptr<ListenThread>   PTR;
             typedef std::function<void(sock fd)> ACCEPT_CALLBACK;
 
-            /*  开启监听线程  */
             void                                startListen(bool isIPV6, 
                                                             const std::string& ip,
                                                             int port,
                                                             ACCEPT_CALLBACK callback);
             void                                closeListenThread();
 
-            //TODO::将SSL换一个地方
 #ifdef USE_OPENSSL
             bool                                initSSL(const std::string& certificate, 
                                                         const std::string& privatekey);

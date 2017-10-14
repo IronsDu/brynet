@@ -162,11 +162,6 @@ void EventLoop::loop(int64_t milliseconds)
         return;
     }
 
-    /*  warn::
-        如果mAfterLoopProcs不为空（目前仅当第一次loop(时）
-        之前就添加了回调或者某会话断开处理中又向其他会话发送消息而新产生callback）
-        将timeout改为0，表示不阻塞iocp/epoll wait   
-    */
     if (!mAfterLoopProcs.empty())
     {
         milliseconds = 0;
@@ -188,12 +183,9 @@ void EventLoop::loop(int64_t milliseconds)
     }
     else
     {
-        /*  
-            对GQCS返回失败不予处理，正常流程下只存在于上层主动closesocket才发生此情况
-            且其会在onRecv中得到处理(最终释放会话资源)
-        */
         do
         {
+            /* don't check the return value of GQCS */
             GetQueuedCompletionStatus(mIOCP,
                 &mEventEntries[numComplete].dwNumberOfBytesTransferred,
                 &mEventEntries[numComplete].lpCompletionKey,
@@ -234,7 +226,6 @@ void EventLoop::loop(int64_t milliseconds)
         if (event_data & EPOLLRDHUP)
         {
             channel->canRecv();
-            /*  无条件调用断开处理(安全的，不会造成重复close)，以防canRecv里没有recv 断开通知*/
             channel->onClose();
             continue;
         }
@@ -259,7 +250,6 @@ void EventLoop::loop(int64_t milliseconds)
 
     if (numComplete == mEventEntriesNum)
     {
-        /*  如果事件被填充满了，则扩大事件结果队列大小，可以让一次epoll/iocp wait获得尽可能更多的通知 */
         reallocEventSize(mEventEntriesNum + 128);
     }
 

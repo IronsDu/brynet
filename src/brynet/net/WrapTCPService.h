@@ -15,7 +15,6 @@ namespace brynet
         class WrapTcpService;
         class IOLoopData;
 
-        /*  以智能指针对象为网络会话标识的网络服务   */
         class TCPSession : public NonCopyable
         {
         public:
@@ -91,7 +90,7 @@ namespace brynet
                                                         TcpService::FRAME_CALLBACK callback = nullptr);
             void                        stopWorkThread();
             
-            //TODO::改掉 ssl和listenThread的使用方式
+            //TODO::modify ssl
             void                        addSession(sock fd, 
                                                     const SESSION_ENTER_CALLBACK& userEnterCallback, 
                                                     bool isUseSSL,

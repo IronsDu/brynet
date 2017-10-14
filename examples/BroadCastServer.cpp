@@ -9,7 +9,6 @@
 #include <atomic>
 
 #include <brynet/utils/packet.h>
-#include <brynet/utils/systemlib.h>
 #include <brynet/net/SocketLibFunction.h>
 
 #include <brynet/net/EventLoop.h>
@@ -143,8 +142,15 @@ int main(int argc, char** argv)
         if (diff >= std::chrono::seconds(1))
         {
             auto msDiff = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-            std::cout << "cost " << msDiff << " ms, clientnum:" << getClientNum() << ", recv" << (TotalRecvLen / 1024) * 1000 / msDiff  << " K/s, " << "num : " << RecvPacketNum * 1000 / msDiff << ", send " <<
-                (TotalSendLen / 1024) / 1024 * 1000 / msDiff << " M/s, " << " num: " << SendPacketNum * 1000 / msDiff << std::endl;
+            std::cout << "cost " << 
+                msDiff << " ms, clientnum:" << 
+                getClientNum() << ", recv" <<
+                (TotalRecvLen / 1024) * 1000 / msDiff  << 
+                " K/s, " << "num : " << 
+                RecvPacketNum * 1000 / msDiff << ", send " <<
+                (TotalSendLen / 1024) / 1024 * 1000 / msDiff <<
+                " M/s, " << " num: " << 
+                SendPacketNum * 1000 / msDiff << std::endl;
             TotalRecvLen = 0;
             TotalSendLen = 0;
             RecvPacketNum = 0;

@@ -5,7 +5,6 @@
 #include <chrono>
 #include <brynet/net/WrapTCPService.h>
 
-/*应用服务器的网络层会话对象基类*/
 class BaseNetSession
 {
 public:
@@ -35,11 +34,8 @@ public:
         return mService;
     }
 
-    /*处理收到的数据*/
     virtual size_t  onMsg(const char* buffer, size_t len) = 0;
-    /*链接建立*/
     virtual void    onEnter() = 0;
-    /*链接断开*/
     virtual void    onClose() = 0;
 
     const std::string&  getIP() const

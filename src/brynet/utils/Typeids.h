@@ -7,8 +7,6 @@
 #include <stdexcept>
 #include <algorithm>
 
-/*采用ID管理对象的管理器*/
-
 namespace brynet
 {
     template<typename T>

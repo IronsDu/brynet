@@ -48,7 +48,6 @@ bool TimerMgr::isEmpty() const
     return mTimers.empty();
 }
 
-/* 返回定时器管理器中最近的一个定时器还需多久到期(如果定时器为空或已经到期则返回zero) */
 nanoseconds TimerMgr::nearLeftTime() const
 {
     if (mTimers.empty())

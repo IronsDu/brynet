@@ -53,7 +53,7 @@ namespace brynet
 
         void                                    schedule();
         bool                                    isEmpty() const;
-        // 最近的定时器的剩余超时时间(如果没有则为zero)
+        // if timer empty, return zero
         std::chrono::nanoseconds                nearLeftTime() const;
         void                                    clear();
 

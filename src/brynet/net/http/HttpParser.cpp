@@ -25,7 +25,7 @@ HTTPParser::HTTPParser(http_parser_type parserType) : mParserType(parserType)
     mSettings.on_chunk_header = sChunkHeader;
     mSettings.on_chunk_complete = sChunkComplete;
     mParser.data = this;
-    // 初始化解析器
+
     http_parser_init(&mParser, mParserType);
 }
 
@@ -112,7 +112,6 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
         std::string numstr(tmp, len_flag);
         auto nValude = std::stoi(numstr, nullptr, 10);
 
-        /*跳过Len字段后的RL*/
         len_flag += (RL_LEN);
         tmp = len_flag;
         if (tmp >= (copyBuffer.c_str() + len))
@@ -126,7 +125,6 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
             break;
         }
 
-        /*跳过数据*/
         len_flag += nValude;
         tmp = len_flag;
         if (tmp >= (copyBuffer.c_str() + len))
@@ -134,7 +132,6 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
             break;
         }
 
-        /*跳过其后的RL*/
         len_flag = strstr(tmp, RL);
         if (len_flag == nullptr)
         {
@@ -143,13 +140,11 @@ bool HTTPParser::checkCompleted(const char* buffer, size_t len)
 
         len_flag += RL_LEN;
         tmp = len_flag;
-        /*指向可能存在的下一个datalen末尾的rl*/
         len_flag = strstr(tmp, RL);
     }
 
     if (checkChunked)
     {
-        /*检查是否有拖挂数据*/
         if (*tmp == '\r')
         {
             const char* finish = strstr(tmp, RL);

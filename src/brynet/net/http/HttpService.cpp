@@ -134,7 +134,7 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
     {
         parseString.clear();
 
-        auto opcode = WebSocketFormat::WebSocketFrameType::ERROR_FRAME; /*TODO::opcode是否回传给回调函数*/
+        auto opcode = WebSocketFormat::WebSocketFrameType::ERROR_FRAME;
         size_t frameSize = 0;
         bool isFin = false;
         if (!WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
@@ -221,7 +221,6 @@ size_t HttpService::ProcessHttp(const char* buffer,
         }
         if (httpParser->isKeepAlive())
         {
-            /*清除本次http报文数据，为下一次http报文准备*/
             httpParser->clearParse();
         }
     }

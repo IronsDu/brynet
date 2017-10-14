@@ -221,12 +221,11 @@ struct schedule {
     LPVOID  main;
     struct array_s* cos;
 
-    /*  空闲ID  */
     struct stack_s* freeids;
 
     struct stack_s* active_list;
 
-    int current;        /*  当前运行的协程ID   */
+    int current;
 };
 
 struct coroutine {
@@ -313,7 +312,6 @@ VOID
         free(para);
     }
 
-    /*  回到主协程   */
     SwitchToFiber(s->main);
 }
 
@@ -364,7 +362,6 @@ void coroutine_yield(struct schedule * s) {
     int current = s->current;
     struct coroutine* co = *(struct coroutine**)(ox_array_at(s->cos, current));
     co->state = COROUTINE_SUSPEND;
-    /*  暂时挂起，放入活动列表末尾   */
     ox_stack_push(s->active_list, &current);
     s->current = -1;
 
@@ -374,7 +371,6 @@ void coroutine_yield(struct schedule * s) {
 void coroutine_block(struct schedule * s) {
     struct coroutine* co = *(struct coroutine**)(ox_array_at(s->cos, s->current));
     co->state = COROUTINE_BLOCK;
-
     s->current = -1;
     SwitchToFiber(s->main);
 }
@@ -384,7 +380,6 @@ void coroutine_block(struct schedule * s) {
 void coroutine_resume(struct schedule * s, int id) {
     struct coroutine* co = *(struct coroutine**)(ox_array_at(s->cos, id));
     if(co != NULL && co->state == COROUTINE_BLOCK) {
-        /*  激活某协程,放入活动列表    */
         co->state = COROUTINE_SUSPEND;
         ox_stack_push(s->active_list, &id);
     }
