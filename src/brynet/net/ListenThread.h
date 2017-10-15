@@ -25,13 +25,6 @@ namespace brynet
                                                             int port,
                                                             ACCEPT_CALLBACK callback);
             void                                closeListenThread();
-
-#ifdef USE_OPENSSL
-            bool                                initSSL(const std::string& certificate, 
-                                                        const std::string& privatekey);
-            void                                destroySSL();
-            SSL_CTX*                            getOpenSSLCTX();
-#endif
             static  PTR                         Create();
 
         private:
@@ -48,9 +41,6 @@ namespace brynet
             bool                                mRunListen;
             std::shared_ptr<std::thread>        mListenThread;
             std::mutex                          mListenThreadGuard;
-#ifdef USE_OPENSSL
-            SSL_CTX*                            mOpenSSLCTX;
-#endif
         };
     }
 }

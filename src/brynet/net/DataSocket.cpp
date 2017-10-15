@@ -261,6 +261,7 @@ void DataSocket::recv()
             break;
         }
 
+        /* TODO:: if retlen < tryRecvLen, check read */
         ox_buffer_addwritepos(mRecvBuffer, retlen);
         if (ox_buffer_getreadvalidcount(mRecvBuffer) == ox_buffer_getsize(mRecvBuffer))
         {
@@ -334,54 +335,80 @@ void DataSocket::normalFlush()
     {
         threadLocalSendBuf = (char*)malloc(SENDBUF_SIZE);
     }
-    
-SEND_PROC:
-    char* sendptr = threadLocalSendBuf;
-    size_t     wait_send_size = 0;
 
-    for (auto it = mSendList.begin(); it != mSendList.end(); ++it)
+    bool must_close = false;
+
+    while (!mSendList.empty())
     {
-        auto& packet = *it;
-        auto packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
-        auto packetLeftLen = packet.left;
+        char* sendptr = threadLocalSendBuf;
+        size_t     wait_send_size = 0;
 
-        if ((wait_send_size + packetLeftLen) > SENDBUF_SIZE)
+        for (auto it = mSendList.begin(); it != mSendList.end(); ++it)
         {
-            if (it == mSendList.begin())
+            auto& packet = *it;
+            auto packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
+            auto packetLeftLen = packet.left;
+
+            if ((wait_send_size + packetLeftLen) > SENDBUF_SIZE)
             {
-                sendptr = packetLeftBuf;
-                wait_send_size = packetLeftLen;
+                if (it == mSendList.begin())
+                {
+                    sendptr = packetLeftBuf;
+                    wait_send_size = packetLeftLen;
+                }
+                break;
             }
+
+            memcpy(sendptr + wait_send_size, packetLeftBuf, packetLeftLen);
+            wait_send_size += packetLeftLen;
+        }
+
+        if (wait_send_size <= 0)
+        {
             break;
         }
 
-        memcpy(sendptr + wait_send_size, packetLeftBuf, packetLeftLen);
-        wait_send_size += packetLeftLen;
-    }
-
-    if (wait_send_size <= 0)
-    {
-        return;
-    }
-    
-    bool must_close = false;
-
-    int send_retlen = 0;
+        int send_retlen = 0;
 #ifdef USE_OPENSSL
-    if (mSSL != nullptr)
-    {
-        send_retlen = SSL_write(mSSL, sendptr, wait_send_size);
-    }
-    else
-    {
-        send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
-    }
+        if (mSSL != nullptr)
+        {
+            send_retlen = SSL_write(mSSL, sendptr, wait_send_size);
+        }
+        else
+        {
+            send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
+        }
 #else
-    send_retlen = ::send(mFD, sendptr, static_cast<int>(wait_send_size), 0);
+        send_retlen = ::send(mFD, sendptr, static_cast<int>(wait_send_size), 0);
 #endif
+        if (send_retlen <= 0)
+        {
 
-    if (send_retlen > 0)
-    {
+#ifdef USE_OPENSSL
+            if ((mSSL != nullptr && SSL_get_error(mSSL, send_retlen) == SSL_ERROR_WANT_WRITE) ||
+                (sErrno == S_EWOULDBLOCK))
+            {
+                mCanWrite = false;
+                must_close = !checkWrite();
+            }
+            else
+            {
+                must_close = true;
+            }
+#else
+            if (sErrno == S_EWOULDBLOCK)
+            {
+                mCanWrite = false;
+                must_close = !checkWrite();
+            }
+            else
+            {
+                must_close = true;
+            }
+#endif
+            break;
+        }
+
         auto tmp_len = static_cast<size_t>(send_retlen);
         for (auto it = mSendList.begin(); it != mSendList.end();)
         {
@@ -400,43 +427,12 @@ SEND_PROC:
             it = mSendList.erase(it);
         }
 
-        if (send_retlen == wait_send_size)
-        {
-            if (!mSendList.empty())
-            {
-                goto SEND_PROC;
-            }
-        }
-        else
+        if (send_retlen != wait_send_size)
         {
             mCanWrite = false;
             must_close = !checkWrite();
+            break;
         }
-    }
-    else
-    {
-#ifdef USE_OPENSSL
-        if ((mSSL != nullptr && SSL_get_error(mSSL, send_retlen) == SSL_ERROR_WANT_WRITE) ||
-            (sErrno == S_EWOULDBLOCK))
-        {
-            mCanWrite = false;
-            must_close = !checkWrite();
-        }
-        else
-        {
-            must_close = true;
-        }
-#else
-        if (sErrno == S_EWOULDBLOCK)
-        {
-            mCanWrite = false;
-            must_close = !checkWrite();
-        }
-        else
-        {
-            must_close = true;
-        }
-#endif
     }
 
     if (must_close)
@@ -453,33 +449,47 @@ void DataSocket::quickFlush()
 #endif
 
     struct iovec iov[MAX_IOVEC];
-SEND_PROC:
     bool must_close = false;
-    int num = 0;
-    int ready_send_len = 0;
-    for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
-    {
-        pending_packet& b = *it;
-        iov[num].iov_base = (void*)(b.data->c_str() + (b.data->size() - b.left));
-        iov[num].iov_len = b.left;
-        ready_send_len += b.left;
 
-        ++it;
-        num++;
-        if (num >=  MAX_IOVEC)
+    while (!mSendList.empty())
+    {
+        int num = 0;
+        int ready_send_len = 0;
+        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+        {
+            pending_packet& b = *it;
+            iov[num].iov_base = (void*)(b.data->c_str() + (b.data->size() - b.left));
+            iov[num].iov_len = b.left;
+            ready_send_len += b.left;
+
+            ++it;
+            num++;
+            if (num >= MAX_IOVEC)
+            {
+                break;
+            }
+        }
+
+        if (num == 0)
         {
             break;
         }
-    }
 
-    if (num == 0)
-    {
-        return;
-    }
+        int send_len = writev(mFD, iov, num);
+        if (send_len <= 0)
+        {
+            if (sErrno == S_EWOULDBLOCK)
+            {
+                mCanWrite = false;
+                must_close = !checkWrite();
+            }
+            else
+            {
+                must_close = true;
+            }
+            break;
+        }
 
-    int send_len = writev(mFD, iov, num);
-    if (send_len > 0)
-    {
         int tmp_len = send_len;
         for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
@@ -498,29 +508,11 @@ SEND_PROC:
             it = mSendList.erase(it);
         }
 
-        if (send_len == ready_send_len)
-        {
-            if (!mSendList.empty())
-            {
-                goto SEND_PROC;
-            }
-        }
-        else
+        if (send_len != ready_send_len)
         {
             mCanWrite = false;
             must_close = !checkWrite();
-        }
-    }
-    else
-    {
-        if (sErrno == S_EWOULDBLOCK)
-        {
-            mCanWrite = false;
-            must_close = !checkWrite();
-        }
-        else
-        {
-            must_close = true;
+            break;
         }
     }
 

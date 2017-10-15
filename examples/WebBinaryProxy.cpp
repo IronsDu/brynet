@@ -77,7 +77,7 @@ int main(int argc, char **argv)
                             session->send(buffer, size);
                             return size;
                         });
-                    }, false, nullptr, 32 * 1024, false); //TODO
+                    }, false, nullptr, 32 * 1024, false);
                 }
             }, nullptr);
 

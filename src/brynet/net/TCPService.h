@@ -11,6 +11,7 @@
 #include <brynet/net/DataSocket.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/utils/Typeids.h>
+#include <brynet/net/SSLHelper.h>
 
 namespace brynet
 {
@@ -46,12 +47,13 @@ namespace brynet
             void                                setPingCheckTime(SESSION_TYPE id, 
                                                                  std::chrono::nanoseconds checktime);
 
+            /* pass nullptr sslHelper if fd is client socket, either is a server side socket */
             bool                                addDataSocket(sock fd,
-                                                                const std::shared_ptr<ListenThread>& listenThread,
+                                                                const SSLHelper::PTR& sslHelper,
+                                                                bool isUseSSL,
                                                                 const TcpService::ENTER_CALLBACK& enterCallback,
                                                                 const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
                                                                 const TcpService::DATA_CALLBACK& dataCallback,
-                                                                bool isUseSSL,
                                                                 size_t maxRecvBufferSize,
                                                                 bool forceSameThreadLoop = false);
 
@@ -77,7 +79,8 @@ namespace brynet
         private:
             SESSION_TYPE                        MakeID(size_t loopIndex, const std::shared_ptr<IOLoopData>&);
             void                                procDataSocketClose(DataSocket::PTR);
-            void                                postSessionAsyncProc(SESSION_TYPE id, std::function<void(DataSocket::PTR)> callback) const;
+            void                                postSessionAsyncProc(SESSION_TYPE id, 
+                std::function<void(DataSocket::PTR)> callback) const;
 
         private:
             std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
@@ -87,7 +90,10 @@ namespace brynet
             std::mutex                          mServiceGuard;
         };
 
-        void IOLoopDataSend(const std::shared_ptr<IOLoopData>&, TcpService::SESSION_TYPE id, const DataSocket::PACKET_PTR& packet, const DataSocket::PACKED_SENDED_CALLBACK& callback);
+        void IOLoopDataSend(const std::shared_ptr<IOLoopData>&, 
+            TcpService::SESSION_TYPE id, 
+            const DataSocket::PACKET_PTR& packet, 
+            const DataSocket::PACKED_SENDED_CALLBACK& callback);
         const EventLoop::PTR& IOLoopDataGetEventLoop(const std::shared_ptr<IOLoopData>&);
     }
 }

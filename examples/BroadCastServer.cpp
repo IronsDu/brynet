@@ -129,7 +129,7 @@ int main(int argc, char** argv)
 
                 return totalProcLen;
             });
-        }, false, listenThrean, 1024 * 1024, false);
+        }, false, nullptr, 1024 * 1024, false);
     });
 
     service->startWorkThread(2);

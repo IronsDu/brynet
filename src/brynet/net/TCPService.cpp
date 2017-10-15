@@ -392,71 +392,65 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
     return true;
 }
 
-// TODO::
 bool TcpService::addDataSocket(sock fd,
-    const std::shared_ptr<ListenThread>& listenThread,
+    const SSLHelper::PTR& sslHelper,
+    bool isUseSSL,
     const TcpService::ENTER_CALLBACK& enterCallback,
     const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
     const TcpService::DATA_CALLBACK& dataCallback,
-    bool isUseSSL,
     size_t maxRecvBufferSize,
     bool forceSameThreadLoop)
 {
     std::string ip = ox_socket_getipoffd(fd);
-    DataSocket::PTR channel = nullptr;
+    DataSocket::PTR channel = new DataSocket(fd, maxRecvBufferSize);
 #ifdef USE_OPENSSL
-    bool ret = true;
-    channel = new DataSocket(fd, maxRecvBufferSize);
     if (isUseSSL)
     {
-        if (listenThread != nullptr)
+        if (sslHelper != nullptr)
         {
-            if (listenThread.getOpenSSLCTX() != nullptr)
+            if (sslHelper.getOpenSSLCTX() == nullptr ||
+                !channel->initAcceptSSL(sslHelper.getOpenSSLCTX())
             {
-                ret = channel->initAcceptSSL(listenThread.getOpenSSLCTX());
-            }
-            else
-            {
-                ret = false;
+                goto FAILED;
             }
         }
         else
         {
-            ret = channel->initConnectSSL();
+            if (!channel->initConnectSSL())
+            {
+                goto FAILED;
+            }
         }
     }
 #else
-    bool ret = false;
-    if (!isUseSSL)
+    if (isUseSSL)
     {
-        channel = new DataSocket(fd, maxRecvBufferSize);
-        ret = true;
+        goto FAILED;
     }
 #endif
-    if (ret)
+
+    if (helpAddChannel(channel,
+        ip,
+        enterCallback,
+        disConnectCallback,
+        dataCallback,
+        forceSameThreadLoop))
     {
-        ret = helpAddChannel(channel, 
-            ip, 
-            enterCallback, 
-            disConnectCallback, 
-            dataCallback, 
-            forceSameThreadLoop);
+        return true;
     }
 
-    if (!ret)
+FAILED:
+    if (channel != nullptr)
     {
-        if (channel != nullptr)
-        {
-            delete channel;
-            channel = nullptr;
-        }
-        else
-        {
-            ox_socket_close(fd);
-        }
+        delete channel;
+        channel = nullptr;
+    }
+    else
+    {
+        ox_socket_close(fd);
     }
 
-    return ret;
+    return false;
 }
 
 IOLoopData::PTR IOLoopData::Create(EventLoop::PTR eventLoop, std::shared_ptr<std::thread> ioThread)

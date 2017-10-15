@@ -43,7 +43,7 @@ int main(int argc, char** argv)
 
     for (int i = 0; i < clietNum; i++)
     {
-        int fd = ox_socket_connect(false, ip.c_str(), port);
+        auto fd = ox_socket_connect(false, ip.c_str(), port);
         ox_socket_setsdsize(fd, 32 * 1024);
         ox_socket_setrdsize(fd, 32 * 1024);
         ox_socket_nodelay(fd);

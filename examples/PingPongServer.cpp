@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     auto server = std::make_shared<WrapTcpService>();
     auto listenThread = ListenThread::Create();
 
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](int fd){
+    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](sock fd){
         ox_socket_nodelay(fd);
         server->addSession(fd, [](const TCPSession::PTR& session){
             total_client_num++;
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
             session->setCloseCallback([](const TCPSession::PTR& session){
                 total_client_num--;
             });
-        }, false, listenThread, 1024*1024);
+        }, false, nullptr, 1024*1024);
     });
 
     server->startWorkThread(atoi(argv[2]));

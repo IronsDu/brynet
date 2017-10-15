@@ -50,7 +50,10 @@ namespace brynet
             void    wakeup()
             {
                 uint64_t one = 1;
-                write(mFd, &one, sizeof one);
+                if (write(mFd, &one, sizeof one) <= 0)
+                {
+                    std::cerr << wakeup failed << std::endl;
+                }
             }
 
             ~WakeupChannel()

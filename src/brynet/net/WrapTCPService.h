@@ -7,6 +7,7 @@
 #include <brynet/net/TCPService.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Any.h>
+#include <brynet/net/SSLHelper.h>
 
 namespace brynet
 {
@@ -94,7 +95,7 @@ namespace brynet
             void                        addSession(sock fd, 
                                                     const SESSION_ENTER_CALLBACK& userEnterCallback, 
                                                     bool isUseSSL,
-                                                    const std::shared_ptr<ListenThread>& listenThread,
+                                                    const SSLHelper::PTR& sslHelper,
                                                     size_t maxRecvBufferSize, 
                                                     bool forceSameThreadLoop = false);
 
