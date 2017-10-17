@@ -261,7 +261,6 @@ void DataSocket::recv()
             break;
         }
 
-        /* TODO:: if retlen < tryRecvLen, check read */
         ox_buffer_addwritepos(mRecvBuffer, retlen);
         if (ox_buffer_getreadvalidcount(mRecvBuffer) == ox_buffer_getsize(mRecvBuffer))
         {
@@ -288,6 +287,12 @@ void DataSocket::recv()
         if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer) == 0)
         {
             ox_buffer_adjustto_head(mRecvBuffer);
+        }
+
+        if (retlen < tryRecvLen)
+        {
+            must_close = !checkRead();
+            break;
         }
     }
 
@@ -475,7 +480,7 @@ void DataSocket::quickFlush()
             break;
         }
 
-        int send_len = writev(mFD, iov, num);
+        const int send_len = writev(mFD, iov, num);
         if (send_len <= 0)
         {
             if (sErrno == S_EWOULDBLOCK)
@@ -776,42 +781,40 @@ const BrynetAny& DataSocket::getUD() const
 #ifdef USE_OPENSSL
 bool DataSocket::initAcceptSSL(SSL_CTX* ctx)
 {
-    bool ret = false;
-
-    if(mSSL == nullptr)
+    if (mSSL != nullptr)
     {
-        mSSL = SSL_new(ctx);
-        ret = SSL_set_fd(mSSL, mFD) == 1;
-
-        if (!ret)
-        {
-            ERR_print_errors_fp(stdout);
-            ::fflush(stdout);
-        }
+        return false;
     }
 
-    return ret;
+    mSSL = SSL_new(ctx);
+    if (SSL_set_fd(mSSL, mFD) != 1)
+    {
+        ERR_print_errors_fp(stdout);
+        ::fflush(stdout);
+        return false;
+    }
+
+    return true;
 }
 
 bool DataSocket::initConnectSSL()
 {
-    bool ret = false;
-
-    if(mSSLCtx == nullptr)
+    if (mSSLCtx != nullptr)
     {
-        mSSLCtx = SSL_CTX_new(SSLv23_client_method());
-        mSSL = SSL_new(mSSLCtx);
-
-        ret = SSL_set_fd(mSSL, mFD) == 1;
-
-        if (!ret)
-        {
-            ERR_print_errors_fp(stdout);
-            ::fflush(stdout);
-        }
+        return false;
     }
 
-    return ret;
+    mSSLCtx = SSL_CTX_new(SSLv23_client_method());
+    mSSL = SSL_new(mSSLCtx);
+
+    if (SSL_set_fd(mSSL, mFD) != 1)
+    {
+        ERR_print_errors_fp(stdout);
+        ::fflush(stdout);
+        return false;
+    }
+
+    return true;
 }
 
 void DataSocket::processSSLHandshake()

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <iostream>
 
 #include <brynet/net/Channel.h>
 #include <brynet/net/EventLoop.h>
@@ -52,7 +53,7 @@ namespace brynet
                 uint64_t one = 1;
                 if (write(mFd, &one, sizeof one) <= 0)
                 {
-                    std::cerr << wakeup failed << std::endl;
+                    std::cerr << "wakeup failed" << std::endl;
                 }
             }
 
@@ -69,7 +70,7 @@ namespace brynet
                 while (true)
                 {
                     auto n = read(mFd, temp, sizeof(temp));
-                    if (n == -1)
+                    if (n == -1 || n < sizeof(temp))
                     {
                         break;
                     }
