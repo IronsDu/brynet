@@ -13,6 +13,9 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyq
 * Support HTTP、HTTPS、WebSocket
 * IPv6 support
 
+## Documentation
+- [简体中文](https://github.com/IronsDu/brynet/blob/master/docs/main.zh-cn.md)
+
 ## Build
 1. `cmake .`
 2. If you use Windows, please open brynet.sln then build. If on Linux, only enter `make`.
