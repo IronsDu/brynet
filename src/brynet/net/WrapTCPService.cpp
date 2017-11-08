@@ -5,7 +5,7 @@ using namespace brynet::net;
 TCPSession::TCPSession() noexcept
 {
     mSocketID = -1;
-    mCloseCallback = nullptr;
+    mDisConnectCallback = nullptr;
     mDataCallback = nullptr;
     mService = nullptr;
 }
@@ -50,17 +50,17 @@ void TCPSession::send(const DataSocket::PACKET_PTR& packet,
 
 void TCPSession::postShutdown() const
 {
-    mService->shutdown(mSocketID);
+    mService->postShutdown(mSocketID);
 }
 
-void TCPSession::postClose() const
+void TCPSession::postDisConnect() const
 {
-    mService->disConnect(mSocketID);
+    mService->postDisConnect(mSocketID);
 }
 
-void TCPSession::setCloseCallback(CLOSE_CALLBACK callback)
+void TCPSession::setDisConnectCallback(DISCONNECT_CALLBACK callback)
 {
-    mCloseCallback = std::move(callback);
+    mDisConnectCallback = std::move(callback);
 }
 
 void TCPSession::setDataCallback(DATA_CALLBACK callback)
@@ -78,9 +78,9 @@ const EventLoop::PTR& TCPSession::getEventLoop() const
     return IOLoopDataGetEventLoop(mIoLoopData);
 }
 
-void TCPSession::setPingCheckTime(std::chrono::nanoseconds checkTime)
+void TCPSession::setHeartBeat(std::chrono::nanoseconds checkTime)
 {
-    mService->setPingCheckTime(mSocketID, checkTime);
+    mService->setHeartBeat(mSocketID, checkTime);
 }
 
 void TCPSession::setSocketID(TcpService::SESSION_TYPE id)
@@ -98,9 +98,9 @@ void TCPSession::setService(const TcpService::PTR& service)
     mService = service;
 }
 
-const TCPSession::CLOSE_CALLBACK& TCPSession::getCloseCallback()
+const TCPSession::DISCONNECT_CALLBACK& TCPSession::getCloseCallback()
 {
-    return mCloseCallback;
+    return mDisConnectCallback;
 }
 
 const TCPSession::DATA_CALLBACK& TCPSession::getDataCallback()

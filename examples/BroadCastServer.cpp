@@ -89,7 +89,7 @@ int main(int argc, char** argv)
                 addClientID(session);
             });
 
-            session->setCloseCallback([mainLoop](const TCPSession::PTR& session) {
+            session->setDisConnectCallback([mainLoop](const TCPSession::PTR& session) {
                 mainLoop->pushAsyncProc([session]() {
                     removeClientID(session);
                 });

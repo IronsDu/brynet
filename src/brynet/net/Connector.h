@@ -7,7 +7,14 @@
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/SocketLibTypes.h>
 #include <brynet/utils/NonCopyable.h>
+#include <brynet/utils/CPP_VERSION.h>
 #include <brynet/net/Any.h>
+
+#ifdef HAVE_LANG_CXX17
+#include <shared_mutex>
+#else
+#include <mutex>
+#endif
 
 namespace brynet
 {
@@ -22,8 +29,8 @@ namespace brynet
             typedef std::function<void(sock)> COMPLETED_CALLBACK;
             typedef std::function<void()> FAILED_CALLBACK;
 
-            void                startThread();
-            void                destroy();
+            void                startWorkerThread();
+            void                stopWorkerThread();
             void                asyncConnect(const std::string& ip, 
                                              int port, 
                                              std::chrono::nanoseconds timeout,
@@ -38,11 +45,15 @@ namespace brynet
             void                run();
 
         private:
-            EventLoop                       mEventLoop;
+            std::shared_ptr<EventLoop>      mEventLoop;
 
             std::shared_ptr<ConnectorWorkInfo> mWorkInfo;
             std::shared_ptr<std::thread>    mThread;
+#ifdef HAVE_LANG_CXX17
+            std::shared_mutex               mThreadGuard;
+#else
             std::mutex                      mThreadGuard;
+#endif
             bool                            mIsRun;
         };
     }

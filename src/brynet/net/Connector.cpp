@@ -83,6 +83,7 @@ namespace brynet
             bool                isConnectSuccess(sock clientfd) const;
             void                checkTimeout();
             void                processConnect(const AsyncConnectAddr&);
+            void                causeAllFailed();
 
         private:
 
@@ -221,6 +222,26 @@ void ConnectorWorkInfo::checkTimeout()
     }
 }
 
+void ConnectorWorkInfo::causeAllFailed()
+{
+    for (auto it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
+    {
+        auto fd = it->first;
+        auto cb = it->second.failedCB;
+
+        ox_fdset_del(mFDSet.get(), fd, WriteCheck | ErrorCheck);
+
+        mConnectingFds.erase(fd);
+        mConnectingInfos.erase(it++);
+
+        ox_socket_close(fd);
+        if (cb != nullptr)
+        {
+            cb();
+        }
+    }
+}
+
 void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 {
     struct sockaddr_in server_addr;
@@ -291,22 +312,27 @@ AsyncConnector::AsyncConnector()
 
 AsyncConnector::~AsyncConnector()
 {
-    destroy();
+    stopWorkerThread();
 }
 
 void AsyncConnector::run()
 {
     while (mIsRun)
     {
-        mEventLoop.loop(10);
+        mEventLoop->loop(10);
         mWorkInfo->checkConnectStatus(0);
         mWorkInfo->checkTimeout();
     }
+    mWorkInfo->causeAllFailed();
 }
 
-void AsyncConnector::startThread()
+void AsyncConnector::startWorkerThread()
 {
+#ifdef HAVE_LANG_CXX17
+    std::lock_guard<std::shared_mutex> lck(mThreadGuard);
+#else
     std::lock_guard<std::mutex> lck(mThreadGuard);
+#endif
 
     if (mThread != nullptr)
     {
@@ -315,38 +341,61 @@ void AsyncConnector::startThread()
 
     mIsRun = true;
     mWorkInfo = std::make_shared<ConnectorWorkInfo>();
+    mEventLoop = std::make_shared<EventLoop>();
     mThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
         shared_this->run();
     });
 }
 
-void AsyncConnector::destroy()
+void AsyncConnector::stopWorkerThread()
 {
+#ifdef HAVE_LANG_CXX17
+    std::lock_guard<std::shared_mutex> lck(mThreadGuard);
+#else
     std::lock_guard<std::mutex> lck(mThreadGuard);
+#endif
 
-    if (mThread = nullptr)
+    if (mThread == nullptr)
     {
         return;
     }
 
-    mEventLoop.wakeup();
-    mIsRun = false;
+    mEventLoop->pushAsyncProc([this]() {
+        mIsRun = false;
+    });
+
     if (mThread->joinable())
     {
         mThread->join();
     }
+    mEventLoop = nullptr;
     mThread = nullptr;
     mWorkInfo = nullptr;
 }
 
-//TODO::if work thread stop, will not have result forever
 void AsyncConnector::asyncConnect(const std::string& ip, 
     int port, 
     std::chrono::nanoseconds timeout,
     COMPLETED_CALLBACK successCB, 
     FAILED_CALLBACK failedCB)
 {
-    mEventLoop.pushAsyncProc([shared_this = shared_from_this(), 
+#ifdef HAVE_LANG_CXX17
+    std::shared_lock<std::shared_mutex> lck(mThreadGuard);
+#else
+    std::lock_guard<std::mutex> lck(mThreadGuard);
+#endif
+
+    if (successCB == nullptr || failedCB == nullptr)
+    {
+        throw std::runtime_error("all callback is nullptr");
+    }
+
+    if (!mIsRun)
+    {
+        throw std::runtime_error("work thread already stop");
+    }
+
+    mEventLoop->pushAsyncProc([shared_this = shared_from_this(), 
         address = AsyncConnectAddr(ip, 
             port, 
             timeout,

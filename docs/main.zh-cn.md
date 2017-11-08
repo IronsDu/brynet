@@ -20,8 +20,21 @@
 - 通过封装`TCPService`,使用`TCPSession::PTR`表示网络对象.
   详情见[wrap_tcp_service](https://github.com/IronsDu/brynet/blob/master/docs/wrap_tcp_service.zh-cn.md)
 
+## 高级特性
+- 提供 `promise receive` 方便解析网络消息，详见:[promise_receive](https://github.com/IronsDu/brynet/blob/master/docs/promise_receive.zh-cn.md)
+
 # 效率优化
   详情见[merge_send](https://github.com/IronsDu/brynet/blob/master/docs/merge_send.zh-cn.md)
 
 # 使用SSL
 请确保你已经安装了openssl，然后在编译`brynet`时定义`USE_OPENSSL`宏即可。
+
+# 完整示例
+请查看[example](https://github.com/IronsDu/brynet/tree/master/examples)
+
+# 应用项目
+* [Redis proxy](https://github.com/IronsDu/DBProxy)
+* [Distributed game server framework](https://github.com/IronsDu/DServerFramework)
+* [Joynet - Lua network library](https://github.com/IronsDu/Joynet)
+* [HTTP-RPC](https://github.com/IronsDu/http-rpc)
+* [grpc-gateway](https://github.com/IronsDu/grpc-gateway)

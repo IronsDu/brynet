@@ -21,7 +21,7 @@ ListenThread::ListenThread() noexcept
 
 ListenThread::~ListenThread() noexcept
 {
-    closeListenThread();
+    stopListen();
 }
 
 void ListenThread::startListen(bool isIPV6, 
@@ -35,6 +35,17 @@ void ListenThread::startListen(bool isIPV6,
     {
         return;
     }
+    if (callback == nullptr)
+    {
+        throw std::runtime_error("accept callback is nullptr");
+    }
+
+    // TODO::socket leak
+    sock fd = ox_socket_listen(isIPV6, ip.c_str(), port, 512);
+    if (SOCKET_ERROR == fd)
+    {
+        throw std::runtime_error("listen error of:" + sErrno);
+    }
 
     mIsIPV6 = isIPV6;
     mRunListen = true;
@@ -42,12 +53,13 @@ void ListenThread::startListen(bool isIPV6,
     mPort = port;
     mAcceptCallback = callback;
 
-    mListenThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
-        shared_this->runListen();
+    mListenThread = std::make_shared<std::thread>([shared_this = shared_from_this(), fd]() {
+        shared_this->runListen(fd);
+        ox_socket_close(fd);
     });
 }
 
-void ListenThread::closeListenThread()
+void ListenThread::stopListen()
 {
     std::lock_guard<std::mutex> lck(mListenThreadGuard);
 
@@ -69,9 +81,8 @@ void ListenThread::closeListenThread()
     mListenThread = nullptr;
 }
 
-void ListenThread::runListen()
+void ListenThread::runListen(sock fd)
 {
-    sock client_fd = SOCKET_ERROR;
     struct sockaddr_in socketaddress;
     struct sockaddr_in6 ip6Addr;
     socklen_t addrLen = sizeof(struct sockaddr);
@@ -83,17 +94,10 @@ void ListenThread::runListen()
         pAddr = (sockaddr_in*)&ip6Addr;
     }
 
-    sock listen_fd = ox_socket_listen(mIsIPV6, mIP.c_str(), mPort, 512);
-    if (SOCKET_ERROR == listen_fd)
-    {
-        fprintf(stderr, "listen failed, error:%d \n", sErrno);
-        return;
-    }
-
-    fprintf(stderr, "listen : %d \n", mPort);
     for (; mRunListen;)
     {
-        while ((client_fd = ox_socket_accept(listen_fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
+        sock client_fd = SOCKET_ERROR;
+        while ((client_fd = ox_socket_accept(fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
         {
             if (EINTR == sErrno)
             {
@@ -113,7 +117,4 @@ void ListenThread::runListen()
 
         mAcceptCallback(client_fd);
     }
-
-    ox_socket_close(listen_fd);
-    listen_fd = SOCKET_ERROR;
 }

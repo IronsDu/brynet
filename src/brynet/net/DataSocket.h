@@ -51,15 +51,15 @@ namespace brynet
             bool                            onEnterEventLoop(const EventLoop::PTR& eventLoop);
 
             void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                            sendPacket(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                            sendPacketInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                            send(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+            void                            sendInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
             void                            setEnterCallback(ENTER_CALLBACK cb);
             void                            setDataCallback(DATA_CALLBACK cb);
             void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
             /* if checkTime is zero, will cancel check heartbeat */
-            void                            setCheckTime(std::chrono::nanoseconds checkTime);
+            void                            setHeartBeat(std::chrono::nanoseconds checkTime);
             void                            postDisConnect();
             void                            postShutdown();
 

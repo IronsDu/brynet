@@ -28,11 +28,11 @@
 
     (线程安全)向id标识的网络会话发送消息，当发送完成会调用`cb`
 
-- `TcpService::shutdown(int64_t id)`
+- `TcpService::postShutdown(int64_t id)`
 
-    (线程安全)异步执行对id标识的网络会话的shutdown，关闭写。
+    (线程安全)异步执行对id标识的网络会话的postShutdown，关闭写。
 
-- `TcpService::disConnect(int64_t id)`
+- `TcpService::postDisConnect(int64_t id)`
 
     (线程安全)异步断开id标识的网络会话的，会触发`addDataSocket`接口中传入的`DISCONNECT_CALLBACK`。
 
@@ -63,7 +63,7 @@ std::this_thread::sleep_for(2s);
 ```
 
 # 提示
-- 在任何线程任何时候使用`TcpService`对象操作某个网络会话`int64_t id`时都是安全的，哪怕A线程执行了`disConnect`，B线程再调用`send`，那也是安全的。
+- 在任何线程任何时候使用`TcpService`对象操作某个网络会话`int64_t id`时都是安全的，哪怕A线程执行了`postDisConnect`，B线程再调用`send`，那也是安全的。
 
 # 注意事项
 - 通常在使用`brynet`时不会使用`TcpService`，因为没有接口和方式能够设置网络会话对象的`user data`，</br>但我们应用程序开发总是会遇到将网络会话关联到某个逻辑会话的需求。如果使用`TcpService`，需要用户自己管理这个映射/绑定关系（比如使用线程安全的`map<int64_t, Player>`)。</br>因此，一般而言我们推荐使用[wrap_tcp_service](https://github.com/IronsDu/brynet/blob/master/docs/wrap_tcp_service.zh-cn.md)，它提供的`TCPSession`可以直接设置`user data`绑定逻辑层对象。

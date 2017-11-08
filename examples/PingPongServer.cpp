@@ -37,7 +37,7 @@ int main(int argc, char **argv)
                 return len;
             });
 
-            session->setCloseCallback([](const TCPSession::PTR& session){
+            session->setDisConnectCallback([](const TCPSession::PTR& session){
                 total_client_num--;
             });
         }, false, nullptr, 1024*1024);
