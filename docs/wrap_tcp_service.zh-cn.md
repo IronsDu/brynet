@@ -28,7 +28,7 @@
 
     (线程安全)发异步投递shutdown(WRITE)
 
-- `TCPSession::postClose()`
+- `TCPSession::postDisConnect()`
 
     (线程安全)发投递异步断开
 
@@ -40,7 +40,7 @@
 
      (非线程安全)获取用户层对象
 
-- `TCPSession::setCloseCallback(CLOSE_CALLBACK cb)`
+- `TCPSession::setDisConnectCallback(DISCONNECT_CALLBACK cb)`
 
     (非线程安全)设置断开回调
 
@@ -50,7 +50,7 @@
 
 # 提示
 - 建议使用`WrapTcpService`和`TCPSession`
-- 只要你拥有一个`TCPSession::PTR`，那么你可以在任何线程任何时候调用`send`、`postShutdown`以及`postClose`，这都是安全的，无论它是否已经发生了断开等情况。
+- 只要你拥有一个`TCPSession::PTR`，那么你可以在任何线程任何时候调用`send`、`postShutdown`以及`postDisConnect`，这都是安全的，无论它是否已经发生了断开等情况。
 
 # 示例
 ```C++
@@ -62,7 +62,7 @@ service->addSession(fd,
     [](const TCPSession::PTR& session) {
         session->setUD(1);
 
-        session->setCloseCallback([](const TCPSession::PTR& session) {
+        session->setDisConnectCallback([](const TCPSession::PTR& session) {
             auto ud = brynet::net::cast<int64_t>(session->getUD());
             std::cout << "close by" << *ud << std::endl;
         });
@@ -83,6 +83,6 @@ std::this_thread::sleep_for(2s);
 ```
 
 # 注意事项
-- `setUD`、`setCloseCallback`以及`setDataCallback`都不是线程安全的。</br>
+- `setUD`、`setDisConnectCallback`以及`setDataCallback`都不是线程安全的。</br>
 因此最好在`addSession`中的`SESSION_ENTER_CALLBACK`回调里统一设置，避免读写冲突。</br>
 同样，`getUD`也不是线程安全的，但这只表示它和`setUD`会有冲突，因此当你遵守前面的建议，那么你之后无论怎么调用`getUD`都不会有问题。

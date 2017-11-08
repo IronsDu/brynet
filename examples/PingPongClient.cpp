@@ -22,23 +22,30 @@ int main(int argc, char **argv)
     server->startWorkThread(atoi(argv[3]));
 
     auto connector = AsyncConnector::Create();
-    connector->startThread();
+    connector->startWorkerThread();
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {
-        connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](sock fd) {
-            std::cout << "connect success" << std::endl;
-            ox_socket_nodelay(fd);
-            server->addSession(fd, [tmp](const TCPSession::PTR& session) {
-                session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
-                    session->send(buffer, len);
-                    return len;
-                });
-                session->send(tmp.c_str(), tmp.size());
-            }, false, nullptr, 1024 * 1024);
-        }, []() {
-            std::cout << "connect failed" << std::endl;
-        });
+        try
+        {
+            connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](sock fd) {
+                std::cout << "connect success" << std::endl;
+                ox_socket_nodelay(fd);
+                server->addSession(fd, [tmp](const TCPSession::PTR& session) {
+                    session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
+                        session->send(buffer, len);
+                        return len;
+                    });
+                    session->send(tmp.c_str(), tmp.size());
+                }, false, nullptr, 1024 * 1024);
+            }, []() {
+                std::cout << "connect failed" << std::endl;
+            });
+        }
+        catch (std::runtime_error& e)
+        {
+            std::cout << "error:" << e.what() << std::endl;
+        }
     }
 
     std::cin.get();

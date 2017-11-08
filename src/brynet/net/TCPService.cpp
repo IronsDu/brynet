@@ -99,25 +99,25 @@ void TcpService::send(SESSION_TYPE id,
     }
 }
 
-void TcpService::shutdown(SESSION_TYPE id) const
+void TcpService::postShutdown(SESSION_TYPE id) const
 {
     postSessionAsyncProc(id, [](DataSocket::PTR ds){
         ds->postShutdown();
     });
 }
 
-void TcpService::disConnect(SESSION_TYPE id) const
+void TcpService::postDisConnect(SESSION_TYPE id) const
 {
     postSessionAsyncProc(id, [](DataSocket::PTR ds){
         ds->postDisConnect();
     });
 }
 
-void TcpService::setPingCheckTime(SESSION_TYPE id, 
+void TcpService::setHeartBeat(SESSION_TYPE id, 
     std::chrono::nanoseconds checktime)
 {
     postSessionAsyncProc(id, [checktime](DataSocket::PTR ds){
-        ds->setCheckTime(checktime);
+        ds->setHeartBeat(checktime);
     });
 }
 
@@ -505,7 +505,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
             const auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
             if (ud != nullptr && *ud == sid.id)
             {
-                tmp->sendPacketInLoop(packet, callback);
+                tmp->sendInLoop(packet, callback);
             }
         }
     }
@@ -522,7 +522,7 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
                 const auto ud = brynet::net::cast<TcpService::SESSION_TYPE>(tmp->getUD());
                 if (ud != nullptr && *ud == sid.id)
                 {
-                    tmp->sendPacketInLoop(packetCapture, callbackCapture);
+                    tmp->sendInLoop(packetCapture, callbackCapture);
                 }
             }
         });

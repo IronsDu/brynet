@@ -34,22 +34,22 @@ namespace brynet
             isOK = false;
         }
 
-        class PromiseRecieve;
+        class PromiseReceive;
 
-        std::shared_ptr<PromiseRecieve> setupPromiseReceive(const TCPSession::PTR& session);
+        std::shared_ptr<PromiseReceive> setupPromiseReceive(const TCPSession::PTR& session);
 
-        class PromiseRecieve : public std::enable_shared_from_this<PromiseRecieve>
+        class PromiseReceive : public std::enable_shared_from_this<PromiseReceive>
         {
         public:
-            typedef std::shared_ptr<PromiseRecieve> PTR;
+            typedef std::shared_ptr<PromiseReceive> PTR;
             typedef std::function<bool(const char* buffer, size_t len)> Handle;
 
-            PromiseRecieve::PTR receive(size_t len, Handle handle)
+            PromiseReceive::PTR receive(size_t len, Handle handle)
             {
                 return receive(std::make_shared<size_t>(len), std::move(handle));
             }
 
-            PromiseRecieve::PTR receive(std::shared_ptr<size_t> len, Handle handle)
+            PromiseReceive::PTR receive(std::shared_ptr<size_t> len, Handle handle)
             {
                 if (*len < 0)
                 {
@@ -59,7 +59,7 @@ namespace brynet
                 return helpReceive(std::move(len), "", std::move(handle));
             }
 
-            PromiseRecieve::PTR receiveUntil(std::string str, Handle handle)
+            PromiseReceive::PTR receiveUntil(std::string str, Handle handle)
             {
                 if (str.empty())
                 {
@@ -70,7 +70,7 @@ namespace brynet
             }
 
         private:
-            PromiseRecieve::PTR helpReceive(std::shared_ptr<size_t> len, std::string str, Handle handle)
+            PromiseReceive::PTR helpReceive(std::shared_ptr<size_t> len, std::string str, Handle handle)
             {
                 auto pr = std::make_shared<PendingReceive>();
                 pr->len = std::move(len);
@@ -81,7 +81,7 @@ namespace brynet
                 return shared_from_this();
             }
 
-            size_t process(const char* buffer, size_t len)
+            size_t process(const char* buffer, const size_t len)
             {
                 size_t procLen = 0;
 
@@ -90,7 +90,7 @@ namespace brynet
                     auto pendingReceive = mPendingReceives.front();
                     if (pendingReceive->len != nullptr)
                     {
-                        auto tryReceiveLen = *pendingReceive->len;
+                        const auto tryReceiveLen = *pendingReceive->len;
                         if (tryReceiveLen < (len - procLen))
                         {
                             break;
@@ -146,12 +146,12 @@ namespace brynet
 
             std::deque<std::shared_ptr<PendingReceive>> mPendingReceives;
 
-            friend std::shared_ptr<PromiseRecieve> setupPromiseReceive(const TCPSession::PTR& session);
+            friend std::shared_ptr<PromiseReceive> setupPromiseReceive(const TCPSession::PTR& session);
         };
 
-        std::shared_ptr<PromiseRecieve> setupPromiseReceive(const TCPSession::PTR& session)
+        std::shared_ptr<PromiseReceive> setupPromiseReceive(const TCPSession::PTR& session)
         {
-            auto promiseReceive = std::make_shared<PromiseRecieve>();
+            auto promiseReceive = std::make_shared<PromiseReceive>();
             session->setDataCallback([promiseReceive](const TCPSession::PTR& session, 
                 const char* buffer, 
                 size_t len) {

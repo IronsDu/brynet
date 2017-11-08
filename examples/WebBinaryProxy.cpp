@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     tcpService->startWorkThread(std::thread::hardware_concurrency());
 
     auto asyncConnector = AsyncConnector::Create();
-    asyncConnector->startThread();
+    asyncConnector->startWorkerThread();
 
     auto listenThread = ListenThread::Create();
 
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
                         auto ud = brynet::net::cast<int64_t>(session->getUD());
                         if (*ud == -1)   /*if http client already close*/
                         {
-                            backendSession->postClose();
+                            backendSession->postDisConnect();
                             return;
                         }
 
@@ -63,12 +63,12 @@ int main(int argc, char **argv)
                         }
                         cachePacket->clear();
 
-                        backendSession->setCloseCallback([=](const TCPSession::PTR& backendSession) {
+                        backendSession->setDisConnectCallback([=](const TCPSession::PTR& backendSession) {
                             *shareBackendSession = nullptr;
                             auto ud = brynet::net::cast<int64_t>(session->getUD());
                             if (*ud != -1)
                             {
-                                session->postClose();
+                                session->postDisConnect();
                             }
                         });
 
@@ -97,12 +97,12 @@ int main(int argc, char **argv)
                 return size;
             });
 
-            session->setCloseCallback([=](const TCPSession::PTR& session) {
+            session->setDisConnectCallback([=](const TCPSession::PTR& session) {
                 /*if http client close, then close it's backend server */
                 TCPSession::PTR backendSession = *shareBackendSession;
                 if (backendSession != nullptr)
                 {
-                    backendSession->postClose();
+                    backendSession->postDisConnect();
                 }
 
                 session->setUD(-1);

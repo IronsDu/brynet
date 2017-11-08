@@ -40,11 +40,11 @@ namespace brynet
                                                     const DataSocket::PACKET_PTR& packet, 
                                                     const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
-            void                                shutdown(SESSION_TYPE id) const;
+            void                                postShutdown(SESSION_TYPE id) const;
             /* still will cause dis connect callback */
-            void                                disConnect(SESSION_TYPE id) const;
+            void                                postDisConnect(SESSION_TYPE id) const;
 
-            void                                setPingCheckTime(SESSION_TYPE id, 
+            void                                setHeartBeat(SESSION_TYPE id, 
                                                                  std::chrono::nanoseconds checktime);
 
             /* pass nullptr sslHelper if fd is client socket, either is a server side socket */
@@ -94,6 +94,7 @@ namespace brynet
             TcpService::SESSION_TYPE id, 
             const DataSocket::PACKET_PTR& packet, 
             const DataSocket::PACKED_SENDED_CALLBACK& callback);
+
         const EventLoop::PTR& IOLoopDataGetEventLoop(const std::shared_ptr<IOLoopData>&);
     }
 }

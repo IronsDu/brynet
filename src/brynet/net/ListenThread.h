@@ -9,6 +9,7 @@
 
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/utils/Typeids.h>
+#include <brynet/net/SocketLibFunction.h>
 
 namespace brynet
 {
@@ -24,14 +25,14 @@ namespace brynet
                                                             const std::string& ip,
                                                             int port,
                                                             ACCEPT_CALLBACK callback);
-            void                                closeListenThread();
+            void                                stopListen();
             static  PTR                         Create();
 
         private:
             ListenThread() noexcept;
             virtual ~ListenThread() noexcept;
 
-            void                                runListen();
+            void                                runListen(sock fd);
 
         private:
             ACCEPT_CALLBACK                     mAcceptCallback;

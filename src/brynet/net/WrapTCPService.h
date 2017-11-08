@@ -22,7 +22,7 @@ namespace brynet
             typedef std::shared_ptr<TCPSession>     PTR;
             typedef std::weak_ptr<TCPSession>       WEAK_PTR;
 
-            typedef std::function<void(const TCPSession::PTR&)>   CLOSE_CALLBACK;
+            typedef std::function<void(const TCPSession::PTR&)>   DISCONNECT_CALLBACK;
             typedef std::function<size_t(const TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
 
         public:
@@ -40,13 +40,13 @@ namespace brynet
                                              const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
 
             void                        postShutdown() const;
-            void                        postClose() const;
+            void                        postDisConnect() const;
 
-            void                        setCloseCallback(CLOSE_CALLBACK callback);
+            void                        setDisConnectCallback(DISCONNECT_CALLBACK callback);
             void                        setDataCallback(DATA_CALLBACK callback);
             const EventLoop::PTR&       getEventLoop() const;
 
-            void                        setPingCheckTime(std::chrono::nanoseconds checkTime);
+            void                        setHeartBeat(std::chrono::nanoseconds checkTime);
 
         private:
             TCPSession() noexcept;
@@ -58,7 +58,7 @@ namespace brynet
             void                        setIOLoopData(std::shared_ptr<IOLoopData> ioLoopData);
             void                        setService(const TcpService::PTR& service);
 
-            const CLOSE_CALLBACK&       getCloseCallback();
+            const DISCONNECT_CALLBACK&  getCloseCallback();
             const DATA_CALLBACK&        getDataCallback();
 
             static  PTR                 Create();
@@ -70,7 +70,7 @@ namespace brynet
             std::string                 mIP;
             BrynetAny                   mUD;
 
-            CLOSE_CALLBACK              mCloseCallback;
+            DISCONNECT_CALLBACK         mDisConnectCallback;
             DATA_CALLBACK               mDataCallback;
 
             friend class WrapTcpService;
@@ -90,8 +90,7 @@ namespace brynet
             void                        startWorkThread(size_t threadNum, 
                                                         TcpService::FRAME_CALLBACK callback = nullptr);
             void                        stopWorkThread();
-            
-            //TODO::modify ssl
+
             void                        addSession(sock fd, 
                                                     const SESSION_ENTER_CALLBACK& userEnterCallback, 
                                                     bool isUseSSL,

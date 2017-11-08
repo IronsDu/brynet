@@ -33,11 +33,11 @@
     (线程安全)此函数用于异步发送消息，它是`brynet`中调用最频繁的函数。</br>
     当底层实际调用了`::send`系统调用将`buffer`完全压入了内核发送缓冲区时，（如果cb不为nullptr）会回调`cb`。
 
-- `DataSocket::sendPacket(std::shared_ptr<std::string>, const PACKED_SENDED_CALLBACK& cb = nullptr)`
+- `DataSocket::send(std::shared_ptr<std::string>, const PACKED_SENDED_CALLBACK& cb = nullptr)`
 
     (线程安全)此重载函数用于发送数据，数据由智能指针提供。
 
-- `DataSocket::setCheckTime(std::chrono::nanoseconds checkTime)`
+- `DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)`
 
    (线程安全) 设置keepalive检测，当 `checkTime`内没有收到对方的数据时，会主动断开连接。</br>
     当`checkTime`的值为`std::chrono::nanoseconds::zero`时则停止检测。
@@ -78,7 +78,7 @@ while(true)
     });
 
     // 设置存活时间，如果距离上次接收数据的时间达到1s则会断开链接
-    datasocket->setCheckTime(std::chrono::seconds(1));
+    datasocket->setHeartBeat(std::chrono::seconds(1));
 
     // 这里只是演示多线程环境下怎么调用onEnterEventLoop
     // 所以使用了pushAsyncProc。

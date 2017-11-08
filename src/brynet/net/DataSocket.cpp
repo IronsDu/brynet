@@ -122,10 +122,10 @@ bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
 
 void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
 {
-    sendPacket(makePacket(buffer, len), callback);
+    send(makePacket(buffer, len), callback);
 }
 
-void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     mEventLoop->pushAsyncProc([this, packetCapture = packet, callbackCapture = callback](){
         auto len = packetCapture->size();
@@ -134,7 +134,7 @@ void DataSocket::sendPacket(const PACKET_PTR& packet, const PACKED_SENDED_CALLBA
     });
 }
 
-void DataSocket::sendPacketInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+void DataSocket::sendInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
     if (mEventLoop->isInLoopThread())
@@ -720,7 +720,7 @@ void DataSocket::startPingCheckTimer()
     }
 }
 
-void DataSocket::setCheckTime(std::chrono::nanoseconds checkTime)
+void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
 {
     assert(mEventLoop->isInLoopThread());
     if (!mEventLoop->isInLoopThread())
