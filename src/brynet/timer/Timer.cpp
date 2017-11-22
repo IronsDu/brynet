@@ -13,7 +13,7 @@ void Timer::cancel()
     mActive = false;
 }
 
-Timer::Timer(steady_clock::time_point endTime, Callback callback) noexcept : 
+Timer::Timer(steady_clock::time_point endTime, Callback callback) BRYNET_NOEXCEPT :
     mEndTime(std::move(endTime)), 
     mCallback(std::move(callback)),
     mActive(true)

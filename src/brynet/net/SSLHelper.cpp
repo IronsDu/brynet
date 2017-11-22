@@ -1,3 +1,4 @@
+#include <brynet/net/Noexcept.h>
 #include <brynet/net/SSLHelper.h>
                                               
 using namespace brynet::net;
@@ -8,14 +9,14 @@ SSLHelper::PTR SSLHelper::Create()
     return std::make_shared<make_shared_enabler>();
 }
 
-SSLHelper::SSLHelper() noexcept
+SSLHelper::SSLHelper() BRYNET_NOEXCEPT
 {
 #ifdef USE_OPENSSL
     mOpenSSLCTX = nullptr;
 #endif
 }
 
-SSLHelper::~SSLHelper() noexcept
+SSLHelper::~SSLHelper() BRYNET_NOEXCEPT
 {
 #ifdef USE_OPENSSL
     destroySSL();

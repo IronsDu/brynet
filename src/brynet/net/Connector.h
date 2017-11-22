@@ -9,6 +9,7 @@
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/utils/CPP_VERSION.h>
 #include <brynet/net/Any.h>
+#include <brynet/net/Noexcept.h>
 
 #ifdef HAVE_LANG_CXX17
 #include <shared_mutex>

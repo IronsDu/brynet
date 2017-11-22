@@ -7,6 +7,8 @@
 #include <vector>
 #include <chrono>
 
+#include <brynet/net/Noexcept.h>
+
 namespace brynet
 {
     class TimerMgr;
@@ -18,7 +20,7 @@ namespace brynet
         typedef std::weak_ptr<Timer>            WeakPtr;
         typedef std::function<void(void)>       Callback;
 
-        Timer(std::chrono::steady_clock::time_point endTime, Callback f) noexcept;
+        Timer(std::chrono::steady_clock::time_point endTime, Callback f) BRYNET_NOEXCEPT;
 
         const std::chrono::steady_clock::time_point&    getEndTime() const;
         void                                    cancel();

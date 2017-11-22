@@ -49,8 +49,8 @@ namespace brynet
             void                        setHeartBeat(std::chrono::nanoseconds checkTime);
 
         private:
-            TCPSession() noexcept;
-            virtual ~TCPSession() noexcept;
+            TCPSession() BRYNET_NOEXCEPT;
+            virtual ~TCPSession() BRYNET_NOEXCEPT;
 
             void                        setSocketID(TcpService::SESSION_TYPE id);
             void                        setIP(const std::string& ip);
@@ -84,8 +84,8 @@ namespace brynet
 
             typedef std::function<void(const TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
-            WrapTcpService() noexcept;
-            virtual ~WrapTcpService() noexcept;
+            WrapTcpService() BRYNET_NOEXCEPT;
+            virtual ~WrapTcpService() BRYNET_NOEXCEPT;
 
             void                        startWorkThread(size_t threadNum, 
                                                         TcpService::FRAME_CALLBACK callback = nullptr);

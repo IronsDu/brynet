@@ -21,7 +21,7 @@ namespace brynet
         class AsyncConnectAddr
         {
         public:
-            AsyncConnectAddr() noexcept : mTimeout(std::chrono::nanoseconds::zero())
+            AsyncConnectAddr() BRYNET_NOEXCEPT : mTimeout(std::chrono::nanoseconds::zero())
             {
                 mPort = 0;
             }
@@ -39,27 +39,27 @@ namespace brynet
             {
             }
 
-            const auto&         getIP() const
+            const std::string&         getIP() const
             {
                 return mIP;
             }
 
-            auto                getPort() const
+            int                         getPort() const
             {
                 return mPort;
             }
 
-            const auto&         getSuccessCB() const
+            const AsyncConnector::COMPLETED_CALLBACK&   getSuccessCB() const
             {
                 return mSuccessCB;
             }
 
-            const auto&         getFailedCB() const
+            const AsyncConnector::FAILED_CALLBACK&  getFailedCB() const
             {
                 return mFailedCB;
             }
 
-            auto                getTimeout() const
+            std::chrono::nanoseconds                getTimeout() const
             {
                 return mTimeout;
             }
@@ -77,7 +77,7 @@ namespace brynet
         public:
             typedef std::shared_ptr<ConnectorWorkInfo>    PTR;
 
-            ConnectorWorkInfo() noexcept;
+            ConnectorWorkInfo() BRYNET_NOEXCEPT;
 
             void                checkConnectStatus(int millsecond);
             bool                isConnectSuccess(sock clientfd) const;
@@ -116,7 +116,7 @@ namespace brynet
     }
 }
 
-ConnectorWorkInfo::ConnectorWorkInfo() noexcept
+ConnectorWorkInfo::ConnectorWorkInfo() BRYNET_NOEXCEPT
 {
     mFDSet.reset(ox_fdset_new());
 }
@@ -342,7 +342,8 @@ void AsyncConnector::startWorkerThread()
     mIsRun = true;
     mWorkInfo = std::make_shared<ConnectorWorkInfo>();
     mEventLoop = std::make_shared<EventLoop>();
-    mThread = std::make_shared<std::thread>([shared_this = shared_from_this()](){
+    auto shared_this = shared_from_this();
+    mThread = std::make_shared<std::thread>([shared_this](){
         shared_this->run();
     });
 }
@@ -395,7 +396,8 @@ void AsyncConnector::asyncConnect(const std::string& ip,
         throw std::runtime_error("work thread already stop");
     }
 
-    mEventLoop->pushAsyncProc([shared_this = shared_from_this(), 
+    auto shared_this = shared_from_this();
+    mEventLoop->pushAsyncProc([shared_this, 
         address = AsyncConnectAddr(ip, 
             port, 
             timeout,
