@@ -1,4 +1,9 @@
 language: cpp
+sudo: required
+dist: trusty
+
+common_sources: &all_sources
+  - ubuntu-toolchain-r-test
 
 matrix:
   include:

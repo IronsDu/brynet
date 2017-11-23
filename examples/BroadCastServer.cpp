@@ -109,7 +109,8 @@ int main(int argc, char** argv)
                         PACKET_LEN_TYPE packet_len = rp.readPacketLen();
                         if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
                         {
-                            mainLoop->pushAsyncProc([packet = DataSocket::makePacket(parseStr, packet_len)]() {
+                            auto packet = DataSocket::makePacket(parseStr, packet_len);
+                            mainLoop->pushAsyncProc([packet]() {
                                 broadCastPacket(packet);
                             });
 

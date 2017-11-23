@@ -517,10 +517,13 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
     }
     else
     {
-        mEventLoop->pushAsyncProc([packetCapture = packet, 
-            callbackCapture = callback, 
+        auto packetCapture = packet;
+        auto callbackCapture = callback;
+        auto ioLoopDataCapture = shared_from_this();
+        mEventLoop->pushAsyncProc([packetCapture, 
+            callbackCapture, 
             sid, 
-            ioLoopDataCapture = shared_from_this()](){
+            ioLoopDataCapture](){
             DataSocket::PTR tmp = nullptr;
             if (ioLoopDataCapture->mDataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)

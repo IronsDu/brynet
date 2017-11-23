@@ -2,7 +2,7 @@ Brynet
 =======
 Cross platform high performance TCP network library using C++ 11.
 
-Windows : [![Build status](https://ci.appveyor.com/api/projects/status/76j8f2hyqlw3ekua/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/dodo/branch/master)  Linux : [![Build Status](https://travis-ci.org/IronsDu/dodo.svg?branch=master)](https://travis-ci.org/IronsDu/dodo)
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umbwwdb01k/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/brynet/branch/master) Linux : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet)
 
 ## Features
 * Cross platform (Linux | Windows)
