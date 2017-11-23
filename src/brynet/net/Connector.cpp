@@ -397,12 +397,13 @@ void AsyncConnector::asyncConnect(const std::string& ip,
     }
 
     auto shared_this = shared_from_this();
+    auto address = AsyncConnectAddr(ip,
+        port,
+        timeout,
+        successCB,
+        failedCB);
     mEventLoop->pushAsyncProc([shared_this, 
-        address = AsyncConnectAddr(ip, 
-            port, 
-            timeout,
-            successCB, 
-            failedCB)]() {
+        address]() {
         shared_this->mWorkInfo->processConnect(address);
     });
 }

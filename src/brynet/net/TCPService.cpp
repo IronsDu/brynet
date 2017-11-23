@@ -355,14 +355,15 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
     
 
     const auto& loop = ioLoopData->getEventLoop();
-
+    auto loopDataCapture = std::move(ioLoopData);
+    auto shared_this = shared_from_this();
     channel->setEnterCallback([ip, 
         loopIndex, 
         enterCallback, 
         disConnectCallback, 
         dataCallback, 
-        shared_this = shared_from_this(), 
-        loopDataCapture = std::move(ioLoopData)](DataSocket::PTR dataSocket){
+        shared_this,
+        loopDataCapture](DataSocket::PTR dataSocket){
         auto id = shared_this->MakeID(loopIndex, loopDataCapture);
         union SessionId sid;
         sid.id = id;

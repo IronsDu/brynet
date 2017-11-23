@@ -1,11 +1,62 @@
 language: cpp
-compiler: g++
-sudo: required
-before_install:
-    - sudo add-apt-repository ppa:jonathonf/gcc-7.1 -y
-    - sudo apt-get update -y
-    - sudo apt install g++-7 -y
+
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+         sources: ['ubuntu-toolchain-r-test']
+         packages: ['g++-4.8']
+      env: COMPILER='g++-4.8'
+
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: *all_sources
+          packages: ['g++-4.9']
+      env: COMPILER='g++-4.9'
+
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: *all_sources
+          packages: ['g++-5']
+      env: COMPILER='g++-5'
+
+    - os: linux
+      compiler: gcc
+      addons: &gcc6
+        apt:
+          sources: *all_sources
+          packages: ['g++-6']
+      env: COMPILER='g++-6'
+
+    - os: linux
+      compiler: gcc
+      addons: &gcc7
+        apt:
+          sources: *all_sources
+          packages: ['g++-7']
+      env: COMPILER='g++-7'
+
+    - os: linux
+      compiler: gcc
+      addons: *gcc6
+      env: COMPILER='g++-6' CPP14=1
+
+    - os: linux
+      compiler: gcc
+      addons: *gcc7
+      env: COMPILER='g++-7' CPP14=1
+
 install:
-    - cmake .
-    - export CXX="g++-7"
-script: make
+  - cmake .
+
+before_script:
+  - export CXX=${COMPILER}
+
+script:
+  - make
