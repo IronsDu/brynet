@@ -9,7 +9,7 @@
 
 using namespace brynet::net;
 
-DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) noexcept
+DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
 #if defined PLATFORM_WINDOWS
     : 
     mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), 
@@ -40,7 +40,7 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) noexcept
 #endif
 }
 
-DataSocket::~DataSocket() noexcept
+DataSocket::~DataSocket() BRYNET_NOEXCEPT
 {
     assert(mFD == SOCKET_ERROR);
 
@@ -127,7 +127,9 @@ void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBA
 
 void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
-    mEventLoop->pushAsyncProc([this, packetCapture = packet, callbackCapture = callback](){
+    auto packetCapture = packet;
+    auto callbackCapture = callback;
+    mEventLoop->pushAsyncProc([this, packetCapture, callbackCapture](){
         auto len = packetCapture->size();
         mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
         runAfterFlush();

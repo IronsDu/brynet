@@ -3,9 +3,14 @@
 using namespace std::chrono;
 using namespace brynet;
 
-const steady_clock::time_point& Timer::getEndTime() const
+const steady_clock::time_point& Timer::getStartTime() const
 {
-    return mEndTime;
+    return mStartTime;
+}
+
+const std::chrono::nanoseconds& Timer::getLastTime() const
+{
+    return mLastTime;
 }
 
 void Timer::cancel()
@@ -13,8 +18,11 @@ void Timer::cancel()
     mActive = false;
 }
 
-Timer::Timer(steady_clock::time_point endTime, Callback callback) noexcept : 
-    mEndTime(std::move(endTime)), 
+Timer::Timer(std::chrono::steady_clock::time_point startTime,
+    std::chrono::nanoseconds lastTime,
+    Callback callback) BRYNET_NOEXCEPT :
+    mStartTime(std::move(startTime)),
+    mLastTime(std::move(lastTime)),
     mCallback(std::move(callback)),
     mActive(true)
 {
@@ -33,7 +41,7 @@ void TimerMgr::schedule()
     while (!mTimers.empty())
     {
         auto tmp = mTimers.top();
-        if (tmp->getEndTime() > steady_clock::now())
+        if ((steady_clock::now() - tmp->getStartTime()) < tmp->getLastTime())
         {
             break;
         }
@@ -55,7 +63,9 @@ nanoseconds TimerMgr::nearLeftTime() const
         return nanoseconds::zero();
     }
 
-    auto result = mTimers.top()->getEndTime() - steady_clock::now();
+    auto result = steady_clock::now() - 
+        mTimers.top()->getStartTime() +
+        mTimers.top()->getLastTime();
     if (result.count() < 0)
     {
         return nanoseconds::zero();

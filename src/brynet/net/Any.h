@@ -24,7 +24,7 @@ namespace brynet
 #else
         typedef int64_t BrynetAny;
         template<typename T>
-        auto cast(const BrynetAny& ud)
+        const T* cast(const BrynetAny& ud)
         {
             return static_cast<const T*>(&ud);
         }
