@@ -94,9 +94,9 @@ namespace brynet
 
 EventLoop::EventLoop()
 #ifdef PLATFORM_WINDOWS
-noexcept : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
+BRYNET_NOEXCEPT : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
 #else
-noexcept : mEpollFd(epoll_create(1))
+BRYNET_NOEXCEPT: mEpollFd(epoll_create(1))
 #endif
 {
 #ifdef PLATFORM_WINDOWS
@@ -126,7 +126,7 @@ noexcept : mEpollFd(epoll_create(1))
 }
 
 
-EventLoop::~EventLoop() noexcept
+EventLoop::~EventLoop() BRYNET_NOEXCEPT
 {
 #ifdef PLATFORM_WINDOWS
     CloseHandle(mIOCP);

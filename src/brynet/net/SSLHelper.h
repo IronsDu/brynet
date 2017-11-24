@@ -5,6 +5,7 @@
 #include <memory>
 
 #include <brynet/utils/NonCopyable.h>
+#include <brynet/net/Noexcept.h>
 
 #ifdef USE_OPENSSL
 
@@ -37,8 +38,8 @@ namespace brynet
             static  PTR                         Create();
 
         private:
-            SSLHelper() noexcept;
-            virtual ~SSLHelper() noexcept;
+            SSLHelper() BRYNET_NOEXCEPT;
+            virtual ~SSLHelper() BRYNET_NOEXCEPT;
 
         private:
 #ifdef USE_OPENSSL

@@ -12,6 +12,7 @@
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/timer/Timer.h>
 #include <brynet/utils/NonCopyable.h>
+#include <brynet/net/Noexcept.h>
 
 namespace brynet
 {
@@ -48,8 +49,8 @@ namespace brynet
 #endif
 
         public:
-            EventLoop() noexcept;
-            virtual ~EventLoop() noexcept;
+            EventLoop() BRYNET_NOEXCEPT;
+            virtual ~EventLoop() BRYNET_NOEXCEPT;
 
             void                            loop(int64_t milliseconds);
             bool                            wakeup();

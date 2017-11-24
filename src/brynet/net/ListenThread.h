@@ -10,6 +10,7 @@
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/utils/Typeids.h>
 #include <brynet/net/SocketLibFunction.h>
+#include <brynet/net/Noexcept.h>
 
 namespace brynet
 {
@@ -29,8 +30,8 @@ namespace brynet
             static  PTR                         Create();
 
         private:
-            ListenThread() noexcept;
-            virtual ~ListenThread() noexcept;
+            ListenThread() BRYNET_NOEXCEPT;
+            virtual ~ListenThread() BRYNET_NOEXCEPT;
 
             void                                runListen(sock fd);
 

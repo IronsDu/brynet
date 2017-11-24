@@ -2,6 +2,7 @@
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/ListenThread.h>
+#include <brynet/net/Noexcept.h>
 #include <brynet/net/TCPService.h>
 
 const static unsigned int sDefaultLoopTimeOutMS = 100;
@@ -74,14 +75,14 @@ namespace brynet
     }
 }
 
-TcpService::TcpService() noexcept
+TcpService::TcpService() BRYNET_NOEXCEPT
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), 
         "sizeof SessionId must equal int64_t");
     mRunIOLoop = false;
 }
 
-TcpService::~TcpService() noexcept
+TcpService::~TcpService() BRYNET_NOEXCEPT
 {
     stopWorkerThread();
 }
@@ -133,10 +134,13 @@ void TcpService::postSessionAsyncProc(SESSION_TYPE id,
     }
 
     const auto& eventLoop = ioLoopData->getEventLoop();
-    eventLoop->pushAsyncProc([callbackCapture = std::move(callback), 
+    auto callbackCapture = std::move(callback);
+    auto shared_this = shared_from_this();
+    auto ioLoopDataCapture = std::move(ioLoopData);
+    eventLoop->pushAsyncProc([callbackCapture, 
         sid, 
-        shared_this = shared_from_this(), 
-        ioLoopDataCapture = std::move(ioLoopData)](){
+        shared_this, 
+        ioLoopDataCapture](){
         DataSocket::PTR tmp = nullptr;
         if (callbackCapture != nullptr &&
             ioLoopDataCapture->getDataSockets().get(sid.data.index, tmp) &&
@@ -185,8 +189,9 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
     for (auto& v : mIOLoopDatas)
     {
         auto eventLoop = std::make_shared<EventLoop>();
+        auto shared_this = shared_from_this();
         v = IOLoopData::Create(eventLoop, std::make_shared<std::thread>([callback,
-            shared_this = shared_from_this(),
+            shared_this,
             eventLoop]() {
             while (shared_this->mRunIOLoop)
             {
@@ -247,7 +252,7 @@ TcpService::PTR TcpService::Create()
     return std::make_shared<make_shared_enabler>();
 }
 
-EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id) const noexcept
+EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT
 {
     std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
@@ -264,7 +269,7 @@ EventLoop::PTR TcpService::getEventLoopBySocketID(SESSION_TYPE id) const noexcep
     }
 }
 
-std::shared_ptr<IOLoopData> TcpService::getIOLoopDataBySocketID(SESSION_TYPE id) const noexcept
+std::shared_ptr<IOLoopData> TcpService::getIOLoopDataBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT
 {
     std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
@@ -350,14 +355,15 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
     
 
     const auto& loop = ioLoopData->getEventLoop();
-
+    auto loopDataCapture = std::move(ioLoopData);
+    auto shared_this = shared_from_this();
     channel->setEnterCallback([ip, 
         loopIndex, 
         enterCallback, 
         disConnectCallback, 
         dataCallback, 
-        shared_this = shared_from_this(), 
-        loopDataCapture = std::move(ioLoopData)](DataSocket::PTR dataSocket){
+        shared_this,
+        loopDataCapture](DataSocket::PTR dataSocket){
         auto id = shared_this->MakeID(loopIndex, loopDataCapture);
         union SessionId sid;
         sid.id = id;
@@ -511,10 +517,13 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
     }
     else
     {
-        mEventLoop->pushAsyncProc([packetCapture = packet, 
-            callbackCapture = callback, 
+        auto packetCapture = packet;
+        auto callbackCapture = callback;
+        auto ioLoopDataCapture = shared_from_this();
+        mEventLoop->pushAsyncProc([packetCapture, 
+            callbackCapture, 
             sid, 
-            ioLoopDataCapture = shared_from_this()](){
+            ioLoopDataCapture](){
             DataSocket::PTR tmp = nullptr;
             if (ioLoopDataCapture->mDataSockets.get(sid.data.index, tmp) &&
                 tmp != nullptr)

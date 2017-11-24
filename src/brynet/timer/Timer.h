@@ -7,6 +7,8 @@
 #include <vector>
 #include <chrono>
 
+#include <brynet/net/Noexcept.h>
+
 namespace brynet
 {
     class TimerMgr;
@@ -18,9 +20,12 @@ namespace brynet
         typedef std::weak_ptr<Timer>            WeakPtr;
         typedef std::function<void(void)>       Callback;
 
-        Timer(std::chrono::steady_clock::time_point endTime, Callback f) noexcept;
+        Timer(std::chrono::steady_clock::time_point startTime, 
+            std::chrono::nanoseconds lastTime, 
+            Callback f) BRYNET_NOEXCEPT;
 
-        const std::chrono::steady_clock::time_point&    getEndTime() const;
+        const std::chrono::steady_clock::time_point&    getStartTime() const;
+        const std::chrono::nanoseconds&         getLastTime() const;
         void                                    cancel();
 
     private:
@@ -29,7 +34,8 @@ namespace brynet
     private:
         bool                                    mActive;
         Callback                                mCallback;
-        const std::chrono::steady_clock::time_point mEndTime;
+        const std::chrono::steady_clock::time_point mStartTime;
+        std::chrono::nanoseconds                mLastTime;
 
         friend class TimerMgr;
     };
@@ -44,7 +50,8 @@ namespace brynet
                                                          F callback, 
                                                          TArgs&& ...args)
         {
-            auto timer = std::make_shared<Timer>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(timeout),
+            auto timer = std::make_shared<Timer>(std::chrono::steady_clock::now(),
+                                                std::chrono::nanoseconds(timeout),
                                                 std::bind(std::move(callback), std::forward<TArgs>(args)...));
             mTimers.push(timer);
 
@@ -63,7 +70,10 @@ namespace brynet
         public:
             bool operator() (const Timer::Ptr& left, const Timer::Ptr& right) const
             {
-                return left->getEndTime() > right->getEndTime();
+                auto startDiff = (left->getStartTime() - right->getStartTime());
+                auto lastDiff = left->getLastTime() - right->getLastTime();
+                auto diff = startDiff.count() + lastDiff.count();
+                return diff > 0;
             }
         };
 

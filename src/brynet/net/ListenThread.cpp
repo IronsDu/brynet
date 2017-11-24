@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <brynet/net/SocketLibFunction.h>
+#include <brynet/net/Noexcept.h>
 
 #include <brynet/net/ListenThread.h>
 
@@ -11,7 +12,7 @@ ListenThread::PTR ListenThread::Create()
     return std::make_shared<make_shared_enabler>();
 }
 
-ListenThread::ListenThread() noexcept
+ListenThread::ListenThread() BRYNET_NOEXCEPT
 {
     mIsIPV6 = false;
     mAcceptCallback = nullptr;
@@ -19,7 +20,7 @@ ListenThread::ListenThread() noexcept
     mRunListen = false;
 }
 
-ListenThread::~ListenThread() noexcept
+ListenThread::~ListenThread() BRYNET_NOEXCEPT
 {
     stopListen();
 }
@@ -53,7 +54,8 @@ void ListenThread::startListen(bool isIPV6,
     mPort = port;
     mAcceptCallback = callback;
 
-    mListenThread = std::make_shared<std::thread>([shared_this = shared_from_this(), fd]() {
+    auto shared_this = shared_from_this();
+    mListenThread = std::make_shared<std::thread>([shared_this, fd]() {
         shared_this->runListen(fd);
         ox_socket_close(fd);
     });
