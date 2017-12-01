@@ -241,7 +241,8 @@ void HttpService::handle(const HttpSession::PTR& httpSession)
         }
     });
 
-    session->setDataCallback([httpSession, httpParser = std::make_shared<HTTPParser>(HTTP_BOTH)](
+    auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
+    session->setDataCallback([httpSession, httpParser](
                                 const TCPSession::PTR& session, 
                                 const char* buffer, size_t len){
         size_t retlen = 0;

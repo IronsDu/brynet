@@ -2,7 +2,7 @@
 
 using namespace brynet::net;
 
-TCPSession::TCPSession() noexcept
+TCPSession::TCPSession() BRYNET_NOEXCEPT
 {
     mSocketID = -1;
     mDisConnectCallback = nullptr;
@@ -10,7 +10,7 @@ TCPSession::TCPSession() noexcept
     mService = nullptr;
 }
 
-TCPSession::~TCPSession() noexcept
+TCPSession::~TCPSession() BRYNET_NOEXCEPT
 {
     mSocketID = -1;
 }
@@ -114,12 +114,12 @@ TCPSession::PTR TCPSession::Create()
     return std::make_shared<make_shared_enabler>();
 }
 
-WrapTcpService::WrapTcpService() noexcept
+WrapTcpService::WrapTcpService() BRYNET_NOEXCEPT
 {
     mTCPService = TcpService::Create();
 }
 
-WrapTcpService::~WrapTcpService() noexcept
+WrapTcpService::~WrapTcpService() BRYNET_NOEXCEPT
 {
     stopWorkThread();
 }
@@ -144,10 +144,11 @@ void WrapTcpService::addSession(sock fd,
     auto tmpSession = TCPSession::Create();
     tmpSession->setService(mTCPService);
 
-    auto enterCallback = [sharedTCPService = mTCPService, 
-        tmpSession, userEnterCallback](TcpService::SESSION_TYPE id, 
-            const std::
-            string& ip) mutable {
+    auto sharedTCPService = mTCPService;
+    auto enterCallback = [sharedTCPService, 
+        tmpSession, 
+        userEnterCallback](TcpService::SESSION_TYPE id, 
+                            const std::string& ip) mutable {
         tmpSession->setIOLoopData(sharedTCPService->getIOLoopDataBySocketID(id));
         tmpSession->setSocketID(id);
         tmpSession->setIP(ip);

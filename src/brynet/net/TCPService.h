@@ -12,6 +12,7 @@
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/utils/Typeids.h>
 #include <brynet/net/SSLHelper.h>
+#include <brynet/net/Noexcept.h>
 
 namespace brynet
 {
@@ -63,12 +64,12 @@ namespace brynet
             void                                wakeup(SESSION_TYPE id) const;
             void                                wakeupAll() const;
             EventLoop::PTR                      getRandomEventLoop();
-            EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const noexcept;
-            std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const noexcept;
+            EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT;
+            std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT;
 
         private:
-            TcpService() noexcept;
-            virtual ~TcpService() noexcept;
+            TcpService() BRYNET_NOEXCEPT;
+            virtual ~TcpService() BRYNET_NOEXCEPT;
 
             bool                                helpAddChannel(DataSocket::PTR channel,
                                                                 const std::string& ip,

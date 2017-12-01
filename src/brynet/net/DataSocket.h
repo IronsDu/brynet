@@ -11,6 +11,7 @@
 #include <brynet/timer/Timer.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Any.h>
+#include <brynet/net/Noexcept.h>
 
 #ifdef USE_OPENSSL
 
@@ -44,8 +45,8 @@ namespace brynet
             typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
         public:
-            DataSocket(sock fd, size_t maxRecvBufferSize) noexcept;
-            ~DataSocket() noexcept;
+            DataSocket(sock fd, size_t maxRecvBufferSize) BRYNET_NOEXCEPT;
+            ~DataSocket() BRYNET_NOEXCEPT;
 
             /* must called in network thread */
             bool                            onEnterEventLoop(const EventLoop::PTR& eventLoop);
