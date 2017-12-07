@@ -87,6 +87,7 @@ namespace brynet
             WrapTcpService() BRYNET_NOEXCEPT;
             virtual ~WrapTcpService() BRYNET_NOEXCEPT;
 
+            const TcpService::PTR&      getService() const;
             void                        startWorkThread(size_t threadNum, 
                                                         TcpService::FRAME_CALLBACK callback = nullptr);
             void                        stopWorkThread();
