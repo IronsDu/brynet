@@ -129,6 +129,11 @@ void WrapTcpService::stopWorkThread()
     mTCPService->stopWorkerThread();
 }
 
+const TcpService::PTR& WrapTcpService::getService() const
+{
+    return mTCPService;
+}
+
 void WrapTcpService::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBACK callback)
 {
     mTCPService->startWorkerThread(threadNum, callback);
