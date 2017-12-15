@@ -37,16 +37,16 @@ int main(int argc, char** argv)
     int clietNum = atoi(argv[3]);
     int packetLen = atoi(argv[4]);
 
-    ox_socket_init();
+    brynet::net::base::InitSocket();
 
     auto clientEventLoop = std::make_shared<EventLoop>();
 
     for (int i = 0; i < clietNum; i++)
     {
-        auto fd = ox_socket_connect(false, ip.c_str(), port);
-        ox_socket_setsdsize(fd, 32 * 1024);
-        ox_socket_setrdsize(fd, 32 * 1024);
-        ox_socket_nodelay(fd);
+        auto fd = brynet::net::base::Connect(false, ip.c_str(), port);
+        brynet::net::base::SocketSetSendSize(fd, 32 * 1024);
+        brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
+        brynet::net::base::SocketNodelay(fd);
 
         DataSocket::PTR datasSocket = new DataSocket(fd, 1024 * 1024);
         datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {

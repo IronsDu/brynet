@@ -8,7 +8,6 @@
 #include <winsock2.h>
 #include <Windows.h>
 #else
-#include <sys/syscall.h>
 #include <sys/types.h>
 #endif
 
@@ -26,17 +25,7 @@ namespace brynet
             extern __thread THREAD_ID_TYPE cachedTid;
 #endif
 
-            void cacheTid();
-
-            inline THREAD_ID_TYPE& tid()
-            {
-                if (cachedTid == 0)
-                {
-                    cacheTid();
-                }
-
-                return cachedTid;
-            }
+            THREAD_ID_TYPE& tid();
         }
     }
 }

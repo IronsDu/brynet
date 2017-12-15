@@ -11,11 +11,13 @@ elseif(UNIX)
   endif()
 endif()
 
+set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
+
 set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/net/EventLoop.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/CurrentThread.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/DataSocket.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.c
+	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/WrapTCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp
@@ -28,11 +30,6 @@ set(timer_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/timer/Timer.cpp
 )
 
-set(base_src_list
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
-)
-
 set(http_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/net/http/http_parser.c
 	${PROJECT_SOURCE_DIR}/src/brynet/net/http/HttpParser.cpp
@@ -43,70 +40,30 @@ set(utils_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/base64.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/md5calc.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/SHA1.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
 )
 
 include_directories("${PROJECT_SOURCE_DIR}/src/")
-
-add_executable(pingpongserver ${net_src_list} ${timer_src_list} ${base_src_list} ${PROJECT_SOURCE_DIR}/examples/PingPongServer.cpp)
 if(WIN32)
-  target_link_libraries(pingpongserver ws2_32)
+  add_library(brynet ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
 elseif(UNIX)
+  add_library(brynet SHARED ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
   find_package(Threads REQUIRED)
-  target_link_libraries(pingpongserver pthread)
+  target_link_libraries(brynet pthread)
 endif()
+install(TARGETS brynet DESTINATION lib)
 
-add_executable(pingpongclient ${net_src_list} ${timer_src_list} ${base_src_list} ${PROJECT_SOURCE_DIR}/examples/PingPongClient.cpp)
-if(WIN32)
-  target_link_libraries(pingpongclient ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(pingpongclient pthread)
-endif()
+file(GLOB BRYNET_NET_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/net/*.h)
+install (FILES ${BRYNET_NET_PUBLIC_HEADERS} DESTINATION "include/brynet/net")
 
-add_executable(broadcastserver ${net_src_list} ${timer_src_list} ${base_src_list} ${PROJECT_SOURCE_DIR}/examples/BroadCastServer.cpp)
-if(WIN32)
-  target_link_libraries(broadcastserver ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(broadcastserver pthread)
-endif()
+file(GLOB BRYNET_TIMER_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/timer/*.h)
+install (FILES ${BRYNET_TIMER_PUBLIC_HEADERS} DESTINATION "include/brynet/timer")
 
-add_executable(broadcastclient ${net_src_list} ${timer_src_list} ${base_src_list} ${PROJECT_SOURCE_DIR}/examples/BroadCastClient.cpp)
-if(WIN32)
-  target_link_libraries(broadcastclient ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(broadcastclient pthread)
-endif()
+file(GLOB BRYNET_UTILS_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/utils/*.h)
+install (FILES ${BRYNET_UTILS_PUBLIC_HEADERS} DESTINATION "include/brynet/utils")
 
-add_executable(httpserver ${net_src_list} ${timer_src_list} ${base_src_list} ${utils_src_list} ${http_src_list} ${PROJECT_SOURCE_DIR}/examples/TestHttp.cpp)
-if(WIN32)
-  target_link_libraries(httpserver ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(httpserver pthread)
-endif()
+file(GLOB BRYNET_HTTP_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/net/http/*.h)
+install (FILES ${BRYNET_HTTP_PUBLIC_HEADERS} DESTINATION "include/brynet/net/http")
 
-add_executable(benchwebsocket ${net_src_list} ${timer_src_list} ${base_src_list} ${utils_src_list} ${http_src_list} ${PROJECT_SOURCE_DIR}/examples/BenchWebsocket.cpp)
-if(WIN32)
-  target_link_libraries(benchwebsocket ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(benchwebsocket pthread)
-endif()
-
-add_executable(promisereceive ${net_src_list} ${timer_src_list} ${base_src_list} ${utils_src_list} ${http_src_list} ${PROJECT_SOURCE_DIR}/examples/TestPromiseReceive.cpp)
-if(WIN32)
-  target_link_libraries(promisereceive ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(promisereceive pthread)
-endif()
-
-add_executable(web_binary_proxy ${net_src_list} ${timer_src_list} ${base_src_list} ${utils_src_list} ${http_src_list} ${PROJECT_SOURCE_DIR}/examples/WebBinaryProxy.cpp)
-if(WIN32)
-  target_link_libraries(web_binary_proxy ws2_32)
-elseif(UNIX)
-  find_package(Threads REQUIRED)
-  target_link_libraries(web_binary_proxy pthread)
-endif()
+add_subdirectory(examples)

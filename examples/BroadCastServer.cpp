@@ -74,16 +74,16 @@ int main(int argc, char** argv)
     }
 
     int port = atoi(argv[1]);
-    ox_socket_init();
+    brynet::net::base::InitSocket();
 
     service = std::make_shared<WrapTcpService>();
     auto mainLoop = std::make_shared<EventLoop>();
     auto listenThrean = ListenThread::Create();
 
     listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](sock fd) {
-        ox_socket_nodelay(fd);
-        ox_socket_setsdsize(fd, 32 * 1024);
-        ox_socket_setrdsize(fd, 32 * 1024);
+        brynet::net::base::SocketNodelay(fd);
+        brynet::net::base::SocketSetSendSize(fd, 32 * 1024);
+        brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
         service->addSession(fd, [mainLoop](const TCPSession::PTR& session) {
             mainLoop->pushAsyncProc([session]() {
                 addClientID(session);

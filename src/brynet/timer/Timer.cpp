@@ -13,6 +13,11 @@ const std::chrono::nanoseconds& Timer::getLastTime() const
     return mLastTime;
 }
 
+std::chrono::nanoseconds Timer::getLeftTime() const
+{
+    return getLastTime() - (steady_clock::now() - getStartTime());
+}
+
 void Timer::cancel()
 {
     mActive = false;
@@ -41,13 +46,13 @@ void TimerMgr::schedule()
     while (!mTimers.empty())
     {
         auto tmp = mTimers.top();
-        if ((steady_clock::now() - tmp->getStartTime()) < tmp->getLastTime())
+        if (tmp->getLeftTime() > nanoseconds::zero())
         {
             break;
         }
 
         mTimers.pop();
-        tmp->operator() ();
+        (*tmp)();
     }
 }
 
@@ -63,9 +68,8 @@ nanoseconds TimerMgr::nearLeftTime() const
         return nanoseconds::zero();
     }
 
-    auto result = mTimers.top()->getLastTime() - 
-        (steady_clock::now() - mTimers.top()->getStartTime());
-    if (result.count() < 0)
+    auto result = mTimers.top()->getLeftTime();
+    if (result < nanoseconds::zero())
     {
         return nanoseconds::zero();
     }

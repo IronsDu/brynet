@@ -86,7 +86,7 @@ bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
 
     mEventLoop = eventLoop;
 
-    if (!ox_socket_nonblock(mFD))
+    if (!brynet::net::base::SocketNonblock(mFD))
     {
         closeSocket();
         return false;
@@ -291,7 +291,7 @@ void DataSocket::recv()
             ox_buffer_adjustto_head(mRecvBuffer);
         }
 
-        if (retlen < tryRecvLen)
+        if (retlen < static_cast<int>(tryRecvLen))
         {
             must_close = !checkRead();
             break;
@@ -587,7 +587,7 @@ void DataSocket::closeSocket()
     if (mFD != SOCKET_ERROR)
     {
         mCanWrite = false;
-        ox_socket_close(mFD);
+        brynet::net::base::SocketClose(mFD);
         mFD = SOCKET_ERROR;
     }
 }

@@ -30,7 +30,7 @@ int main(int argc, char **argv)
         {
             connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](sock fd) {
                 std::cout << "connect success" << std::endl;
-                ox_socket_nodelay(fd);
+                brynet::net::base::SocketNodelay(fd);
                 server->addSession(fd, [tmp](const TCPSession::PTR& session) {
                     session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
                         session->send(buffer, len);
