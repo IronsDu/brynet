@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](sock fd){
-        ox_socket_nodelay(fd);
+        brynet::net::base::SocketNodelay(fd);
         server->addSession(fd, [](const TCPSession::PTR& session){
 
             auto promiseReceive = setupPromiseReceive(session);

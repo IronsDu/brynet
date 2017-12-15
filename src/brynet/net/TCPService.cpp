@@ -407,7 +407,7 @@ bool TcpService::addDataSocket(sock fd,
     size_t maxRecvBufferSize,
     bool forceSameThreadLoop)
 {
-    std::string ip = ox_socket_getipoffd(fd);
+    std::string ip = brynet::net::base::GetIPOfSocket(fd);
     DataSocket::PTR channel = new DataSocket(fd, maxRecvBufferSize);
 #ifdef USE_OPENSSL
     if (isUseSSL)
@@ -453,7 +453,7 @@ FAILED:
     }
     else
     {
-        ox_socket_close(fd);
+        brynet::net::base::SocketClose(fd);
     }
 
     return false;

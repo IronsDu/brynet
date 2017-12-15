@@ -26,6 +26,8 @@ namespace brynet
 
         const std::chrono::steady_clock::time_point&    getStartTime() const;
         const std::chrono::nanoseconds&         getLastTime() const;
+
+        std::chrono::nanoseconds                getLeftTime() const;
         void                                    cancel();
 
     private:
@@ -70,7 +72,7 @@ namespace brynet
         public:
             bool operator() (const Timer::Ptr& left, const Timer::Ptr& right) const
             {
-                auto startDiff = (left->getStartTime() - right->getStartTime());
+                auto startDiff = left->getStartTime() - right->getStartTime();
                 auto lastDiff = left->getLastTime() - right->getLastTime();
                 auto diff = startDiff.count() + lastDiff.count();
                 return diff > 0;

@@ -78,9 +78,9 @@ namespace brynet
         {
         public:
             static void setup(const TCPSession::PTR& session, const HttpSession::ENTER_CALLBACK& enterCallback);
-            static void handle(const HttpSession::PTR& httpSession);
 
         private:
+            static void handle(const HttpSession::PTR& httpSession);
             static size_t ProcessWebSocket(const char* buffer,
                 size_t len, 
                 const HTTPParser::PTR& httpParser,

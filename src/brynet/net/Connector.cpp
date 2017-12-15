@@ -21,11 +21,6 @@ namespace brynet
         class AsyncConnectAddr
         {
         public:
-            AsyncConnectAddr() BRYNET_NOEXCEPT : mTimeout(std::chrono::nanoseconds::zero())
-            {
-                mPort = 0;
-            }
-
             AsyncConnectAddr(const std::string& ip, 
                 int port, 
                 std::chrono::nanoseconds timeout, 
@@ -184,7 +179,7 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
         }
         else
         {
-            ox_socket_close(fd);
+            brynet::net::base::SocketClose(fd);
             if (it->second.failedCB != nullptr)
             {
                 it->second.failedCB();
@@ -214,7 +209,7 @@ void ConnectorWorkInfo::checkTimeout()
         mConnectingFds.erase(fd);
         mConnectingInfos.erase(it++);
 
-        ox_socket_close(fd);
+        brynet::net::base::SocketClose(fd);
         if (cb != nullptr)
         {
             cb();
@@ -234,7 +229,7 @@ void ConnectorWorkInfo::causeAllFailed()
         mConnectingFds.erase(fd);
         mConnectingInfos.erase(it++);
 
-        ox_socket_close(fd);
+        brynet::net::base::SocketClose(fd);
         if (cb != nullptr)
         {
             cb();
@@ -255,17 +250,17 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 #endif
     int n = 0;
 
-    ox_socket_init();
+    brynet::net::base::InitSocket();
 
-    clientfd = ox_socket_create(AF_INET, SOCK_STREAM, 0);
+    clientfd = brynet::net::base::SocketCreate(AF_INET, SOCK_STREAM, 0);
     if (clientfd == SOCKET_ERROR)
     {
         goto FAILED;
     }
 
-    ox_socket_nonblock(clientfd);
+    brynet::net::base::SocketNonblock(clientfd);
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(addr.getIP().c_str());
+    inet_pton(AF_INET, addr.getIP().c_str(), &server_addr.sin_addr.s_addr);
     server_addr.sin_port = htons(addr.getPort());
 
     n = connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
@@ -276,7 +271,7 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 
     if (check_error != sErrno)
     {
-        ox_socket_close(clientfd);
+        brynet::net::base::SocketClose(clientfd);
         clientfd = SOCKET_ERROR;
         goto FAILED;
     }

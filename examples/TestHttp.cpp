@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 
     std::cin.get();
 
-    sock fd = ox_socket_connect(false, "192.168.12.128", 8080);
+    sock fd = brynet::net::base::Connect(false, "192.168.12.128", 8080);
     if (fd != SOCKET_ERROR)
     {
         service->addSession(fd, [](const TCPSession::PTR& session) {

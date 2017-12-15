@@ -50,8 +50,8 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < connections; i++)
     {
-        sock fd = ox_socket_connect(false, host, port);
-        ox_socket_nodelay(fd);
+        sock fd = brynet::net::base::Connect(false, host, port);
+        brynet::net::base::SocketNodelay(fd);
         service->addSession(fd, [host](const TCPSession::PTR& session) {
             HttpService::setup(session, [host](const HttpSession::PTR& httpSession) {
                 HttpRequest request;

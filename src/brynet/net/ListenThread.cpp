@@ -42,7 +42,7 @@ void ListenThread::startListen(bool isIPV6,
     }
 
     // TODO::socket leak
-    sock fd = ox_socket_listen(isIPV6, ip.c_str(), port, 512);
+    sock fd = brynet::net::base::Listen(isIPV6, ip.c_str(), port, 512);
     if (SOCKET_ERROR == fd)
     {
         throw std::runtime_error("listen error of:" + sErrno);
@@ -57,7 +57,7 @@ void ListenThread::startListen(bool isIPV6,
     auto shared_this = shared_from_this();
     mListenThread = std::make_shared<std::thread>([shared_this, fd]() {
         shared_this->runListen(fd);
-        ox_socket_close(fd);
+        brynet::net::base::SocketClose(fd);
     });
 }
 
@@ -72,8 +72,8 @@ void ListenThread::stopListen()
 
     mRunListen = false;
 
-    sock tmp = ox_socket_connect(mIsIPV6, mIP.c_str(), mPort);
-    ox_socket_close(tmp);
+    sock tmp = brynet::net::base::Connect(mIsIPV6, mIP.c_str(), mPort);
+    brynet::net::base::SocketClose(tmp);
     tmp = SOCKET_ERROR;
 
     if (mListenThread->joinable())
@@ -99,7 +99,7 @@ void ListenThread::runListen(sock fd)
     for (; mRunListen;)
     {
         sock client_fd = SOCKET_ERROR;
-        while ((client_fd = ox_socket_accept(fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
+        while ((client_fd = brynet::net::base::Accept(fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
         {
             if (EINTR == sErrno)
             {
@@ -113,7 +113,7 @@ void ListenThread::runListen(sock fd)
         }
         if (!mRunListen)
         {
-            ox_socket_close(client_fd);
+            brynet::net::base::SocketClose(client_fd);
             continue;
         }
 
