@@ -92,6 +92,7 @@ namespace brynet
                                                         TcpService::FRAME_CALLBACK callback = nullptr);
             void                        stopWorkThread();
 
+            //TODO::maybe used wrongly
             void                        addSession(sock fd, 
                                                     const SESSION_ENTER_CALLBACK& userEnterCallback, 
                                                     bool isUseSSL,

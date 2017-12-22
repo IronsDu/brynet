@@ -414,8 +414,8 @@ bool TcpService::addDataSocket(sock fd,
     {
         if (sslHelper != nullptr)
         {
-            if (sslHelper.getOpenSSLCTX() == nullptr ||
-                !channel->initAcceptSSL(sslHelper.getOpenSSLCTX())
+            if (sslHelper->getOpenSSLCTX() == nullptr ||
+                !channel->initAcceptSSL(sslHelper->getOpenSSLCTX()))
             {
                 goto FAILED;
             }

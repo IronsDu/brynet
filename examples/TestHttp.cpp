@@ -41,31 +41,17 @@ int main(int argc, char **argv)
         }, false, nullptr, 1024 * 1024, false);
     });
 
-    std::cin.get();
-
-    sock fd = brynet::net::base::Connect(false, "192.168.12.128", 8080);
+#ifdef USE_OPENSSL
+    sock fd = brynet::net::base::Connect(false, "180.97.33.108", 443);
     if (fd != SOCKET_ERROR)
     {
+        SSL_library_init();
         service->addSession(fd, [](const TCPSession::PTR& session) {
             HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
-                HttpQueryParameter parameter;
-                parameter.add("value", "123456");
+                request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
+                request.setUrl("/");
 
-                if (false)
-                {
-                    request.addHeadValue("Accept", "*/*");
-                    request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_PUT);
-                    request.setUrl("/v2/keys/asea/aagee");
-                    request.setContentType("application/x-www-form-urlencoded");
-                    request.setBody(parameter.getResult());
-                }
-                else
-                {
-                    request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-                    request.setUrl("/v2/keys/asea/aagee");
-                    request.setQuery(parameter.getResult());
-                }
                 std::string requestStr = request.getResult();
                 httpSession->send(requestStr.c_str(), requestStr.size());
                 httpSession->setHttpCallback([](const HTTPParser& httpParser, const HttpSession::PTR& session) {
@@ -73,8 +59,9 @@ int main(int argc, char **argv)
                     std::cout << httpParser.getBody() << std::endl;
                 });
             });
-        }, false, nullptr, 1024 * 1024, false);
+        }, true, nullptr, 1024 * 1024, false);
     }
+#endif
 
     std::cin.get();
     return 0;
