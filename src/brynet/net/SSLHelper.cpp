@@ -24,12 +24,12 @@ SSLHelper::~SSLHelper() BRYNET_NOEXCEPT
 }
 
 #ifdef USE_OPENSSL
-SSL_CTX* ListenThread::getOpenSSLCTX()
+SSL_CTX* SSLHelper::getOpenSSLCTX()
 {
     return mOpenSSLCTX;
 }
 
-bool ListenThread::initSSL(const std::string& certificate, const std::string& privatekey)
+bool SSLHelper::initSSL(const std::string& certificate, const std::string& privatekey)
 {
     if (mOpenSSLCTX != nullptr)
     {
@@ -65,7 +65,7 @@ bool ListenThread::initSSL(const std::string& certificate, const std::string& pr
     return true;
 }
 
-void ListenThread::destroySSL()
+void SSLHelper::destroySSL()
 {
     if(mOpenSSLCTX != nullptr)
     {

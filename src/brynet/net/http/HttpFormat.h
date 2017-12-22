@@ -113,7 +113,7 @@ namespace brynet
 
                 ret += " ";
                 ret += mUrl;
-                if (mQuery.empty())
+                if (!mQuery.empty())
                 {
                     ret += "?";
                     ret += mQuery;
