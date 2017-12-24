@@ -42,6 +42,8 @@ set(utils_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/SHA1.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/app_status.c
+	${PROJECT_SOURCE_DIR}/src/brynet/utils/ox_file.cpp
 )
 
 include_directories("${PROJECT_SOURCE_DIR}/src/")
