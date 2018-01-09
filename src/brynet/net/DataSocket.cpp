@@ -9,7 +9,7 @@
 
 using namespace brynet::net;
 
-DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
+DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
 #if defined PLATFORM_WINDOWS
     : 
     mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), 
@@ -21,7 +21,7 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
     mCheckTime = std::chrono::steady_clock::duration::zero();
     mIsPostFinalClose = false;
     mIsPostFlush = false;
-    mFD = fd;
+    mSocket = std::move(socket);
 
     mCanWrite = true;
 
@@ -42,8 +42,6 @@ DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
 
 DataSocket::~DataSocket() BRYNET_NOEXCEPT
 {
-    assert(mFD == SOCKET_ERROR);
-
     if (mRecvBuffer != nullptr)
     {
         ox_buffer_delete(mRecvBuffer);
@@ -62,8 +60,6 @@ DataSocket::~DataSocket() BRYNET_NOEXCEPT
         mSSLCtx = nullptr;
     }
 #endif
-
-    closeSocket();
 
     if (mTimer.lock())
     {
@@ -86,12 +82,12 @@ bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
 
     mEventLoop = eventLoop;
 
-    if (!brynet::net::base::SocketNonblock(mFD))
+    if (!brynet::net::base::SocketNonblock(mSocket->getFD()))
     {
         closeSocket();
         return false;
     }
-    if (!mEventLoop->linkChannel(mFD, this))
+    if (!mEventLoop->linkChannel(mSocket->getFD(), this))
     {
         closeSocket();
         return false;
@@ -151,7 +147,7 @@ void DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
-    if (mFD == SOCKET_ERROR && !mPostWriteCheck)
+    if (mSocket == nullptr && !mPostWriteCheck)
     {
         onClose();
         return;
@@ -173,7 +169,7 @@ void DataSocket::canSend()
 {
 #ifdef PLATFORM_WINDOWS
     mPostWriteCheck = false;
-    if (mFD == SOCKET_ERROR && !mPostRecvCheck)
+    if (mSocket == nullptr && !mPostRecvCheck)
     {
         onClose();
         return;
@@ -196,7 +192,7 @@ void DataSocket::canSend()
 
 void DataSocket::runAfterFlush()
 {
-    if (!mIsPostFlush && !mSendList.empty() && mFD != SOCKET_ERROR)
+    if (!mIsPostFlush && !mSendList.empty() && mSocket != nullptr)
     {
         mEventLoop->pushAfterLoopProc([=](){
             mIsPostFlush = false;
@@ -211,7 +207,7 @@ void DataSocket::recv()
 {
     bool must_close = false;
 
-    while (mFD != SOCKET_ERROR)
+    while (mSocket != nullptr)
     {
         const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
         if (tryRecvLen == 0)
@@ -227,10 +223,10 @@ void DataSocket::recv()
         }
         else
         {
-            retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
+            retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
         }
 #else
-        retlen = ::recv(mFD, ox_buffer_getwriteptr(mRecvBuffer), static_cast<int>(tryRecvLen), 0);
+        retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer), static_cast<int>(tryRecvLen), 0);
 #endif
 
         if (retlen == 0)
@@ -306,7 +302,7 @@ void DataSocket::recv()
 
 void DataSocket::flush()
 {
-    if (!mCanWrite || mFD == SOCKET_ERROR)
+    if (!mCanWrite || mSocket == nullptr)
     {
         return;
     }
@@ -383,10 +379,10 @@ void DataSocket::normalFlush()
         }
         else
         {
-            send_retlen = ::send(mFD, sendptr, wait_send_size, 0);
+            send_retlen = ::send(mSocket->getFD(), sendptr, wait_send_size, 0);
         }
 #else
-        send_retlen = ::send(mFD, sendptr, static_cast<int>(wait_send_size), 0);
+        send_retlen = ::send(mSocket->getFD(), sendptr, static_cast<int>(wait_send_size), 0);
 #endif
         if (send_retlen <= 0)
         {
@@ -429,7 +425,7 @@ void DataSocket::normalFlush()
             tmp_len -= packet.left;
             if (packet.mCompleteCallback != nullptr)
             {
-                (*packet.mCompleteCallback)();
+                (packet.mCompleteCallback)();
             }
             it = mSendList.erase(it);
         }
@@ -482,7 +478,7 @@ void DataSocket::quickFlush()
             break;
         }
 
-        const int send_len = writev(mFD, iov, num);
+        const int send_len = writev(mSocket->getFD(), iov, num);
         if (send_len <= 0)
         {
             if (sErrno == S_EWOULDBLOCK)
@@ -510,7 +506,7 @@ void DataSocket::quickFlush()
             tmp_len -= b.left;
             if (b.mCompleteCallback != nullptr)
             {
-                (*b.mCompleteCallback)();
+                b.mCompleteCallback();
             }
             it = mSendList.erase(it);
         }
@@ -532,7 +528,7 @@ void DataSocket::quickFlush()
 
 void DataSocket::procCloseInLoop()
 {
-    if (mFD == SOCKET_ERROR)
+    if (mSocket == nullptr)
     {
         return;
     }
@@ -553,12 +549,12 @@ void DataSocket::procCloseInLoop()
 
 void DataSocket::procShutdownInLoop()
 {
-    if (mFD != SOCKET_ERROR)
+    if (mSocket != nullptr)
     {
 #ifdef PLATFORM_WINDOWS
-        shutdown(mFD, SD_SEND);
+        shutdown(mSocket->getFD(), SD_SEND);
 #else
-        shutdown(mFD, SHUT_WR);
+        shutdown(mSocket->getFD(), SHUT_WR);
 #endif
         mCanWrite = false;
     }
@@ -584,11 +580,10 @@ void DataSocket::onClose()
 
 void DataSocket::closeSocket()
 {
-    if (mFD != SOCKET_ERROR)
+    if (mSocket != nullptr)
     {
         mCanWrite = false;
-        brynet::net::base::SocketClose(mFD);
-        mFD = SOCKET_ERROR;
+        mSocket = nullptr;
     }
 }
 
@@ -606,7 +601,7 @@ bool    DataSocket::checkRead()
 
     DWORD   dwBytes = 0;
     DWORD   flag = 0;
-    int ret = WSARecv(mFD, &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
+    int ret = WSARecv(mSocket->getFD(), &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
     if (ret == -1)
     {
         check_ret = (sErrno == WSA_IO_PENDING);
@@ -633,7 +628,7 @@ bool    DataSocket::checkWrite()
     }
 
     DWORD send_len = 0;
-    int ret = WSASend(mFD, wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
+    int ret = WSASend(mSocket->getFD(), wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
     if (ret == -1)
     {
         check_ret = (sErrno == WSA_IO_PENDING);
@@ -647,7 +642,7 @@ bool    DataSocket::checkWrite()
     struct epoll_event ev = { 0, { 0 } };
     ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
     ev.data.ptr = (Channel*)(this);
-    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
 #endif
 
     return check_ret;
@@ -656,12 +651,12 @@ bool    DataSocket::checkWrite()
 #ifdef PLATFORM_LINUX
 void    DataSocket::removeCheckWrite()
 {
-    if(mFD != SOCKET_ERROR)
+    if(mSocket != nullptr)
     {
         struct epoll_event ev = { 0, { 0 } };
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
-        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mFD, &ev);
+        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
     }
 }
 #endif
@@ -761,7 +756,7 @@ void DataSocket::postShutdown()
     }
 
     mEventLoop->pushAsyncProc([=]() {
-        if (mFD != SOCKET_ERROR)
+        if (mSocket != nullptr)
         {
             mEventLoop->pushAfterLoopProc([=]() {
                 procShutdownInLoop();
@@ -789,7 +784,7 @@ bool DataSocket::initAcceptSSL(SSL_CTX* ctx)
     }
 
     mSSL = SSL_new(ctx);
-    if (SSL_set_fd(mSSL, mFD) != 1)
+    if (SSL_set_fd(mSSL, mSocket->getFD()) != 1)
     {
         ERR_print_errors_fp(stdout);
         ::fflush(stdout);
@@ -809,7 +804,7 @@ bool DataSocket::initConnectSSL()
     mSSLCtx = SSL_CTX_new(SSLv23_client_method());
     mSSL = SSL_new(mSSLCtx);
 
-    if (SSL_set_fd(mSSL, mFD) != 1)
+    if (SSL_set_fd(mSSL, mSocket->getFD()) != 1)
     {
         ERR_print_errors_fp(stdout);
         ::fflush(stdout);

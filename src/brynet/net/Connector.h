@@ -10,6 +10,7 @@
 #include <brynet/utils/CPP_VERSION.h>
 #include <brynet/net/Any.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/Socket.h>
 
 #ifdef HAVE_LANG_CXX17
 #include <shared_mutex>
@@ -27,7 +28,7 @@ namespace brynet
         {
         public:
             typedef std::shared_ptr<AsyncConnector> PTR;
-            typedef std::function<void(sock)> COMPLETED_CALLBACK;
+            typedef std::function<void(TcpSocket::PTR)> COMPLETED_CALLBACK;
             typedef std::function<void()> FAILED_CALLBACK;
 
             void                startWorkerThread();

@@ -48,7 +48,7 @@ int main(int argc, char** argv)
         brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
         brynet::net::base::SocketNodelay(fd);
 
-        DataSocket::PTR datasSocket = new DataSocket(fd, 1024 * 1024);
+        DataSocket::PTR datasSocket = new DataSocket(TcpSocket::Create(fd, false), 1024 * 1024);
         datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {
             static_assert(sizeof(datasSocket) <= sizeof(int64_t), "");
 

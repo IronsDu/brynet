@@ -51,8 +51,9 @@ int main(int argc, char **argv)
     for (int i = 0; i < connections; i++)
     {
         sock fd = brynet::net::base::Connect(false, host, port);
+        auto socket = TcpSocket::Create(fd, false);
         brynet::net::base::SocketNodelay(fd);
-        service->addSession(fd, [host](const TCPSession::PTR& session) {
+        service->addSession(std::move(socket), [host](const TCPSession::PTR& session) {
             HttpService::setup(session, [host](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);

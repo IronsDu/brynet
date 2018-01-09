@@ -388,6 +388,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
         }
     });
 
+    //TODO::考虑channel 内存更安全的方式
     loop->pushAsyncProc([loop, channel](){
         if (!channel->onEnterEventLoop(std::move(loop)))
         {
@@ -398,7 +399,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
     return true;
 }
 
-bool TcpService::addDataSocket(sock fd,
+bool TcpService::addDataSocket(TcpSocket::PTR socket,
     const SSLHelper::PTR& sslHelper,
     bool isUseSSL,
     const TcpService::ENTER_CALLBACK& enterCallback,
@@ -407,14 +408,17 @@ bool TcpService::addDataSocket(sock fd,
     size_t maxRecvBufferSize,
     bool forceSameThreadLoop)
 {
-    std::string ip = brynet::net::base::GetIPOfSocket(fd);
-    DataSocket::PTR channel = new DataSocket(fd, maxRecvBufferSize);
+    const auto isServerSide = socket->isServerSide();
+    const std::string ip = socket->GetIP();
+
+    DataSocket::PTR channel = new DataSocket(std::move(socket), maxRecvBufferSize);
 #ifdef USE_OPENSSL
     if (isUseSSL)
     {
-        if (sslHelper != nullptr)
+        if (isServerSide)
         {
-            if (sslHelper->getOpenSSLCTX() == nullptr ||
+            if (sslHelper == nullptr ||
+                sslHelper->getOpenSSLCTX() == nullptr ||
                 !channel->initAcceptSSL(sslHelper->getOpenSSLCTX()))
             {
                 goto FAILED;
@@ -450,10 +454,6 @@ FAILED:
     {
         delete channel;
         channel = nullptr;
-    }
-    else
-    {
-        brynet::net::base::SocketClose(fd);
     }
 
     return false;

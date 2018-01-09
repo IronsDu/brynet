@@ -30,7 +30,7 @@ connector->startWorkerThread();
 connector->asyncConnect("127.0.0.1", 
     9999, 
     std::chrono::seconds(1),
-    [](sock fd) {
+    [](TcpSocket::PTR socket) {
         std::cout << "connect success" << std::endl;
         // 在此我们就可以将 fd 用于网络库的其他部分,比如用于`TCPService`
     },

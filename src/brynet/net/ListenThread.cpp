@@ -1,6 +1,8 @@
 #include <cstdlib>
+#include <iostream>
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/Socket.h>
 
 #include <brynet/net/ListenThread.h>
 
@@ -41,9 +43,8 @@ void ListenThread::startListen(bool isIPV6,
         throw std::runtime_error("accept callback is nullptr");
     }
 
-    // TODO::socket leak
     sock fd = brynet::net::base::Listen(isIPV6, ip.c_str(), port, 512);
-    if (SOCKET_ERROR == fd)
+    if (fd == SOCKET_ERROR)
     {
         throw std::runtime_error("listen error of:" + sErrno);
     }
@@ -53,11 +54,10 @@ void ListenThread::startListen(bool isIPV6,
     mIP = ip;
     mPort = port;
     mAcceptCallback = callback;
-
     auto shared_this = shared_from_this();
-    mListenThread = std::make_shared<std::thread>([shared_this, fd]() {
-        shared_this->runListen(fd);
-        brynet::net::base::SocketClose(fd);
+    mListenSocket = ListenSocket::Create(fd);
+    mListenThread = std::make_shared<std::thread>([shared_this]() mutable {
+        shared_this->runListen();
     });
 }
 
@@ -73,8 +73,7 @@ void ListenThread::stopListen()
     mRunListen = false;
 
     sock tmp = brynet::net::base::Connect(mIsIPV6, mIP.c_str(), mPort);
-    brynet::net::base::SocketClose(tmp);
-    tmp = SOCKET_ERROR;
+    auto clientSocket = TcpSocket::Create(tmp, false);
 
     if (mListenThread->joinable())
     {
@@ -83,40 +82,32 @@ void ListenThread::stopListen()
     mListenThread = nullptr;
 }
 
-void ListenThread::runListen(sock fd)
+void ListenThread::runListen()
 {
-    struct sockaddr_in socketaddress;
-    struct sockaddr_in6 ip6Addr;
-    socklen_t addrLen = sizeof(struct sockaddr);
-    sockaddr_in* pAddr = &socketaddress;
-
-    if (mIsIPV6)
-    {
-        addrLen = sizeof(ip6Addr);
-        pAddr = (sockaddr_in*)&ip6Addr;
-    }
-
     for (; mRunListen;)
     {
-        sock client_fd = SOCKET_ERROR;
-        while ((client_fd = brynet::net::base::Accept(fd, (struct sockaddr*)pAddr, &addrLen)) == SOCKET_ERROR)
+        try
         {
-            if (EINTR == sErrno)
+            auto clientSocket = mListenSocket->Accept();
+            if (!mRunListen)
             {
-                continue;
+                break;
             }
-        }
 
-        if (SOCKET_ERROR == client_fd)
-        {
-            continue;
+            mAcceptCallback(std::move(clientSocket));
         }
-        if (!mRunListen)
+        catch (const EintrError&)
         {
-            brynet::net::base::SocketClose(client_fd);
-            continue;
         }
-
-        mAcceptCallback(client_fd);
+        catch (const AcceptError& e)
+        {
+            std::cerr << "accept execption:" << e.what() << std::endl;
+            break;
+        }
+        catch (...)
+        {
+            std::cerr << "accept unknow execption:" << std::endl;
+            break;
+        }
     }
 }

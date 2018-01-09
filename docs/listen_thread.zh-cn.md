@@ -10,7 +10,7 @@
 - `ListenThread::startThread(bool isIPV6, const std::string& ip, int port, CB cb)`
 	
 	(线程安全)此成员函数用于开启工作/监听线程，`isIPV6`表示是否使用ipv6。
-	当收到外部链接时会回调cb。CB的类型是`std::function<void(sock fd)>`。</br>
+	当收到外部链接时会回调cb。CB的类型是`std::function<void(TcpSocket::PTR socket)>`。</br>
 	如果`startThread`失败会产生异常
 
 - `ListenThread::stopListen(void)`
@@ -23,9 +23,9 @@ auto listenThread = ListenThread::Create();
 listenThread->startThread(false,
 	"0.0.0.0",
 	9999,
-	[](sock fd) {
+	[](TcpSocket::PTR socket) {
 		std::cout << "accepted connection" << std::endl;
-		// 在此我们就可以将 fd 用于网络库的其他部分,比如用于`TCPService`
+		// 在此我们就可以将 socket 用于网络库的其他部分,比如用于`TCPService`
 	});
 
 // wait 2s

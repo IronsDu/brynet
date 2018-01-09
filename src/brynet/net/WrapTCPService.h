@@ -8,6 +8,7 @@
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Any.h>
 #include <brynet/net/SSLHelper.h>
+#include <brynet/net/Socket.h>
 
 namespace brynet
 {
@@ -93,7 +94,7 @@ namespace brynet
             void                        stopWorkThread();
 
             //TODO::maybe used wrongly
-            void                        addSession(sock fd, 
+            void                        addSession(TcpSocket::PTR socket, 
                                                     const SESSION_ENTER_CALLBACK& userEnterCallback, 
                                                     bool isUseSSL,
                                                     const SSLHelper::PTR& sslHelper,

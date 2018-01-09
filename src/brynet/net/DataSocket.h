@@ -12,6 +12,7 @@
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Any.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/Socket.h>
 
 #ifdef USE_OPENSSL
 
@@ -40,12 +41,12 @@ namespace brynet
             typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
             typedef std::function<size_t(PTR, const char* buffer, size_t len)>          DATA_CALLBACK;
             typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
-            typedef std::shared_ptr<std::function<void(void)>>                          PACKED_SENDED_CALLBACK;
+            typedef std::function<void(void)>                                           PACKED_SENDED_CALLBACK;
 
             typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
         public:
-            DataSocket(sock fd, size_t maxRecvBufferSize) BRYNET_NOEXCEPT;
+            DataSocket(TcpSocket::PTR, size_t maxRecvBufferSize) BRYNET_NOEXCEPT;
             ~DataSocket() BRYNET_NOEXCEPT;
 
             /* must called in network thread */
@@ -114,7 +115,7 @@ namespace brynet
             bool                            mPostWriteCheck;
 #endif
 
-            sock                            mFD;
+            TcpSocket::PTR                  mSocket;
             bool                            mIsPostFinalClose;
 
             bool                            mCanWrite;

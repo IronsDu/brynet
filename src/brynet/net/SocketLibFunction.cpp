@@ -76,6 +76,7 @@ int brynet::net::base::SocketSetRecvSize(sock fd, int rd_size)
     return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
 }
 
+// TODO::Connect是否直接返回TcpSocket::PTR
 sock brynet::net::base::Connect(bool isIPV6, const std::string& server_ip, int port)
 {
     struct sockaddr_in ip4Addr;
@@ -258,6 +259,7 @@ int brynet::net::base::SocketSend(sock fd, const char* buffer, int len)
     return transnum;
 }
 
+// TODO::Accept是否直接返回TcpSocket::PTR
 sock brynet::net::base::Accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen)
 {
 #if defined PLATFORM_WINDOWS

@@ -19,22 +19,30 @@ int main(int argc, char **argv)
     service->startWorkThread(2);
 
     auto listenThread = ListenThread::Create();
-    listenThread->startListen(false, "0.0.0.0", 8080, [service, body](sock fd) {
-        service->addSession(fd, [body](const TCPSession::PTR& session) {
+    listenThread->startListen(false, "0.0.0.0", 8080, [service, body](TcpSocket::PTR socket) {
+        service->addSession(std::move(socket), [body](const TCPSession::PTR& session) {
             HttpService::setup(session, [body](const HttpSession::PTR& httpSession) {
-                httpSession->setHttpCallback([body](const HTTPParser& httpParser, const HttpSession::PTR& session) {
+                httpSession->setHttpCallback([body](const HTTPParser& httpParser, 
+                    const HttpSession::PTR& session) {
                     HttpResponse response;
                     response.setBody(body);
                     std::string result = response.getResult();
-                    session->send(result.c_str(), result.size(), std::make_shared<std::function<void(void)>>([session]() {
+                    session->send(result.c_str(), result.size(), [session]() {
                         session->postShutdown();
-                    }));
+                    });
                 });
 
-                httpSession->setWSCallback([](const HttpSession::PTR& httpSession, WebSocketFormat::WebSocketFrameType opcode, const std::string& payload) {
+                httpSession->setWSCallback([](const HttpSession::PTR& httpSession, 
+                    WebSocketFormat::WebSocketFrameType opcode, 
+                    const std::string& payload) {
                     // ping pong
                     auto frame = std::make_shared<std::string>();
-                    WebSocketFormat::wsFrameBuild(payload.c_str(), payload.size(), *frame, WebSocketFormat::WebSocketFrameType::TEXT_FRAME, true, true);
+                    WebSocketFormat::wsFrameBuild(payload.c_str(), 
+                        payload.size(), 
+                        *frame, 
+                        WebSocketFormat::WebSocketFrameType::TEXT_FRAME, 
+                        true, 
+                        true);
                     httpSession->send(frame);
                 });
             });
@@ -45,8 +53,9 @@ int main(int argc, char **argv)
     sock fd = brynet::net::base::Connect(false, "180.97.33.108", 443);
     if (fd != SOCKET_ERROR)
     {
+        auto socket = TcpSocket::Create(fd, false);
         SSL_library_init();
-        service->addSession(fd, [](const TCPSession::PTR& session) {
+        service->addSession(std::move(socket), [](const TCPSession::PTR& session) {
             HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);

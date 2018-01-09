@@ -12,7 +12,7 @@
 
     (线程安全)开启工作线程，在每个工作线程中的`EventLoop::loop`调用之后会回调一次`cb`(如果`cb`不为nullptr)。
 
-- `WrapTcpService::addSession(sock fd, SESSION_ENTER_CALLBACK cb, bool isUseSSL, SSLHelper::PTR, size_t maxRecvBufferSize, bool forceSameThreadLoop)`
+- `WrapTcpService::addSession(TcpSocket::PTR socket, SESSION_ENTER_CALLBACK cb, bool isUseSSL, SSLHelper::PTR, size_t maxRecvBufferSize, bool forceSameThreadLoop)`
 
     (线程安全)此函数类似`TcpService::addDataSocket`，区别在于 `cb` 回调的类型为:`std::function<void(const TCPSession::PTR&)`。</br>
     它的`TCPSession::PTR`参数即为创建的网络会话对象，以后的工作都将使用它。</br>
@@ -57,6 +57,7 @@
 auto service = std::make_shared<WrapTcpService>();
 // use blocking connect for test
 auto fd = ox_socket_connect(false, ip, port);
+auto socket = TcpSocket::Create(fd, false);
 
 service->addSession(fd,
     [](const TCPSession::PTR& session) {

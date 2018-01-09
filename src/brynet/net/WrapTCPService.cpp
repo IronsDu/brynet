@@ -139,7 +139,7 @@ void WrapTcpService::startWorkThread(size_t threadNum, TcpService::FRAME_CALLBAC
     mTCPService->startWorkerThread(threadNum, callback);
 }
 
-void WrapTcpService::addSession(sock fd, 
+void WrapTcpService::addSession(TcpSocket::PTR socket,
     const SESSION_ENTER_CALLBACK& userEnterCallback, 
     bool isUseSSL,
     const SSLHelper::PTR& sslHelper,
@@ -185,7 +185,7 @@ void WrapTcpService::addSession(sock fd,
         }
     };
 
-    mTCPService->addDataSocket(fd, 
+    mTCPService->addDataSocket(std::move(socket),
         sslHelper,
         isUseSSL,
         enterCallback, 

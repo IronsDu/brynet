@@ -37,17 +37,20 @@ int main(int argc, char **argv)
     auto listenThread = ListenThread::Create();
 
     // listen for front http client
-    listenThread->startListen(false, "0.0.0.0", bindPort, [tcpService, asyncConnector, backendIP, backendPort](sock fd) {
-        tcpService->addSession(fd, [tcpService, asyncConnector, backendIP, backendPort](const TCPSession::PTR& session) {
+    listenThread->startListen(false, "0.0.0.0", bindPort, [tcpService, asyncConnector, backendIP, backendPort](TcpSocket::PTR socket) {
+        tcpService->addSession(std::move(socket), [tcpService, asyncConnector, backendIP, backendPort](const TCPSession::PTR& session) {
             session->setUD(static_cast<int64_t>(1));
             std::shared_ptr<TCPSession::PTR> shareBackendSession = std::make_shared<TCPSession::PTR>(nullptr);
             std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
             /* new connect to backend server */
-            asyncConnector->asyncConnect(backendIP.c_str(), backendPort, std::chrono::seconds(10), [tcpService, session, shareBackendSession, cachePacket](sock fd) {
+            asyncConnector->asyncConnect(backendIP.c_str(), 
+                backendPort, 
+                std::chrono::seconds(10), 
+                [tcpService, session, shareBackendSession, cachePacket](TcpSocket::PTR socket) {
                 if (true)
                 {
-                    tcpService->addSession(fd, [=](const TCPSession::PTR& backendSession) {
+                    tcpService->addSession(std::move(socket), [=](const TCPSession::PTR& backendSession) {
                         auto ud = brynet::net::cast<int64_t>(session->getUD());
                         if (*ud == -1)   /*if http client already close*/
                         {

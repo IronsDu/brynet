@@ -6,6 +6,7 @@
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/WrapTCPService.h>
 #include <brynet/net/ListenThread.h>
+#include <brynet/net/Socket.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -25,9 +26,9 @@ int main(int argc, char **argv)
     auto server = std::make_shared<WrapTcpService>();
     auto listenThread = ListenThread::Create();
 
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](sock fd){
-        brynet::net::base::SocketNodelay(fd);
-        server->addSession(fd, [](const TCPSession::PTR& session){
+    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
+        socket->SocketNodelay();
+        server->addSession(std::move(socket), [](const TCPSession::PTR& session){
             total_client_num++;
 
             session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len){

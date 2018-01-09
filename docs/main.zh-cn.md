@@ -10,6 +10,10 @@
 ## 网络连接
   由`ListenThread`和`AsyncConnector`提供,前者用于接收外部的链接请求,后者用于向外部进行网络连接.
   详情见[listen_thread](https://github.com/IronsDu/brynet/blob/master/docs/listen_thread.zh-cn.md)和[connector](https://github.com/IronsDu/brynet/blob/master/docs/connector.zh-cn.md)
+
+## 安全的Socket对象
+`brynet`不对用户暴露原始的socket fd，而是提供`TcpSocket::PTR`，详见[Socket](https://github.com/IronsDu/brynet/blob/master/docs/socket.zh-cn.md)
+
 ## 数据传输
 分别(可以)由以下几个方式进行提供数据读写
 

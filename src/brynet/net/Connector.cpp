@@ -170,16 +170,16 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
             continue;
         }
 
+        auto socket = TcpSocket::Create(fd, false);
         if (success_fds.find(fd) != success_fds.end())
         {
             if (it->second.successCB != nullptr)
             {
-                it->second.successCB(fd);
+                it->second.successCB(std::move(socket));
             }
         }
         else
         {
-            brynet::net::base::SocketClose(fd);
             if (it->second.failedCB != nullptr)
             {
                 it->second.failedCB();
@@ -289,7 +289,7 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 SUCCESS:
     if (addr.getSuccessCB() != nullptr)
     {
-        addr.getSuccessCB()(clientfd);
+        addr.getSuccessCB()(TcpSocket::Create(clientfd, false));
     }
     return;
 

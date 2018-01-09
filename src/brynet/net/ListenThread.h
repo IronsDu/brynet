@@ -11,6 +11,7 @@
 #include <brynet/utils/Typeids.h>
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/Socket.h>
 
 namespace brynet
 {
@@ -20,7 +21,7 @@ namespace brynet
         {
         public:
             typedef std::shared_ptr<ListenThread>   PTR;
-            typedef std::function<void(sock fd)> ACCEPT_CALLBACK;
+            typedef std::function<void(TcpSocket::PTR)> ACCEPT_CALLBACK;
 
             void                                startListen(bool isIPV6, 
                                                             const std::string& ip,
@@ -33,7 +34,7 @@ namespace brynet
             ListenThread() BRYNET_NOEXCEPT;
             virtual ~ListenThread() BRYNET_NOEXCEPT;
 
-            void                                runListen(sock fd);
+            void                                runListen();
 
         private:
             ACCEPT_CALLBACK                     mAcceptCallback;
@@ -41,6 +42,7 @@ namespace brynet
             std::string                         mIP;
             int                                 mPort;
             bool                                mRunListen;
+            ListenSocket::PTR                   mListenSocket;
             std::shared_ptr<std::thread>        mListenThread;
             std::mutex                          mListenThreadGuard;
         };

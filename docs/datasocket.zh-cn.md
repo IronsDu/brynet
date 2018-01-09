@@ -4,11 +4,11 @@
 
 # 接口
 
-- `DataSocket::DataSocket(sock fd, size_t maxRecvBufferSize)`
+- `DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize)`
     
 
     创建网络会话对象，且只能使用指针。</br>
-    参数 `sock fd`通常产生自`ListenThread`[doc](https://github.com/IronsDu/brynet/blob/master/docs/listen_thread.zh-cn.md#接口)和`AsyncConnector`[doc](https://github.com/IronsDu/brynet/blob/master/docs/connector.zh-cn.md#接口)。
+    参数 `TcpSocket::PTR socket`通常产生自`ListenThread`[doc](https://github.com/IronsDu/brynet/blob/master/docs/listen_thread.zh-cn.md#接口)和`AsyncConnector`[doc](https://github.com/IronsDu/brynet/blob/master/docs/connector.zh-cn.md#接口)。
 
 - `DataSocket::onEnterEventLoop(const EventLoop::PTR&)`
     
@@ -51,7 +51,7 @@
 
     (线程安全)投递shutdown（不会直接触发任何回调）（当然最终由对方导致的断开，则会触发断开回调）
 
-- `DataSocket::setUD(BrynetAny value`
+- `DataSocket::setUD(BrynetAny value)`
 
     (线程安全)设置应用层user data
 
@@ -63,8 +63,9 @@ while(true)
     ev->loop(1)
 
     auto fd = ox_socket_connect(false, ip, port);
+    auto socket = TcpSocket::Create(fd, false);
 
-    auto datasocket = new DataSocket(fd, 10000);
+    auto datasocket = new DataSocket(std::move(socket), 10000);
     datasocket->setEnterCallback([](DataSocket::PTR datasocket) {
     });
     datasocket->setDisConnectCallback([](DataSocket::PTR datasocket) {

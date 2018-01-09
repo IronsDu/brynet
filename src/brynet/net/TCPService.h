@@ -13,6 +13,7 @@
 #include <brynet/utils/Typeids.h>
 #include <brynet/net/SSLHelper.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/Socket.h>
 
 namespace brynet
 {
@@ -49,7 +50,7 @@ namespace brynet
                                                                  std::chrono::nanoseconds checktime);
 
             /* pass nullptr sslHelper if fd is client socket, either is a server side socket */
-            bool                                addDataSocket(sock fd,
+            bool                                addDataSocket(TcpSocket::PTR socket,
                                                                 const SSLHelper::PTR& sslHelper,
                                                                 bool isUseSSL,
                                                                 const TcpService::ENTER_CALLBACK& enterCallback,

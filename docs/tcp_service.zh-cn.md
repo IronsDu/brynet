@@ -17,12 +17,12 @@
     (线程安全)开启工作线程，每一个工作线程有一个`EventLoop`负责事件检测。
 
 
-- `TcpService::addDataSocket(sock fd, SSLHelper::PTR ssl, bool isUseSSL, ENTER_CALLBACK, DISCONNECT_CALLBACK, DATA_CALLBACK, size_t maxRecvBuffer, bool forceSameLoop)`
+- `TcpService::addDataSocket(TcpSocket::PTR socket, SSLHelper::PTR ssl, bool isUseSSL, ENTER_CALLBACK, DISCONNECT_CALLBACK, DATA_CALLBACK, size_t maxRecvBuffer, bool forceSameLoop)`
 
-    (线程安全)此函数是最负责的函数，用于添加socket到管理对象中。</br>当底层绑定成功会调用`ENTER_CALLBACK`，当链接断开会调用`DISCONNECT_CALLBACK`，当收到数据则会调用`DATA_CALLBACK`。</br>
+    (线程安全)此函数是最复杂的函数，用于添加socket到管理对象中。</br>当底层绑定成功会调用`ENTER_CALLBACK`，当链接断开会调用`DISCONNECT_CALLBACK`，当收到数据则会调用`DATA_CALLBACK`。</br>
     这三个回调的第一个参数就标识网络会话对象，其类型是`int64_t`。</br>
     `forceSameLoop`参数表示是否绑定到当前线程所属的`EventLoop`中。</br>
-    需要特别提醒的是：`isUseSSL`参数标识是否使用SSL，当它为`true`时，如果`ssl`为`nullptr`则表示当前在`server side`，也就是说当我们编写服务器端代码时，如果要使用SSl，那么`ssl`不应该为`nullptr`。如果是编写的客户端，那么必须为`nullptr`。
+    需要特别提醒的是：`isUseSSL`参数标识是否使用SSL，当它为`true`时，如果`socket`为server side socket，那么`ssl`为`nullptr`会返回失败。
 
 - `TcpService::send(int64_t id, std::shared_ptr<string> msg, PACKED_SENDED_CALLBACK cb)`
 
@@ -42,7 +42,9 @@
 auto service = TcpService::Create();
 // use blocking connect for test
 auto fd = ox_socket_connect(false, ip, port);
-service->addDataSocket(fd,
+auto socket = TcpSocket::Create(fd, false);
+
+service->addDataSocket(socket,
     nullptr,
     false,
     [](int64_t id) {

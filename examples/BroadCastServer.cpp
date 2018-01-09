@@ -80,11 +80,11 @@ int main(int argc, char** argv)
     auto mainLoop = std::make_shared<EventLoop>();
     auto listenThrean = ListenThread::Create();
 
-    listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](sock fd) {
-        brynet::net::base::SocketNodelay(fd);
-        brynet::net::base::SocketSetSendSize(fd, 32 * 1024);
-        brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
-        service->addSession(fd, [mainLoop](const TCPSession::PTR& session) {
+    listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](TcpSocket::PTR socket) {
+        socket->SocketNodelay();
+        socket->SetSendSize(32 * 1024);
+        socket->SetRecvSize(32 * 1024);
+        service->addSession(std::move(socket), [mainLoop](const TCPSession::PTR& session) {
             mainLoop->pushAsyncProc([session]() {
                 addClientID(session);
             });
