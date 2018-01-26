@@ -29,7 +29,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umb
 * [Examples](#examples)
 * [Users](#users)
 
-## Benchamrk
+## Benchmark
    Under localhost, use CentOS 6.5 virtual mahcine(host machine is Win10 i5)
 * PingPong
 
