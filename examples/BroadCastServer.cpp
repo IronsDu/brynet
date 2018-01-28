@@ -103,11 +103,12 @@ int main(int argc, char** argv)
                 while (true)
                 {
                     bool flag = false;
-                    if (leftLen >= PACKET_HEAD_LEN)
+                    auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
+                    if (leftLen >= HEAD_LEN)
                     {
-                        ReadPacket rp(parseStr, leftLen);
-                        PACKET_LEN_TYPE packet_len = rp.readPacketLen();
-                        if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
+                        BasePacketReader rp(parseStr, leftLen);
+                        auto packet_len = rp.readUINT32();
+                        if (leftLen >= packet_len && packet_len >= HEAD_LEN)
                         {
                             auto packet = DataSocket::makePacket(parseStr, packet_len);
                             mainLoop->pushAsyncProc([packet]() {

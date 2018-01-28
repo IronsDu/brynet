@@ -51,14 +51,18 @@ int main(int argc, char** argv)
         DataSocket::PTR datasSocket = new DataSocket(TcpSocket::Create(fd, false), 1024 * 1024);
         datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {
             static_assert(sizeof(datasSocket) <= sizeof(int64_t), "");
+            
+            auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
 
             std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
+            sp->writeUINT32(HEAD_LEN+sizeof(int64_t) + packetLen);
+            sp->writeUINT16(1);
             sp->writeINT64((int64_t)datasSocket);
             sp->writeBinary(std::string(packetLen, '_'));
 
             for (int i = 0; i < 1; ++i)
             {
-                datasSocket->send(sp->getData(), sp->getLen());
+                datasSocket->send(sp->getData(), sp->getPos());
             }
 
             datasSocket->setDataCallback([](DataSocket::PTR datasSocket, const char* buffer, size_t len) {
@@ -69,18 +73,19 @@ int main(int argc, char** argv)
                 while (true)
                 {
                     bool flag = false;
-                    if (leftLen >= PACKET_HEAD_LEN)
+                    auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
+                    if (leftLen >= HEAD_LEN)
                     {
-                        ReadPacket rp(parseStr, leftLen);
-                        PACKET_LEN_TYPE packet_len = rp.readPacketLen();
-                        if (leftLen >= packet_len && packet_len >= PACKET_HEAD_LEN)
+                        BasePacketReader rp(parseStr, leftLen);
+                        auto packet_len = rp.readUINT32();
+                        if (leftLen >= packet_len && packet_len >= HEAD_LEN)
                         {
                             TotalRecvSize += packet_len;
                             TotalRecvPacketNum++;
 
-                            ReadPacket rp(parseStr, packet_len);
-                            rp.readPacketLen();
-                            rp.readOP();
+                            BasePacketReader rp(parseStr, packet_len);
+                            rp.readUINT32();
+                            rp.readUINT16();
                             int64_t addr = rp.readINT64();
 
                             if (addr == (int64_t)(datasSocket))

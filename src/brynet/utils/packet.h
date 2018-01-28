@@ -13,11 +13,6 @@
 #include <endian.h>
 #endif
 
-typedef  uint32_t PACKET_LEN_TYPE;
-typedef  uint16_t PACKET_OP_TYPE;
-
-const static PACKET_LEN_TYPE PACKET_HEAD_LEN = sizeof(PACKET_LEN_TYPE) + sizeof(PACKET_OP_TYPE);
-
 namespace socketendian
 {
     inline uint64_t  hl64ton(uint64_t   host)
@@ -119,7 +114,8 @@ public:
     BasePacketWriter(char* buffer, 
         size_t len, 
         bool useBigEndian = true, 
-        bool isAutoMalloc = false) : 
+        bool isAutoMalloc = false)
+        : 
         mBigEndian(useBigEndian), 
         mIsAutoMalloc(isAutoMalloc)
     {
@@ -148,98 +144,87 @@ public:
         return mMaxLen;
     }
 
-    size_t      getPos()
+    size_t      getPos() const
     {
         return mPos;
     }
 
-    const char* getData()
+    const char* getData() const
     {
         return mBuffer;
     }
 
-    bool isAutoGrow() const
+    bool    isAutoGrow() const
     {
         return mIsAutoMalloc;
     }
 
-    void    writeBool(bool value)
+    bool    writeBool(bool value)
     {
         static_assert(sizeof(bool) == sizeof(int8_t), "");
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeINT8(int8_t value)
+    bool    writeINT8(int8_t value)
     {
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeUINT8(uint8_t value)
+    bool    writeUINT8(uint8_t value)
     {
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeINT16(int16_t value)
-    {
-        value = socketendian::hostToNetwork16(value, mBigEndian);
-        writeBuffer((char*)&value, sizeof(value));
-    }
-    void    writeUINT16(uint16_t value)
+    bool    writeINT16(int16_t value)
     {
         value = socketendian::hostToNetwork16(value, mBigEndian);
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeINT32(int32_t value)
+    bool    writeUINT16(uint16_t value)
+    {
+        value = socketendian::hostToNetwork16(value, mBigEndian);
+        return writeBuffer((char*)&value, sizeof(value));
+    }
+    bool    writeINT32(int32_t value)
     {
         value = socketendian::hostToNetwork32(value, mBigEndian);
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeUINT32(uint32_t value)
+    bool    writeUINT32(uint32_t value)
     {
         value = socketendian::hostToNetwork32(value, mBigEndian);
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeINT64(int64_t value)
+    bool    writeINT64(int64_t value)
     {
         value = socketendian::hostToNetwork64(value, mBigEndian);
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
-    void    writeUINT64(uint64_t value)
+    bool    writeUINT64(uint64_t value)
     {
         value = socketendian::hostToNetwork64(value, mBigEndian);
-        writeBuffer((char*)&value, sizeof(value));
+        return writeBuffer((char*)&value, sizeof(value));
     }
 
-    void    writeBinary(const std::string& binary)
+    bool    writeBinary(const std::string& binary)
     {
-        writeBuffer(binary.c_str(), binary.size());
+        return writeBuffer(binary.c_str(), binary.size());
     }
-    void    writeBinary(const char* binary, size_t binaryLen)
+    bool    writeBinary(const char* binary, size_t binaryLen)
     {
-        writeBuffer(binary, binaryLen);
+        return writeBuffer(binary, binaryLen);
     }
-    void    writeBuffer(const char* buffer, size_t len)
+    bool    writeBuffer(const char* buffer, size_t len)
     {
         growBuffer(len);
 
-        if ((mPos + len) <= mMaxLen)
+        if (mMaxLen < (mPos + len))
         {
-            memcpy(mBuffer + mPos, buffer, len);
-            mPos += len;
+            return false;
         }
-        else
-        {
-            assert((mPos + len) <= mMaxLen);
-        }
+
+        memcpy(mBuffer + mPos, buffer, len);
+        mPos += len;
+        return true;
     }
 
-    template<typename Arg1, typename... Args>
-    void            writev(const Arg1& arg1, const Args&... args)
-    {
-        this->operator<<(arg1);
-        writev(args...);
-    }
-
-    void            writev()
-    {
-    }
     BasePacketWriter & operator << (const bool &v)
     {
         writeBool(v);
@@ -296,6 +281,8 @@ public:
         return *this;
     }
 
+private:
+    // 为了避免直接<<导致没有越是字节序导致隐藏BUG,因为此函数设置为私有
     template<typename T>
     BasePacketWriter & operator << (const T& v)
     {
@@ -304,6 +291,17 @@ public:
         static_assert(std::is_pod <T>::value, "T must a pod type");
         writeBuffer((const char*)&v, sizeof(v));
         return *this;
+    }
+
+    template<typename Arg1, typename... Args>
+    void            writev(const Arg1& arg1, const Args&... args)
+    {
+        this->operator<<(arg1);
+        writev(args...);
+    }
+
+    void            writev()
+    {
     }
 
 protected:
@@ -342,97 +340,6 @@ protected:
     char*       mMallocBuffer;
 };
 
-class Packet : public BasePacketWriter
-{
-public:
-    Packet(char* buffer, 
-        size_t len, 
-        bool useBigEndian = true, 
-        bool isAutoMalloc = false) : 
-        BasePacketWriter(buffer, len, useBigEndian, isAutoMalloc)
-    {
-        mIsFinish = false;
-    }
-    
-    virtual ~Packet()
-    {
-        assert(mIsFinish);
-    }
-
-    void    init()
-    {
-        BasePacketWriter::init();
-        mIsFinish = false;
-    }
-
-    void    setOP(PACKET_OP_TYPE op)
-    {
-        assert(mPos == 0);
-        if (mPos == 0)
-        {
-            this->operator<< (static_cast<PACKET_LEN_TYPE>(PACKET_HEAD_LEN));
-            this->operator<< (op);
-        }
-    }
-
-    void    writeBinary(const std::string& binary)
-    {
-        writeUINT32(static_cast<uint32_t>(binary.size()));
-        writeBuffer(binary.c_str(), binary.size());
-    }
-    void    writeBinary(const char* binary, size_t binaryLen)
-    {
-        writeUINT32(static_cast<uint32_t>(binaryLen));
-        writeBuffer(binary, binaryLen);
-    }
-
-    void    claimBinary(const char* &binary, size_t binaryLen)
-    {
-        growBuffer(binaryLen+sizeof(int32_t));
-        assert((mPos + binaryLen + sizeof(int32_t)) <= mMaxLen);
-        if ((mPos + binaryLen + sizeof(int32_t)) <= mMaxLen)
-        {
-            writeUINT32(static_cast<uint32_t>(binaryLen));
-            binary = getData()+mPos;
-            mPos += binaryLen;
-        }
-        else
-        {
-            writeUINT32(0);
-            binary = nullptr;
-        }
-    }
-
-    size_t      getLen()
-    {
-        end();
-        return getPos();
-    }
-
-private:
-    void        end()
-    {
-        if (mIsFinish)
-        {
-            return;
-        }
-
-        PACKET_LEN_TYPE len = socketendian::hostToNetwork32(static_cast<uint32_t>(mPos));
-        if (sizeof(len) <= mMaxLen)
-        {
-            memcpy(mBuffer, &len, sizeof(len));
-            mIsFinish = true;
-        }
-        else
-        {
-            assert(false);
-        }
-    }
-
-private:
-    bool        mIsFinish;
-};
-
 class BasePacketReader
 {
 public:
@@ -448,10 +355,11 @@ public:
 
     virtual ~BasePacketReader()
     {
-        if (mPos != mMaxLen)
-        {
-            assert(mPos == mMaxLen);
-        }
+    }
+
+    size_t          getLeft() const
+    {
+        return mMaxLen - mPos;
     }
 
     const char*     getBuffer() const
@@ -539,6 +447,8 @@ public:
         return socketendian::networkToHost64(value, mBigEndian);
     }
 
+private:
+    // 为了避免直接read(uintXXX)导致没有指定字节序造成隐患BUG,因为此函数设置为私有
     template<typename T>
     void            read(T& value)
     {
@@ -563,124 +473,20 @@ protected:
     const char*     mBuffer;
 };
 
-class ReadPacket : public BasePacketReader
-{
-public:
-    ReadPacket(const char* buffer, size_t len, bool useBigendian = true) : BasePacketReader(buffer, len, useBigendian)
-    {
-    }
-
-    PACKET_LEN_TYPE readPacketLen()
-    {
-        return readUINT32();
-    }
-
-    PACKET_OP_TYPE  readOP()
-    {
-        return readUINT16();
-    }
-    
-    std::string     readBinary()
-    {
-        std::string ret;
-        size_t len = readUINT32();
-        if ((mPos + len) <= mMaxLen)
-        {
-            ret = std::string((const char*)(mBuffer + mPos), len);
-            mPos += len;
-        }
-        
-        return ret;
-    }
-
-    bool            readBinary(const char*& str, size_t& outLen)
-    {
-        bool ret = false;
-        size_t len = readUINT32();
-        outLen = len;
-        if ((mPos + len) <= mMaxLen && len > 0)
-        {
-            str = mBuffer + mPos;
-            mPos += len;
-            ret = true;
-        }
-
-        return ret;
-    }
-};
-
-class SendPacket : public Packet
-{
-public:
-    SendPacket(PACKET_OP_TYPE op, 
-        char* buffer, 
-        size_t len, 
-        bool useBigEndian = true, 
-        bool isAutoMalloc = false) : 
-        Packet(buffer, len, useBigEndian, isAutoMalloc)
-    {
-        setOP(op);
-    }
-};
 
 template<size_t SIZE>
-class FixedPacket : public SendPacket
+class AutoMallocPacket : public BasePacketWriter
 {
 public:
-    FixedPacket(PACKET_OP_TYPE op) : SendPacket(op, mData, SIZE)
-    {}
-    
-private:
-    char        mData[SIZE];
-};
-
-template<size_t SIZE>
-class AutoMallocPacket : public SendPacket
-{
-public:
-    AutoMallocPacket(PACKET_OP_TYPE op) : SendPacket(op, mData, SIZE, true)
+    AutoMallocPacket(bool useBigEndian = true,
+        bool isAutoMalloc = false)
+        :
+        BasePacketWriter(mData, SIZE, useBigEndian, isAutoMalloc)
     {}
 private:
     char        mData[SIZE];
 };
 
-typedef FixedPacket<128>        TinyPacket;
-typedef FixedPacket<256>        ShortPacket;
-typedef FixedPacket<512>        MiddlePacket;
-typedef FixedPacket<1024>       LongPacket;
 typedef AutoMallocPacket<32 * 1024>    BigPacket;
-
-template<typename T>
-static bool serializePBMsgToPacket(T& pbObj, Packet& packet)
-{
-    bool ret = false;
-    int pbByteSize = pbObj.ByteSize();
-    const char* buff = nullptr;
-
-    packet.claimBinary(buff, pbByteSize);
-    assert(buff != nullptr);
-    if (buff != nullptr)
-    {
-        ret = pbObj.SerializePartialToArray((void*)buff, pbByteSize);
-    }
-
-    return ret;
-}
-
-template<typename T>
-static bool deserializePBMsgToPacket(T& pbObj, ReadPacket& packet)
-{
-    const char* data = nullptr;
-    size_t outLen = 0;
-    packet.readBinary(data, outLen);
-    assert(data != nullptr);
-    if (data != nullptr)
-    {
-        pbObj.ParsePartialFromArray(data, outLen);
-        return true;
-    }
-
-    return false;
-}
 
 #endif
