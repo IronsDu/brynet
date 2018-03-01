@@ -25,6 +25,7 @@ namespace brynet
             const std::string&                      getPath() const;
             const std::string&                      getQuery() const;
 
+            bool                                    hasEntry(const std::string& key, const std::string& value) const;
             bool                                    hasKey(const std::string& key) const;
             const std::string&                      getValue(const std::string& key) const;
             const std::string&                      getBody() const;

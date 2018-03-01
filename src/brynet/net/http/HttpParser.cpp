@@ -172,8 +172,8 @@ size_t HTTPParser::tryParse(const char* buffer, size_t len)
     size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
     http_parser_init(&mParser, mParserType);
 
-    mIsWebSocket = getValue("Upgrade") == "websocket";
-    mIsKeepAlive = !getValue("Keep-Alive").empty();
+    mIsWebSocket = hasEntry("Upgrade", "websocket");
+    mIsKeepAlive = !hasEntry("Connection", "close");
     mTmpHeadStr = nullptr;
     mTmpHeadLen = 0;
 
@@ -193,6 +193,12 @@ const std::string& HTTPParser::getQuery() const
 bool HTTPParser::isCompleted() const
 {
     return mISCompleted;
+}
+
+bool HTTPParser::hasEntry(const std::string& key, const std::string& value) const
+{
+    auto it = mHeadValues.find(key);
+    return it != mHeadValues.end() && value == it->second;
 }
 
 bool HTTPParser::hasKey(const std::string& key) const
