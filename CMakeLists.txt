@@ -70,3 +70,4 @@ file(GLOB BRYNET_HTTP_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/net/http/*
 install (FILES ${BRYNET_HTTP_PUBLIC_HEADERS} DESTINATION "include/brynet/net/http")
 
 add_subdirectory(examples)
+add_subdirectory(tests)

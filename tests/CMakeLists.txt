@@ -1,0 +1,5 @@
+enable_testing()
+add_executable(test_timer test_timer.cpp)
+add_test(TestTimer test_timer)
+add_executable(test_wait_group test_wait_group.cpp)
+add_test(TestWaitGroup test_wait_group)

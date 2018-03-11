@@ -65,3 +65,5 @@ before_script:
 
 script:
   - make
+  - cd tests
+  - ctest -V

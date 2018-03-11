@@ -1,7 +1,6 @@
 #include <iostream>
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
-#include <brynet/net/ListenThread.h>
 #include <brynet/net/Noexcept.h>
 #include <brynet/net/TCPService.h>
 

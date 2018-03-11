@@ -29,3 +29,7 @@ build:
   project: brynet.sln
   parallel: true
   verbosity: minimal
+
+test_script:
+    - cd tests
+    - ctest -V -C %CONFIGURATION%

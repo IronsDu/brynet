@@ -20,7 +20,6 @@ namespace brynet
     namespace net
     {
         class EventLoop;
-        class ListenThread;
         class IOLoopData;
 
         class TcpService : public NonCopyable, public std::enable_shared_from_this<TcpService>
