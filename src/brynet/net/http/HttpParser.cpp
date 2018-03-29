@@ -236,6 +236,16 @@ std::string& HTTPParser::getWSParseString()
     return mParsePayload;
 }
 
+WebSocketFormat::WebSocketFrameType HTTPParser::getWSFrameType() const
+{
+    return mWSFrameType;
+}
+
+void HTTPParser::cacheWSFrameType(WebSocketFormat::WebSocketFrameType frameType)
+{
+    mWSFrameType = frameType;
+}
+
 int HTTPParser::sChunkHeader(http_parser* hp)
 {
     return 0;

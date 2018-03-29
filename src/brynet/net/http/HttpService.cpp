@@ -122,8 +122,6 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
     const HTTPParser::PTR& httpParser,
     const HttpSession::PTR& httpSession)
 {
-    size_t retlen = 0;
-
     const char* parse_str = buffer;
     size_t leftLen = len;
 
@@ -137,54 +135,49 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
         auto opcode = WebSocketFormat::WebSocketFrameType::ERROR_FRAME;
         size_t frameSize = 0;
         bool isFin = false;
+
         if (!WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
         {
+            // 如果没有解析出完整的ws frame则退出函数
             break;
         }
 
-        if ( isFin &&
-            (opcode == WebSocketFormat::WebSocketFrameType::TEXT_FRAME ||
-             opcode == WebSocketFormat::WebSocketFrameType::BINARY_FRAME))
+        // 如果当前fram的fin为false或者opcode为延续包，则将当前frame的payload添加到cache
+        if (!isFin || opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
+        {
+            cacheFrame += std::move(parseString);
+        }
+        // 如果当前fram的fin为false，并且opcode不为延续包，则表示收到分段payload的第一个段(frame)，需要缓存当前frame的opcode
+        if (!isFin && opcode != WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
+        {
+            httpParser->cacheWSFrameType(opcode);
+        }
+
+        if ( isFin)
         {
             if (!cacheFrame.empty())
             {
-                cacheFrame += parseString;
                 parseString = std::move(cacheFrame);
                 cacheFrame.clear();
             }
+            // 如果fin为true，并且opcode为延续包，则表示分段payload全部接受完毕，因此需要获取之前第一次收到分段frame的opcode作为整个payload的类型
+            if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
+            {
+                opcode = httpParser->getWSFrameType();
+            }
 
             const auto& wsCallback = httpSession->getWSCallback();
             if (wsCallback != nullptr)
             {
                 wsCallback(httpSession, opcode, parseString);
             }
-        }
-        else if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
-        {
-            cacheFrame += parseString;
-            parseString.clear();
-        }
-        else if (opcode == WebSocketFormat::WebSocketFrameType::PING_FRAME ||
-            opcode == WebSocketFormat::WebSocketFrameType::PONG_FRAME ||
-            opcode == WebSocketFormat::WebSocketFrameType::CLOSE_FRAME)
-        {
-            const auto& wsCallback = httpSession->getWSCallback();
-            if (wsCallback != nullptr)
-            {
-                wsCallback(httpSession, opcode, parseString);
-            }
-        }
-        else
-        {
-            assert(false);
         }
 
         leftLen -= frameSize;
-        retlen += frameSize;
         parse_str += frameSize;
     }
 
-    return retlen;
+    return parse_str - buffer;
 }
 
 size_t HttpService::ProcessHttp(const char* buffer,

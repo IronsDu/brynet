@@ -6,6 +6,7 @@
 #include <memory>
 
 #include <brynet/net/http/http_parser.h>
+#include <brynet/net/http/WebSocketFormat.h>
 
 namespace brynet
 {
@@ -32,6 +33,8 @@ namespace brynet
 
             std::string&                            getWSCacheFrame();
             std::string&                            getWSParseString();
+            WebSocketFormat::WebSocketFrameType     getWSFrameType() const;
+            void                                    cacheWSFrameType(WebSocketFormat::WebSocketFrameType frameType);
 
         private:
             void                                    clearParse();
@@ -68,6 +71,7 @@ namespace brynet
 
             std::string                             mWSCacheFrame;
             std::string                             mParsePayload;
+            WebSocketFormat::WebSocketFrameType     mWSFrameType;
 
         private:
             const char*                             mTmpHeadStr;

@@ -47,6 +47,7 @@ namespace brynet
                 return response;
             }
 
+            // TODO::考虑分段超大payload(延续包）的情况
             static bool wsFrameBuild(const char* payload, 
                 size_t payloadLen, 
                 std::string& frame, 
