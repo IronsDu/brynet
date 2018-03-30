@@ -314,7 +314,7 @@ void AsyncConnector::run()
 {
     while (mIsRun)
     {
-        mEventLoop->loop(10);
+        mEventLoop->loop(std::chrono::milliseconds(10).count());
         mWorkInfo->checkConnectStatus(0);
         mWorkInfo->checkTimeout();
     }
