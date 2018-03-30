@@ -1,5 +1,5 @@
-#ifndef DODO_NET_SOCKETLIBFUNCTION_H_
-#define DODO_NET_SOCKETLIBFUNCTION_H_
+#ifndef BRYNET_NET_SOCKETLIBFUNCTION_H_
+#define BRYNET_NET_SOCKETLIBFUNCTION_H_
 
 #include <cstdbool>
 #include <string>

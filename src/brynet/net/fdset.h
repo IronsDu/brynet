@@ -1,5 +1,5 @@
-#ifndef _FDSET_INCLUDED_H
-#define _FDSET_INCLUDED_H
+#ifndef _BRYNET_NET_FDSET_INCLUDED_H
+#define _BRYNET_NET_FDSET_INCLUDED_H
 
 #include <stdbool.h>
 #include <brynet/net/SocketLibTypes.h>
