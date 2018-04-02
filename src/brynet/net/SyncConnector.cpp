@@ -35,15 +35,15 @@ brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
     brynet::net::WrapTcpService::PTR service,
     brynet::net::AsyncConnector::PTR asyncConnector)
 {
+    if (service == nullptr)
+    {
+        return nullptr;
+    }
+
     if (asyncConnector == nullptr)
     {
         asyncConnector = AsyncConnector::Create();
         asyncConnector->startWorkerThread();
-    }
-    if (service == nullptr)
-    {
-        service = std::make_shared<WrapTcpService>();
-        service->startWorkThread(1);
     }
 
     auto sessionPromise = std::make_shared<std::promise<TCPSession::PTR>>();
@@ -65,5 +65,11 @@ brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
         sessionPromise->set_value(nullptr);
     });
 
-    return sessionPromise->get_future().get();
+    auto future = sessionPromise->get_future();
+    if (future.wait_for(timeout) != std::future_status::ready)
+    {
+        return nullptr;
+    }
+    
+    return future.get();
 }

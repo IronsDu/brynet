@@ -78,7 +78,7 @@ TcpService::TcpService() BRYNET_NOEXCEPT
 {
     static_assert(sizeof(SessionId) == sizeof(((SessionId*)nullptr)->id), 
         "sizeof SessionId must equal int64_t");
-    mRunIOLoop = false;
+    mRunIOLoop = std::make_shared<bool>(false);
 }
 
 TcpService::~TcpService() BRYNET_NOEXCEPT
@@ -159,14 +159,20 @@ void TcpService::stopWorkerThread()
     std::lock_guard<std::mutex> lck(mServiceGuard);
     std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
-    mRunIOLoop = false;
+    *mRunIOLoop = false;
 
     for (const auto& v : mIOLoopDatas)
     {
         v->getEventLoop()->wakeup();
-        if (v->getIOThread()->joinable())
+        try
         {
-            v->getIOThread()->join();
+            if (v->getIOThread()->joinable())
+            {
+                v->getIOThread()->join();
+            }
+        }
+        catch (...)
+        {
         }
     }
     mIOLoopDatas.clear();
@@ -182,17 +188,17 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
         return;
     }
 
-    mRunIOLoop = true;
+    mRunIOLoop = std::make_shared<bool>(true);
 
     mIOLoopDatas.resize(threadNum);
     for (auto& v : mIOLoopDatas)
     {
         auto eventLoop = std::make_shared<EventLoop>();
-        auto shared_this = shared_from_this();
+        auto runIoLoop = mRunIOLoop;
         v = IOLoopData::Create(eventLoop, std::make_shared<std::thread>([callback,
-            shared_this,
+            runIoLoop,
             eventLoop]() {
-            while (shared_this->mRunIOLoop)
+            while (*runIoLoop)
             {
                 auto timeout = std::chrono::milliseconds(sDefaultLoopTimeOutMS);
                 if (!eventLoop->getTimerMgr()->isEmpty())

@@ -145,11 +145,7 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
 
     for (auto& v : mConnectingFds)
     {
-        if (ox_fdset_check(mFDSet.get(), v, ErrorCheck))
-        {
-            total_fds.insert(v);
-        } 
-        else if (ox_fdset_check(mFDSet.get(), v, WriteCheck))
+        if (ox_fdset_check(mFDSet.get(), v, WriteCheck))
         {
             total_fds.insert(v);
             if (isConnectSuccess(v))
@@ -161,7 +157,7 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
 
     for (auto fd : total_fds)
     {
-        ox_fdset_del(mFDSet.get(), fd, WriteCheck | ErrorCheck);
+        ox_fdset_del(mFDSet.get(), fd, WriteCheck);
         mConnectingFds.erase(fd);
 
         auto it = mConnectingInfos.find(fd);
@@ -200,11 +196,11 @@ void ConnectorWorkInfo::checkTimeout()
             ++it;
             continue;
         }
-
+        
         auto fd = it->first;
         auto cb = it->second.failedCB;
 
-        ox_fdset_del(mFDSet.get(), fd, WriteCheck | ErrorCheck);
+        ox_fdset_del(mFDSet.get(), fd, WriteCheck);
 
         mConnectingFds.erase(fd);
         mConnectingInfos.erase(it++);
@@ -224,7 +220,7 @@ void ConnectorWorkInfo::causeAllFailed()
         auto fd = it->first;
         auto cb = it->second.failedCB;
 
-        ox_fdset_del(mFDSet.get(), fd, WriteCheck | ErrorCheck);
+        ox_fdset_del(mFDSet.get(), fd, WriteCheck);
 
         mConnectingFds.erase(fd);
         mConnectingInfos.erase(it++);
@@ -283,7 +279,7 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 
     mConnectingInfos[clientfd] = ci;
     mConnectingFds.insert(clientfd);
-    ox_fdset_add(mFDSet.get(), clientfd, WriteCheck | ErrorCheck);
+    ox_fdset_add(mFDSet.get(), clientfd, WriteCheck);
     return;
 
 SUCCESS:
@@ -310,15 +306,12 @@ AsyncConnector::~AsyncConnector()
     stopWorkerThread();
 }
 
-void AsyncConnector::run()
+static void runOnceCheckConnect(const std::shared_ptr<brynet::net::EventLoop>& eventLoop,
+    const std::shared_ptr<ConnectorWorkInfo>& workerInfo)
 {
-    while (mIsRun)
-    {
-        mEventLoop->loop(std::chrono::milliseconds(10).count());
-        mWorkInfo->checkConnectStatus(0);
-        mWorkInfo->checkTimeout();
-    }
-    mWorkInfo->causeAllFailed();
+    eventLoop->loop(std::chrono::milliseconds(10).count());
+    workerInfo->checkConnectStatus(0);
+    workerInfo->checkTimeout();
 }
 
 void AsyncConnector::startWorkerThread()
@@ -334,12 +327,21 @@ void AsyncConnector::startWorkerThread()
         return;
     }
 
-    mIsRun = true;
+    mIsRun = std::make_shared<bool>(true);
     mWorkInfo = std::make_shared<ConnectorWorkInfo>();
     mEventLoop = std::make_shared<EventLoop>();
-    auto shared_this = shared_from_this();
-    mThread = std::make_shared<std::thread>([shared_this](){
-        shared_this->run();
+
+    auto eventLoop = mEventLoop;
+    auto workerInfo = mWorkInfo;
+    auto isRun = mIsRun;
+
+    mThread = std::make_shared<std::thread>([eventLoop, workerInfo, isRun](){
+        while (*isRun)
+        {
+            runOnceCheckConnect(eventLoop, workerInfo);
+        }
+
+        workerInfo->causeAllFailed();
     });
 }
 
@@ -357,16 +359,23 @@ void AsyncConnector::stopWorkerThread()
     }
 
     mEventLoop->pushAsyncProc([this]() {
-        mIsRun = false;
+        *mIsRun = false;
     });
 
-    if (mThread->joinable())
+    try
     {
-        mThread->join();
+        if (mThread->joinable())
+        {
+            mThread->join();
+        }
     }
+    catch(...)
+    { }
+
     mEventLoop = nullptr;
-    mThread = nullptr;
     mWorkInfo = nullptr;
+    mIsRun = nullptr;
+    mThread = nullptr;
 }
 
 void AsyncConnector::asyncConnect(const std::string& ip, 
@@ -386,20 +395,19 @@ void AsyncConnector::asyncConnect(const std::string& ip,
         throw std::runtime_error("all callback is nullptr");
     }
 
-    if (!mIsRun)
+    if (!(*mIsRun))
     {
         throw std::runtime_error("work thread already stop");
     }
 
-    auto shared_this = shared_from_this();
+    auto workInfo = mWorkInfo;
     auto address = AsyncConnectAddr(ip,
         port,
         timeout,
         successCB,
         failedCB);
-    mEventLoop->pushAsyncProc([shared_this, 
-        address]() {
-        shared_this->mWorkInfo->processConnect(address);
+    mEventLoop->pushAsyncProc([workInfo, address]() {
+        workInfo->processConnect(address);
     });
 }
 

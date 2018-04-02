@@ -19,7 +19,7 @@ namespace brynet
         TCPSession::PTR SyncConnectSession(std::string ip,
             int port,
             std::chrono::milliseconds timeout,
-            brynet::net::WrapTcpService::PTR service = nullptr,
+            brynet::net::WrapTcpService::PTR service,
             brynet::net::AsyncConnector::PTR asyncConnector = nullptr);
     }
 }
