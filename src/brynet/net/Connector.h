@@ -44,7 +44,6 @@ namespace brynet
         private:
             AsyncConnector();
             virtual ~AsyncConnector();
-            void                run();
 
         private:
             std::shared_ptr<EventLoop>      mEventLoop;
@@ -56,7 +55,7 @@ namespace brynet
 #else
             std::mutex                      mThreadGuard;
 #endif
-            bool                            mIsRun;
+            std::shared_ptr<bool>           mIsRun;
         };
     }
 }

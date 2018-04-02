@@ -34,15 +34,11 @@ namespace brynet
             ListenThread() BRYNET_NOEXCEPT;
             virtual ~ListenThread() BRYNET_NOEXCEPT;
 
-            void                                runListen();
-
         private:
-            ACCEPT_CALLBACK                     mAcceptCallback;
             bool                                mIsIPV6;
             std::string                         mIP;
             int                                 mPort;
-            bool                                mRunListen;
-            ListenSocket::PTR                   mListenSocket;
+            std::shared_ptr<bool>               mRunListen;
             std::shared_ptr<std::thread>        mListenThread;
             std::mutex                          mListenThreadGuard;
         };
