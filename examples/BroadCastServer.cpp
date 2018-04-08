@@ -84,7 +84,8 @@ int main(int argc, char** argv)
         socket->SocketNodelay();
         socket->SetSendSize(32 * 1024);
         socket->SetRecvSize(32 * 1024);
-        service->addSession(std::move(socket), [mainLoop](const TCPSession::PTR& session) {
+
+        auto enterCallback = [mainLoop](const TCPSession::PTR& session) {
             mainLoop->pushAsyncProc([session]() {
                 addClientID(session);
             });
@@ -131,7 +132,10 @@ int main(int argc, char** argv)
 
                 return totalProcLen;
             });
-        }, false, nullptr, 1024 * 1024, false);
+        };
+        service->addSession(std::move(socket),
+            AddSessionOption::WithEnterCallback(enterCallback),
+            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
     });
 
     service->startWorkThread(2);

@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
         socket->SocketNodelay();
-        server->addSession(std::move(socket), [](const TCPSession::PTR& session){
+        auto enterCallback = [](const TCPSession::PTR& session) {
 
             auto promiseReceive = setupPromiseReceive(session);
             auto contentLength = std::make_shared<size_t>();
@@ -45,14 +45,17 @@ int main(int argc, char **argv)
                 response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
                 response.setContentType("text/html; charset=utf-8");
                 response.setBody("<html>hello world </html>");
-                
+
                 auto result = response.getResult();
                 session->send(result.c_str(), result.size());
                 session->postShutdown();
 
                 return false;
             });
-        }, false, nullptr, 1024*1024);
+        };
+        server->addSession(std::move(socket),
+            AddSessionOption::WithEnterCallback(enterCallback),
+            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
     });
 
     server->startWorkThread(atoi(argv[2]));

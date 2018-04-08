@@ -1,4 +1,3 @@
-#include <iostream>
 #include <brynet/net/Socket.h>
 
 brynet::net::TcpSocket::PTR brynet::net::TcpSocket::Create(

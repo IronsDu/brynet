@@ -33,6 +33,22 @@ namespace brynet
             typedef std::function<void(SESSION_TYPE)>                                   DISCONNECT_CALLBACK;
             typedef std::function<size_t(SESSION_TYPE, const char* buffer, size_t len)> DATA_CALLBACK;
 
+            class AddSocketOption
+            {
+            public:
+                struct Options;
+
+                typedef std::function<void(Options& option)> AddSocketOptionFunc;
+
+                static AddSocketOptionFunc WithEnterCallback(TcpService::ENTER_CALLBACK callback);
+                static AddSocketOptionFunc WithDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
+                static AddSocketOptionFunc WithDataCallback(TcpService::DATA_CALLBACK callback);
+                static AddSocketOptionFunc WithClientSideSSL();
+                static AddSocketOptionFunc WithServerSideSSL(SSLHelper::PTR sslHelper);
+                static AddSocketOptionFunc WithMaxRecvBufferSize(size_t size);
+                static AddSocketOptionFunc WithForceSameThreadLoop(bool same);
+            };
+
         public:
             static  PTR                         Create();
 
@@ -48,18 +64,14 @@ namespace brynet
             void                                setHeartBeat(SESSION_TYPE id, 
                                                                  std::chrono::nanoseconds checktime);
 
-            /* pass nullptr sslHelper if fd is client socket, either is a server side socket */
-            bool                                addDataSocket(TcpSocket::PTR socket,
-                                                                const SSLHelper::PTR& sslHelper,
-                                                                bool isUseSSL,
-                                                                const TcpService::ENTER_CALLBACK& enterCallback,
-                                                                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
-                                                                const TcpService::DATA_CALLBACK& dataCallback,
-                                                                size_t maxRecvBufferSize,
-                                                                bool forceSameThreadLoop = false);
 
             void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
             void                                stopWorkerThread();
+            template<class... Args>
+            bool                                addDataSocket(TcpSocket::PTR socket, const Args& ... args)
+            {
+                return _addDataSocket(std::move(socket), { args... });
+            }
 
             void                                wakeup(SESSION_TYPE id) const;
             void                                wakeupAll() const;
@@ -77,6 +89,10 @@ namespace brynet
                                                                 const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
                                                                 const TcpService::DATA_CALLBACK& dataCallback,
                                                                 bool forceSameThreadLoop = false);
+
+            /* pass nullptr sslHelper if fd is client socket, either is a server side socket */
+            bool                                _addDataSocket(TcpSocket::PTR socket,
+                const std::vector<AddSocketOption::AddSocketOptionFunc>&);
         private:
             SESSION_TYPE                        MakeID(size_t loopIndex, const std::shared_ptr<IOLoopData>&);
             void                                procDataSocketClose(DataSocket::PTR);
