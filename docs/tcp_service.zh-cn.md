@@ -17,12 +17,9 @@
     (线程安全)开启工作线程，每一个工作线程有一个`EventLoop`负责事件检测。
 
 
-- `TcpService::addDataSocket(TcpSocket::PTR socket, SSLHelper::PTR ssl, bool isUseSSL, ENTER_CALLBACK, DISCONNECT_CALLBACK, DATA_CALLBACK, size_t maxRecvBuffer, bool forceSameLoop)`
+- `TcpService::addDataSocket(TcpSocket::PTR socket, Options...)`
 
-    (线程安全)此函数是最复杂的函数，用于添加socket到管理对象中。</br>当底层绑定成功会调用`ENTER_CALLBACK`，当链接断开会调用`DISCONNECT_CALLBACK`，当收到数据则会调用`DATA_CALLBACK`。</br>
-    这三个回调的第一个参数就标识网络会话对象，其类型是`int64_t`。</br>
-    `forceSameLoop`参数表示是否绑定到当前线程所属的`EventLoop`中。</br>
-    需要特别提醒的是：`isUseSSL`参数标识是否使用SSL，当它为`true`时，如果`socket`为server side socket，那么`ssl`为`nullptr`会返回失败。
+    (线程安全),将一个DataSocket交给TcpService管理,其中Options请查阅`AddSocketOption的WithXXX系列函数`。
 
 - `TcpService::send(int64_t id, std::shared_ptr<string> msg, PACKED_SENDED_CALLBACK cb)`
 
@@ -44,22 +41,7 @@ auto service = TcpService::Create();
 auto fd = ox_socket_connect(false, ip, port);
 auto socket = TcpSocket::Create(fd, false);
 
-service->addDataSocket(socket,
-    nullptr,
-    false,
-    [](int64_t id) {
-        std::cout << "client enter, id is:" << id << std::endl;
-    },
-    [](int64_t id) {
-        std::cout << "client close, id is:" << id << std::endl;
-    },
-    [service](int64_t id, const char* buffer, size_t len) {
-        std::cout << "recv data from client, id is:" << id << std::endl;
-        service->send(id, buffer, len); // echo
-        return len;
-    },
-    1024,
-    false);
+service->addDataSocket(socket, AddSocketOption::WithMaxRecvBufferSize(1024*1024));
 
 std::this_thread::sleep_for(2s);
 ```

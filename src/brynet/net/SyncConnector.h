@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include <brynet/net/WrapTCPService.h>
 #include <brynet/net/Connector.h>
@@ -20,6 +21,7 @@ namespace brynet
             int port,
             std::chrono::milliseconds timeout,
             brynet::net::WrapTcpService::PTR service,
+            const std::vector<AddSessionOption::AddSessionOptionFunc>& options,
             brynet::net::AsyncConnector::PTR asyncConnector = nullptr);
     }
 }

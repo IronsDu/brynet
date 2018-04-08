@@ -3,6 +3,8 @@
 
 #include <memory>
 #include <string>
+#include <exception>
+#include <stdexcept>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/SocketLibFunction.h>
 

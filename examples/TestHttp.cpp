@@ -20,9 +20,9 @@ int main(int argc, char **argv)
 
     auto listenThread = ListenThread::Create();
     listenThread->startListen(false, "0.0.0.0", 8080, [service, body](TcpSocket::PTR socket) {
-        service->addSession(std::move(socket), [body](const TCPSession::PTR& session) {
+        auto enterCallback = [body](const TCPSession::PTR& session) {
             HttpService::setup(session, [body](const HttpSession::PTR& httpSession) {
-                httpSession->setHttpCallback([body](const HTTPParser& httpParser, 
+                httpSession->setHttpCallback([body](const HTTPParser& httpParser,
                     const HttpSession::PTR& session) {
                     HttpResponse response;
                     response.setBody(body);
@@ -32,21 +32,24 @@ int main(int argc, char **argv)
                     });
                 });
 
-                httpSession->setWSCallback([](const HttpSession::PTR& httpSession, 
-                    WebSocketFormat::WebSocketFrameType opcode, 
+                httpSession->setWSCallback([](const HttpSession::PTR& httpSession,
+                    WebSocketFormat::WebSocketFrameType opcode,
                     const std::string& payload) {
                     // ping pong
                     auto frame = std::make_shared<std::string>();
-                    WebSocketFormat::wsFrameBuild(payload.c_str(), 
-                        payload.size(), 
-                        *frame, 
-                        WebSocketFormat::WebSocketFrameType::TEXT_FRAME, 
-                        true, 
+                    WebSocketFormat::wsFrameBuild(payload.c_str(),
+                        payload.size(),
+                        *frame,
+                        WebSocketFormat::WebSocketFrameType::TEXT_FRAME,
+                        true,
                         true);
                     httpSession->send(frame);
                 });
             });
-        }, false, nullptr, 1024 * 1024, false);
+        };
+        service->addSession(std::move(socket), 
+            AddSessionOption::WithEnterCallback(enterCallback),
+            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
     });
 
 #ifdef USE_OPENSSL
@@ -55,7 +58,7 @@ int main(int argc, char **argv)
     {
         auto socket = TcpSocket::Create(fd, false);
         SSL_library_init();
-        service->addSession(std::move(socket), [](const TCPSession::PTR& session) {
+        auto enterCallback = [](const TCPSession::PTR& session) {
             HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
@@ -68,7 +71,11 @@ int main(int argc, char **argv)
                     std::cout << httpParser.getBody() << std::endl;
                 });
             });
-        }, true, nullptr, 1024 * 1024, false);
+        };
+
+        service->addSession(std::move(socket), 
+            AddSessionOption::WithClientSideSSL(),
+            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
     }
 #endif
 

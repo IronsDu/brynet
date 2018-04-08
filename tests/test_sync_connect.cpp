@@ -13,7 +13,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
         auto socket = brynet::net::SyncConnectSocket(ip, port, std::chrono::seconds(2));
         REQUIRE(socket == nullptr);
 
-        auto session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), nullptr);
+        auto session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), nullptr, {});
         REQUIRE(session == nullptr);
     }
 
@@ -26,20 +26,22 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
         REQUIRE(socket != nullptr);
         
         // 没有service
-        auto session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), nullptr);
+        auto session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), nullptr, {});
         REQUIRE(session == nullptr);
 
         {
+            std::cout << "start 35" << std::endl;
             auto service = std::make_shared<brynet::net::WrapTcpService>();
             service->startWorkThread(1);
-            session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), service);
+            session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), service, {brynet::net::AddSessionOption::WithMaxRecvBufferSize(1)});
             REQUIRE(session != nullptr);
+            std::cout << "end 35" << std::endl;
         }
 
         {
             // 没有开启service工作线程
             auto service = std::make_shared<brynet::net::WrapTcpService>();
-            session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), service);
+            session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), service, { brynet::net::AddSessionOption::WithMaxRecvBufferSize(1) });
             REQUIRE(session == nullptr);
         }
     }

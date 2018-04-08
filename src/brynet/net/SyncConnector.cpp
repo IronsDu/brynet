@@ -33,6 +33,7 @@ brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
     int port,
     std::chrono::milliseconds timeout,
     brynet::net::WrapTcpService::PTR service,
+    const std::vector<AddSessionOption::AddSessionOptionFunc>& options,
     brynet::net::AsyncConnector::PTR asyncConnector)
 {
     if (service == nullptr)
@@ -51,16 +52,15 @@ brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
         ip,
         port,
         timeout,
-        [service, sessionPromise](TcpSocket::PTR socket) {
+        [=](TcpSocket::PTR socket) mutable {
         socket->SocketNodelay();
-        service->addSession(
-            std::move(socket),
-            [sessionPromise](const TCPSession::PTR& session) {
+
+        auto enterCallback = [sessionPromise](const TCPSession::PTR& session) mutable {
             sessionPromise->set_value(session);
-        },
-            false,
-            nullptr,
-            1024 * 1024);
+        };
+        std::vector < AddSessionOption::AddSessionOptionFunc> tmpOptions = options;
+        tmpOptions.push_back(brynet::net::AddSessionOption::WithEnterCallback(enterCallback));
+        service->addSession(std::move(socket), tmpOptions);
     }, [sessionPromise]() {
         sessionPromise->set_value(nullptr);
     });

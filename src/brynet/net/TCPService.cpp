@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/Noexcept.h>
@@ -404,41 +405,67 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
     return true;
 }
 
-bool TcpService::addDataSocket(TcpSocket::PTR socket,
-    const SSLHelper::PTR& sslHelper,
-    bool isUseSSL,
-    const TcpService::ENTER_CALLBACK& enterCallback,
-    const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
-    const TcpService::DATA_CALLBACK& dataCallback,
-    size_t maxRecvBufferSize,
-    bool forceSameThreadLoop)
+struct brynet::net::TcpService::AddSocketOption::Options
 {
+    Options()
+    {
+        useClientSideSSL = false;
+        useServerSizeSSL = false;
+        forceSameThreadLoop = false;
+        maxRecvBufferSize = 0;
+    }
+
+    TcpService::ENTER_CALLBACK      enterCallback;
+    TcpService::DISCONNECT_CALLBACK disConnectCallback;
+    TcpService::DATA_CALLBACK       dataCallback;
+
+    SSLHelper::PTR                  sslHelper;
+    bool                            useClientSideSSL;
+    bool                            useServerSizeSSL;
+    bool                            forceSameThreadLoop;
+    size_t                          maxRecvBufferSize;
+};
+
+bool TcpService::_addDataSocket(TcpSocket::PTR socket,
+    const std::vector<AddSocketOption::AddSocketOptionFunc>& optionFuncs)
+{
+    struct TcpService::AddSocketOption::Options options;
+    for (const auto& v : optionFuncs)
+    {
+        if (v != nullptr)
+        {
+            v(options);
+        }
+    }
+
+    if (options.maxRecvBufferSize <= 0)
+    {
+        throw std::runtime_error("buffer size is zero");
+    }
+
     const auto isServerSide = socket->isServerSide();
     const std::string ip = socket->GetIP();
 
-    DataSocket::PTR channel = new DataSocket(std::move(socket), maxRecvBufferSize);
+    DataSocket::PTR channel = new DataSocket(std::move(socket), options.maxRecvBufferSize);
 #ifdef USE_OPENSSL
-    if (isUseSSL)
+    if (options.useServerSizeSSL)
     {
-        if (isServerSide)
+        if (options.sslHelper == nullptr ||
+            options.sslHelper->getOpenSSLCTX() == nullptr ||
+            !channel->initAcceptSSL(options.sslHelper->getOpenSSLCTX()))
         {
-            if (sslHelper == nullptr ||
-                sslHelper->getOpenSSLCTX() == nullptr ||
-                !channel->initAcceptSSL(sslHelper->getOpenSSLCTX()))
-            {
-                goto FAILED;
-            }
+            goto FAILED;
         }
-        else
+    }
+    else if (options.useClientSideSSL)
+    {
+        if (!channel->initConnectSSL())
         {
-            if (!channel->initConnectSSL())
-            {
-                goto FAILED;
-            }
+            goto FAILED;
         }
     }
 #else
-    if (isUseSSL)
+    if (options.useClientSideSSL || options.useServerSizeSSL)
     {
         goto FAILED;
     }
@@ -446,10 +473,10 @@ bool TcpService::addDataSocket(TcpSocket::PTR socket,
 
     if (helpAddChannel(channel,
         ip,
-        enterCallback,
-        disConnectCallback,
-        dataCallback,
-        forceSameThreadLoop))
+        options.enterCallback,
+        options.disConnectCallback,
+        options.dataCallback,
+        options.forceSameThreadLoop))
     {
         return true;
     }
@@ -541,4 +568,54 @@ void IOLoopData::send(TcpService::SESSION_TYPE id,
             }
         });
     }
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithEnterCallback(TcpService::ENTER_CALLBACK callback)
+{
+    return [=](TcpService::AddSocketOption::Options& option) {
+        option.enterCallback = callback;
+    };
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback)
+{
+    return [=](TcpService::AddSocketOption::Options& option) {
+        option.disConnectCallback = callback;
+    };
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithDataCallback(TcpService::DATA_CALLBACK callback)
+{
+    return [=](TcpService::AddSocketOption::Options& option) {
+        option.dataCallback = callback;
+    };
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithClientSideSSL()
+{
+    return [=](TcpService::AddSocketOption::Options& option) {
+        option.useClientSideSSL = true;
+    };
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithServerSideSSL(SSLHelper::PTR sslHelper)
+{
+    return [=](TcpService::AddSocketOption::Options& option) {
+        option.sslHelper = sslHelper;
+        option.useServerSizeSSL = true;
+    };
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithMaxRecvBufferSize(size_t size)
+{
+    return [=](TcpService::AddSocketOption::Options& option) {
+        option.maxRecvBufferSize = size;
+    };
+}
+
+TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithForceSameThreadLoop(bool same)
+{
+    return [=](AddSocketOption::Options& option) {
+        option.forceSameThreadLoop = same;
+    };
 }

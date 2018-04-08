@@ -53,7 +53,8 @@ int main(int argc, char **argv)
         sock fd = brynet::net::base::Connect(false, host, port);
         auto socket = TcpSocket::Create(fd, false);
         brynet::net::base::SocketNodelay(fd);
-        service->addSession(std::move(socket), [host](const TCPSession::PTR& session) {
+
+        auto enterCallback = [host](const TCPSession::PTR& session) {
             HttpService::setup(session, [host](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
@@ -81,7 +82,11 @@ int main(int argc, char **argv)
                     count += 1;
                 });
             });
-        }, false, nullptr, 1024 * 1024, false);
+        };
+
+        service->addSession(std::move(socket), 
+            AddSessionOption::WithEnterCallback(enterCallback),
+            AddSessionOption::WithMaxRecvBufferSize(1024*1024));
     }
 
     brynet::net::EventLoop mainLoop;

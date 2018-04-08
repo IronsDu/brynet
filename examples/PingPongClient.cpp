@@ -31,13 +31,18 @@ int main(int argc, char **argv)
             connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](TcpSocket::PTR socket) {
                 std::cout << "connect success" << std::endl;
                 socket->SocketNodelay();
-                server->addSession(std::move(socket), [tmp](const TCPSession::PTR& session) {
+
+                auto enterCallback = [tmp](const TCPSession::PTR& session) {
                     session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
                         session->send(buffer, len);
                         return len;
                     });
                     session->send(tmp.c_str(), tmp.size());
-                }, false, nullptr, 1024 * 1024);
+                };
+
+                server->addSession(std::move(socket),
+                        AddSessionOption::WithEnterCallback(enterCallback),
+                        AddSessionOption::WithMaxRecvBufferSize(1024*1024));
             }, []() {
                 std::cout << "connect failed" << std::endl;
             });

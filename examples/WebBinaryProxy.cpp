@@ -38,50 +38,51 @@ int main(int argc, char **argv)
 
     // listen for front http client
     listenThread->startListen(false, "0.0.0.0", bindPort, [tcpService, asyncConnector, backendIP, backendPort](TcpSocket::PTR socket) {
-        tcpService->addSession(std::move(socket), [tcpService, asyncConnector, backendIP, backendPort](const TCPSession::PTR& session) {
+        auto enterCallback = [tcpService, asyncConnector, backendIP, backendPort](const TCPSession::PTR& session) {
             session->setUD(static_cast<int64_t>(1));
             std::shared_ptr<TCPSession::PTR> shareBackendSession = std::make_shared<TCPSession::PTR>(nullptr);
             std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
             /* new connect to backend server */
-            asyncConnector->asyncConnect(backendIP.c_str(), 
-                backendPort, 
-                std::chrono::seconds(10), 
+            asyncConnector->asyncConnect(backendIP.c_str(),
+                backendPort,
+                std::chrono::seconds(10),
                 [tcpService, session, shareBackendSession, cachePacket](TcpSocket::PTR socket) {
-                if (true)
-                {
-                    tcpService->addSession(std::move(socket), [=](const TCPSession::PTR& backendSession) {
+                auto enterCallback = [=](const TCPSession::PTR& backendSession) {
+                    auto ud = brynet::net::cast<int64_t>(session->getUD());
+                    if (*ud == -1)   /*if http client already close*/
+                    {
+                        backendSession->postDisConnect();
+                        return;
+                    }
+
+                    *shareBackendSession = backendSession;
+
+                    for (auto& p : *cachePacket)
+                    {
+                        backendSession->send(p.c_str(), p.size());
+                    }
+                    cachePacket->clear();
+
+                    backendSession->setDisConnectCallback([=](const TCPSession::PTR& backendSession) {
+                        *shareBackendSession = nullptr;
                         auto ud = brynet::net::cast<int64_t>(session->getUD());
-                        if (*ud == -1)   /*if http client already close*/
+                        if (*ud != -1)
                         {
-                            backendSession->postDisConnect();
-                            return;
+                            session->postDisConnect();
                         }
+                    });
 
-                        *shareBackendSession = backendSession;
+                    backendSession->setDataCallback([=](const TCPSession::PTR& backendSession, const char* buffer, size_t size) {
+                        /* recieve data from backend server, then send to http client */
+                        session->send(buffer, size);
+                        return size;
+                    });
+                };
 
-                        for (auto& p : *cachePacket)
-                        {
-                            backendSession->send(p.c_str(), p.size());
-                        }
-                        cachePacket->clear();
-
-                        backendSession->setDisConnectCallback([=](const TCPSession::PTR& backendSession) {
-                            *shareBackendSession = nullptr;
-                            auto ud = brynet::net::cast<int64_t>(session->getUD());
-                            if (*ud != -1)
-                            {
-                                session->postDisConnect();
-                            }
-                        });
-
-                        backendSession->setDataCallback([=](const TCPSession::PTR& backendSession, const char* buffer, size_t size) {
-                            /* recieve data from backend server, then send to http client */
-                            session->send(buffer, size);
-                            return size;
-                        });
-                    }, false, nullptr, 32 * 1024, false);
-                }
+                tcpService->addSession(std::move(socket),
+                    AddSessionOption::WithEnterCallback(enterCallback),
+                    AddSessionOption::WithMaxRecvBufferSize(32 * 1024));
             }, nullptr);
 
             session->setDataCallback([=](const TCPSession::PTR&, const char* buffer, size_t size) {
@@ -110,7 +111,11 @@ int main(int argc, char **argv)
 
                 session->setUD(-1);
             });
-        }, false, nullptr, 32 * 1024);
+        };
+
+        tcpService->addSession(std::move(socket), 
+            AddSessionOption::WithEnterCallback(enterCallback),
+            AddSessionOption::WithMaxRecvBufferSize(32 * 1024));
     });
     
     std::cin.get();

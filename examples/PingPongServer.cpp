@@ -28,20 +28,25 @@ int main(int argc, char **argv)
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
         socket->SocketNodelay();
-        server->addSession(std::move(socket), [](const TCPSession::PTR& session){
+
+        auto enterCallback = [](const TCPSession::PTR& session) {
             total_client_num++;
 
-            session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len){
+            session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
                 session->send(buffer, len);
                 TotalRecvSize += len;
                 total_packet_num++;
                 return len;
             });
 
-            session->setDisConnectCallback([](const TCPSession::PTR& session){
+            session->setDisConnectCallback([](const TCPSession::PTR& session) {
                 total_client_num--;
             });
-        }, false, nullptr, 1024*1024);
+        };
+
+        server->addSession(std::move(socket),
+                AddSessionOption::WithEnterCallback(enterCallback),
+                AddSessionOption::WithMaxRecvBufferSize(1024*1024));
     });
 
     server->startWorkThread(atoi(argv[2]));

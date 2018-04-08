@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstdint>
+#include <vector>
 
 #include <brynet/net/TCPService.h>
 #include <brynet/utils/NonCopyable.h>
@@ -25,6 +26,7 @@ namespace brynet
 
             typedef std::function<void(const TCPSession::PTR&)>   DISCONNECT_CALLBACK;
             typedef std::function<size_t(const TCPSession::PTR&, const char*, size_t)>   DATA_CALLBACK;
+            typedef std::function<void(const TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
         public:
             const BrynetAny&            getUD() const;
@@ -77,13 +79,26 @@ namespace brynet
             friend class WrapTcpService;
         };
 
+        class AddSessionOption
+        {
+        public:
+            struct Options;
+
+            typedef std::function<void(Options& option)> AddSessionOptionFunc;
+
+            static AddSessionOptionFunc WithEnterCallback(TCPSession::SESSION_ENTER_CALLBACK callback);
+            static AddSessionOptionFunc WithClientSideSSL();
+            static AddSessionOptionFunc WithServerSideSSL(SSLHelper::PTR sslHelper);
+            static AddSessionOptionFunc WithMaxRecvBufferSize(size_t size);
+            static AddSessionOptionFunc WithForceSameThreadLoop(bool same);
+        };
+
         class WrapTcpService : public NonCopyable
         {
         public:
             typedef std::shared_ptr<WrapTcpService> PTR;
             typedef std::weak_ptr<WrapTcpService>   WEAK_PTR;
 
-            typedef std::function<void(const TCPSession::PTR&)>   SESSION_ENTER_CALLBACK;
 
             WrapTcpService() BRYNET_NOEXCEPT;
             virtual ~WrapTcpService() BRYNET_NOEXCEPT;
@@ -93,14 +108,22 @@ namespace brynet
                                                         TcpService::FRAME_CALLBACK callback = nullptr);
             void                        stopWorkThread();
 
-            //TODO::maybe used wrongly
-            void                        addSession(TcpSocket::PTR socket, 
-                                                    const SESSION_ENTER_CALLBACK& userEnterCallback, 
-                                                    bool isUseSSL,
-                                                    const SSLHelper::PTR& sslHelper,
-                                                    size_t maxRecvBufferSize, 
-                                                    bool forceSameThreadLoop = false);
+            template<class... Args>
+            bool                        addSession(TcpSocket::PTR socket, const Args& ... args)
+            {
+                return _addSession(std::move(socket), { args... });
+            }
+            template<class... Args>
+            bool                        addSession(TcpSocket::PTR socket, 
+                const std::vector<AddSessionOption::AddSessionOptionFunc>& options)
+            {
+                return _addSession(std::move(socket), options);
+            }
 
+        private:
+            bool                        _addSession(TcpSocket::PTR socket,
+                const std::vector<AddSessionOption::AddSessionOptionFunc>&);
+           
         private:
             TcpService::PTR             mTCPService;
         };
