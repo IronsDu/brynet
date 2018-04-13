@@ -409,8 +409,7 @@ struct brynet::net::TcpService::AddSocketOption::Options
 {
     Options()
     {
-        useClientSideSSL = false;
-        useServerSizeSSL = false;
+        useSSL = false;
         forceSameThreadLoop = false;
         maxRecvBufferSize = 0;
     }
@@ -420,8 +419,7 @@ struct brynet::net::TcpService::AddSocketOption::Options
     TcpService::DATA_CALLBACK       dataCallback;
 
     SSLHelper::PTR                  sslHelper;
-    bool                            useClientSideSSL;
-    bool                            useServerSizeSSL;
+    bool                            useSSL;
     bool                            forceSameThreadLoop;
     size_t                          maxRecvBufferSize;
 };
@@ -448,24 +446,27 @@ bool TcpService::_addDataSocket(TcpSocket::PTR socket,
 
     DataSocket::PTR channel = new DataSocket(std::move(socket), options.maxRecvBufferSize);
 #ifdef USE_OPENSSL
-    if (options.useServerSizeSSL)
+    if (options.useSSL)
     {
-        if (options.sslHelper == nullptr ||
-            options.sslHelper->getOpenSSLCTX() == nullptr ||
-            !channel->initAcceptSSL(options.sslHelper->getOpenSSLCTX()))
+        if (isServerSide)
         {
-            goto FAILED;
+            if (options.sslHelper == nullptr ||
+                options.sslHelper->getOpenSSLCTX() == nullptr ||
+                !channel->initAcceptSSL(options.sslHelper->getOpenSSLCTX()))
+            {
+                goto FAILED;
+            }
         }
-    }
-    else if (options.useClientSideSSL)
-    {
-        if (!channel->initConnectSSL())
+        else
         {
-            goto FAILED;
+            if (!channel->initConnectSSL())
+            {
+                goto FAILED;
+            }
         }
     }
 #else
-    if (options.useClientSideSSL || options.useServerSizeSSL)
+    if (options.useSSL)
     {
         goto FAILED;
     }
@@ -594,7 +595,7 @@ TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::Wi
 TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithClientSideSSL()
 {
     return [=](TcpService::AddSocketOption::Options& option) {
-        option.useClientSideSSL = true;
+        option.useSSL = true;
     };
 }
 
@@ -602,7 +603,7 @@ TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::Wi
 {
     return [=](TcpService::AddSocketOption::Options& option) {
         option.sslHelper = sslHelper;
-        option.useServerSizeSSL = true;
+        option.useSSL = true;
     };
 }
 

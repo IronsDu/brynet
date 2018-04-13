@@ -143,16 +143,14 @@ struct brynet::net::AddSessionOption::Options
 {
     Options()
     {
-        useClientSideSSL = false;
-        useServerSideSSL = false;
+        useSSL = false;
         forceSameThreadLoop = false;
         maxRecvBufferSize = 0;
     }
 
     TCPSession::SESSION_ENTER_CALLBACK  enterCallback;
     SSLHelper::PTR                      sslHelper;
-    bool                                useClientSideSSL;
-    bool                                useServerSideSSL;
+    bool                                useSSL;
     bool                                forceSameThreadLoop;
     size_t                              maxRecvBufferSize;
 };
@@ -167,7 +165,7 @@ AddSessionOption::AddSessionOptionFunc AddSessionOption::WithEnterCallback(TCPSe
 AddSessionOption::AddSessionOptionFunc AddSessionOption::WithClientSideSSL()
 {
     return [=](AddSessionOption::Options& option) {
-        option.useClientSideSSL = true;
+        option.useSSL = true;
     };
 }
 
@@ -175,7 +173,7 @@ AddSessionOption::AddSessionOptionFunc AddSessionOption::WithServerSideSSL(SSLHe
 {
     return [=](AddSessionOption::Options& option) {
         option.sslHelper = sslHelper;
-        option.useServerSideSSL = true;
+        option.useSSL = true;
     };
 }
 
@@ -245,9 +243,21 @@ bool WrapTcpService::_addSession(TcpSocket::PTR socket,
         }
     };
 
+    TcpService::AddSocketOption::AddSocketOptionFunc sslOption;
+    if (options.useSSL)
+    {
+        if (socket->isServerSide())
+        {
+            sslOption = TcpService::AddSocketOption::WithServerSideSSL(options.sslHelper);
+        }
+        else
+        {
+            sslOption = TcpService::AddSocketOption::WithClientSideSSL();
+        }
+    }
+
     return mTCPService->addDataSocket(std::move(socket),
-        options.useClientSideSSL ? TcpService::AddSocketOption::WithClientSideSSL() : nullptr,
-        options.useServerSideSSL ? TcpService::AddSocketOption::WithServerSideSSL(options.sslHelper) : nullptr,
+        sslOption,
         TcpService::AddSocketOption::WithEnterCallback(enterCallback),
         TcpService::AddSocketOption::WithDisconnectCallback(closeCallback),
         TcpService::AddSocketOption::WithDataCallback(msgCallback),

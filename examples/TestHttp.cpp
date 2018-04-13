@@ -3,6 +3,7 @@
 #include <mutex>
 #include <condition_variable>
 
+#include <brynet/net/SSLHelper.h>
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/http/HttpService.h>
 #include <brynet/net/http/HttpFormat.h>
