@@ -155,14 +155,14 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
 
         if ( isFin)
         {
-            if (!cacheFrame.empty())
-            {
-                parseString = std::move(cacheFrame);
-                cacheFrame.clear();
-            }
             // 如果fin为true，并且opcode为延续包，则表示分段payload全部接受完毕，因此需要获取之前第一次收到分段frame的opcode作为整个payload的类型
             if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
             {
+                if (!cacheFrame.empty())
+                {
+                    parseString = std::move(cacheFrame);
+                    cacheFrame.clear();
+                }
                 opcode = httpParser->getWSFrameType();
             }
 

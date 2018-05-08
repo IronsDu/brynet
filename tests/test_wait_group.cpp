@@ -4,6 +4,7 @@
 #include <atomic>
 #include <brynet/utils/WaitGroup.h>
 #include <chrono>
+#include <thread>
 
 TEST_CASE("WaitGroup are computed", "[waitgroup]") {
     auto wg = brynet::WaitGroup::Create();

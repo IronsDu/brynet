@@ -298,7 +298,7 @@ FAILED:
 
 AsyncConnector::AsyncConnector()
 {
-    mIsRun = false;
+    mIsRun = std::make_shared<bool>(false);
 }
 
 AsyncConnector::~AsyncConnector()
