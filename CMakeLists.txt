@@ -10,7 +10,7 @@ elseif(UNIX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-  set(CMAKE_C_FLAGS   "${(CMAKE_C_FLAGS} -fPIC")
+  set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
 set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
