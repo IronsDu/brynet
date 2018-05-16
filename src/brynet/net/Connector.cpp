@@ -298,7 +298,7 @@ FAILED:
 
 AsyncConnector::AsyncConnector()
 {
-    mIsRun = false;
+    *mIsRun = false;
 }
 
 AsyncConnector::~AsyncConnector()
