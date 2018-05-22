@@ -8,6 +8,7 @@
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/fdset.h>
+#include <brynet/utils/stack.h>
 
 #include <brynet/net/Connector.h>
 
@@ -75,7 +76,7 @@ namespace brynet
             ConnectorWorkInfo() BRYNET_NOEXCEPT;
 
             void                checkConnectStatus(int millsecond);
-            bool                isConnectSuccess(sock clientfd) const;
+            bool                isConnectSuccess(sock clientfd, bool willCheckWrite) const;
             void                checkTimeout();
             void                processConnect(const AsyncConnectAddr&);
             void                causeAllFailed();
@@ -96,7 +97,6 @@ namespace brynet
             };
 
             std::map<sock, ConnectingInfo>  mConnectingInfos;
-            std::set<sock>                  mConnectingFds;
 
             struct FDSetDeleter
             {
@@ -105,8 +105,16 @@ namespace brynet
                     ox_fdset_delete(ptr);
                 }
             };
+            struct StackDeleter
+            {
+                void operator()(struct stack_s* ptr) const
+                {
+                    ox_stack_delete(ptr);
+                }
+            };
 
             std::unique_ptr<struct fdset_s, FDSetDeleter> mFDSet;
+            std::unique_ptr<struct stack_s, StackDeleter> mPollResult;
         };
     }
 }
@@ -114,11 +122,12 @@ namespace brynet
 ConnectorWorkInfo::ConnectorWorkInfo() BRYNET_NOEXCEPT
 {
     mFDSet.reset(ox_fdset_new());
+    mPollResult.reset(ox_stack_new(1024, sizeof(sock)));
 }
 
-bool ConnectorWorkInfo::isConnectSuccess(sock clientfd) const
+bool ConnectorWorkInfo::isConnectSuccess(sock clientfd, bool willCheckWrite) const
 {
-    if (!ox_fdset_check(mFDSet.get(), clientfd, WriteCheck))
+    if(willCheckWrite && !ox_fdset_check(mFDSet.get(), clientfd, WriteCheck))
     {
         return false;
     }
@@ -143,22 +152,26 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
     std::set<sock>  total_fds;
     std::set<sock>  success_fds;
 
-    for (auto& v : mConnectingFds)
+    ox_fdset_visitor(mFDSet.get(), WriteCheck, mPollResult.get());
+    while (true)
     {
-        if (ox_fdset_check(mFDSet.get(), v, WriteCheck))
+        auto p = ox_stack_popfront(mPollResult.get());
+        if (p == nullptr)
         {
-            total_fds.insert(v);
-            if (isConnectSuccess(v))
-            {
-                success_fds.insert(v);
-            }
+            break;
+        }
+
+        sock fd = *(sock*)p;
+        total_fds.insert(fd);
+        if (isConnectSuccess(fd, false))
+        {
+            success_fds.insert(fd);
         }
     }
 
     for (auto fd : total_fds)
     {
-        ox_fdset_del(mFDSet.get(), fd, WriteCheck);
-        mConnectingFds.erase(fd);
+        ox_fdset_remove(mFDSet.get(), fd);
 
         auto it = mConnectingInfos.find(fd);
         if (it == mConnectingInfos.end())
@@ -200,14 +213,13 @@ void ConnectorWorkInfo::checkTimeout()
         auto fd = it->first;
         auto cb = it->second.failedCB;
 
-        ox_fdset_del(mFDSet.get(), fd, WriteCheck);
-
-        mConnectingFds.erase(fd);
+        ox_fdset_remove(mFDSet.get(), fd);
         mConnectingInfos.erase(it++);
 
         brynet::net::base::SocketClose(fd);
         if (cb != nullptr)
         {
+            //TODO::don't modify mConnectingInfos in cb
             cb();
         }
     }
@@ -215,16 +227,15 @@ void ConnectorWorkInfo::checkTimeout()
 
 void ConnectorWorkInfo::causeAllFailed()
 {
-    for (auto it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
+    auto copyMap = mConnectingInfos;
+    mConnectingInfos.clear();
+
+    for (const auto& v : copyMap)
     {
-        auto fd = it->first;
-        auto cb = it->second.failedCB;
+        auto fd = v.first;
+        auto cb = v.second.failedCB;
 
-        ox_fdset_del(mFDSet.get(), fd, WriteCheck);
-
-        mConnectingFds.erase(fd);
-        mConnectingInfos.erase(it++);
-
+        ox_fdset_remove(mFDSet.get(), fd);
         brynet::net::base::SocketClose(fd);
         if (cb != nullptr)
         {
@@ -237,7 +248,6 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 {
     struct sockaddr_in server_addr;
     sock clientfd = SOCKET_ERROR;
-    ConnectingInfo ci;
 
 #if defined PLATFORM_WINDOWS
     int check_error = WSAEWOULDBLOCK;
@@ -272,14 +282,16 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
         goto FAILED;
     }
 
-    ci.startConnectTime = std::chrono::steady_clock::now();
-    ci.successCB = addr.getSuccessCB();
-    ci.failedCB = addr.getFailedCB();
-    ci.timeout = addr.getTimeout();
+    {
+        ConnectingInfo ci;
+        ci.startConnectTime = std::chrono::steady_clock::now();
+        ci.successCB = addr.getSuccessCB();
+        ci.failedCB = addr.getFailedCB();
+        ci.timeout = addr.getTimeout();
 
-    mConnectingInfos[clientfd] = ci;
-    mConnectingFds.insert(clientfd);
-    ox_fdset_add(mFDSet.get(), clientfd, WriteCheck);
+        mConnectingInfos[clientfd] = ci;
+        ox_fdset_add(mFDSet.get(), clientfd, WriteCheck);
+    }
     return;
 
 SUCCESS:

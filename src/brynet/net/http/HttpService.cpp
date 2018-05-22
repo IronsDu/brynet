@@ -1,4 +1,4 @@
-#include <string>
+ï»¿#include <string>
 #include <cstring>
 #include <cassert>
 
@@ -138,16 +138,16 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
 
         if (!WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
         {
-            // Èç¹ûÃ»ÓÐ½âÎö³öÍêÕûµÄws frameÔòÍË³öº¯Êý
+            // å¦‚æžœæ²¡æœ‰è§£æžå‡ºå®Œæ•´çš„ws frameåˆ™é€€å‡ºå‡½æ•°
             break;
         }
 
-        // Èç¹ûµ±Ç°framµÄfinÎªfalse»òÕßopcodeÎªÑÓÐø°ü£¬Ôò½«µ±Ç°frameµÄpayloadÌí¼Óµ½cache
+        // å¦‚æžœå½“å‰framçš„finä¸ºfalseæˆ–è€…opcodeä¸ºå»¶ç»­åŒ…ï¼Œåˆ™å°†å½“å‰frameçš„payloadæ·»åŠ åˆ°cache
         if (!isFin || opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
         {
             cacheFrame += std::move(parseString);
         }
-        // Èç¹ûµ±Ç°framµÄfinÎªfalse£¬²¢ÇÒopcode²»ÎªÑÓÐø°ü£¬Ôò±íÊ¾ÊÕµ½·Ö¶ÎpayloadµÄµÚÒ»¸ö¶Î(frame)£¬ÐèÒª»º´æµ±Ç°frameµÄopcode
+        // å¦‚æžœå½“å‰framçš„finä¸ºfalseï¼Œå¹¶ä¸”opcodeä¸ä¸ºå»¶ç»­åŒ…ï¼Œåˆ™è¡¨ç¤ºæ”¶åˆ°åˆ†æ®µpayloadçš„ç¬¬ä¸€ä¸ªæ®µ(frame)ï¼Œéœ€è¦ç¼“å­˜å½“å‰frameçš„opcode
         if (!isFin && opcode != WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
         {
             httpParser->cacheWSFrameType(opcode);
@@ -155,7 +155,7 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
 
         if ( isFin)
         {
-            // Èç¹ûfinÎªtrue£¬²¢ÇÒopcodeÎªÑÓÐø°ü£¬Ôò±íÊ¾·Ö¶ÎpayloadÈ«²¿½ÓÊÜÍê±Ï£¬Òò´ËÐèÒª»ñÈ¡Ö®Ç°µÚÒ»´ÎÊÕµ½·Ö¶ÎframeµÄopcode×÷ÎªÕû¸öpayloadµÄÀàÐÍ
+            // å¦‚æžœfinä¸ºtrueï¼Œå¹¶ä¸”opcodeä¸ºå»¶ç»­åŒ…ï¼Œåˆ™è¡¨ç¤ºåˆ†æ®µpayloadå…¨éƒ¨æŽ¥å—å®Œæ¯•ï¼Œå› æ­¤éœ€è¦èŽ·å–ä¹‹å‰ç¬¬ä¸€æ¬¡æ”¶åˆ°åˆ†æ®µframeçš„opcodeä½œä¸ºæ•´ä¸ªpayloadçš„ç±»åž‹
             if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
             {
                 if (!cacheFrame.empty())
@@ -185,10 +185,14 @@ size_t HttpService::ProcessHttp(const char* buffer,
     const HTTPParser::PTR& httpParser,
     const HttpSession::PTR& httpSession)
 {
-    const auto retlen = httpParser->tryParse(buffer, len);
+    size_t retlen = len;
     if (!httpParser->isCompleted())
     {
-        return retlen;
+        retlen = httpParser->tryParse(buffer, len);
+        if (!httpParser->isCompleted())
+        {
+            return retlen;
+        }
     }
 
     if (httpParser->isWebSocket())

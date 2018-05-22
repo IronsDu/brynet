@@ -91,7 +91,7 @@ namespace brynet
                     if (pendingReceive->len != nullptr)
                     {
                         const auto tryReceiveLen = *pendingReceive->len;
-                        if (tryReceiveLen < (len - procLen))
+                        if ((len - procLen) < tryReceiveLen)
                         {
                             break;
                         }
@@ -107,6 +107,7 @@ namespace brynet
                     {
                         size_t pos = 0;
                         bool isOK = false;
+                        auto data = buffer + procLen;
                         memsearch(buffer + procLen,
                             len-procLen, 
                             pendingReceive->str.c_str(), 
@@ -120,9 +121,8 @@ namespace brynet
                         }
 
                         mPendingReceives.pop_front();
-                        auto findLen = pos + pendingReceive->str.size();
-                        procLen += findLen;
-                        if (pendingReceive->handle(buffer + procLen - findLen, findLen))
+                        procLen += (pos + pendingReceive->str.size());
+                        if (pendingReceive->handle(data, pos))
                         {
                             mPendingReceives.push_front(pendingReceive);
                         }

@@ -107,7 +107,12 @@ void ListenThread::stopListen()
     }
 
     *mRunListen = false;
-    brynet::net::SyncConnectSocket(mIP, mPort, std::chrono::seconds(10));
+    auto selfIP = mIP;
+    if (selfIP == "0.0.0.0")
+    {
+        selfIP = "127.0.0.1";
+    }
+    brynet::net::SyncConnectSocket(selfIP, mPort, std::chrono::seconds(10));
 
     try
     {

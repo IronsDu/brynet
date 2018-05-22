@@ -50,20 +50,20 @@ int main(int argc, char **argv)
         };
         service->addSession(std::move(socket), 
             AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
+            AddSessionOption::WithMaxRecvBufferSize(10));
     });
 
-#ifdef USE_OPENSSL
-    sock fd = brynet::net::base::Connect(false, "180.97.33.108", 443);
+
+    sock fd = brynet::net::base::Connect(false, "191.236.16.125", 80);
     if (fd != SOCKET_ERROR)
     {
         auto socket = TcpSocket::Create(fd, false);
-        SSL_library_init();
         auto enterCallback = [](const TCPSession::PTR& session) {
             HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-                request.setUrl("/");
+                request.setUrl("/httpgallery/chunked/chunkedimage.aspx");
+                request.addHeadValue("Host", "www.httpwatch.com");
 
                 std::string requestStr = request.getResult();
                 httpSession->send(requestStr.c_str(), requestStr.size());
@@ -74,11 +74,10 @@ int main(int argc, char **argv)
             });
         };
 
-        service->addSession(std::move(socket), 
-            AddSessionOption::WithClientSideSSL(),
-            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
+        service->addSession(std::move(socket),
+            AddSessionOption::WithEnterCallback(enterCallback),
+            AddSessionOption::WithMaxRecvBufferSize(10));
     }
-#endif
 
     std::cin.get();
     return 0;

@@ -42,6 +42,7 @@ set(utils_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/base64.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/md5calc.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/SHA1.cpp
+    ${PROJECT_SOURCE_DIR}/src/brynet/utils/stack.c
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
 	${PROJECT_SOURCE_DIR}/src/brynet/utils/app_status.c

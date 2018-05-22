@@ -31,12 +31,21 @@ int main(int argc, char **argv)
             auto contentLength = std::make_shared<size_t>();
 
             promiseReceive->receiveUntil("\r\n", [](const char* buffer, size_t len) {
-                std::cout << std::string(buffer, len);
+                auto headline = std::string(buffer, len);
+                std::cout << headline << std::endl;
                 return false;
             })->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
-                std::cout << std::string(buffer, len);
+                auto headerValue = std::string(buffer, len);
+                std::cout << headerValue << std::endl;
                 if (len > 2)
                 {
+                    const static std::string ContentLenghtFlag = "Content-Length: ";
+                    auto pos = headerValue.find(ContentLenghtFlag);
+                    if (pos != std::string::npos)
+                    {
+                        auto lenStr = headerValue.substr(pos+ ContentLenghtFlag.size(), headerValue.size());
+                        *contentLength = std::stoi(lenStr);
+                    }
                     return true;
                 }
                 return false;
@@ -55,7 +64,7 @@ int main(int argc, char **argv)
         };
         server->addSession(std::move(socket),
             AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
+            AddSessionOption::WithMaxRecvBufferSize(10));
     });
 
     server->startWorkThread(atoi(argv[2]));
