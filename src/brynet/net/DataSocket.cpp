@@ -1,4 +1,4 @@
-#include <cassert>
+﻿#include <cassert>
 #include <cstring>
 
 #include <brynet/net/SocketLibFunction.h>
@@ -696,6 +696,7 @@ void DataSocket::growRecvBuffer()
 }
 void DataSocket::PingCheck()
 {
+    mTimer.reset();
     if (mRecvData)
     {
         mRecvData = false;
@@ -725,17 +726,14 @@ void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
         return;
     }
     
-    if (mTimer.lock())
+    if (mTimer.lock() != nullptr)
     {
         mTimer.lock()->cancel();
         mTimer.reset();
     }
 
     mCheckTime = checkTime;
-    if (mCheckTime != std::chrono::steady_clock::duration::zero())
-    {
-        startPingCheckTimer();
-    }
+    startPingCheckTimer();
 }
 
 void DataSocket::postDisConnect()
