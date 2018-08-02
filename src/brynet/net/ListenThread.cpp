@@ -69,7 +69,7 @@ void ListenThread::startListen(bool isIPV6,
     sock fd = brynet::net::base::Listen(isIPV6, ip.c_str(), port, 512);
     if (fd == SOCKET_ERROR)
     {
-        throw std::runtime_error("listen error of:" + sErrno);
+        throw std::runtime_error(std::string("listen error of:") + std::to_string(sErrno));;
     }
 
     mIsIPV6 = isIPV6;
