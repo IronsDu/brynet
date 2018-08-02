@@ -41,7 +41,7 @@ namespace brynet
                 OVERLAPPED  base;
                 const EventLoop::OLV_VALUE  OP;
 
-                ovl_ext_s(OLV_VALUE op) : OP(op)
+                ovl_ext_s(OLV_VALUE op) BRYNET_NOEXCEPT : OP(op)
                 {
                     memset(&base, 0, sizeof(base));
                 }
@@ -74,22 +74,21 @@ namespace brynet
 #ifndef PLATFORM_WINDOWS
             int                             getEpollHandle() const;
 #endif
-            bool                            linkChannel(sock fd, Channel* ptr);
+            bool                            linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT;
             void                            tryInitThreadID();
 
         private:
 
 #ifdef PLATFORM_WINDOWS
-            OVERLAPPED_ENTRY*               mEventEntries;
+            std::vector<OVERLAPPED_ENTRY>   mEventEntries;
 
             typedef BOOL(WINAPI *sGetQueuedCompletionStatusEx) (HANDLE, LPOVERLAPPED_ENTRY, ULONG, PULONG, DWORD, BOOL);
             sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
             HANDLE                          mIOCP;
 #else
-            epoll_event*                    mEventEntries;
+            std::vector<epoll_event>        mEventEntries;
             int                             mEpollFd;
 #endif
-            size_t                          mEventEntriesNum;
             std::unique_ptr<WakeupChannel>  mWakeupChannel;
 
             std::atomic_bool                mIsInBlock;

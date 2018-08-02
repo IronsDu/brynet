@@ -66,7 +66,7 @@ brynet::net::TcpSocket::~TcpSocket()
 brynet::net::TcpSocket::PTR brynet::net::ListenSocket::Accept()
 {
     sock clientFD = brynet::net::base::Accept(mFD, nullptr, nullptr);
-    if (clientFD == SOCKET_ERROR)
+    if (clientFD == INVALID_SOCKET)
     {
         if (EINTR == sErrno)
         {

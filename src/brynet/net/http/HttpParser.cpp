@@ -97,7 +97,7 @@ bool HTTPParser::hasKey(const std::string& key) const
 
 const std::string& HTTPParser::getValue(const std::string& key) const
 {
-    static std::string emptystr("");
+    const static std::string emptystr("");
 
     auto it = mHeadValues.find(key);
     if (it != mHeadValues.end())
@@ -175,7 +175,7 @@ int HTTPParser::sHeadComplete(http_parser* hp)
 
     struct http_parser_url u;
 
-    int result = http_parser_parse_url(httpParser->mUrl.data(), httpParser->mUrl.size(), 0, &u);
+    const int result = http_parser_parse_url(httpParser->mUrl.data(), httpParser->mUrl.size(), 0, &u);
     if (result != 0)
     {
         return -1;

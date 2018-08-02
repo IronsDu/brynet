@@ -46,6 +46,7 @@ typedef SOCKET sock;
 #define S_ECONNABORTED ECONNABORTED
 typedef int sock;
 #define SOCKET_ERROR (-1)
+#define INVALID_SOCKET (-1)
 
 #endif
 

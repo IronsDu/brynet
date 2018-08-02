@@ -51,7 +51,7 @@ namespace brynet
 
             void                        setHeartBeat(std::chrono::nanoseconds checkTime);
 
-        private:
+        protected:
             TCPSession() BRYNET_NOEXCEPT;
             virtual ~TCPSession() BRYNET_NOEXCEPT;
 

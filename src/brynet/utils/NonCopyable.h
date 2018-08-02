@@ -6,10 +6,9 @@ namespace brynet
     class NonCopyable
     {
     protected:
-        NonCopyable()   {}
-        ~NonCopyable()  {}
+        NonCopyable() = default;
+        ~NonCopyable() = default;
 
-    private:
         NonCopyable(const NonCopyable&) = delete;
         const NonCopyable& operator=(const NonCopyable&) = delete;
     };

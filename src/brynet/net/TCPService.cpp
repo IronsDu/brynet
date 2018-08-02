@@ -241,7 +241,7 @@ EventLoop::PTR TcpService::getRandomEventLoop()
 {
     EventLoop::PTR ret;
     {
-        auto randNum = rand();
+        const auto randNum = rand();
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
         if (!mIOLoopDatas.empty())
         {
@@ -303,7 +303,7 @@ TcpService::SESSION_TYPE TcpService::MakeID(size_t loopIndex,
     return sid.id;
 }
 
-void TcpService::procDataSocketClose(DataSocket::PTR ds)
+void TcpService::procDataSocketClose(const DataSocket::PTR ds)
 {
     auto ud = brynet::net::cast<SESSION_TYPE>(ds->getUD());
     if (ud != nullptr)
@@ -326,7 +326,7 @@ bool TcpService::helpAddChannel(DataSocket::PTR channel,
     std::shared_ptr<IOLoopData> ioLoopData;
     size_t loopIndex = 0;
     {
-        auto randNum = rand();
+        const auto randNum = rand();
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
         if (mIOLoopDatas.empty())

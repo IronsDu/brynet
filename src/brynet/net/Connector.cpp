@@ -132,9 +132,9 @@ bool ConnectorWorkInfo::isConnectSuccess(sock clientfd, bool willCheckWrite) con
         return false;
     }
 
-    int error;
+    int error = SOCKET_ERROR;
     int len = sizeof(error);
-    if (getsockopt(clientfd, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len) == -1)
+    if (getsockopt(clientfd, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len) == SOCKET_ERROR)
     {
         return false;
     }
@@ -161,7 +161,7 @@ void ConnectorWorkInfo::checkConnectStatus(int millsecond)
             break;
         }
 
-        sock fd = *(sock*)p;
+        const sock fd = *(sock*)p;
         total_fds.insert(fd);
         if (isConnectSuccess(fd, false))
         {
@@ -203,7 +203,7 @@ void ConnectorWorkInfo::checkTimeout()
 {
     for (auto it = mConnectingInfos.begin(); it != mConnectingInfos.end();)
     {
-        auto now = std::chrono::steady_clock::now();
+        const auto now = std::chrono::steady_clock::now();
         if ((now - it->second.startConnectTime) < it->second.timeout)
         {
             ++it;
@@ -246,20 +246,20 @@ void ConnectorWorkInfo::causeAllFailed()
 
 void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
 {
-    struct sockaddr_in server_addr;
-    sock clientfd = SOCKET_ERROR;
+    struct sockaddr_in server_addr = {0};
+    sock clientfd = INVALID_SOCKET;
 
 #if defined PLATFORM_WINDOWS
-    int check_error = WSAEWOULDBLOCK;
+    const int check_error = WSAEWOULDBLOCK;
 #else
-    int check_error = EINPROGRESS;
+    const int check_error = EINPROGRESS;
 #endif
     int n = 0;
 
     brynet::net::base::InitSocket();
 
     clientfd = brynet::net::base::SocketCreate(AF_INET, SOCK_STREAM, 0);
-    if (clientfd == SOCKET_ERROR)
+    if (clientfd == INVALID_SOCKET)
     {
         goto FAILED;
     }
@@ -278,7 +278,7 @@ void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
     if (check_error != sErrno)
     {
         brynet::net::base::SocketClose(clientfd);
-        clientfd = SOCKET_ERROR;
+        clientfd = INVALID_SOCKET;
         goto FAILED;
     }
 

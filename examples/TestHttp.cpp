@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 
 
     sock fd = brynet::net::base::Connect(false, "191.236.16.125", 80);
-    if (fd != SOCKET_ERROR)
+    if (fd != INVALID_SOCKET)
     {
         auto socket = TcpSocket::Create(fd, false);
         auto enterCallback = [](const TCPSession::PTR& session) {

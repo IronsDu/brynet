@@ -126,7 +126,7 @@ void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& ca
     auto packetCapture = packet;
     auto callbackCapture = callback;
     mEventLoop->pushAsyncProc([this, packetCapture, callbackCapture](){
-        auto len = packetCapture->size();
+        const auto len = packetCapture->size();
         mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
         runAfterFlush();
     });
@@ -137,7 +137,7 @@ void DataSocket::sendInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBA
     assert(mEventLoop->isInLoopThread());
     if (mEventLoop->isInLoopThread())
     {
-        auto len = packet->size();
+        const auto len = packet->size();
         mSendList.push_back({ packet, len, callback });
         runAfterFlush();
     }
@@ -350,7 +350,7 @@ void DataSocket::normalFlush()
         {
             auto& packet = *it;
             auto packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
-            auto packetLeftLen = packet.left;
+            const auto packetLeftLen = packet.left;
 
             if ((wait_send_size + packetLeftLen) > SENDBUF_SIZE)
             {
@@ -601,8 +601,8 @@ bool    DataSocket::checkRead()
 
     DWORD   dwBytes = 0;
     DWORD   flag = 0;
-    int ret = WSARecv(mSocket->getFD(), &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
-    if (ret == -1)
+    const int ret = WSARecv(mSocket->getFD(), &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
+    if (ret == SOCKET_ERROR)
     {
         check_ret = (sErrno == WSA_IO_PENDING);
     }
@@ -628,8 +628,8 @@ bool    DataSocket::checkWrite()
     }
 
     DWORD send_len = 0;
-    int ret = WSASend(mSocket->getFD(), wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
-    if (ret == -1)
+    const int ret = WSASend(mSocket->getFD(), wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
+    if (ret == SOCKET_ERROR)
     {
         check_ret = (sErrno == WSA_IO_PENDING);
     }

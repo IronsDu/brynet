@@ -49,10 +49,8 @@ namespace brynet
             void                    setUD(BrynetAny);
 
         protected:
-            virtual ~HttpSession() = default;
-
-        private:
             explicit HttpSession(TCPSession::PTR);
+            virtual ~HttpSession() = default;
 
             static  PTR             Create(TCPSession::PTR session);
 

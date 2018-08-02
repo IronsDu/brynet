@@ -87,7 +87,7 @@ namespace brynet
         {
             const static size_t _NUM = 100;
 
-            size_t oldsize = mValues.size();
+            const size_t oldsize = mValues.size();
             mValues.resize(oldsize + _NUM, nullptr);
             for (size_t i = 0; i < _NUM; i++)
             {

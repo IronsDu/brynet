@@ -79,7 +79,7 @@ namespace brynet
             EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT;
             std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT;
 
-        private:
+        protected:
             TcpService() BRYNET_NOEXCEPT;
             virtual ~TcpService() BRYNET_NOEXCEPT;
 
@@ -95,7 +95,7 @@ namespace brynet
                 const std::vector<AddSocketOption::AddSocketOptionFunc>&);
         private:
             SESSION_TYPE                        MakeID(size_t loopIndex, const std::shared_ptr<IOLoopData>&);
-            void                                procDataSocketClose(DataSocket::PTR);
+            void                                procDataSocketClose(const DataSocket::PTR);
             void                                postSessionAsyncProc(SESSION_TYPE id, 
                 std::function<void(DataSocket::PTR)> callback) const;
 
