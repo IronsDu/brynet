@@ -29,8 +29,6 @@ DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_N
     mPostRecvCheck = false;
     mPostWriteCheck = false;
 #endif
-
-    mRecvBuffer = nullptr;
     growRecvBuffer();
 
 #ifdef USE_OPENSSL
@@ -42,12 +40,6 @@ DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_N
 
 DataSocket::~DataSocket() BRYNET_NOEXCEPT
 {
-    if (mRecvBuffer != nullptr)
-    {
-        ox_buffer_delete(mRecvBuffer);
-        mRecvBuffer = nullptr;
-    }
-
 #ifdef USE_OPENSSL
     if (mSSL != nullptr)
     {
@@ -209,7 +201,7 @@ void DataSocket::recv()
 
     while (mSocket != nullptr)
     {
-        const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
+        const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer.get());
         if (tryRecvLen == 0)
         {
             break;
@@ -219,14 +211,14 @@ void DataSocket::recv()
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
-            retlen = SSL_read(mSSL, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen);
+            retlen = SSL_read(mSSL, ox_buffer_getwriteptr(mRecvBuffer.get()), tryRecvLen);
         }
         else
         {
-            retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
+            retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer.get()), tryRecvLen, 0);
         }
 #else
-        retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer), static_cast<int>(tryRecvLen), 0);
+        retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer.get()), static_cast<int>(tryRecvLen), 0);
 #endif
 
         if (retlen == 0)
@@ -259,8 +251,8 @@ void DataSocket::recv()
             break;
         }
 
-        ox_buffer_addwritepos(mRecvBuffer, retlen);
-        if (ox_buffer_getreadvalidcount(mRecvBuffer) == ox_buffer_getsize(mRecvBuffer))
+        ox_buffer_addwritepos(mRecvBuffer.get(), retlen);
+        if (ox_buffer_getreadvalidcount(mRecvBuffer.get()) == ox_buffer_getsize(mRecvBuffer.get()))
         {
             growRecvBuffer();
         }
@@ -269,12 +261,12 @@ void DataSocket::recv()
         {
             mRecvData = true;
             auto proclen = mDataCallback(this, 
-                ox_buffer_getreadptr(mRecvBuffer), 
-                ox_buffer_getreadvalidcount(mRecvBuffer));
-            assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer));
-            if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer))
+                ox_buffer_getreadptr(mRecvBuffer.get()),
+                ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+            assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+            if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
             {
-                ox_buffer_addreadpos(mRecvBuffer, proclen);
+                ox_buffer_addreadpos(mRecvBuffer.get(), proclen);
             }
             else
             {
@@ -282,9 +274,9 @@ void DataSocket::recv()
             }
         }
 
-        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer) == 0)
+        if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
         {
-            ox_buffer_adjustto_head(mRecvBuffer);
+            ox_buffer_adjustto_head(mRecvBuffer.get());
         }
 
         if (retlen < static_cast<int>(tryRecvLen))
@@ -682,16 +674,20 @@ void DataSocket::growRecvBuffer()
 {
     if (mRecvBuffer == nullptr)
     {
-        mRecvBuffer = ox_buffer_new(16*1024+GROW_BUFFER_SIZE);
+        mRecvBuffer.reset(ox_buffer_new(16 * 1024 + GROW_BUFFER_SIZE));
     }
-    else if ((ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE) <= mMaxRecvBufferSize)
+    else
     {
-        buffer_s* newBuffer = ox_buffer_new(ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE);
-        ox_buffer_write(newBuffer, 
-            ox_buffer_getreadptr(mRecvBuffer), 
-            ox_buffer_getreadvalidcount(mRecvBuffer));
-        ox_buffer_delete(mRecvBuffer);
-        mRecvBuffer = newBuffer;
+        const auto NewSize = ox_buffer_getsize(mRecvBuffer.get()) + GROW_BUFFER_SIZE;
+        if (NewSize > mMaxRecvBufferSize)
+        {
+            return;
+        }
+        std::unique_ptr<struct buffer_s, BufferDeleter> newBuffer(ox_buffer_new(NewSize));
+        ox_buffer_write(newBuffer.get(), 
+            ox_buffer_getreadptr(mRecvBuffer.get()),
+            ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+        mRecvBuffer = std::move(newBuffer);
     }
 }
 void DataSocket::PingCheck()

@@ -1,4 +1,4 @@
-#ifndef BRYNET_NET_DATASOCKET_H_
+﻿#ifndef BRYNET_NET_DATASOCKET_H_
 #define BRYNET_NET_DATASOCKET_H_
 
 #include <memory>
@@ -13,6 +13,7 @@
 #include <brynet/net/Any.h>
 #include <brynet/net/Noexcept.h>
 #include <brynet/net/Socket.h>
+#include <brynet/utils/buffer.h>
 
 #ifdef USE_OPENSSL
 
@@ -121,7 +122,15 @@ namespace brynet
             bool                            mCanWrite;
 
             EventLoop::PTR                  mEventLoop;
-            buffer_s*                       mRecvBuffer;
+
+            struct BufferDeleter
+            {
+                void operator()(struct buffer_s* ptr) const
+                {
+                    ox_buffer_delete(ptr);
+                }
+            };
+            std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
             size_t                          mMaxRecvBufferSize;
 
             struct pending_packet
