@@ -70,7 +70,7 @@ namespace brynet
                 while (true)
                 {
                     auto n = read(mFd, temp, sizeof(temp));
-                    if (n == -1 || n < sizeof(temp))
+                    if (n == -1 || static_cast<size_t>(n) < sizeof(temp))
                     {
                         break;
                     }
@@ -253,7 +253,7 @@ void EventLoop::loop(int64_t milliseconds)
     processAsyncProcs();
     processAfterLoopProcs();
 
-    if (numComplete == mEventEntries.size())
+    if (static_cast<size_t>(numComplete) == mEventEntries.size())
     {
         reallocEventSize(mEventEntries.size() + 128);
     }

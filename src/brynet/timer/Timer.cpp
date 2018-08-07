@@ -26,10 +26,10 @@ void Timer::cancel()
 Timer::Timer(std::chrono::steady_clock::time_point startTime,
     std::chrono::nanoseconds lastTime,
     Callback callback) BRYNET_NOEXCEPT :
-    mStartTime(std::move(startTime)),
-    mLastTime(std::move(lastTime)),
+    mActive(true),
     mCallback(std::move(callback)),
-    mActive(true)
+    mStartTime(std::move(startTime)),
+    mLastTime(std::move(lastTime))
 {
 }
 

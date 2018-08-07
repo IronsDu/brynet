@@ -346,8 +346,8 @@ public:
     BasePacketReader(const char* buffer, 
         size_t len, 
         bool useBigEndian = true) : 
-        mMaxLen(len), 
-        mBigEndian(useBigEndian)
+        mBigEndian(useBigEndian),
+        mMaxLen(len)
     {
         mPos = 0;
         mBuffer = buffer;
@@ -467,7 +467,7 @@ private:
     }
 
 protected:
-    bool            mBigEndian;
+    const bool      mBigEndian;
     size_t          mPos;
     const size_t    mMaxLen;
     const char*     mBuffer;

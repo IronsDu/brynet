@@ -91,8 +91,6 @@ void TcpService::send(SESSION_TYPE id,
     const DataSocket::PACKET_PTR& packet, 
     const DataSocket::PACKED_SENDED_CALLBACK& callback) const
 {
-    union  SessionId sid;
-    sid.id = id;
     auto ioLoopData = getIOLoopDataBySocketID(id);
     if (ioLoopData != nullptr)
     {
@@ -218,8 +216,6 @@ void TcpService::startWorkerThread(size_t threadNum, FRAME_CALLBACK callback)
 
 void TcpService::wakeup(SESSION_TYPE id) const
 {
-    union  SessionId sid;
-    sid.id = id;
     auto eventLoop = getEventLoopBySocketID(id);
     if (eventLoop != nullptr)
     {
@@ -442,6 +438,7 @@ bool TcpService::_addDataSocket(TcpSocket::PTR socket,
     }
 
     const auto isServerSide = socket->isServerSide();
+    (void)isServerSide;
     const std::string ip = socket->GetIP();
 
     DataSocket::PTR channel = new DataSocket(std::move(socket), options.maxRecvBufferSize);

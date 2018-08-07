@@ -358,7 +358,7 @@ void DataSocket::normalFlush()
             wait_send_size += packetLeftLen;
         }
 
-        if (wait_send_size <= 0)
+        if (wait_send_size == 0)
         {
             break;
         }
@@ -422,7 +422,7 @@ void DataSocket::normalFlush()
             it = mSendList.erase(it);
         }
 
-        if (send_retlen != wait_send_size)
+        if (static_cast<size_t>(send_retlen) != wait_send_size)
         {
             mCanWrite = false;
             must_close = !checkWrite();
@@ -449,7 +449,7 @@ void DataSocket::quickFlush()
     while (!mSendList.empty())
     {
         int num = 0;
-        int ready_send_len = 0;
+        size_t ready_send_len = 0;
         for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_packet& b = *it;
@@ -485,7 +485,7 @@ void DataSocket::quickFlush()
             break;
         }
 
-        int tmp_len = send_len;
+        auto tmp_len = static_cast<size_t>(send_len);
         for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_packet& b = *it;
@@ -503,7 +503,7 @@ void DataSocket::quickFlush()
             it = mSendList.erase(it);
         }
 
-        if (send_len != ready_send_len)
+        if (static_cast<size_t>(send_len) != ready_send_len)
         {
             mCanWrite = false;
             must_close = !checkWrite();
