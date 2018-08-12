@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 #include <mutex>
 #include <condition_variable>
@@ -26,7 +26,12 @@ static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
     bw.writeINT8('}');
 
     auto frame = std::make_shared<std::string>();
-    WebSocketFormat::wsFrameBuild(bw.getData(), bw.getPos(), *frame, WebSocketFormat::WebSocketFrameType::TEXT_FRAME, true, true);
+    WebSocketFormat::wsFrameBuild(bw.getData(),
+        bw.getPos(), 
+        *frame, 
+        WebSocketFormat::WebSocketFrameType::TEXT_FRAME, 
+        true, 
+        true);
     session->send(frame);
 }
 
@@ -45,8 +50,8 @@ int main(int argc, char **argv)
     
     std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << workers << std::endl;
     
-    auto service = std::make_shared<WrapTcpService>();
-    service->startWorkThread(workers);
+    auto service = TcpService::Create();
+    service->startWorkerThread(workers);
 
     for (int i = 0; i < connections; i++)
     {
@@ -54,7 +59,7 @@ int main(int argc, char **argv)
         auto socket = TcpSocket::Create(fd, false);
         brynet::net::base::SocketNodelay(fd);
 
-        auto enterCallback = [host](const TCPSession::PTR& session) {
+        auto enterCallback = [host](const DataSocket::PTR& session) {
             HttpService::setup(session, [host](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
@@ -84,9 +89,9 @@ int main(int argc, char **argv)
             });
         };
 
-        service->addSession(std::move(socket), 
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(1024*1024));
+        service->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024*1024));
     }
 
     brynet::net::EventLoop mainLoop;

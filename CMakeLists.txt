@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+﻿cmake_minimum_required (VERSION 2.6)
 project(brynet)
 
 if(WIN32)
@@ -24,7 +24,6 @@ set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/net/DataSocket.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/WrapTCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/ListenThread.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/fdset.c

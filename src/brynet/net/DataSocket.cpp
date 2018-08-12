@@ -9,17 +9,22 @@
 
 using namespace brynet::net;
 
-DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
+DataSocket::DataSocket(TcpSocket::PTR socket, 
+    size_t maxRecvBufferSize, 
+    ENTER_CALLBACK enterCallback, 
+    EventLoop::PTR eventLoop) BRYNET_NOEXCEPT
+    :
 #if defined PLATFORM_WINDOWS
-    : 
     mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), 
-    mOvlSend(EventLoop::OLV_VALUE::OVL_SEND)
+    mOvlSend(EventLoop::OLV_VALUE::OVL_SEND),
 #endif
+    mFD(socket->getFD()),
+    mIP(socket->GetIP()),
+    mEventLoop(eventLoop),
+    mMaxRecvBufferSize(maxRecvBufferSize)
 {
-    mMaxRecvBufferSize = maxRecvBufferSize;
     mRecvData = false;
     mCheckTime = std::chrono::steady_clock::duration::zero();
-    mIsPostFinalClose = false;
     mIsPostFlush = false;
     mSocket = std::move(socket);
 
@@ -36,6 +41,7 @@ DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_N
     mSSL = nullptr;
     mIsHandsharked = false;
 #endif
+    mEnterCallback = enterCallback;
 }
 
 DataSocket::~DataSocket() BRYNET_NOEXCEPT
@@ -59,27 +65,34 @@ DataSocket::~DataSocket() BRYNET_NOEXCEPT
     }
 }
 
-bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
+DataSocket::PTR DataSocket::Create(TcpSocket::PTR socket, 
+    size_t maxRecvBufferSize, 
+    ENTER_CALLBACK enterCallback,
+    EventLoop::PTR eventLoop)
 {
-    assert(eventLoop->isInLoopThread());
-    if (!eventLoop->isInLoopThread())
+    struct make_shared_enabler : public DataSocket
     {
-        return false;
-    }
-    assert(mEventLoop == nullptr);
-    if (mEventLoop != nullptr)
+        make_shared_enabler(TcpSocket::PTR socket,
+            size_t maxRecvBufferSize, 
+            ENTER_CALLBACK enterCallback, 
+            EventLoop::PTR eventLoop)
+            :
+            DataSocket(std::move(socket), maxRecvBufferSize, enterCallback, eventLoop)
+        {}
+    };
+    return std::make_shared<make_shared_enabler>(std::move(socket), maxRecvBufferSize, enterCallback, eventLoop);
+}
+
+bool DataSocket::onEnterEventLoop()
+{
+    assert(mEventLoop->isInLoopThread());
+    if (!mEventLoop->isInLoopThread())
     {
         return false;
     }
 
-    mEventLoop = eventLoop;
-
-    if (!brynet::net::base::SocketNonblock(mSocket->getFD()))
-    {
-        closeSocket();
-        return false;
-    }
-    if (!mEventLoop->linkChannel(mSocket->getFD(), this))
+    if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
+        !mEventLoop->linkChannel(mSocket->getFD(), this))
     {
         closeSocket();
         return false;
@@ -88,6 +101,7 @@ bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
 #ifdef USE_OPENSSL
     if (mSSL != nullptr)
     {
+        mEventLoop->addDataSocket(mSocket->getFD(), shared_from_this());
         processSSLHandshake();
         return true;
     }
@@ -99,11 +113,8 @@ bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
         return false;
     }
 
-    if (mEnterCallback != nullptr)
-    {
-        mEnterCallback(this);
-        mEnterCallback = nullptr;
-    }
+    mEventLoop->addDataSocket(mSocket->getFD(), shared_from_this());
+    causeEnterCallback();
 
     return true;
 }
@@ -117,17 +128,20 @@ void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& ca
 {
     auto packetCapture = packet;
     auto callbackCapture = callback;
-    mEventLoop->pushAsyncProc([this, packetCapture, callbackCapture](){
+    mEventLoop->pushAsyncProc([sharedThis = shared_from_this(), packetCapture, callbackCapture](){
         const auto len = packetCapture->size();
-        mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
-        runAfterFlush();
+        if (sharedThis->mSocket != nullptr)
+        {
+            sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
+            sharedThis->runAfterFlush();
+        }
     });
 }
 
 void DataSocket::sendInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
-    if (mEventLoop->isInLoopThread())
+    if (mEventLoop->isInLoopThread() && mSocket != nullptr)
     {
         const auto len = packet->size();
         mSendList.push_back({ packet, len, callback });
@@ -260,8 +274,7 @@ void DataSocket::recv()
         if (mDataCallback != nullptr)
         {
             mRecvData = true;
-            auto proclen = mDataCallback(this, 
-                ox_buffer_getreadptr(mRecvBuffer.get()),
+            auto proclen = mDataCallback(ox_buffer_getreadptr(mRecvBuffer.get()),
                 ox_buffer_getreadvalidcount(mRecvBuffer.get()));
             assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
             if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
@@ -554,20 +567,26 @@ void DataSocket::procShutdownInLoop()
 
 void DataSocket::onClose()
 {
-    if (mIsPostFinalClose)
-    {
-        return;
-    }
-
-    mEventLoop->pushAfterLoopProc([=]() {
-        if (mDisConnectCallback != nullptr)
+    assert(mEnterCallback == nullptr);
+    mEventLoop->pushAfterLoopProc([callBack = mDisConnectCallback, 
+        sharedThis = shared_from_this(),
+        eventLoop = mEventLoop,
+        fd = mFD]() {
+        if (callBack != nullptr)
         {
-            mDisConnectCallback(this);
+            callBack(sharedThis);
+        }
+        auto tmp = eventLoop->getDataSocket(fd);
+        assert(tmp == sharedThis);
+        if (tmp == sharedThis)
+        {
+            eventLoop->removeDataSocket(fd);
         }
     });
 
     closeSocket();
-    mIsPostFinalClose = true;
+    mDisConnectCallback = nullptr;
+    mDataCallback = nullptr;
 }
 
 void DataSocket::closeSocket()
@@ -653,11 +672,6 @@ void    DataSocket::removeCheckWrite()
 }
 #endif
 
-void DataSocket::setEnterCallback(ENTER_CALLBACK cb)
-{
-    mEnterCallback = std::move(cb);
-}
-
 void DataSocket::setDataCallback(DATA_CALLBACK cb)
 {
     mDataCallback = std::move(cb);
@@ -734,26 +748,18 @@ void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
 
 void DataSocket::postDisConnect()
 {
-    if (mEventLoop != nullptr)
-    {
-        mEventLoop->pushAsyncProc([=](){
-            procCloseInLoop();
-        });
-    }
+    mEventLoop->pushAsyncProc([sharedThis = shared_from_this()](){
+        sharedThis->procCloseInLoop();
+    });
 }
 
 void DataSocket::postShutdown()
 {
-    if (mEventLoop == nullptr)
-    {
-        return;
-    }
-
-    mEventLoop->pushAsyncProc([=]() {
-        if (mSocket != nullptr)
+    mEventLoop->pushAsyncProc([sharedThis = shared_from_this()]() {
+        if (sharedThis->mSocket != nullptr)
         {
-            mEventLoop->pushAfterLoopProc([=]() {
-                procShutdownInLoop();
+            sharedThis->mEventLoop->pushAfterLoopProc([=]() {
+                sharedThis->procShutdownInLoop();
             });
         }
     });
@@ -769,6 +775,10 @@ const BrynetAny& DataSocket::getUD() const
     return mUD;
 }
 
+const std::string& DataSocket::getIP() const
+{
+    return mIP;
+}
 #ifdef USE_OPENSSL
 bool DataSocket::initAcceptSSL(SSL_CTX* ctx)
 {
@@ -832,11 +842,7 @@ void DataSocket::processSSLHandshake()
         mIsHandsharked = true;
         if (checkRead())
         {
-            if (mEnterCallback != nullptr)
-            {
-                mEnterCallback(this);
-                mEnterCallback = nullptr;
-            }
+            causeEnterCallback();
         }
         else
         {
@@ -865,11 +871,7 @@ void DataSocket::processSSLHandshake()
 
     if (mustClose)
     {
-        if (mEnterCallback != nullptr)
-        {
-            mEnterCallback(this);
-            mEnterCallback = nullptr;
-        }
+        causeEnterCallback();
         procCloseInLoop();
     }
 }
@@ -878,4 +880,17 @@ void DataSocket::processSSLHandshake()
 DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, size_t len)
 {
     return std::make_shared<std::string>(buffer, len);
+}
+
+void DataSocket::causeEnterCallback()
+{
+    assert(mEventLoop->isInLoopThread());
+    if (mEventLoop->isInLoopThread())
+    {
+        if (mEnterCallback != nullptr)
+        {
+            mEnterCallback(shared_from_this());
+            mEnterCallback = nullptr;
+        }
+    }
 }

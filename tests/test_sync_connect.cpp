@@ -1,4 +1,4 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
+ï»¿#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
 #include <brynet/net/SyncConnector.h>
 #include <brynet/net/ListenThread.h>
@@ -9,7 +9,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
     const auto port = 9999;
 
     {
-        // ¼àÌı·şÎñÎ´¿ªÆô
+        // ç›‘å¬æœåŠ¡æœªå¼€å¯
         auto socket = brynet::net::SyncConnectSocket(ip, port, std::chrono::seconds(2));
         REQUIRE(socket == nullptr);
 
@@ -25,28 +25,36 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
         auto socket = brynet::net::SyncConnectSocket(ip, port, std::chrono::seconds(10));
         REQUIRE(socket != nullptr);
         
-        // Ã»ÓĞservice
+        // æ²¡æœ‰service
         auto session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), nullptr, {});
         REQUIRE(session == nullptr);
 
         {
             std::cout << "start 35" << std::endl;
-            auto service = std::make_shared<brynet::net::WrapTcpService>();
-            service->startWorkThread(1);
-            session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), service, {brynet::net::AddSessionOption::WithMaxRecvBufferSize(1)});
+            auto service = brynet::net::TcpService::Create();
+            service->startWorkerThread(1);
+            session = brynet::net::SyncConnectSession(ip, 
+                port, 
+                std::chrono::seconds(2), 
+                service, 
+                {brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1)});
             REQUIRE(session != nullptr);
             std::cout << "end 35" << std::endl;
         }
 
         {
-            // Ã»ÓĞ¿ªÆôservice¹¤×÷Ïß³Ì
-            auto service = std::make_shared<brynet::net::WrapTcpService>();
-            session = brynet::net::SyncConnectSession(ip, port, std::chrono::seconds(2), service, { brynet::net::AddSessionOption::WithMaxRecvBufferSize(1) });
+            // æ²¡æœ‰å¼€å¯serviceå·¥ä½œçº¿ç¨‹
+            auto service = brynet::net::TcpService::Create();
+            session = brynet::net::SyncConnectSession(ip, 
+                port, 
+                std::chrono::seconds(2), 
+                service, 
+                { brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1) });
             REQUIRE(session == nullptr);
         }
     }
 
-    // ÉÏ¸öÓï¾ä¿éµÄ¼àÌıÏß³Ì½áÊø
+    // ä¸Šä¸ªè¯­å¥å—çš„ç›‘å¬çº¿ç¨‹ç»“æŸ
     auto socket = brynet::net::SyncConnectSocket(ip, port, std::chrono::seconds(2));
     REQUIRE(socket == nullptr);
 }

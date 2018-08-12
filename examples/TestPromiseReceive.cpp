@@ -1,10 +1,10 @@
-#include <iostream>
+﻿#include <iostream>
 #include <mutex>
 #include <atomic>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
-#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/TCPService.h>
 #include <brynet/net/PromiseReceive.h>
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/ListenThread.h>
@@ -20,13 +20,12 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    auto server = std::make_shared<WrapTcpService>();
+    auto server = TcpService::Create();
     auto listenThread = ListenThread::Create();
 
     listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
         socket->SocketNodelay();
-        auto enterCallback = [](const TCPSession::PTR& session) {
-
+        auto enterCallback = [](const DataSocket::PTR& session) {
             auto promiseReceive = setupPromiseReceive(session);
             auto contentLength = std::make_shared<size_t>();
 
@@ -62,12 +61,12 @@ int main(int argc, char **argv)
                 return false;
             });
         };
-        server->addSession(std::move(socket),
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(10));
+        server->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     });
 
-    server->startWorkThread(atoi(argv[2]));
+    server->startWorkerThread(atoi(argv[2]));
 
     EventLoop mainLoop;
     while (true)

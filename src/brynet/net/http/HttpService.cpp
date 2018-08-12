@@ -11,12 +11,12 @@
 
 using namespace brynet::net;
 
-HttpSession::HttpSession(TCPSession::PTR session)
+HttpSession::HttpSession(DataSocket::PTR session)
 {
     mSession = std::move(session);
 }
 
-TCPSession::PTR& HttpSession::getSession()
+DataSocket::PTR& HttpSession::getSession()
 {
     return mSession;
 }
@@ -94,19 +94,18 @@ void HttpSession::postClose() const
     mSession->postDisConnect();
 }
 
-HttpSession::PTR HttpSession::Create(TCPSession::PTR session)
+HttpSession::PTR HttpSession::Create(DataSocket::PTR session)
 {
     struct make_shared_enabler : public HttpSession
     {
     public:
-        make_shared_enabler(TCPSession::PTR session) : HttpSession(std::move(session))
+        make_shared_enabler(DataSocket::PTR session) : HttpSession(std::move(session))
         {}
     };
-
     return std::make_shared<make_shared_enabler>(std::move(session));
 }
 
-void HttpService::setup(const TCPSession::PTR& session, 
+void HttpService::setup(const DataSocket::PTR& session,
     const HttpSession::ENTER_CALLBACK& enterCallback)
 {
     auto httpSession = HttpSession::Create(session);
@@ -230,7 +229,7 @@ void HttpService::handle(const HttpSession::PTR& httpSession)
     /*TODO::keep alive and timeout close */
     auto& session = httpSession->getSession();
 
-    session->setDisConnectCallback([httpSession](const TCPSession::PTR& session){
+    session->setDisConnectCallback([httpSession](const DataSocket::PTR& session){
         const auto& tmp = httpSession->getCloseCallback();
         if (tmp != nullptr)
         {
@@ -240,7 +239,6 @@ void HttpService::handle(const HttpSession::PTR& httpSession)
 
     auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
     session->setDataCallback([httpSession, httpParser](
-                                const TCPSession::PTR& session, 
                                 const char* buffer, size_t len){
         size_t retlen = 0;
 

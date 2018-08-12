@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 #include <mutex>
 #include <condition_variable>
@@ -16,12 +16,12 @@ int main(int argc, char **argv)
 {
     std::string body = "<html>hello world </html>";
 
-    auto service = std::make_shared<WrapTcpService>();
-    service->startWorkThread(2);
+    auto service = TcpService::Create();
+    service->startWorkerThread(2);
 
     auto listenThread = ListenThread::Create();
     listenThread->startListen(false, "0.0.0.0", 8080, [service, body](TcpSocket::PTR socket) {
-        auto enterCallback = [body](const TCPSession::PTR& session) {
+        auto enterCallback = [body](const DataSocket::PTR& session) {
             HttpService::setup(session, [body](const HttpSession::PTR& httpSession) {
                 httpSession->setHttpCallback([body](const HTTPParser& httpParser,
                     const HttpSession::PTR& session) {
@@ -48,9 +48,9 @@ int main(int argc, char **argv)
                 });
             });
         };
-        service->addSession(std::move(socket), 
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(10));
+        service->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     });
 
 
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     if (fd != INVALID_SOCKET)
     {
         auto socket = TcpSocket::Create(fd, false);
-        auto enterCallback = [](const TCPSession::PTR& session) {
+        auto enterCallback = [](const DataSocket::PTR& session) {
             HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
@@ -70,13 +70,15 @@ int main(int argc, char **argv)
                 httpSession->setHttpCallback([](const HTTPParser& httpParser, const HttpSession::PTR& session) {
                     //http response handle
                     std::cout << httpParser.getBody() << std::endl;
+                    std::cout << "len:" << httpParser.getBody().size() << std::endl;
+                    std::flush(std::cout);
                 });
             });
         };
 
-        service->addSession(std::move(socket),
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(10));
+        service->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     }
 
     std::cin.get();

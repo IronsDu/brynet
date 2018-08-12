@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 #include <thread>
 
@@ -28,8 +28,8 @@ int main(int argc, char **argv)
     string backendIP = argv[2];
     int backendPort = atoi(argv[3]);
 
-    auto tcpService = std::make_shared<WrapTcpService>();
-    tcpService->startWorkThread(std::thread::hardware_concurrency());
+    auto tcpService = TcpService::Create();
+    tcpService->startWorkerThread(std::thread::hardware_concurrency());
 
     auto asyncConnector = AsyncConnector::Create();
     asyncConnector->startWorkerThread();
@@ -37,10 +37,13 @@ int main(int argc, char **argv)
     auto listenThread = ListenThread::Create();
 
     // listen for front http client
-    listenThread->startListen(false, "0.0.0.0", bindPort, [tcpService, asyncConnector, backendIP, backendPort](TcpSocket::PTR socket) {
-        auto enterCallback = [tcpService, asyncConnector, backendIP, backendPort](const TCPSession::PTR& session) {
+    listenThread->startListen(false, 
+        "0.0.0.0", 
+        bindPort, 
+        [tcpService, asyncConnector, backendIP, backendPort](TcpSocket::PTR socket) {
+        auto enterCallback = [tcpService, asyncConnector, backendIP, backendPort](const DataSocket::PTR& session) {
             session->setUD(static_cast<int64_t>(1));
-            std::shared_ptr<TCPSession::PTR> shareBackendSession = std::make_shared<TCPSession::PTR>(nullptr);
+            std::shared_ptr<DataSocket::PTR> shareBackendSession = std::make_shared<DataSocket::PTR>(nullptr);
             std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
             /* new connect to backend server */
@@ -48,7 +51,7 @@ int main(int argc, char **argv)
                 backendPort,
                 std::chrono::seconds(10),
                 [tcpService, session, shareBackendSession, cachePacket](TcpSocket::PTR socket) {
-                auto enterCallback = [=](const TCPSession::PTR& backendSession) {
+                auto enterCallback = [=](const DataSocket::PTR& backendSession) {
                     auto ud = brynet::net::cast<int64_t>(session->getUD());
                     if (*ud == -1)   /*if http client already close*/
                     {
@@ -64,7 +67,7 @@ int main(int argc, char **argv)
                     }
                     cachePacket->clear();
 
-                    backendSession->setDisConnectCallback([=](const TCPSession::PTR& backendSession) {
+                    backendSession->setDisConnectCallback([=](const DataSocket::PTR& backendSession) {
                         *shareBackendSession = nullptr;
                         auto ud = brynet::net::cast<int64_t>(session->getUD());
                         if (*ud != -1)
@@ -73,20 +76,21 @@ int main(int argc, char **argv)
                         }
                     });
 
-                    backendSession->setDataCallback([=](const TCPSession::PTR& backendSession, const char* buffer, size_t size) {
+                    backendSession->setDataCallback([=](const char* buffer, 
+                        size_t size) {
                         /* recieve data from backend server, then send to http client */
                         session->send(buffer, size);
                         return size;
                     });
                 };
 
-                tcpService->addSession(std::move(socket),
-                    AddSessionOption::WithEnterCallback(enterCallback),
-                    AddSessionOption::WithMaxRecvBufferSize(32 * 1024));
+                tcpService->addDataSocket(std::move(socket),
+                    brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+                    brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
             }, nullptr);
 
-            session->setDataCallback([=](const TCPSession::PTR&, const char* buffer, size_t size) {
-                TCPSession::PTR backendSession = *shareBackendSession;
+            session->setDataCallback([=](const char* buffer, size_t size) {
+                DataSocket::PTR backendSession = *shareBackendSession;
                 if (backendSession == nullptr)
                 {
                     /*cache it*/
@@ -101,9 +105,9 @@ int main(int argc, char **argv)
                 return size;
             });
 
-            session->setDisConnectCallback([=](const TCPSession::PTR& session) {
+            session->setDisConnectCallback([=](const DataSocket::PTR& session) {
                 /*if http client close, then close it's backend server */
-                TCPSession::PTR backendSession = *shareBackendSession;
+                DataSocket::PTR backendSession = *shareBackendSession;
                 if (backendSession != nullptr)
                 {
                     backendSession->postDisConnect();
@@ -113,9 +117,9 @@ int main(int argc, char **argv)
             });
         };
 
-        tcpService->addSession(std::move(socket), 
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(32 * 1024));
+        tcpService->addDataSocket(std::move(socket), 
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
     });
     
     std::cin.get();
