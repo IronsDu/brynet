@@ -34,30 +34,31 @@ namespace brynet
 {
     namespace net
     {
-        class DataSocket final : public Channel, public NonCopyable
+        class DataSocket : public Channel, public NonCopyable, public std::enable_shared_from_this<DataSocket>
         {
         public:
-            typedef DataSocket*                                                         PTR;
+            typedef std::shared_ptr<DataSocket>                                         PTR;
 
             typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
-            typedef std::function<size_t(PTR, const char* buffer, size_t len)>          DATA_CALLBACK;
+            typedef std::function<size_t(const char* buffer, size_t len)>               DATA_CALLBACK;
             typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
             typedef std::function<void(void)>                                           PACKED_SENDED_CALLBACK;
 
             typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
         public:
-            DataSocket(TcpSocket::PTR, size_t maxRecvBufferSize) BRYNET_NOEXCEPT;
-            ~DataSocket() BRYNET_NOEXCEPT;
+            PTR static Create(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR);
 
             /* must called in network thread */
-            bool                            onEnterEventLoop(const EventLoop::PTR& eventLoop);
+            bool                            onEnterEventLoop();
+
+            //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
 
             void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
             void                            send(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
             void                            sendInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-            void                            setEnterCallback(ENTER_CALLBACK cb);
+            //TODO::线程安全问题
             void                            setDataCallback(DATA_CALLBACK cb);
             void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
@@ -69,12 +70,18 @@ namespace brynet
             void                            setUD(BrynetAny value);
             const BrynetAny&                getUD() const;
 
+            const std::string&              getIP() const;
+
 #ifdef USE_OPENSSL
             bool                            initAcceptSSL(SSL_CTX*);
             bool                            initConnectSSL();
 #endif
 
             static  DataSocket::PACKET_PTR  makePacket(const char* buffer, size_t len);
+
+        protected:
+            DataSocket(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR) BRYNET_NOEXCEPT;
+            virtual ~DataSocket() BRYNET_NOEXCEPT;
 
         private:
             void                            growRecvBuffer();
@@ -105,7 +112,7 @@ namespace brynet
 #ifdef USE_OPENSSL
             void                            processSSLHandshake();
 #endif
-
+            void                            causeEnterCallback();
         private:
 
 #ifdef PLATFORM_WINDOWS
@@ -115,13 +122,11 @@ namespace brynet
             bool                            mPostRecvCheck;
             bool                            mPostWriteCheck;
 #endif
-
+            const sock                      mFD;
             TcpSocket::PTR                  mSocket;
-            bool                            mIsPostFinalClose;
-
+            const std::string               mIP;
+            const EventLoop::PTR            mEventLoop;
             bool                            mCanWrite;
-
-            EventLoop::PTR                  mEventLoop;
 
             struct BufferDeleter
             {
@@ -131,7 +136,7 @@ namespace brynet
                 }
             };
             std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
-            size_t                          mMaxRecvBufferSize;
+            const size_t                    mMaxRecvBufferSize;
 
             struct pending_packet
             {
@@ -156,7 +161,6 @@ namespace brynet
             SSL*                            mSSL;
             bool                            mIsHandsharked;
 #endif
-
             bool                            mRecvData;
             std::chrono::nanoseconds        mCheckTime;
             Timer::WeakPtr                  mTimer;

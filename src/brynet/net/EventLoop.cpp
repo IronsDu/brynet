@@ -1,4 +1,4 @@
-#include <cassert>
+﻿#include <cassert>
 #include <iostream>
 
 #include <brynet/net/Channel.h>
@@ -306,6 +306,26 @@ bool EventLoop::linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT
     ev.data.ptr = (void*)ptr;
     return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;
 #endif
+}
+
+DataSocketPtr EventLoop::getDataSocket(sock fd)
+{
+    auto it = mDataSockets.find(fd);
+    if (it != mDataSockets.end())
+    {
+        return (*it).second;
+    }
+    return nullptr;
+}
+
+void EventLoop::addDataSocket(sock fd, DataSocketPtr datasocket)
+{
+    mDataSockets[fd] = datasocket;
+}
+
+void EventLoop::removeDataSocket(sock fd)
+{
+    mDataSockets.erase(fd);
 }
 
 void EventLoop::pushAsyncProc(USER_PROC f)

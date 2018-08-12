@@ -1,8 +1,8 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 
 #include <brynet/net/SocketLibFunction.h>
-#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/TCPService.h>
 #include <brynet/net/Connector.h>
 
 using namespace brynet;
@@ -18,8 +18,8 @@ int main(int argc, char **argv)
 
     std::string tmp(atoi(argv[5]), 'a');
 
-    auto server = std::make_shared<WrapTcpService>();
-    server->startWorkThread(atoi(argv[3]));
+    auto server = TcpService::Create();
+    server->startWorkerThread(atoi(argv[3]));
 
     auto connector = AsyncConnector::Create();
     connector->startWorkerThread();
@@ -32,17 +32,17 @@ int main(int argc, char **argv)
                 std::cout << "connect success" << std::endl;
                 socket->SocketNodelay();
 
-                auto enterCallback = [tmp](const TCPSession::PTR& session) {
-                    session->setDataCallback([](const TCPSession::PTR& session, const char* buffer, size_t len) {
+                auto enterCallback = [tmp](const DataSocket::PTR& session) {
+                    session->setDataCallback([session](const char* buffer, size_t len) {
                         session->send(buffer, len);
                         return len;
                     });
                     session->send(tmp.c_str(), tmp.size());
                 };
 
-                server->addSession(std::move(socket),
-                        AddSessionOption::WithEnterCallback(enterCallback),
-                        AddSessionOption::WithMaxRecvBufferSize(1024*1024));
+                server->addDataSocket(std::move(socket),
+                    brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+                    brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
             }, []() {
                 std::cout << "connect failed" << std::endl;
             });

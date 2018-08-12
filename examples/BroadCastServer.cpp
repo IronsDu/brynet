@@ -1,4 +1,4 @@
-#include <functional>
+﻿#include <functional>
 #include <time.h>
 #include <stdio.h>
 #include <thread>
@@ -13,7 +13,7 @@
 
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/DataSocket.h>
-#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/TCPService.h>
 #include <brynet/net/ListenThread.h>
 
 using namespace brynet;
@@ -25,19 +25,19 @@ std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
 std::atomic_llong  SendPacketNum = ATOMIC_VAR_INIT(0);
 std::atomic_llong  RecvPacketNum = ATOMIC_VAR_INIT(0);
 
-std::vector<TCPSession::PTR> clients;
-WrapTcpService::PTR service;
+std::vector<DataSocket::PTR> clients;
+TcpService::PTR service;
 
-static void addClientID(const TCPSession::PTR& session)
+static void addClientID(const DataSocket::PTR& session)
 {
     clients.push_back(session);
 }
 
-static void removeClientID(const TCPSession::PTR& session)
+static void removeClientID(const DataSocket::PTR& session)
 {
     for (auto it = clients.begin(); it != clients.end(); ++it)
     {
-        if ((*it)->getSocketID() == session->getSocketID())
+        if (*it == session)
         {
             clients.erase(it);
             break;
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
     int port = atoi(argv[1]);
     brynet::net::base::InitSocket();
 
-    service = std::make_shared<WrapTcpService>();
+    service = TcpService::Create();
     auto mainLoop = std::make_shared<EventLoop>();
     auto listenThrean = ListenThread::Create();
 
@@ -85,18 +85,18 @@ int main(int argc, char** argv)
         socket->SetSendSize(32 * 1024);
         socket->SetRecvSize(32 * 1024);
 
-        auto enterCallback = [mainLoop](const TCPSession::PTR& session) {
+        auto enterCallback = [mainLoop](const DataSocket::PTR& session) {
             mainLoop->pushAsyncProc([session]() {
                 addClientID(session);
             });
 
-            session->setDisConnectCallback([mainLoop](const TCPSession::PTR& session) {
+            session->setDisConnectCallback([mainLoop](const DataSocket::PTR& session) {
                 mainLoop->pushAsyncProc([session]() {
                     removeClientID(session);
                 });
             });
 
-            session->setDataCallback([mainLoop](const TCPSession::PTR& session, const char* buffer, size_t len) {
+            session->setDataCallback([mainLoop](const char* buffer, size_t len) {
                 const char* parseStr = buffer;
                 size_t totalProcLen = 0;
                 size_t leftLen = len;
@@ -133,12 +133,12 @@ int main(int argc, char** argv)
                 return totalProcLen;
             });
         };
-        service->addSession(std::move(socket),
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
+        service->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
     });
 
-    service->startWorkThread(2);
+    service->startWorkerThread(2);
 
     auto now = std::chrono::steady_clock::now();
     while (true)
@@ -165,7 +165,7 @@ int main(int argc, char** argv)
         }
     }
 
-    service->stopWorkThread();
+    service->stopWorkerThread();
 
     return 0;
 }

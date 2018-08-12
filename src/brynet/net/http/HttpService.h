@@ -1,9 +1,9 @@
-#ifndef BRYNET_NET_HTTPSERVICE_H_
+﻿#ifndef BRYNET_NET_HTTPSERVICE_H_
 #define BRYNET_NET_HTTPSERVICE_H_
 
 #include <memory>
 
-#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/TCPService.h>
 #include <brynet/net/http/HttpParser.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/http/WebSocketFormat.h>
@@ -49,12 +49,12 @@ namespace brynet
             void                    setUD(BrynetAny);
 
         protected:
-            explicit HttpSession(TCPSession::PTR);
+            explicit HttpSession(DataSocket::PTR);
             virtual ~HttpSession() = default;
 
-            static  PTR             Create(TCPSession::PTR session);
+            static  PTR             Create(DataSocket::PTR session);
 
-            TCPSession::PTR&        getSession();
+            DataSocket::PTR&        getSession();
 
             const HTTPPARSER_CALLBACK&      getHttpCallback();
             const CLOSE_CALLBACK&           getCloseCallback();
@@ -62,7 +62,7 @@ namespace brynet
             const WS_CONNECTED_CALLBACK&    getWSConnectedCallback();
 
         private:
-            TCPSession::PTR         mSession;
+            DataSocket::PTR         mSession;
             BrynetAny               mUD;
             HTTPPARSER_CALLBACK     mHttpRequestCallback;
             WS_CALLBACK             mWSCallback;
@@ -75,7 +75,7 @@ namespace brynet
         class HttpService
         {
         public:
-            static void setup(const TCPSession::PTR& session, const HttpSession::ENTER_CALLBACK& enterCallback);
+            static void setup(const DataSocket::PTR& session, const HttpSession::ENTER_CALLBACK& enterCallback);
 
         private:
             static void handle(const HttpSession::PTR& httpSession);

@@ -1,4 +1,4 @@
-#ifndef BRYNET_NET_EVENTLOOP_H_
+﻿#ifndef BRYNET_NET_EVENTLOOP_H_
 #define BRYNET_NET_EVENTLOOP_H_
 
 #include <cstdint>
@@ -20,6 +20,7 @@ namespace brynet
     {
         class Channel;
         class DataSocket;
+        typedef std::shared_ptr<DataSocket> DataSocketPtr;
         class WakeupChannel;
 
         class EventLoop : public NonCopyable
@@ -75,6 +76,9 @@ namespace brynet
             int                             getEpollHandle() const;
 #endif
             bool                            linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT;
+            DataSocketPtr                   getDataSocket(sock fd);
+            void                            addDataSocket(sock fd, DataSocketPtr);
+            void                            removeDataSocket(sock fd);
             void                            tryInitThreadID();
 
         private:
@@ -105,6 +109,7 @@ namespace brynet
             CurrentThread::THREAD_ID_TYPE   mSelfThreadID;             
 
             TimerMgr::PTR                   mTimer;
+            std::unordered_map<sock, DataSocketPtr> mDataSockets;
 
             friend class DataSocket;
         };
