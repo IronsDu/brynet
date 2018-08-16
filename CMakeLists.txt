@@ -1,5 +1,13 @@
-﻿cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.6)
 project(brynet)
+
+find_library(LIB_OPENSSL NAMES crypto ssl)
+if(LIB_OPENSSL)
+  add_definitions(-DUSE_OPENSSL)
+  SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed -ldl -lrt -lssl -lcrypto")
+elseif()
+  message("not found openssl")
+endif()
 
 if(WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")

@@ -190,14 +190,14 @@ bool TcpService::_addDataSocket(TcpSocket::PTR socket,
         {
             if (options.sslHelper == nullptr ||
                 options.sslHelper->getOpenSSLCTX() == nullptr ||
-                !channel->initAcceptSSL(options.sslHelper->getOpenSSLCTX()))
+                !dataSocket->initAcceptSSL(options.sslHelper->getOpenSSLCTX()))
             {
                 return false;
             }
         }
         else
         {
-            if (!channel->initConnectSSL())
+            if (!dataSocket->initConnectSSL())
             {
                 return false;
             }

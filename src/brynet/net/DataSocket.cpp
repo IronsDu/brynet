@@ -98,6 +98,9 @@ bool DataSocket::onEnterEventLoop()
         return false;
     }
 
+    const auto findRet = mEventLoop->getDataSocket(mSocket->getFD());
+    assert(findRet == nullptr);
+
 #ifdef USE_OPENSSL
     if (mSSL != nullptr)
     {
@@ -119,6 +122,11 @@ bool DataSocket::onEnterEventLoop()
     return true;
 }
 
+const EventLoop::PTR& DataSocket::getEventLoop() const
+{
+    return mEventLoop;
+}
+
 void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
 {
     send(makePacket(buffer, len), callback);
@@ -128,7 +136,8 @@ void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& ca
 {
     auto packetCapture = packet;
     auto callbackCapture = callback;
-    mEventLoop->pushAsyncProc([sharedThis = shared_from_this(), packetCapture, callbackCapture](){
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis, packetCapture, callbackCapture](){
         const auto len = packetCapture->size();
         if (sharedThis->mSocket != nullptr)
         {
@@ -163,8 +172,10 @@ void DataSocket::canRecv()
 #ifdef USE_OPENSSL
     if (!mIsHandsharked && mSSL != nullptr)
     {
-        processSSLHandshake();
-        return;
+        if (!processSSLHandshake() || !mIsHandsharked)
+        {
+            return;
+        }
     }
 #endif
 
@@ -188,8 +199,10 @@ void DataSocket::canSend()
 #ifdef USE_OPENSSL
     if (!mIsHandsharked && mSSL != nullptr)
     {
-        processSSLHandshake();
-        return;
+        if (!processSSLHandshake() || !mIsHandsharked)
+        {
+            return;
+        }
     }
 #endif
 
@@ -200,9 +213,10 @@ void DataSocket::runAfterFlush()
 {
     if (!mIsPostFlush && !mSendList.empty() && mSocket != nullptr)
     {
-        mEventLoop->pushAfterLoopProc([=](){
-            mIsPostFlush = false;
-            flush();
+        auto sharedThis = shared_from_this();
+        mEventLoop->pushAfterLoopProc([sharedThis](){
+            sharedThis->mIsPostFlush = false;
+            sharedThis->flush();
         });
 
         mIsPostFlush = true;
@@ -212,6 +226,11 @@ void DataSocket::runAfterFlush()
 void DataSocket::recv()
 {
     bool must_close = false;
+#ifdef USE_OPENSSL
+    const bool notInSSL = (mSSL == nullptr);
+#else
+    const bool notInSSL = false;
+#endif
 
     while (mSocket != nullptr)
     {
@@ -292,7 +311,7 @@ void DataSocket::recv()
             ox_buffer_adjustto_head(mRecvBuffer.get());
         }
 
-        if (retlen < static_cast<int>(tryRecvLen))
+        if (notInSSL && retlen < static_cast<int>(tryRecvLen))
         {
             must_close = !checkRead();
             break;
@@ -343,6 +362,12 @@ void DataSocket::normalFlush()
     {
         threadLocalSendBuf = (char*)malloc(SENDBUF_SIZE);
     }
+
+#ifdef USE_OPENSSL
+    const bool notInSSL = (mSSL == nullptr);
+#else
+    const bool notInSSL = false;
+#endif
 
     bool must_close = false;
 
@@ -435,7 +460,7 @@ void DataSocket::normalFlush()
             it = mSendList.erase(it);
         }
 
-        if (static_cast<size_t>(send_retlen) != wait_send_size)
+        if (notInSSL && static_cast<size_t>(send_retlen) != wait_send_size)
         {
             mCanWrite = false;
             must_close = !checkWrite();
@@ -568,10 +593,15 @@ void DataSocket::procShutdownInLoop()
 void DataSocket::onClose()
 {
     assert(mEnterCallback == nullptr);
-    mEventLoop->pushAfterLoopProc([callBack = mDisConnectCallback, 
-        sharedThis = shared_from_this(),
-        eventLoop = mEventLoop,
-        fd = mFD]() {
+    auto callBack = mDisConnectCallback;
+    auto sharedThis = shared_from_this();
+    auto eventLoop = mEventLoop;
+    auto fd = mFD;
+
+    mEventLoop->pushAfterLoopProc([callBack, 
+        sharedThis,
+        eventLoop,
+        fd]() {
         if (callBack != nullptr)
         {
             callBack(sharedThis);
@@ -722,8 +752,9 @@ void DataSocket::startPingCheckTimer()
 {
     if (!mTimer.lock() && mCheckTime != std::chrono::steady_clock::duration::zero())
     {
-        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [=](){
-            PingCheck();
+        auto sharedThis = shared_from_this();
+        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [sharedThis](){
+            sharedThis->PingCheck();
         });
     }
 }
@@ -748,17 +779,19 @@ void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
 
 void DataSocket::postDisConnect()
 {
-    mEventLoop->pushAsyncProc([sharedThis = shared_from_this()](){
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis](){
         sharedThis->procCloseInLoop();
     });
 }
 
 void DataSocket::postShutdown()
 {
-    mEventLoop->pushAsyncProc([sharedThis = shared_from_this()]() {
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis]() {
         if (sharedThis->mSocket != nullptr)
         {
-            sharedThis->mEventLoop->pushAfterLoopProc([=]() {
+            sharedThis->mEventLoop->pushAfterLoopProc([sharedThis]() {
                 sharedThis->procShutdownInLoop();
             });
         }
@@ -818,11 +851,11 @@ bool DataSocket::initConnectSSL()
     return true;
 }
 
-void DataSocket::processSSLHandshake()
+bool DataSocket::processSSLHandshake()
 {
     if (mIsHandsharked)
     {
-        return;
+        return true;
     }
 
     bool mustClose = false;
@@ -873,7 +906,9 @@ void DataSocket::processSSLHandshake()
     {
         causeEnterCallback();
         procCloseInLoop();
+        return false;
     }
+    return true;
 }
 #endif
 

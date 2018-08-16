@@ -7,6 +7,7 @@
 #include <mutex>
 #include <memory>
 #include <atomic>
+#include <unordered_map>
 
 #include <brynet/net/CurrentThread.h>
 #include <brynet/net/SocketLibFunction.h>

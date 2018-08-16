@@ -51,6 +51,7 @@ namespace brynet
 
             /* must called in network thread */
             bool                            onEnterEventLoop();
+            const EventLoop::PTR&           getEventLoop() const;
 
             //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
 
@@ -110,7 +111,7 @@ namespace brynet
             void                            removeCheckWrite();
 #endif
 #ifdef USE_OPENSSL
-            void                            processSSLHandshake();
+            bool                            processSSLHandshake();
 #endif
             void                            causeEnterCallback();
         private:

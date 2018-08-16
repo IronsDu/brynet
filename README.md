@@ -81,13 +81,6 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umb
         99%      8
         100%     11 (longest request)
 
-## About session safety
-  This library use three layer ident one session(also is three way to use this library).
-  * First, use raw pointer named [DataSocket](https://github.com/IronsDu/dodo/blob/master/src/net/DataSocket.h#L30), combine with [EventLoop](https://github.com/IronsDu/dodo/blob/master/src/net/EventLoop.h) in used
-  * Second, use int64_t number ident one session, used in some callback of [TCPService](https://github.com/IronsDu/dodo/blob/master/src/net/TCPService.h#L53) that wrapper DataSocket of first layer
-  * Thrid, use smart pointer named [TCPSession::PTR](https://github.com/IronsDu/dodo/blob/master/src/net/WrapTCPService.h#L13) combine with [WrapServer](https://github.com/IronsDu/dodo/blob/master/src/net/WrapTCPService.h#L70), you can control session by [TCPSession::PTR](https://github.com/IronsDu/dodo/blob/master/src/net/WrapTCPService.h#L13)
-
-I suggest you use the second or thrid way above, because don't worry memory manager
 
 Examples
 ----------------------------

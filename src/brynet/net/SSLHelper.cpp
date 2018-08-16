@@ -40,7 +40,10 @@ bool SSLHelper::initSSL(const std::string& certificate, const std::string& priva
         return false;
     }
 
-    mOpenSSLCTX = SSL_CTX_new(SSLv23_server_method());
+    mOpenSSLCTX = SSL_CTX_new(SSLv23_method());
+    SSL_CTX_set_client_CA_list(mOpenSSLCTX, SSL_load_client_CA_file(certificate.c_str()));
+    SSL_CTX_set_verify_depth(mOpenSSLCTX, 10);
+
     if (SSL_CTX_use_certificate_file(mOpenSSLCTX, certificate.c_str(), SSL_FILETYPE_PEM) <= 0)
     {
         SSL_CTX_free(mOpenSSLCTX);
