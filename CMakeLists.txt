@@ -52,7 +52,8 @@ set(utils_src_list
 
 include_directories("${PROJECT_SOURCE_DIR}/src/")
 if(WIN32)
-  add_library(brynet ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
+	add_library(brynet ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
+	set_target_properties(brynet PROPERTIES OUTPUT_NAME_DEBUG "brynetd")
 elseif(UNIX)
   add_library(brynet STATIC ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
   find_package(Threads REQUIRED)
@@ -73,6 +74,7 @@ file(GLOB BRYNET_HTTP_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/net/http/*
 install (FILES ${BRYNET_HTTP_PUBLIC_HEADERS} DESTINATION "include/brynet/net/http")
 
 add_subdirectory(examples)
+
 
 if(WIN32)
   if (MSVC_VERSION VERSION_GREATER 1910)
