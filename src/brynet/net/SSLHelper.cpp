@@ -37,9 +37,9 @@ SSL_CTX* SSLHelper::getOpenSSLCTX()
 static void cryptoSetThreadIDCallback(CRYPTO_THREADID* id)
 {
 #ifdef PLATFORM_WINDOWS
-	CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(GetCurrentThreadId()));
+    CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(GetCurrentThreadId()));
 #else
-	CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(pthread_self()));
+    CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(pthread_self()));
 #endif
 }
 
@@ -50,29 +50,29 @@ static void cryptoLockingCallback(int mode,
 {
     if (mode & CRYPTO_LOCK)
     {
-		cryptoLocks[type]->lock();
+        cryptoLocks[type]->lock();
     }
     else if(mode & CRYPTO_UNLOCK)
     {
-		cryptoLocks[type]->unlock();
+        cryptoLocks[type]->unlock();
     }
 }
 
 static std::once_flag initCryptoThreadSafeSupportOnceFlag;
 static void InitCryptoThreadSafeSupport()
 {
-	for (int i = 0; i < CRYPTO_num_locks(); i++)
-	{
-		cryptoLocks[i] = std::make_shared<std::mutex>();
-	}
+    for (int i = 0; i < CRYPTO_num_locks(); i++)
+    {
+        cryptoLocks[i] = std::make_shared<std::mutex>();
+    }
 
-	CRYPTO_THREADID_set_callback(cryptoSetThreadIDCallback);
-	CRYPTO_set_locking_callback(cryptoLockingCallback);
+    CRYPTO_THREADID_set_callback(cryptoSetThreadIDCallback);
+    CRYPTO_set_locking_callback(cryptoLockingCallback);
 }
 
 bool SSLHelper::initSSL(const std::string& certificate, const std::string& privatekey)
 {
-	std::call_once(initCryptoThreadSafeSupportOnceFlag, InitCryptoThreadSafeSupport);
+    std::call_once(initCryptoThreadSafeSupportOnceFlag, InitCryptoThreadSafeSupport);
 
     if (mOpenSSLCTX != nullptr)
     {

@@ -17,16 +17,17 @@ DataSocket::DataSocket(TcpSocket::PTR socket,
 #if defined PLATFORM_WINDOWS
     mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), 
     mOvlSend(EventLoop::OLV_VALUE::OVL_SEND),
+    mPostClose(false),
 #endif
-    mFD(socket->getFD()),
     mIP(socket->GetIP()),
+    mSocket(std::move(socket)),
     mEventLoop(eventLoop),
+    mAlreadyClose(false),
     mMaxRecvBufferSize(maxRecvBufferSize)
 {
     mRecvData = false;
     mCheckTime = std::chrono::steady_clock::duration::zero();
     mIsPostFlush = false;
-    mSocket = std::move(socket);
 
     mCanWrite = true;
 
@@ -58,6 +59,9 @@ DataSocket::~DataSocket() BRYNET_NOEXCEPT
         mSSLCtx = nullptr;
     }
 #endif
+    
+    // 如果构造datasocket发生异常则mSocket也可能为nullptr
+    assert(mSocket != nullptr);
 
     if (mTimer.lock())
     {
@@ -94,7 +98,6 @@ bool DataSocket::onEnterEventLoop()
     if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
         !mEventLoop->linkChannel(mSocket->getFD(), this))
     {
-        closeSocket();
         return false;
     }
 
@@ -112,7 +115,6 @@ bool DataSocket::onEnterEventLoop()
 
     if (!checkRead())
     {
-        closeSocket();
         return false;
     }
 
@@ -139,18 +141,15 @@ void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& ca
     auto sharedThis = shared_from_this();
     mEventLoop->pushAsyncProc([sharedThis, packetCapture, callbackCapture](){
         const auto len = packetCapture->size();
-        if (sharedThis->mSocket != nullptr)
-        {
-            sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
-            sharedThis->runAfterFlush();
-        }
+        sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
+        sharedThis->runAfterFlush();
     });
 }
 
 void DataSocket::sendInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
 {
     assert(mEventLoop->isInLoopThread());
-    if (mEventLoop->isInLoopThread() && mSocket != nullptr)
+    if (mEventLoop->isInLoopThread())
     {
         const auto len = packet->size();
         mSendList.push_back({ packet, len, callback });
@@ -162,9 +161,12 @@ void DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
-    if (mSocket == nullptr && !mPostWriteCheck)
+    if (mPostClose)
     {
-        onClose();
+        if (!mPostWriteCheck)
+        {
+            onClose();
+        }
         return;
     }
 #endif
@@ -186,9 +188,12 @@ void DataSocket::canSend()
 {
 #ifdef PLATFORM_WINDOWS
     mPostWriteCheck = false;
-    if (mSocket == nullptr && !mPostRecvCheck)
+    if (mPostClose)
     {
-        onClose();
+        if (!mPostRecvCheck)
+        {
+            onClose();
+        }
         return;
     }
 #else
@@ -211,7 +216,7 @@ void DataSocket::canSend()
 
 void DataSocket::runAfterFlush()
 {
-    if (!mIsPostFlush && !mSendList.empty() && mSocket != nullptr)
+    if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
     {
         auto sharedThis = shared_from_this();
         mEventLoop->pushAfterLoopProc([sharedThis](){
@@ -232,7 +237,7 @@ void DataSocket::recv()
     const bool notInSSL = false;
 #endif
 
-    while (mSocket != nullptr)
+    while (true)
     {
         const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer.get());
         if (tryRecvLen == 0)
@@ -326,11 +331,6 @@ void DataSocket::recv()
 
 void DataSocket::flush()
 {
-    if (!mCanWrite || mSocket == nullptr)
-    {
-        return;
-    }
-
 #ifdef PLATFORM_WINDOWS
     normalFlush();
 #else
@@ -371,7 +371,7 @@ void DataSocket::normalFlush()
 
     bool must_close = false;
 
-    while (!mSendList.empty())
+    while (!mSendList.empty() && mCanWrite)
     {
         char* sendptr = threadLocalSendBuf;
         size_t     wait_send_size = 0;
@@ -484,7 +484,7 @@ void DataSocket::quickFlush()
     struct iovec iov[MAX_IOVEC];
     bool must_close = false;
 
-    while (!mSendList.empty())
+    while (!mSendList.empty() && mCanWrite)
     {
         int num = 0;
         size_t ready_send_len = 0;
@@ -558,27 +558,40 @@ void DataSocket::quickFlush()
 
 void DataSocket::procCloseInLoop()
 {
-    if (mSocket == nullptr)
-    {
-        return;
-    }
-
+    mCanWrite = false;
 #ifdef PLATFORM_WINDOWS
     if (mPostWriteCheck || mPostRecvCheck)
     {
-        closeSocket();
+        if (mPostClose)
+        {
+            return;
+        }
+        mPostClose = true;
+        //windows下立即关闭socket可能导致fd被另外的DataSocket重用,而导致此对象在IOCP返回相关完成结果时内存已经释放
+        if (mPostRecvCheck)
+        {
+            CancelIoEx(HANDLE(mSocket->getFD()), &mOvlRecv.base);
+        }
+        if (mPostWriteCheck)
+        {
+            CancelIoEx(HANDLE(mSocket->getFD()), &mOvlRecv.base);
+        }
     }
     else
     {
         onClose();
     }
 #else
+    struct epoll_event ev = { 0, { 0 } };
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
     onClose();
 #endif
 }
 
 void DataSocket::procShutdownInLoop()
 {
+    mCanWrite = false;
+    assert(mSocket != nullptr);
     if (mSocket != nullptr)
     {
 #ifdef PLATFORM_WINDOWS
@@ -586,19 +599,23 @@ void DataSocket::procShutdownInLoop()
 #else
         shutdown(mSocket->getFD(), SHUT_WR);
 #endif
-        mCanWrite = false;
     }
 }
 
 void DataSocket::onClose()
 {
+    if (mAlreadyClose)
+    {
+        return;
+    }
+    mAlreadyClose = true;
+
     assert(mEnterCallback == nullptr);
     auto callBack = mDisConnectCallback;
     auto sharedThis = shared_from_this();
     auto eventLoop = mEventLoop;
-    auto fd = mFD;
-
-    mEventLoop->pushAfterLoopProc([callBack, 
+    auto fd = mSocket->getFD();
+    mEventLoop->pushAfterLoopProc([callBack,
         sharedThis,
         eventLoop,
         fd]() {
@@ -613,22 +630,11 @@ void DataSocket::onClose()
             eventLoop->removeDataSocket(fd);
         }
     });
-
-    closeSocket();
     mDisConnectCallback = nullptr;
     mDataCallback = nullptr;
 }
 
-void DataSocket::closeSocket()
-{
-    if (mSocket != nullptr)
-    {
-        mCanWrite = false;
-        mSocket = nullptr;
-    }
-}
-
-bool    DataSocket::checkRead()
+bool DataSocket::checkRead()
 {
     bool check_ret = true;
 #ifdef PLATFORM_WINDOWS
@@ -692,13 +698,10 @@ bool    DataSocket::checkWrite()
 #ifdef PLATFORM_LINUX
 void    DataSocket::removeCheckWrite()
 {
-    if(mSocket != nullptr)
-    {
-        struct epoll_event ev = { 0, { 0 } };
-        ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
-        ev.data.ptr = (Channel*)(this);
-        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
-    }
+    struct epoll_event ev = { 0, { 0 } };
+    ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
+    ev.data.ptr = (Channel*)(this);
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
 }
 #endif
 
@@ -718,7 +721,7 @@ void DataSocket::growRecvBuffer()
 {
     if (mRecvBuffer == nullptr)
     {
-        mRecvBuffer.reset(ox_buffer_new(16 * 1024 + GROW_BUFFER_SIZE));
+        mRecvBuffer.reset(ox_buffer_new(std::min<size_t>(16 * 1024, mMaxRecvBufferSize)));
     }
     else
     {
@@ -761,20 +764,18 @@ void DataSocket::startPingCheckTimer()
 
 void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
 {
-    assert(mEventLoop->isInLoopThread());
-    if (!mEventLoop->isInLoopThread())
-    {
-        return;
-    }
-    
-    if (mTimer.lock() != nullptr)
-    {
-        mTimer.lock()->cancel();
-        mTimer.reset();
-    }
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis, checkTime]() {
+        if (sharedThis->mTimer.lock() != nullptr)
+        {
+            sharedThis->mTimer.lock()->cancel();
+            sharedThis->mTimer.reset();
+        }
 
-    mCheckTime = checkTime;
-    startPingCheckTimer();
+        sharedThis->mCheckTime = checkTime;
+        sharedThis->startPingCheckTimer();
+    });
+    
 }
 
 void DataSocket::postDisConnect()
@@ -789,12 +790,9 @@ void DataSocket::postShutdown()
 {
     auto sharedThis = shared_from_this();
     mEventLoop->pushAsyncProc([sharedThis]() {
-        if (sharedThis->mSocket != nullptr)
-        {
-            sharedThis->mEventLoop->pushAfterLoopProc([sharedThis]() {
-                sharedThis->procShutdownInLoop();
-            });
-        }
+        sharedThis->mEventLoop->pushAfterLoopProc([sharedThis]() {
+            sharedThis->procShutdownInLoop();
+        });
     });
 }
 
@@ -920,12 +918,10 @@ DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, size_t len)
 void DataSocket::causeEnterCallback()
 {
     assert(mEventLoop->isInLoopThread());
-    if (mEventLoop->isInLoopThread())
+    if (mEventLoop->isInLoopThread() && mEnterCallback != nullptr)
     {
-        if (mEnterCallback != nullptr)
-        {
-            mEnterCallback(shared_from_this());
-            mEnterCallback = nullptr;
-        }
+        auto tmp = mEnterCallback;
+        mEnterCallback = nullptr;
+        tmp(shared_from_this());
     }
 }

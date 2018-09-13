@@ -102,7 +102,6 @@ namespace brynet
             void                            quickFlush();
 
             void                            onClose() override;
-            void                            closeSocket();
             void                            procCloseInLoop();
             void                            procShutdownInLoop();
 
@@ -122,12 +121,13 @@ namespace brynet
 
             bool                            mPostRecvCheck;
             bool                            mPostWriteCheck;
+            bool                            mPostClose;
 #endif
-            const sock                      mFD;
-            TcpSocket::PTR                  mSocket;
             const std::string               mIP;
+            const TcpSocket::PTR            mSocket;
             const EventLoop::PTR            mEventLoop;
             bool                            mCanWrite;
+            bool                            mAlreadyClose;
 
             struct BufferDeleter
             {
