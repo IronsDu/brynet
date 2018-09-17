@@ -183,6 +183,7 @@ bool TcpService::_addDataSocket(TcpSocket::PTR socket,
         options.maxRecvBufferSize, 
         options.enterCallback,
         eventLoop);
+    (void)isServerSide;
 #ifdef USE_OPENSSL
     if (options.useSSL)
     {

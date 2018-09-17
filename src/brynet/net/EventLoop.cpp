@@ -18,9 +18,9 @@ namespace brynet
             {
             }
 
-            void    wakeup() BRYNET_NOEXCEPT
+            bool    wakeup() BRYNET_NOEXCEPT
             {
-                PostQueuedCompletionStatus(mIOCP, 0, reinterpret_cast<ULONG_PTR>(this), &mWakeupOvl.base);
+                return PostQueuedCompletionStatus(mIOCP, 0, reinterpret_cast<ULONG_PTR>(this), &mWakeupOvl.base);
             }
 
         private:
@@ -48,13 +48,10 @@ namespace brynet
             {
             }
 
-            void    wakeup()
+            bool    wakeup()
             {
                 uint64_t one = 1;
-                if (write(mFd, &one, sizeof one) <= 0)
-                {
-                    std::cerr << "wakeup failed" << std::endl;
-                }
+                return write(mFd, &one, sizeof one) > 0;
             }
 
             ~WakeupChannel()
@@ -289,8 +286,7 @@ bool EventLoop::wakeup()
 {
     if (!isInLoopThread() && mIsInBlock && !mIsAlreadyPostWakeup.exchange(true))
     {
-        mWakeupChannel->wakeup();
-        return true;
+        return mWakeupChannel->wakeup();
     }
 
     return false;
@@ -320,7 +316,7 @@ DataSocketPtr EventLoop::getDataSocket(sock fd)
 
 void EventLoop::addDataSocket(sock fd, DataSocketPtr datasocket)
 {
-    mDataSockets[fd] = datasocket;
+    mDataSockets[fd] = std::move(datasocket);
 }
 
 void EventLoop::removeDataSocket(sock fd)
