@@ -79,19 +79,18 @@ int brynet::net::base::SocketSetRecvSize(sock fd, int rd_size)
 // TODO::Connect是否直接返回TcpSocket::PTR
 sock brynet::net::base::Connect(bool isIPV6, const std::string& server_ip, int port)
 {
-    struct sockaddr_in ip4Addr;
-    struct sockaddr_in6 ip6Addr;
+    InitSocket();
+
+    struct sockaddr_in ip4Addr = { 0 };
+    struct sockaddr_in6 ip6Addr = { 0 };
     struct sockaddr_in* paddr = &ip4Addr;
     int addrLen = sizeof(ip4Addr);
 
-    sock clientfd = SOCKET_ERROR;
-    InitSocket();
-
-    clientfd = isIPV6 ?
+    sock clientfd = isIPV6 ?
         SocketCreate(AF_INET6, SOCK_STREAM, 0) :
         SocketCreate(AF_INET, SOCK_STREAM, 0);
 
-    if (clientfd == SOCKET_ERROR)
+    if (clientfd == INVALID_SOCKET)
     {
         return clientfd;
     }
@@ -116,21 +115,18 @@ sock brynet::net::base::Connect(bool isIPV6, const std::string& server_ip, int p
     if (!ptonResult)
     {
         SocketClose(clientfd);
-        clientfd = SOCKET_ERROR;
-        return SOCKET_ERROR;
+        return INVALID_SOCKET;
     }
 
     while (connect(clientfd, (struct sockaddr*)paddr, addrLen) < 0)
     {
-        int e = sErrno;
         if (EINTR == sErrno)
         {
             continue;
         }
 
         SocketClose(clientfd);
-        clientfd = SOCKET_ERROR;
-        break;
+        return INVALID_SOCKET;
     }
 
     return clientfd;
@@ -138,20 +134,19 @@ sock brynet::net::base::Connect(bool isIPV6, const std::string& server_ip, int p
 
 sock brynet::net::base::Listen(bool isIPV6, const char* ip, int port, int back_num)
 {
-    sock socketfd = SOCKET_ERROR;
-    struct  sockaddr_in ip4Addr;
-    struct sockaddr_in6 ip6Addr;
+    InitSocket();
+
+    struct  sockaddr_in ip4Addr = {0};
+    struct sockaddr_in6 ip6Addr = {0};
     struct sockaddr_in* paddr = &ip4Addr;
     int addrLen = sizeof(ip4Addr);
 
-    InitSocket();
-
-    socketfd = isIPV6 ?
+    sock socketfd = isIPV6 ?
         socket(AF_INET6, SOCK_STREAM, 0) :
         socket(AF_INET, SOCK_STREAM, 0);
-    if (socketfd == SOCKET_ERROR)
+    if (socketfd == INVALID_SOCKET)
     {
-        return SOCKET_ERROR;
+        return INVALID_SOCKET;
     }
 
     bool ptonResult = false;
@@ -181,17 +176,15 @@ sock brynet::net::base::Listen(bool isIPV6, const char* ip, int port, int back_n
             sizeof(int)) < 0)
     {
         SocketClose(socketfd);
-        socketfd = SOCKET_ERROR;
-        return SOCKET_ERROR;
+        return INVALID_SOCKET;
     }
 
-    int bindRet = bind(socketfd, (struct sockaddr*)paddr, addrLen);
+    const int bindRet = bind(socketfd, (struct sockaddr*)paddr, addrLen);
     if (bindRet == SOCKET_ERROR ||
         listen(socketfd, back_num) == SOCKET_ERROR)
     {
         SocketClose(socketfd);
-        socketfd = SOCKET_ERROR;
-        return SOCKET_ERROR;
+        return INVALID_SOCKET;
     }
 
     return socketfd;
@@ -208,7 +201,7 @@ void brynet::net::base::SocketClose(sock fd)
 
 static std::string get_ip_str(const struct sockaddr *sa)
 {
-    char tmp[INET6_ADDRSTRLEN];
+    char tmp[INET6_ADDRSTRLEN] = {0};
     switch (sa->sa_family)
     {
     case AF_INET:
@@ -229,7 +222,7 @@ static std::string get_ip_str(const struct sockaddr *sa)
 std::string brynet::net::base::GetIPOfSocket(sock fd)
 {
 #if defined PLATFORM_WINDOWS
-    struct sockaddr name;
+    struct sockaddr name = {0};
     int namelen = sizeof(name);
     if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
     {
@@ -262,29 +255,10 @@ int brynet::net::base::SocketSend(sock fd, const char* buffer, int len)
 // TODO::Accept是否直接返回TcpSocket::PTR
 sock brynet::net::base::Accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen)
 {
-#if defined PLATFORM_WINDOWS
-    sock fd = accept(listenSocket, addr, addrLen);
-    if (fd == INVALID_SOCKET)
-    {
-        fd = SOCKET_ERROR;
-    }
-    return fd;
-#else
     return accept(listenSocket, addr, addrLen);
-#endif
 }
 
 sock brynet::net::base::SocketCreate(int af, int type, int protocol)
 {
-#if defined PLATFORM_WINDOWS
-    sock fd = socket(af, type, protocol);
-    if (fd == INVALID_SOCKET)
-    {
-        fd = SOCKET_ERROR;
-    }
-
-    return fd;
-#else
     return socket(af, type, protocol);
-#endif
 }

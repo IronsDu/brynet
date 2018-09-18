@@ -1,4 +1,4 @@
-#include <functional>
+﻿#include <functional>
 #include <time.h>
 #include <stdio.h>
 #include <thread>
@@ -48,16 +48,15 @@ int main(int argc, char** argv)
         brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
         brynet::net::base::SocketNodelay(fd);
 
-        DataSocket::PTR datasSocket = new DataSocket(TcpSocket::Create(fd, false), 1024 * 1024);
-        datasSocket->setEnterCallback([packetLen](DataSocket::PTR datasSocket) {
-            static_assert(sizeof(datasSocket) <= sizeof(int64_t), "");
-            
+        auto enterCallback = [packetLen](DataSocket::PTR datasSocket) {
+            static_assert(sizeof(datasSocket.get()) <= sizeof(int64_t), "");
+
             auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
 
             std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
-            sp->writeUINT32(HEAD_LEN+sizeof(int64_t) + packetLen);
+            sp->writeUINT32(HEAD_LEN + sizeof(int64_t) + packetLen);
             sp->writeUINT16(1);
-            sp->writeINT64((int64_t)datasSocket);
+            sp->writeINT64((int64_t)datasSocket.get());
             sp->writeBinary(std::string(packetLen, '_'));
 
             for (int i = 0; i < 1; ++i)
@@ -65,7 +64,7 @@ int main(int argc, char** argv)
                 datasSocket->send(sp->getData(), sp->getPos());
             }
 
-            datasSocket->setDataCallback([](DataSocket::PTR datasSocket, const char* buffer, size_t len) {
+            datasSocket->setDataCallback([datasSocket](const char* buffer, size_t len) {
                 const char* parseStr = buffer;
                 int totalProcLen = 0;
                 size_t leftLen = len;
@@ -88,7 +87,7 @@ int main(int argc, char** argv)
                             rp.readUINT16();
                             int64_t addr = rp.readINT64();
 
-                            if (addr == (int64_t)(datasSocket))
+                            if (addr == (int64_t)(datasSocket.get()))
                             {
                                 datasSocket->send(parseStr, packet_len);
                             }
@@ -112,15 +111,14 @@ int main(int argc, char** argv)
             });
 
             datasSocket->setDisConnectCallback([](DataSocket::PTR datasSocket) {
-                delete datasSocket;
             });
-        });
-
+        };
+        DataSocket::PTR datasSocket = DataSocket::Create(TcpSocket::Create(fd, false), 
+            1024 * 1024, 
+            enterCallback, 
+            clientEventLoop);
         clientEventLoop->pushAsyncProc([clientEventLoop, datasSocket]() {
-            if (!datasSocket->onEnterEventLoop(clientEventLoop))
-            {
-                delete datasSocket;
-            }
+            datasSocket->onEnterEventLoop();
         });
     }
 

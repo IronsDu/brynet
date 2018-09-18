@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <brynet/net/SocketLibTypes.h>
+#include <brynet/utils/stack.h>
 
 enum CheckType
 {
@@ -21,6 +22,8 @@ struct fdset_s* ox_fdset_new(void);
 void ox_fdset_delete(struct fdset_s* self);
 void ox_fdset_add(struct fdset_s* self, sock fd, int type);
 void ox_fdset_del(struct fdset_s* self, sock fd, int type);
+void ox_fdset_remove(struct fdset_s* self, sock fd);
+void ox_fdset_visitor(struct fdset_s* self, enum CheckType type, struct stack_s* result);
 int ox_fdset_poll(struct fdset_s* self, long overtime);
 bool ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type);
 

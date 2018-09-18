@@ -1,4 +1,4 @@
-#include <cassert>
+﻿#include <cassert>
 #include <cstring>
 
 #include <brynet/net/SocketLibFunction.h>
@@ -9,19 +9,25 @@
 
 using namespace brynet::net;
 
-DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_NOEXCEPT
+DataSocket::DataSocket(TcpSocket::PTR socket, 
+    size_t maxRecvBufferSize, 
+    ENTER_CALLBACK enterCallback, 
+    EventLoop::PTR eventLoop) BRYNET_NOEXCEPT
+    :
 #if defined PLATFORM_WINDOWS
-    : 
     mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV), 
-    mOvlSend(EventLoop::OLV_VALUE::OVL_SEND)
+    mOvlSend(EventLoop::OLV_VALUE::OVL_SEND),
+    mPostClose(false),
 #endif
+    mIP(socket->GetIP()),
+    mSocket(std::move(socket)),
+    mEventLoop(eventLoop),
+    mAlreadyClose(false),
+    mMaxRecvBufferSize(maxRecvBufferSize)
 {
-    mMaxRecvBufferSize = maxRecvBufferSize;
     mRecvData = false;
     mCheckTime = std::chrono::steady_clock::duration::zero();
-    mIsPostFinalClose = false;
     mIsPostFlush = false;
-    mSocket = std::move(socket);
 
     mCanWrite = true;
 
@@ -29,8 +35,6 @@ DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_N
     mPostRecvCheck = false;
     mPostWriteCheck = false;
 #endif
-
-    mRecvBuffer = nullptr;
     growRecvBuffer();
 
 #ifdef USE_OPENSSL
@@ -38,16 +42,11 @@ DataSocket::DataSocket(TcpSocket::PTR socket, size_t maxRecvBufferSize) BRYNET_N
     mSSL = nullptr;
     mIsHandsharked = false;
 #endif
+    mEnterCallback = enterCallback;
 }
 
 DataSocket::~DataSocket() BRYNET_NOEXCEPT
 {
-    if (mRecvBuffer != nullptr)
-    {
-        ox_buffer_delete(mRecvBuffer);
-        mRecvBuffer = nullptr;
-    }
-
 #ifdef USE_OPENSSL
     if (mSSL != nullptr)
     {
@@ -60,6 +59,9 @@ DataSocket::~DataSocket() BRYNET_NOEXCEPT
         mSSLCtx = nullptr;
     }
 #endif
+    
+    // 如果构造datasocket发生异常则mSocket也可能为nullptr
+    assert(mSocket != nullptr);
 
     if (mTimer.lock())
     {
@@ -67,35 +69,45 @@ DataSocket::~DataSocket() BRYNET_NOEXCEPT
     }
 }
 
-bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
+DataSocket::PTR DataSocket::Create(TcpSocket::PTR socket, 
+    size_t maxRecvBufferSize, 
+    ENTER_CALLBACK enterCallback,
+    EventLoop::PTR eventLoop)
 {
-    assert(eventLoop->isInLoopThread());
-    if (!eventLoop->isInLoopThread())
+    struct make_shared_enabler : public DataSocket
     {
-        return false;
-    }
-    assert(mEventLoop == nullptr);
-    if (mEventLoop != nullptr)
+        make_shared_enabler(TcpSocket::PTR socket,
+            size_t maxRecvBufferSize, 
+            ENTER_CALLBACK enterCallback, 
+            EventLoop::PTR eventLoop)
+            :
+            DataSocket(std::move(socket), maxRecvBufferSize, enterCallback, eventLoop)
+        {}
+    };
+    return std::make_shared<make_shared_enabler>(std::move(socket), maxRecvBufferSize, enterCallback, eventLoop);
+}
+
+bool DataSocket::onEnterEventLoop()
+{
+    assert(mEventLoop->isInLoopThread());
+    if (!mEventLoop->isInLoopThread())
     {
         return false;
     }
 
-    mEventLoop = eventLoop;
+    if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
+        !mEventLoop->linkChannel(mSocket->getFD(), this))
+    {
+        return false;
+    }
 
-    if (!brynet::net::base::SocketNonblock(mSocket->getFD()))
-    {
-        closeSocket();
-        return false;
-    }
-    if (!mEventLoop->linkChannel(mSocket->getFD(), this))
-    {
-        closeSocket();
-        return false;
-    }
+    const auto findRet = mEventLoop->getDataSocket(mSocket->getFD());
+    assert(findRet == nullptr);
 
 #ifdef USE_OPENSSL
     if (mSSL != nullptr)
     {
+        mEventLoop->addDataSocket(mSocket->getFD(), shared_from_this());
         processSSLHandshake();
         return true;
     }
@@ -103,17 +115,18 @@ bool DataSocket::onEnterEventLoop(const EventLoop::PTR& eventLoop)
 
     if (!checkRead())
     {
-        closeSocket();
         return false;
     }
 
-    if (mEnterCallback != nullptr)
-    {
-        mEnterCallback(this);
-        mEnterCallback = nullptr;
-    }
+    mEventLoop->addDataSocket(mSocket->getFD(), shared_from_this());
+    causeEnterCallback();
 
     return true;
+}
+
+const EventLoop::PTR& DataSocket::getEventLoop() const
+{
+    return mEventLoop;
 }
 
 void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
@@ -125,10 +138,11 @@ void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& ca
 {
     auto packetCapture = packet;
     auto callbackCapture = callback;
-    mEventLoop->pushAsyncProc([this, packetCapture, callbackCapture](){
-        auto len = packetCapture->size();
-        mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
-        runAfterFlush();
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis, packetCapture, callbackCapture](){
+        const auto len = packetCapture->size();
+        sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
+        sharedThis->runAfterFlush();
     });
 }
 
@@ -137,7 +151,7 @@ void DataSocket::sendInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBA
     assert(mEventLoop->isInLoopThread());
     if (mEventLoop->isInLoopThread())
     {
-        auto len = packet->size();
+        const auto len = packet->size();
         mSendList.push_back({ packet, len, callback });
         runAfterFlush();
     }
@@ -147,9 +161,12 @@ void DataSocket::canRecv()
 {
 #ifdef PLATFORM_WINDOWS
     mPostRecvCheck = false;
-    if (mSocket == nullptr && !mPostWriteCheck)
+    if (mPostClose)
     {
-        onClose();
+        if (!mPostWriteCheck)
+        {
+            onClose();
+        }
         return;
     }
 #endif
@@ -157,8 +174,10 @@ void DataSocket::canRecv()
 #ifdef USE_OPENSSL
     if (!mIsHandsharked && mSSL != nullptr)
     {
-        processSSLHandshake();
-        return;
+        if (!processSSLHandshake() || !mIsHandsharked)
+        {
+            return;
+        }
     }
 #endif
 
@@ -169,9 +188,12 @@ void DataSocket::canSend()
 {
 #ifdef PLATFORM_WINDOWS
     mPostWriteCheck = false;
-    if (mSocket == nullptr && !mPostRecvCheck)
+    if (mPostClose)
     {
-        onClose();
+        if (!mPostRecvCheck)
+        {
+            onClose();
+        }
         return;
     }
 #else
@@ -182,8 +204,10 @@ void DataSocket::canSend()
 #ifdef USE_OPENSSL
     if (!mIsHandsharked && mSSL != nullptr)
     {
-        processSSLHandshake();
-        return;
+        if (!processSSLHandshake() || !mIsHandsharked)
+        {
+            return;
+        }
     }
 #endif
 
@@ -192,11 +216,12 @@ void DataSocket::canSend()
 
 void DataSocket::runAfterFlush()
 {
-    if (!mIsPostFlush && !mSendList.empty() && mSocket != nullptr)
+    if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
     {
-        mEventLoop->pushAfterLoopProc([=](){
-            mIsPostFlush = false;
-            flush();
+        auto sharedThis = shared_from_this();
+        mEventLoop->pushAfterLoopProc([sharedThis](){
+            sharedThis->mIsPostFlush = false;
+            sharedThis->flush();
         });
 
         mIsPostFlush = true;
@@ -206,10 +231,15 @@ void DataSocket::runAfterFlush()
 void DataSocket::recv()
 {
     bool must_close = false;
+#ifdef USE_OPENSSL
+    const bool notInSSL = (mSSL == nullptr);
+#else
+    const bool notInSSL = false;
+#endif
 
-    while (mSocket != nullptr)
+    while (true)
     {
-        const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer);
+        const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer.get());
         if (tryRecvLen == 0)
         {
             break;
@@ -219,14 +249,14 @@ void DataSocket::recv()
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
-            retlen = SSL_read(mSSL, ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen);
+            retlen = SSL_read(mSSL, ox_buffer_getwriteptr(mRecvBuffer.get()), tryRecvLen);
         }
         else
         {
-            retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer), tryRecvLen, 0);
+            retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer.get()), tryRecvLen, 0);
         }
 #else
-        retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer), static_cast<int>(tryRecvLen), 0);
+        retlen = ::recv(mSocket->getFD(), ox_buffer_getwriteptr(mRecvBuffer.get()), static_cast<int>(tryRecvLen), 0);
 #endif
 
         if (retlen == 0)
@@ -259,8 +289,8 @@ void DataSocket::recv()
             break;
         }
 
-        ox_buffer_addwritepos(mRecvBuffer, retlen);
-        if (ox_buffer_getreadvalidcount(mRecvBuffer) == ox_buffer_getsize(mRecvBuffer))
+        ox_buffer_addwritepos(mRecvBuffer.get(), retlen);
+        if (ox_buffer_getreadvalidcount(mRecvBuffer.get()) == ox_buffer_getsize(mRecvBuffer.get()))
         {
             growRecvBuffer();
         }
@@ -268,13 +298,12 @@ void DataSocket::recv()
         if (mDataCallback != nullptr)
         {
             mRecvData = true;
-            auto proclen = mDataCallback(this, 
-                ox_buffer_getreadptr(mRecvBuffer), 
-                ox_buffer_getreadvalidcount(mRecvBuffer));
-            assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer));
-            if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer))
+            auto proclen = mDataCallback(ox_buffer_getreadptr(mRecvBuffer.get()),
+                ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+            assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+            if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
             {
-                ox_buffer_addreadpos(mRecvBuffer, proclen);
+                ox_buffer_addreadpos(mRecvBuffer.get(), proclen);
             }
             else
             {
@@ -282,12 +311,12 @@ void DataSocket::recv()
             }
         }
 
-        if (ox_buffer_getwritevalidcount(mRecvBuffer) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer) == 0)
+        if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
         {
-            ox_buffer_adjustto_head(mRecvBuffer);
+            ox_buffer_adjustto_head(mRecvBuffer.get());
         }
 
-        if (retlen < static_cast<int>(tryRecvLen))
+        if (notInSSL && retlen < static_cast<int>(tryRecvLen))
         {
             must_close = !checkRead();
             break;
@@ -302,11 +331,6 @@ void DataSocket::recv()
 
 void DataSocket::flush()
 {
-    if (!mCanWrite || mSocket == nullptr)
-    {
-        return;
-    }
-
 #ifdef PLATFORM_WINDOWS
     normalFlush();
 #else
@@ -339,9 +363,15 @@ void DataSocket::normalFlush()
         threadLocalSendBuf = (char*)malloc(SENDBUF_SIZE);
     }
 
+#ifdef USE_OPENSSL
+    const bool notInSSL = (mSSL == nullptr);
+#else
+    const bool notInSSL = false;
+#endif
+
     bool must_close = false;
 
-    while (!mSendList.empty())
+    while (!mSendList.empty() && mCanWrite)
     {
         char* sendptr = threadLocalSendBuf;
         size_t     wait_send_size = 0;
@@ -350,7 +380,7 @@ void DataSocket::normalFlush()
         {
             auto& packet = *it;
             auto packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
-            auto packetLeftLen = packet.left;
+            const auto packetLeftLen = packet.left;
 
             if ((wait_send_size + packetLeftLen) > SENDBUF_SIZE)
             {
@@ -366,7 +396,7 @@ void DataSocket::normalFlush()
             wait_send_size += packetLeftLen;
         }
 
-        if (wait_send_size <= 0)
+        if (wait_send_size == 0)
         {
             break;
         }
@@ -430,7 +460,7 @@ void DataSocket::normalFlush()
             it = mSendList.erase(it);
         }
 
-        if (send_retlen != wait_send_size)
+        if (notInSSL && static_cast<size_t>(send_retlen) != wait_send_size)
         {
             mCanWrite = false;
             must_close = !checkWrite();
@@ -454,10 +484,10 @@ void DataSocket::quickFlush()
     struct iovec iov[MAX_IOVEC];
     bool must_close = false;
 
-    while (!mSendList.empty())
+    while (!mSendList.empty() && mCanWrite)
     {
         int num = 0;
-        int ready_send_len = 0;
+        size_t ready_send_len = 0;
         for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_packet& b = *it;
@@ -493,7 +523,7 @@ void DataSocket::quickFlush()
             break;
         }
 
-        int tmp_len = send_len;
+        auto tmp_len = static_cast<size_t>(send_len);
         for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
         {
             pending_packet& b = *it;
@@ -511,7 +541,7 @@ void DataSocket::quickFlush()
             it = mSendList.erase(it);
         }
 
-        if (send_len != ready_send_len)
+        if (static_cast<size_t>(send_len) != ready_send_len)
         {
             mCanWrite = false;
             must_close = !checkWrite();
@@ -528,27 +558,40 @@ void DataSocket::quickFlush()
 
 void DataSocket::procCloseInLoop()
 {
-    if (mSocket == nullptr)
-    {
-        return;
-    }
-
+    mCanWrite = false;
 #ifdef PLATFORM_WINDOWS
     if (mPostWriteCheck || mPostRecvCheck)
     {
-        closeSocket();
+        if (mPostClose)
+        {
+            return;
+        }
+        mPostClose = true;
+        //windows下立即关闭socket可能导致fd被另外的DataSocket重用,而导致此对象在IOCP返回相关完成结果时内存已经释放
+        if (mPostRecvCheck)
+        {
+            CancelIoEx(HANDLE(mSocket->getFD()), &mOvlRecv.base);
+        }
+        if (mPostWriteCheck)
+        {
+            CancelIoEx(HANDLE(mSocket->getFD()), &mOvlRecv.base);
+        }
     }
     else
     {
         onClose();
     }
 #else
+    struct epoll_event ev = { 0, { 0 } };
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
     onClose();
 #endif
 }
 
 void DataSocket::procShutdownInLoop()
 {
+    mCanWrite = false;
+    assert(mSocket != nullptr);
     if (mSocket != nullptr)
     {
 #ifdef PLATFORM_WINDOWS
@@ -556,38 +599,42 @@ void DataSocket::procShutdownInLoop()
 #else
         shutdown(mSocket->getFD(), SHUT_WR);
 #endif
-        mCanWrite = false;
     }
 }
 
 void DataSocket::onClose()
 {
-    if (mIsPostFinalClose)
+    if (mAlreadyClose)
     {
         return;
     }
+    mAlreadyClose = true;
 
-    mEventLoop->pushAfterLoopProc([=]() {
-        if (mDisConnectCallback != nullptr)
+    assert(mEnterCallback == nullptr);
+    auto callBack = mDisConnectCallback;
+    auto sharedThis = shared_from_this();
+    auto eventLoop = mEventLoop;
+    auto fd = mSocket->getFD();
+    mEventLoop->pushAfterLoopProc([callBack,
+        sharedThis,
+        eventLoop,
+        fd]() {
+        if (callBack != nullptr)
         {
-            mDisConnectCallback(this);
+            callBack(sharedThis);
+        }
+        auto tmp = eventLoop->getDataSocket(fd);
+        assert(tmp == sharedThis);
+        if (tmp == sharedThis)
+        {
+            eventLoop->removeDataSocket(fd);
         }
     });
-
-    closeSocket();
-    mIsPostFinalClose = true;
+    mDisConnectCallback = nullptr;
+    mDataCallback = nullptr;
 }
 
-void DataSocket::closeSocket()
-{
-    if (mSocket != nullptr)
-    {
-        mCanWrite = false;
-        mSocket = nullptr;
-    }
-}
-
-bool    DataSocket::checkRead()
+bool DataSocket::checkRead()
 {
     bool check_ret = true;
 #ifdef PLATFORM_WINDOWS
@@ -601,8 +648,8 @@ bool    DataSocket::checkRead()
 
     DWORD   dwBytes = 0;
     DWORD   flag = 0;
-    int ret = WSARecv(mSocket->getFD(), &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
-    if (ret == -1)
+    const int ret = WSARecv(mSocket->getFD(), &in_buf, 1, &dwBytes, &flag, &(mOvlRecv.base), 0);
+    if (ret == SOCKET_ERROR)
     {
         check_ret = (sErrno == WSA_IO_PENDING);
     }
@@ -628,8 +675,8 @@ bool    DataSocket::checkWrite()
     }
 
     DWORD send_len = 0;
-    int ret = WSASend(mSocket->getFD(), wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
-    if (ret == -1)
+    const int ret = WSASend(mSocket->getFD(), wsendbuf, 1, &send_len, 0, &(mOvlSend.base), 0);
+    if (ret == SOCKET_ERROR)
     {
         check_ret = (sErrno == WSA_IO_PENDING);
     }
@@ -651,20 +698,12 @@ bool    DataSocket::checkWrite()
 #ifdef PLATFORM_LINUX
 void    DataSocket::removeCheckWrite()
 {
-    if(mSocket != nullptr)
-    {
-        struct epoll_event ev = { 0, { 0 } };
-        ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
-        ev.data.ptr = (Channel*)(this);
-        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
-    }
+    struct epoll_event ev = { 0, { 0 } };
+    ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
+    ev.data.ptr = (Channel*)(this);
+    epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
 }
 #endif
-
-void DataSocket::setEnterCallback(ENTER_CALLBACK cb)
-{
-    mEnterCallback = std::move(cb);
-}
 
 void DataSocket::setDataCallback(DATA_CALLBACK cb)
 {
@@ -682,20 +721,25 @@ void DataSocket::growRecvBuffer()
 {
     if (mRecvBuffer == nullptr)
     {
-        mRecvBuffer = ox_buffer_new(16*1024+GROW_BUFFER_SIZE);
+        mRecvBuffer.reset(ox_buffer_new(std::min<size_t>(16 * 1024, mMaxRecvBufferSize)));
     }
-    else if ((ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE) <= mMaxRecvBufferSize)
+    else
     {
-        buffer_s* newBuffer = ox_buffer_new(ox_buffer_getsize(mRecvBuffer) + GROW_BUFFER_SIZE);
-        ox_buffer_write(newBuffer, 
-            ox_buffer_getreadptr(mRecvBuffer), 
-            ox_buffer_getreadvalidcount(mRecvBuffer));
-        ox_buffer_delete(mRecvBuffer);
-        mRecvBuffer = newBuffer;
+        const auto NewSize = ox_buffer_getsize(mRecvBuffer.get()) + GROW_BUFFER_SIZE;
+        if (NewSize > mMaxRecvBufferSize)
+        {
+            return;
+        }
+        std::unique_ptr<struct buffer_s, BufferDeleter> newBuffer(ox_buffer_new(NewSize));
+        ox_buffer_write(newBuffer.get(), 
+            ox_buffer_getreadptr(mRecvBuffer.get()),
+            ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+        mRecvBuffer = std::move(newBuffer);
     }
 }
 void DataSocket::PingCheck()
 {
+    mTimer.reset();
     if (mRecvData)
     {
         mRecvData = false;
@@ -711,57 +755,44 @@ void DataSocket::startPingCheckTimer()
 {
     if (!mTimer.lock() && mCheckTime != std::chrono::steady_clock::duration::zero())
     {
-        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [=](){
-            PingCheck();
+        auto sharedThis = shared_from_this();
+        mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [sharedThis](){
+            sharedThis->PingCheck();
         });
     }
 }
 
 void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
 {
-    assert(mEventLoop->isInLoopThread());
-    if (!mEventLoop->isInLoopThread())
-    {
-        return;
-    }
-    
-    if (mTimer.lock())
-    {
-        mTimer.lock()->cancel();
-        mTimer.reset();
-    }
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis, checkTime]() {
+        if (sharedThis->mTimer.lock() != nullptr)
+        {
+            sharedThis->mTimer.lock()->cancel();
+            sharedThis->mTimer.reset();
+        }
 
-    mCheckTime = checkTime;
-    if (mCheckTime != std::chrono::steady_clock::duration::zero())
-    {
-        startPingCheckTimer();
-    }
+        sharedThis->mCheckTime = checkTime;
+        sharedThis->startPingCheckTimer();
+    });
+    
 }
 
 void DataSocket::postDisConnect()
 {
-    if (mEventLoop != nullptr)
-    {
-        mEventLoop->pushAsyncProc([=](){
-            procCloseInLoop();
-        });
-    }
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis](){
+        sharedThis->procCloseInLoop();
+    });
 }
 
 void DataSocket::postShutdown()
 {
-    if (mEventLoop == nullptr)
-    {
-        return;
-    }
-
-    mEventLoop->pushAsyncProc([=]() {
-        if (mSocket != nullptr)
-        {
-            mEventLoop->pushAfterLoopProc([=]() {
-                procShutdownInLoop();
-            });
-        }
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis]() {
+        sharedThis->mEventLoop->pushAfterLoopProc([sharedThis]() {
+            sharedThis->procShutdownInLoop();
+        });
     });
 }
 
@@ -775,6 +806,10 @@ const BrynetAny& DataSocket::getUD() const
     return mUD;
 }
 
+const std::string& DataSocket::getIP() const
+{
+    return mIP;
+}
 #ifdef USE_OPENSSL
 bool DataSocket::initAcceptSSL(SSL_CTX* ctx)
 {
@@ -814,11 +849,11 @@ bool DataSocket::initConnectSSL()
     return true;
 }
 
-void DataSocket::processSSLHandshake()
+bool DataSocket::processSSLHandshake()
 {
     if (mIsHandsharked)
     {
-        return;
+        return true;
     }
 
     bool mustClose = false;
@@ -838,11 +873,7 @@ void DataSocket::processSSLHandshake()
         mIsHandsharked = true;
         if (checkRead())
         {
-            if (mEnterCallback != nullptr)
-            {
-                mEnterCallback(this);
-                mEnterCallback = nullptr;
-            }
+            causeEnterCallback();
         }
         else
         {
@@ -871,17 +902,26 @@ void DataSocket::processSSLHandshake()
 
     if (mustClose)
     {
-        if (mEnterCallback != nullptr)
-        {
-            mEnterCallback(this);
-            mEnterCallback = nullptr;
-        }
+        causeEnterCallback();
         procCloseInLoop();
+        return false;
     }
+    return true;
 }
 #endif
 
 DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, size_t len)
 {
     return std::make_shared<std::string>(buffer, len);
+}
+
+void DataSocket::causeEnterCallback()
+{
+    assert(mEventLoop->isInLoopThread());
+    if (mEventLoop->isInLoopThread() && mEnterCallback != nullptr)
+    {
+        auto tmp = mEnterCallback;
+        mEnterCallback = nullptr;
+        tmp(shared_from_this());
+    }
 }

@@ -51,6 +51,8 @@ namespace brynet
 
     private:
         WaitGroup()
+            :
+            mCounter(0)
         {
         }
 

@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 #include <mutex>
 #include <condition_variable>
@@ -16,12 +16,12 @@ int main(int argc, char **argv)
 {
     std::string body = "<html>hello world </html>";
 
-    auto service = std::make_shared<WrapTcpService>();
-    service->startWorkThread(2);
+    auto service = TcpService::Create();
+    service->startWorkerThread(2);
 
     auto listenThread = ListenThread::Create();
     listenThread->startListen(false, "0.0.0.0", 8080, [service, body](TcpSocket::PTR socket) {
-        auto enterCallback = [body](const TCPSession::PTR& session) {
+        auto enterCallback = [body](const DataSocket::PTR& session) {
             HttpService::setup(session, [body](const HttpSession::PTR& httpSession) {
                 httpSession->setHttpCallback([body](const HTTPParser& httpParser,
                     const HttpSession::PTR& session) {
@@ -48,37 +48,38 @@ int main(int argc, char **argv)
                 });
             });
         };
-        service->addSession(std::move(socket), 
-            AddSessionOption::WithEnterCallback(enterCallback),
-            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
+        service->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     });
 
-#ifdef USE_OPENSSL
-    sock fd = brynet::net::base::Connect(false, "180.97.33.108", 443);
-    if (fd != SOCKET_ERROR)
+
+    sock fd = brynet::net::base::Connect(false, "191.236.16.125", 80);
+    if (fd != INVALID_SOCKET)
     {
         auto socket = TcpSocket::Create(fd, false);
-        SSL_library_init();
-        auto enterCallback = [](const TCPSession::PTR& session) {
+        auto enterCallback = [](const DataSocket::PTR& session) {
             HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-                request.setUrl("/");
+                request.setUrl("/httpgallery/chunked/chunkedimage.aspx");
+                request.addHeadValue("Host", "www.httpwatch.com");
 
                 std::string requestStr = request.getResult();
                 httpSession->send(requestStr.c_str(), requestStr.size());
                 httpSession->setHttpCallback([](const HTTPParser& httpParser, const HttpSession::PTR& session) {
                     //http response handle
                     std::cout << httpParser.getBody() << std::endl;
+                    std::cout << "len:" << httpParser.getBody().size() << std::endl;
+                    std::flush(std::cout);
                 });
             });
         };
 
-        service->addSession(std::move(socket), 
-            AddSessionOption::WithClientSideSSL(),
-            AddSessionOption::WithMaxRecvBufferSize(1024 * 1024));
+        service->addDataSocket(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     }
-#endif
 
     std::cin.get();
     return 0;

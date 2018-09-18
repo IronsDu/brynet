@@ -72,9 +72,9 @@ namespace brynet
         public:
             bool operator() (const Timer::Ptr& left, const Timer::Ptr& right) const
             {
-                auto startDiff = left->getStartTime() - right->getStartTime();
-                auto lastDiff = left->getLastTime() - right->getLastTime();
-                auto diff = startDiff.count() + lastDiff.count();
+                const auto startDiff = left->getStartTime() - right->getStartTime();
+                const auto lastDiff = left->getLastTime() - right->getLastTime();
+                const auto diff = startDiff.count() + lastDiff.count();
                 return diff > 0;
             }
         };

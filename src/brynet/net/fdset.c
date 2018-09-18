@@ -181,6 +181,54 @@ ox_fdset_del(struct fdset_s* self, sock fd, int type)
     }
 }
 
+void
+ox_fdset_remove(struct fdset_s* self, sock fd)
+{
+    TryRemovePollFd(self, fd);
+}
+
+static bool
+check_event(const struct pollfd* pf, enum CheckType type)
+{
+    if (pf == NULL)
+    {
+        return false;
+    }
+
+    if ((type & ReadCheck) &&
+        (pf->revents & CHECK_READ_FLAG))
+    {
+        return true;
+    }
+    else if ((type & WriteCheck) &&
+        (pf->revents & CHECK_WRITE_FLAG))
+    {
+        return true;
+    }
+    else if ((type & ErrorCheck) &&
+        (pf->revents & CHECK_ERROR_FLAG))
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void
+ox_fdset_visitor(struct fdset_s* self, enum CheckType type, struct stack_s* result)
+{
+    int i = 0;
+    for (; i < self->nfds; i++)
+    {
+        if (check_event(self->pollFds+i, type))
+        {
+            ox_stack_push(result, &self->pollFds[i].fd);
+        }
+    }
+}
+
 int 
 ox_fdset_poll(struct fdset_s* self, long overtime)
 {
@@ -202,34 +250,10 @@ bool
 ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type)
 {
     int i = 0;
-    for (; i < self->nfds; i++)
+    const struct pollfd* pf = findPollfd(self, fd);
+    if (pf == NULL)
     {
-        const struct pollfd* pf = self->pollFds + i;
-        if (pf->fd != fd)
-        {
-            continue;
-        }
-
-        if ((type & ReadCheck) &&
-            (pf->revents & CHECK_READ_FLAG))
-        {
-            return true;
-        }
-        else if ((type & WriteCheck) &&
-                (pf->revents & CHECK_WRITE_FLAG))
-        {
-            return true;
-        }
-        else if ((type & ErrorCheck) &&
-                (pf->revents & CHECK_ERROR_FLAG))
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return false;
     }
-
-    return false;
+    return check_event(pf, type);
 }

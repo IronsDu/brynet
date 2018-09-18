@@ -1,7 +1,7 @@
-#ifndef _BRYNET_NET_PROMISE_RECEIVE_H
+﻿#ifndef _BRYNET_NET_PROMISE_RECEIVE_H
 #define _BRYNET_NET_PROMISE_RECEIVE_H
 
-#include <brynet/net/WrapTCPService.h>
+#include <brynet/net/TCPService.h>
 
 namespace brynet
 {
@@ -36,7 +36,7 @@ namespace brynet
 
         class PromiseReceive;
 
-        std::shared_ptr<PromiseReceive> setupPromiseReceive(const TCPSession::PTR& session);
+        std::shared_ptr<PromiseReceive> setupPromiseReceive(const DataSocket::PTR& session);
 
         class PromiseReceive : public std::enable_shared_from_this<PromiseReceive>
         {
@@ -91,7 +91,7 @@ namespace brynet
                     if (pendingReceive->len != nullptr)
                     {
                         const auto tryReceiveLen = *pendingReceive->len;
-                        if (tryReceiveLen < (len - procLen))
+                        if ((len - procLen) < tryReceiveLen)
                         {
                             break;
                         }
@@ -107,6 +107,7 @@ namespace brynet
                     {
                         size_t pos = 0;
                         bool isOK = false;
+                        auto data = buffer + procLen;
                         memsearch(buffer + procLen,
                             len-procLen, 
                             pendingReceive->str.c_str(), 
@@ -120,9 +121,8 @@ namespace brynet
                         }
 
                         mPendingReceives.pop_front();
-                        auto findLen = pos + pendingReceive->str.size();
-                        procLen += findLen;
-                        if (pendingReceive->handle(buffer + procLen - findLen, findLen))
+                        procLen += (pos + pendingReceive->str.size());
+                        if (pendingReceive->handle(data, pos))
                         {
                             mPendingReceives.push_front(pendingReceive);
                         }
@@ -146,14 +146,13 @@ namespace brynet
 
             std::deque<std::shared_ptr<PendingReceive>> mPendingReceives;
 
-            friend std::shared_ptr<PromiseReceive> setupPromiseReceive(const TCPSession::PTR& session);
+            friend std::shared_ptr<PromiseReceive> setupPromiseReceive(const DataSocket::PTR& session);
         };
 
-        std::shared_ptr<PromiseReceive> setupPromiseReceive(const TCPSession::PTR& session)
+        std::shared_ptr<PromiseReceive> setupPromiseReceive(const DataSocket::PTR& session)
         {
             auto promiseReceive = std::make_shared<PromiseReceive>();
-            session->setDataCallback([promiseReceive](const TCPSession::PTR& session, 
-                const char* buffer, 
+            session->setDataCallback([promiseReceive](const char* buffer, 
                 size_t len) {
                 return promiseReceive->process(buffer, len);
             });

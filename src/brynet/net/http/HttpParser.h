@@ -25,6 +25,8 @@ namespace brynet
 
             const std::string&                      getPath() const;
             const std::string&                      getQuery() const;
+            const std::string&                      getStatus() const;
+            int                                     getStatusCode() const;
 
             bool                                    hasEntry(const std::string& key, const std::string& value) const;
             bool                                    hasKey(const std::string& key) const;
@@ -38,7 +40,6 @@ namespace brynet
 
         private:
             void                                    clearParse();
-            bool                                    checkCompleted(const char* buffer, size_t len);
             size_t                                  tryParse(const char* buffer, size_t len);
             bool                                    isCompleted() const;
 
@@ -63,19 +64,24 @@ namespace brynet
             bool                                    mIsKeepAlive;
             bool                                    mISCompleted;
 
+            bool                                    mLastWasValue;
+            std::string                             mCurrentField;
+            std::string                             mCurrentValue;
+
             std::string                             mPath;
             std::string                             mQuery;
-            std::map<std::string, std::string>      mHeadValues;
             std::string                             mStatus;
+            std::map<std::string, std::string>      mHeadValues;
+            int                                     mStatusCode;
+
+            std::string                             mUrl;
             std::string                             mBody;
 
             std::string                             mWSCacheFrame;
-            std::string                             mParsePayload;
+            std::string                             mWSParsePayload;
             WebSocketFormat::WebSocketFrameType     mWSFrameType;
 
         private:
-            const char*                             mTmpHeadStr;
-            size_t                                  mTmpHeadLen;
 
             friend class HttpService;
         };

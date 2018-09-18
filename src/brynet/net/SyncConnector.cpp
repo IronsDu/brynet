@@ -1,4 +1,4 @@
-#include <future>
+﻿#include <future>
 #include <memory>
 #include <chrono>
 
@@ -29,11 +29,11 @@ brynet::net::TcpSocket::PTR brynet::net::SyncConnectSocket(std::string ip,
     return socketPromise->get_future().get();
 }
 
-brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
+brynet::net::DataSocket::PTR brynet::net::SyncConnectSession(std::string ip,
     int port,
     std::chrono::milliseconds timeout,
-    brynet::net::WrapTcpService::PTR service,
-    const std::vector<AddSessionOption::AddSessionOptionFunc>& options,
+    brynet::net::TcpService::PTR service,
+    const std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>& options,
     brynet::net::AsyncConnector::PTR asyncConnector)
 {
     if (service == nullptr)
@@ -47,7 +47,7 @@ brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
         asyncConnector->startWorkerThread();
     }
 
-    auto sessionPromise = std::make_shared<std::promise<TCPSession::PTR>>();
+    auto sessionPromise = std::make_shared<std::promise<DataSocket::PTR>>();
     asyncConnector->asyncConnect(
         ip,
         port,
@@ -55,12 +55,12 @@ brynet::net::TCPSession::PTR brynet::net::SyncConnectSession(std::string ip,
         [=](TcpSocket::PTR socket) mutable {
         socket->SocketNodelay();
 
-        auto enterCallback = [sessionPromise](const TCPSession::PTR& session) mutable {
+        auto enterCallback = [sessionPromise](const DataSocket::PTR& session) mutable {
             sessionPromise->set_value(session);
         };
-        std::vector < AddSessionOption::AddSessionOptionFunc> tmpOptions = options;
-        tmpOptions.push_back(brynet::net::AddSessionOption::WithEnterCallback(enterCallback));
-        service->addSession(std::move(socket), tmpOptions);
+        std::vector < TcpService::AddSocketOption::AddSocketOptionFunc> tmpOptions = options;
+        tmpOptions.push_back(brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback));
+        service->addDataSocket(std::move(socket), tmpOptions);
     }, [sessionPromise]() {
         sessionPromise->set_value(nullptr);
     });

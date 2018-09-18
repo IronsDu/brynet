@@ -1,4 +1,4 @@
-#ifndef BRYNET_NET_TCP_SERVICE_H_
+﻿#ifndef BRYNET_NET_TCP_SERVICE_H_
 #define BRYNET_NET_TCP_SERVICE_H_
 
 #include <vector>
@@ -21,17 +21,15 @@ namespace brynet
     {
         class EventLoop;
         class IOLoopData;
+        typedef std::shared_ptr<IOLoopData> IOLoopDataPtr;
 
         class TcpService : public NonCopyable, public std::enable_shared_from_this<TcpService>
         {
         public:
             typedef std::shared_ptr<TcpService>                                         PTR;
-            typedef int64_t SESSION_TYPE;
 
             typedef std::function<void(const EventLoop::PTR&)>                          FRAME_CALLBACK;
-            typedef std::function<void(SESSION_TYPE, const std::string&)>               ENTER_CALLBACK;
-            typedef std::function<void(SESSION_TYPE)>                                   DISCONNECT_CALLBACK;
-            typedef std::function<size_t(SESSION_TYPE, const char* buffer, size_t len)> DATA_CALLBACK;
+            typedef std::function<void(const DataSocket::PTR&)>                         ENTER_CALLBACK;
 
             class AddSocketOption
             {
@@ -41,8 +39,6 @@ namespace brynet
                 typedef std::function<void(Options& option)> AddSocketOptionFunc;
 
                 static AddSocketOptionFunc WithEnterCallback(TcpService::ENTER_CALLBACK callback);
-                static AddSocketOptionFunc WithDisconnectCallback(TcpService::DISCONNECT_CALLBACK callback);
-                static AddSocketOptionFunc WithDataCallback(TcpService::DATA_CALLBACK callback);
                 static AddSocketOptionFunc WithClientSideSSL();
                 static AddSocketOptionFunc WithServerSideSSL(SSLHelper::PTR sslHelper);
                 static AddSocketOptionFunc WithMaxRecvBufferSize(size_t size);
@@ -52,67 +48,31 @@ namespace brynet
         public:
             static  PTR                         Create();
 
-        public:
-            void                                send(SESSION_TYPE id, 
-                                                    const DataSocket::PACKET_PTR& packet, 
-                                                    const DataSocket::PACKED_SENDED_CALLBACK& callback = nullptr) const;
-
-            void                                postShutdown(SESSION_TYPE id) const;
-            /* still will cause dis connect callback */
-            void                                postDisConnect(SESSION_TYPE id) const;
-
-            void                                setHeartBeat(SESSION_TYPE id, 
-                                                                 std::chrono::nanoseconds checktime);
-
-
             void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
             void                                stopWorkerThread();
-            template<class... Args>
-            bool                                addDataSocket(TcpSocket::PTR socket, const Args& ... args)
+            template<class... Options>
+            bool                                addDataSocket(TcpSocket::PTR socket, const Options& ... options)
             {
-                return _addDataSocket(std::move(socket), { args... });
+                return _addDataSocket(std::move(socket), { options... });
             }
 
-            void                                wakeup(SESSION_TYPE id) const;
-            void                                wakeupAll() const;
             EventLoop::PTR                      getRandomEventLoop();
-            EventLoop::PTR                      getEventLoopBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT;
-            std::shared_ptr<IOLoopData>         getIOLoopDataBySocketID(SESSION_TYPE id) const BRYNET_NOEXCEPT;
 
-        private:
+        protected:
             TcpService() BRYNET_NOEXCEPT;
             virtual ~TcpService() BRYNET_NOEXCEPT;
 
-            bool                                helpAddChannel(DataSocket::PTR channel,
-                                                                const std::string& ip,
-                                                                const TcpService::ENTER_CALLBACK& enterCallback,
-                                                                const TcpService::DISCONNECT_CALLBACK& disConnectCallback,
-                                                                const TcpService::DATA_CALLBACK& dataCallback,
-                                                                bool forceSameThreadLoop = false);
-
-            /* pass nullptr sslHelper if fd is client socket, either is a server side socket */
             bool                                _addDataSocket(TcpSocket::PTR socket,
                 const std::vector<AddSocketOption::AddSocketOptionFunc>&);
-        private:
-            SESSION_TYPE                        MakeID(size_t loopIndex, const std::shared_ptr<IOLoopData>&);
-            void                                procDataSocketClose(DataSocket::PTR);
-            void                                postSessionAsyncProc(SESSION_TYPE id, 
-                std::function<void(DataSocket::PTR)> callback) const;
+            EventLoop::PTR                      getSameThreadEventLoop();
 
         private:
-            std::vector<std::shared_ptr<IOLoopData>>    mIOLoopDatas;
+            std::vector<IOLoopDataPtr>          mIOLoopDatas;
             mutable std::mutex                  mIOLoopGuard;
             std::shared_ptr<bool>               mRunIOLoop;
 
             std::mutex                          mServiceGuard;
         };
-
-        void IOLoopDataSend(const std::shared_ptr<IOLoopData>&, 
-            TcpService::SESSION_TYPE id, 
-            const DataSocket::PACKET_PTR& packet, 
-            const DataSocket::PACKED_SENDED_CALLBACK& callback);
-
-        const EventLoop::PTR& IOLoopDataGetEventLoop(const std::shared_ptr<IOLoopData>&);
     }
 }
 

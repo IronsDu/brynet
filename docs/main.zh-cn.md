@@ -14,16 +14,6 @@
 ## 安全的Socket对象
 `brynet`不对用户暴露原始的socket fd，而是提供`TcpSocket::PTR`，详见[Socket](https://github.com/IronsDu/brynet/blob/master/docs/socket.zh-cn.md)
 
-## 数据传输
-分别(可以)由以下几个方式进行提供数据读写
-
-- 使用裸指针表示网络对话对象,需要用户手动配合使用`EventLoop`.
-  详情见[datasocket](https://github.com/IronsDu/brynet/blob/master/docs/datasocket.zh-cn.md)
-- 使用`int64_t`表示网络对话对象,提供线程安全的发送接口,无需用户接触`EventLoop`,安全方便.
-  详情见[tcp_service](https://github.com/IronsDu/brynet/blob/master/docs/tcp_service.zh-cn.md)
-- 通过封装`TCPService`,使用`TCPSession::PTR`表示网络对象.
-  详情见[wrap_tcp_service](https://github.com/IronsDu/brynet/blob/master/docs/wrap_tcp_service.zh-cn.md)
-
 ## 高级特性
 - 提供 `promise receive` 方便解析网络消息，详见:[promise_receive](https://github.com/IronsDu/brynet/blob/master/docs/promise_receive.zh-cn.md)
 

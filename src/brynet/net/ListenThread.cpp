@@ -66,10 +66,10 @@ void ListenThread::startListen(bool isIPV6,
         throw std::runtime_error("accept callback is nullptr");
     }
 
-    sock fd = brynet::net::base::Listen(isIPV6, ip.c_str(), port, 512);
-    if (fd == SOCKET_ERROR)
+    const sock fd = brynet::net::base::Listen(isIPV6, ip.c_str(), port, 512);
+    if (fd == INVALID_SOCKET)
     {
-        throw std::runtime_error("listen error of:" + sErrno);
+        throw std::runtime_error(std::string("listen error of:") + std::to_string(sErrno));;
     }
 
     mIsIPV6 = isIPV6;
@@ -107,7 +107,12 @@ void ListenThread::stopListen()
     }
 
     *mRunListen = false;
-    brynet::net::SyncConnectSocket(mIP, mPort, std::chrono::seconds(10));
+    auto selfIP = mIP;
+    if (selfIP == "0.0.0.0")
+    {
+        selfIP = "127.0.0.1";
+    }
+    brynet::net::SyncConnectSocket(selfIP, mPort, std::chrono::seconds(10));
 
     try
     {

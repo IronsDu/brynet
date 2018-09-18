@@ -1,4 +1,4 @@
-#include <string>
+ï»¿#include <string>
 #include <cstring>
 #include <cassert>
 
@@ -11,12 +11,12 @@
 
 using namespace brynet::net;
 
-HttpSession::HttpSession(TCPSession::PTR session)
+HttpSession::HttpSession(DataSocket::PTR session)
 {
     mSession = std::move(session);
 }
 
-TCPSession::PTR& HttpSession::getSession()
+DataSocket::PTR& HttpSession::getSession()
 {
     return mSession;
 }
@@ -94,19 +94,18 @@ void HttpSession::postClose() const
     mSession->postDisConnect();
 }
 
-HttpSession::PTR HttpSession::Create(TCPSession::PTR session)
+HttpSession::PTR HttpSession::Create(DataSocket::PTR session)
 {
     struct make_shared_enabler : public HttpSession
     {
     public:
-        make_shared_enabler(TCPSession::PTR session) : HttpSession(std::move(session))
+        make_shared_enabler(DataSocket::PTR session) : HttpSession(std::move(session))
         {}
     };
-
     return std::make_shared<make_shared_enabler>(std::move(session));
 }
 
-void HttpService::setup(const TCPSession::PTR& session, 
+void HttpService::setup(const DataSocket::PTR& session,
     const HttpSession::ENTER_CALLBACK& enterCallback)
 {
     auto httpSession = HttpSession::Create(session);
@@ -138,16 +137,16 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
 
         if (!WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
         {
-            // Èç¹ûÃ»ÓÐ½âÎö³öÍêÕûµÄws frameÔòÍË³öº¯Êý
+            // å¦‚æžœæ²¡æœ‰è§£æžå‡ºå®Œæ•´çš„ws frameåˆ™é€€å‡ºå‡½æ•°
             break;
         }
 
-        // Èç¹ûµ±Ç°framµÄfinÎªfalse»òÕßopcodeÎªÑÓÐø°ü£¬Ôò½«µ±Ç°frameµÄpayloadÌí¼Óµ½cache
+        // å¦‚æžœå½“å‰framçš„finä¸ºfalseæˆ–è€…opcodeä¸ºå»¶ç»­åŒ…ï¼Œåˆ™å°†å½“å‰frameçš„payloadæ·»åŠ åˆ°cache
         if (!isFin || opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
         {
             cacheFrame += std::move(parseString);
         }
-        // Èç¹ûµ±Ç°framµÄfinÎªfalse£¬²¢ÇÒopcode²»ÎªÑÓÐø°ü£¬Ôò±íÊ¾ÊÕµ½·Ö¶ÎpayloadµÄµÚÒ»¸ö¶Î(frame)£¬ÐèÒª»º´æµ±Ç°frameµÄopcode
+        // å¦‚æžœå½“å‰framçš„finä¸ºfalseï¼Œå¹¶ä¸”opcodeä¸ä¸ºå»¶ç»­åŒ…ï¼Œåˆ™è¡¨ç¤ºæ”¶åˆ°åˆ†æ®µpayloadçš„ç¬¬ä¸€ä¸ªæ®µ(frame)ï¼Œéœ€è¦ç¼“å­˜å½“å‰frameçš„opcode
         if (!isFin && opcode != WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
         {
             httpParser->cacheWSFrameType(opcode);
@@ -155,14 +154,14 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
 
         if ( isFin)
         {
-            if (!cacheFrame.empty())
-            {
-                parseString = std::move(cacheFrame);
-                cacheFrame.clear();
-            }
-            // Èç¹ûfinÎªtrue£¬²¢ÇÒopcodeÎªÑÓÐø°ü£¬Ôò±íÊ¾·Ö¶ÎpayloadÈ«²¿½ÓÊÜÍê±Ï£¬Òò´ËÐèÒª»ñÈ¡Ö®Ç°µÚÒ»´ÎÊÕµ½·Ö¶ÎframeµÄopcode×÷ÎªÕû¸öpayloadµÄÀàÐÍ
+            // å¦‚æžœfinä¸ºtrueï¼Œå¹¶ä¸”opcodeä¸ºå»¶ç»­åŒ…ï¼Œåˆ™è¡¨ç¤ºåˆ†æ®µpayloadå…¨éƒ¨æŽ¥å—å®Œæ¯•ï¼Œå› æ­¤éœ€è¦èŽ·å–ä¹‹å‰ç¬¬ä¸€æ¬¡æ”¶åˆ°åˆ†æ®µframeçš„opcodeä½œä¸ºæ•´ä¸ªpayloadçš„ç±»åž‹
             if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
             {
+                if (!cacheFrame.empty())
+                {
+                    parseString = std::move(cacheFrame);
+                    cacheFrame.clear();
+                }
                 opcode = httpParser->getWSFrameType();
             }
 
@@ -185,10 +184,14 @@ size_t HttpService::ProcessHttp(const char* buffer,
     const HTTPParser::PTR& httpParser,
     const HttpSession::PTR& httpSession)
 {
-    const auto retlen = httpParser->tryParse(buffer, len);
+    size_t retlen = len;
     if (!httpParser->isCompleted())
     {
-        return retlen;
+        retlen = httpParser->tryParse(buffer, len);
+        if (!httpParser->isCompleted())
+        {
+            return retlen;
+        }
     }
 
     if (httpParser->isWebSocket())
@@ -226,7 +229,7 @@ void HttpService::handle(const HttpSession::PTR& httpSession)
     /*TODO::keep alive and timeout close */
     auto& session = httpSession->getSession();
 
-    session->setDisConnectCallback([httpSession](const TCPSession::PTR& session){
+    session->setDisConnectCallback([httpSession](const DataSocket::PTR& session){
         const auto& tmp = httpSession->getCloseCallback();
         if (tmp != nullptr)
         {
@@ -236,7 +239,6 @@ void HttpService::handle(const HttpSession::PTR& httpSession)
 
     auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
     session->setDataCallback([httpSession, httpParser](
-                                const TCPSession::PTR& session, 
                                 const char* buffer, size_t len){
         size_t retlen = 0;
 

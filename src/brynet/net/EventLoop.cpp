@@ -1,4 +1,4 @@
-#include <cassert>
+﻿#include <cassert>
 #include <iostream>
 
 #include <brynet/net/Channel.h>
@@ -18,21 +18,21 @@ namespace brynet
             {
             }
 
-            void    wakeup()
+            bool    wakeup() BRYNET_NOEXCEPT
             {
-                PostQueuedCompletionStatus(mIOCP, 0, (ULONG_PTR)this, (OVERLAPPED*)&mWakeupOvl);
+                return PostQueuedCompletionStatus(mIOCP, 0, reinterpret_cast<ULONG_PTR>(this), &mWakeupOvl.base);
             }
 
         private:
-            void    canRecv() override
+            void    canRecv() BRYNET_NOEXCEPT override
             {
             }
 
-            void    canSend() override
+            void    canSend() BRYNET_NOEXCEPT override
             {
             }
 
-            void    onClose() override
+            void    onClose() BRYNET_NOEXCEPT override
             {
             }
 
@@ -48,19 +48,16 @@ namespace brynet
             {
             }
 
-            void    wakeup()
+            bool    wakeup()
             {
                 uint64_t one = 1;
-                if (write(mFd, &one, sizeof one) <= 0)
-                {
-                    std::cerr << "wakeup failed" << std::endl;
-                }
+                return write(mFd, &one, sizeof one) > 0;
             }
 
             ~WakeupChannel()
             {
                 close(mFd);
-                mFd = SOCKET_ERROR;
+                mFd = INVALID_SOCKET;
             }
 
         private:
@@ -70,7 +67,7 @@ namespace brynet
                 while (true)
                 {
                     auto n = read(mFd, temp, sizeof(temp));
-                    if (n == -1 || n < sizeof(temp))
+                    if (n == -1 || static_cast<size_t>(n) < sizeof(temp))
                     {
                         break;
                     }
@@ -94,7 +91,7 @@ namespace brynet
 
 EventLoop::EventLoop()
 #ifdef PLATFORM_WINDOWS
-BRYNET_NOEXCEPT : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(new WakeupChannel(mIOCP))
+BRYNET_NOEXCEPT : mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), mWakeupChannel(std::make_unique<WakeupChannel>(mIOCP))
 #else
 BRYNET_NOEXCEPT: mEpollFd(epoll_create(1))
 #endif
@@ -103,9 +100,9 @@ BRYNET_NOEXCEPT: mEpollFd(epoll_create(1))
     mPGetQueuedCompletionStatusEx = NULL;
     auto kernel32_module = GetModuleHandleA("kernel32.dll");
     if (kernel32_module != NULL) {
-        mPGetQueuedCompletionStatusEx = (sGetQueuedCompletionStatusEx)GetProcAddress(
+        mPGetQueuedCompletionStatusEx = reinterpret_cast<sGetQueuedCompletionStatusEx>(GetProcAddress(
             kernel32_module,
-            "GetQueuedCompletionStatusEx");
+            "GetQueuedCompletionStatusEx"));
         FreeLibrary(kernel32_module);
     }
 #else
@@ -116,9 +113,6 @@ BRYNET_NOEXCEPT: mEpollFd(epoll_create(1))
 
     mIsAlreadyPostWakeup = false;
     mIsInBlock = true;
-
-    mEventEntries = nullptr;
-    mEventEntriesNum = 0;
 
     reallocEventSize(1024);
     mSelfThreadID = -1;
@@ -135,9 +129,6 @@ EventLoop::~EventLoop() BRYNET_NOEXCEPT
     close(mEpollFd);
     mEpollFd = -1;
 #endif
-    delete[] mEventEntries;
-    mEventEntries = nullptr;
-    mEventEntriesNum = 0;
 }
 
 brynet::TimerMgr::PTR EventLoop::getTimerMgr()
@@ -176,8 +167,8 @@ void EventLoop::loop(int64_t milliseconds)
     if (mPGetQueuedCompletionStatusEx != nullptr)
     {
         if (!mPGetQueuedCompletionStatusEx(mIOCP, 
-                                           mEventEntries, 
-                                           static_cast<ULONG>(mEventEntriesNum), 
+                                           mEventEntries.data(), 
+                                           mEventEntries.size(),
                                            &numComplete, 
                                            static_cast<DWORD>(milliseconds), 
                                            false))
@@ -187,15 +178,21 @@ void EventLoop::loop(int64_t milliseconds)
     }
     else
     {
-        do
+        for (auto& e : mEventEntries)
         {
+            const auto timeout = (numComplete == 0) ? static_cast<DWORD>(milliseconds) : 0;
             /* don't check the return value of GQCS */
             GetQueuedCompletionStatus(mIOCP,
-                &mEventEntries[numComplete].dwNumberOfBytesTransferred,
-                &mEventEntries[numComplete].lpCompletionKey,
-                &mEventEntries[numComplete].lpOverlapped,
-                (numComplete == 0) ? static_cast<DWORD>(milliseconds) : 0);
-        } while (mEventEntries[numComplete].lpOverlapped != nullptr && ++numComplete < mEventEntriesNum);
+                &e.dwNumberOfBytesTransferred,
+                &e.lpCompletionKey,
+                &e.lpOverlapped,
+                timeout);
+            if (e.lpOverlapped == nullptr)
+            {
+                break;
+            }
+            ++numComplete;
+        }
     }
 
     mIsInBlock = false;
@@ -203,7 +200,8 @@ void EventLoop::loop(int64_t milliseconds)
     for (ULONG i = 0; i < numComplete; ++i)
     {
         auto channel = (Channel*)mEventEntries[i].lpCompletionKey;
-        const auto ovl = (EventLoop::ovl_ext_s*)mEventEntries[i].lpOverlapped;
+        assert(channel != nullptr);
+        const auto ovl = reinterpret_cast<const EventLoop::ovl_ext_s*>(mEventEntries[i].lpOverlapped);
         if (ovl->OP == EventLoop::OLV_VALUE::OVL_RECV)
         {
             channel->canRecv();
@@ -218,7 +216,7 @@ void EventLoop::loop(int64_t milliseconds)
         }
     }
 #else
-    int numComplete = epoll_wait(mEpollFd, mEventEntries, mEventEntriesNum, milliseconds);
+    int numComplete = epoll_wait(mEpollFd, mEventEntries.data(), mEventEntries.size(), milliseconds);
 
     mIsInBlock = false;
 
@@ -252,9 +250,9 @@ void EventLoop::loop(int64_t milliseconds)
     processAsyncProcs();
     processAfterLoopProcs();
 
-    if (numComplete == mEventEntriesNum)
+    if (static_cast<size_t>(numComplete) == mEventEntries.size())
     {
-        reallocEventSize(mEventEntriesNum + 128);
+        reallocEventSize(mEventEntries.size() + 128);
     }
 
     mTimer->schedule();
@@ -288,23 +286,42 @@ bool EventLoop::wakeup()
 {
     if (!isInLoopThread() && mIsInBlock && !mIsAlreadyPostWakeup.exchange(true))
     {
-        mWakeupChannel->wakeup();
-        return true;
+        return mWakeupChannel->wakeup();
     }
 
     return false;
 }
 
-bool EventLoop::linkChannel(sock fd, Channel* ptr)
+bool EventLoop::linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT
 {
 #ifdef PLATFORM_WINDOWS
     return CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0) != nullptr;
 #else
     struct epoll_event ev = { 0, { 0 } };
     ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
-    ev.data.ptr = ptr;
+    ev.data.ptr = (void*)ptr;
     return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;
 #endif
+}
+
+DataSocketPtr EventLoop::getDataSocket(sock fd)
+{
+    auto it = mDataSockets.find(fd);
+    if (it != mDataSockets.end())
+    {
+        return (*it).second;
+    }
+    return nullptr;
+}
+
+void EventLoop::addDataSocket(sock fd, DataSocketPtr datasocket)
+{
+    mDataSockets[fd] = std::move(datasocket);
+}
+
+void EventLoop::removeDataSocket(sock fd)
+{
+    mDataSockets.erase(fd);
 }
 
 void EventLoop::pushAsyncProc(USER_PROC f)
@@ -341,17 +358,5 @@ int EventLoop::getEpollHandle() const
 
 void EventLoop::reallocEventSize(size_t size)
 {
-    if (mEventEntries != nullptr)
-    {
-        delete[] mEventEntries;
-        mEventEntries = nullptr;
-    }
-
-#ifdef PLATFORM_WINDOWS
-    mEventEntries = new OVERLAPPED_ENTRY[size];
-#else
-    mEventEntries = new epoll_event[size];
-#endif
-
-    mEventEntriesNum = size;
+    mEventEntries.resize(size);
 }

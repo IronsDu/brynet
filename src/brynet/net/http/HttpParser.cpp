@@ -8,8 +8,7 @@ using namespace brynet::net;
 
 HTTPParser::HTTPParser(http_parser_type parserType) : mParserType(parserType)
 {
-    mTmpHeadStr = nullptr;
-    mTmpHeadLen = 0;
+    mLastWasValue = true;
 
     mIsWebSocket = false;
     mIsKeepAlive = false;
@@ -17,8 +16,8 @@ HTTPParser::HTTPParser(http_parser_type parserType) : mParserType(parserType)
     mSettings.on_status = sStatusHandle;
     mSettings.on_body = sBodyHandle;
     mSettings.on_url = sUrlHandle;
-    mSettings.on_header_value = sHeadValue;
     mSettings.on_header_field = sHeadField;
+    mSettings.on_header_value = sHeadValue;
     mSettings.on_headers_complete = sHeadComplete;
     mSettings.on_message_begin = sMessageBegin;
     mSettings.on_message_complete = sMessageEnd;
@@ -47,137 +46,17 @@ bool HTTPParser::isKeepAlive() const
     return mIsKeepAlive;
 }
 
-bool HTTPParser::checkCompleted(const char* buffer, size_t len)
-{
-    const static char* RL = "\r\n";
-    const static size_t RL_LEN = strlen(RL);
-
-    const static char* DOUBLE_RL = "\r\n\r\n";
-    const static size_t DOUBLE_RL_LEN = strlen(DOUBLE_RL);
-
-    const static char* CONTENT_LENGTH_FLAG = "Content-Length: ";
-    const static size_t CONTENT_LENGTH_FLAG_LEN = strlen(CONTENT_LENGTH_FLAG);
-
-    const static char* CHUNKED_FLAG = "Transfer-Encoding: chunked";
-    const static size_t CHUNKED_FLAG_LEN = strlen(CHUNKED_FLAG);
-
-    /*  TODO::*/
-    std::string copyBuffer(buffer, len);
-    copyBuffer.push_back(0);
-
-    const char* headlineend = strstr(copyBuffer.c_str(), DOUBLE_RL);
-    if (headlineend == nullptr) return false;
-
-    const char* bodystart = headlineend + DOUBLE_RL_LEN;
-
-    const char* contentlen_find = strstr(copyBuffer.c_str(), CONTENT_LENGTH_FLAG);
-    if (contentlen_find != nullptr)
-    {
-        char temp[1024];
-        int num = 0;
-        const char* content_len_flag_start = contentlen_find + CONTENT_LENGTH_FLAG_LEN;
-        const char* content_len_flag_end = strstr(content_len_flag_start, "\r\n");
-
-        for (; content_len_flag_start < content_len_flag_end; ++content_len_flag_start)
-        {
-            temp[num++] = *content_len_flag_start;
-        }
-        temp[num++] = 0;
-        if (num == 1)
-        {
-            return false;
-        }
-
-        const int datalen = atoi(temp);
-        assert(datalen >= 0);
-        if (datalen < 0 || (len - (bodystart - copyBuffer.c_str())) < static_cast<size_t>(datalen))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    const char* has_chunked = strstr(copyBuffer.c_str(), CHUNKED_FLAG);
-    if (has_chunked == nullptr)
-    {
-        return true;
-    }
-
-    bool checkChunked = false;
-    const char* tmp = bodystart;
-    const char* len_flag = strstr(bodystart, RL);
-    while (len_flag != nullptr)
-    {
-        std::string numstr(tmp, len_flag);
-        auto nValude = std::stoi(numstr, nullptr, 10);
-
-        len_flag += (RL_LEN);
-        tmp = len_flag;
-        if (tmp >= (copyBuffer.c_str() + len))
-        {
-            break;
-        }
-
-        if (nValude == 0)
-        {
-            checkChunked = true;
-            break;
-        }
-
-        len_flag += nValude;
-        tmp = len_flag;
-        if (tmp >= (copyBuffer.c_str() + len))
-        {
-            break;
-        }
-
-        len_flag = strstr(tmp, RL);
-        if (len_flag == nullptr)
-        {
-            break;
-        }
-
-        len_flag += RL_LEN;
-        tmp = len_flag;
-        len_flag = strstr(tmp, RL);
-    }
-
-    if (checkChunked)
-    {
-        if (*tmp == '\r')
-        {
-            const char* finish = strstr(tmp, RL);
-            return finish != nullptr;
-        }
-        else
-        {
-            const char* finish = strstr(tmp, DOUBLE_RL);
-            return finish != nullptr;
-        }
-    }
-
-    return false;
-}
-
 size_t HTTPParser::tryParse(const char* buffer, size_t len)
 {
-    if (mISCompleted || !checkCompleted(buffer, len))
+    size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
+    if (mISCompleted)
     {
-        return 0;
+        mIsWebSocket = mParser.upgrade;
+        mIsKeepAlive = !hasEntry("Connection", "close");
+        http_parser_init(&mParser, mParserType);
     }
 
-    mISCompleted = true;
-
-    size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
-    http_parser_init(&mParser, mParserType);
-
-    mIsWebSocket = hasEntry("Upgrade", "websocket");
-    mIsKeepAlive = !hasEntry("Connection", "close");
-    mTmpHeadStr = nullptr;
-    mTmpHeadLen = 0;
-
-    return len;
+    return nparsed;
 }
 
 const std::string& HTTPParser::getPath() const
@@ -188,6 +67,16 @@ const std::string& HTTPParser::getPath() const
 const std::string& HTTPParser::getQuery() const
 {
     return mQuery;
+}
+
+const std::string& HTTPParser::getStatus() const
+{
+    return mStatus;
+}
+
+int HTTPParser::getStatusCode() const
+{
+    return mStatusCode;
 }
 
 bool HTTPParser::isCompleted() const
@@ -208,7 +97,7 @@ bool HTTPParser::hasKey(const std::string& key) const
 
 const std::string& HTTPParser::getValue(const std::string& key) const
 {
-    static std::string emptystr("");
+    const static std::string emptystr("");
 
     auto it = mHeadValues.find(key);
     if (it != mHeadValues.end())
@@ -233,7 +122,7 @@ std::string& HTTPParser::getWSCacheFrame()
 
 std::string& HTTPParser::getWSParseString()
 {
-    return mParsePayload;
+    return mWSParsePayload;
 }
 
 WebSocketFormat::WebSocketFrameType HTTPParser::getWSFrameType() const
@@ -256,23 +145,37 @@ int HTTPParser::sChunkComplete(http_parser* hp)
 }
 int HTTPParser::sMessageBegin(http_parser* hp)
 {
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mLastWasValue = true;
+    httpParser->mCurrentField.clear();
+    httpParser->mCurrentValue.clear();
+
     return 0;
 }
+
 int HTTPParser::sMessageEnd(http_parser* hp)
 {
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mISCompleted = true;
     return 0;
 }
+
 int HTTPParser::sHeadComplete(http_parser* hp)
 {
-    return 0;
-}
-
-int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
-{
-    struct http_parser_url u;
     HTTPParser* httpParser = (HTTPParser*)hp->data;
+    if (!httpParser->mCurrentField.empty())
+    {
+        httpParser->mHeadValues[httpParser->mCurrentField] = httpParser->mCurrentValue;
+    }
 
-    int result = http_parser_parse_url(url, length, 0, &u);
+    if (httpParser->mUrl.empty())
+    {
+        return 0;
+    }
+
+    struct http_parser_url u;
+
+    const int result = http_parser_parse_url(httpParser->mUrl.data(), httpParser->mUrl.size(), 0, &u);
     if (result != 0)
     {
         return -1;
@@ -280,15 +183,23 @@ int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
 
     if (!(u.field_set & (1 << UF_PATH)))
     {
-        fprintf(stderr, "\n\n*** failed to parse PATH in URL %s ***\n\n", url);
+        fprintf(stderr, "\n\n*** failed to parse PATH in URL %s ***\n\n", httpParser->mUrl.c_str());
         return -1;
     }
 
-    httpParser->mPath = std::string(url + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
+    httpParser->mPath = std::string(httpParser->mUrl.data() + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
     if ((u.field_set & (1 << UF_QUERY)))
     {
-        httpParser->mQuery = std::string(url + u.field_data[UF_QUERY].off, u.field_data[UF_QUERY].len);
+        httpParser->mQuery = std::string(httpParser->mUrl.data() + u.field_data[UF_QUERY].off, u.field_data[UF_QUERY].len);
     }
+
+    return 0;
+}
+
+int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
+{
+    HTTPParser* httpParser = (HTTPParser*)hp->data;
+    httpParser->mUrl.append(url, length);
 
     return 0;
 }
@@ -296,28 +207,41 @@ int HTTPParser::sUrlHandle(http_parser* hp, const char *url, size_t length)
 int HTTPParser::sHeadValue(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mHeadValues[std::string(httpParser->mTmpHeadStr, httpParser->mTmpHeadLen)] = std::string(at, length);
+    httpParser->mCurrentValue.append(at, length);
+    httpParser->mLastWasValue = true;
     return 0;
 }
 
 int HTTPParser::sHeadField(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mTmpHeadStr = at;
-    httpParser->mTmpHeadLen = length;
+    if (httpParser->mLastWasValue)
+    {
+        if (!httpParser->mCurrentField.empty())
+        {
+            sHeadComplete(hp);
+        }
+        httpParser->mCurrentField.clear();
+        httpParser->mCurrentValue.clear();
+    }
+
+    httpParser->mCurrentField.append(at, length);
+    httpParser->mLastWasValue = false;
+
     return 0;
 }
 
 int HTTPParser::sStatusHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mStatus = std::string(at, length);
+    httpParser->mStatus.append(at, length);
+    httpParser->mStatusCode = hp->status_code;
     return 0;
 }
 
 int HTTPParser::sBodyHandle(http_parser* hp, const char *at, size_t length)
 {
     HTTPParser* httpParser = (HTTPParser*)hp->data;
-    httpParser->mBody = std::string(at, length);
+    httpParser->mBody.append(at, length);
     return 0;
 }

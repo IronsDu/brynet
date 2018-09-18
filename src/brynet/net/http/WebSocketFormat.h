@@ -57,14 +57,14 @@ namespace brynet
             {
                 static_assert(std::is_same<std::string::value_type, char>::value, "");
 
-                uint8_t head = (uint8_t)frame_type | (isFin ? 0x80 : 0x00);
+                const uint8_t head = static_cast<uint8_t>(frame_type) | (isFin ? 0x80 : 0x00);
 
                 frame.clear();
-                frame.push_back((char)head);
+                frame.push_back(static_cast<char>(head));
                 if (payloadLen <= 125)
                 {
                     // mask << 7 | payloadLen, mask = 0
-                    frame.push_back((uint8_t)payloadLen);
+                    frame.push_back(static_cast<uint8_t>(payloadLen));
                 }
                 else if (payloadLen <= 0xFFFF)
                 {
@@ -102,7 +102,7 @@ namespace brynet
 
                     for (size_t i = 0; i < payloadLen; i++)
                     {
-                        frame.push_back((uint8_t)payload[i] ^ mask[i % 4]);
+                        frame.push_back(static_cast<uint8_t>(payload[i]) ^ mask[i % 4]);
                     }
                 }
                 else
