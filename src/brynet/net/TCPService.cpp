@@ -139,7 +139,7 @@ struct brynet::net::TcpService::AddSocketOption::Options
         maxRecvBufferSize = 0;
     }
 
-    TcpService::ENTER_CALLBACK      enterCallback;
+    std::vector<TcpService::ENTER_CALLBACK>      enterCallback;
 
     SSLHelper::PTR                  sslHelper;
     bool                            useSSL;
@@ -178,10 +178,17 @@ bool TcpService::_addDataSocket(TcpSocket::PTR socket,
         return false;
     }
 
+    auto wrapperEnterCallback = [options](const DataSocket::PTR& dataSocket) {
+        for (const auto& callback : options.enterCallback)
+        {
+            callback(dataSocket);
+        }
+    };
+
     const auto isServerSide = socket->isServerSide();
     auto dataSocket = DataSocket::Create(std::move(socket), 
         options.maxRecvBufferSize, 
-        options.enterCallback,
+        wrapperEnterCallback,
         eventLoop);
     (void)isServerSide;
 #ifdef USE_OPENSSL
@@ -259,7 +266,7 @@ std::shared_ptr<std::thread>& IOLoopData::getIOThread()
 TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithEnterCallback(TcpService::ENTER_CALLBACK callback)
 {
     return [=](TcpService::AddSocketOption::Options& option) {
-        option.enterCallback = callback;
+        option.enterCallback.push_back(callback);
     };
 }
 

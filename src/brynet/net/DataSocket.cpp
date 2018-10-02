@@ -707,12 +707,18 @@ void    DataSocket::removeCheckWrite()
 
 void DataSocket::setDataCallback(DATA_CALLBACK cb)
 {
-    mDataCallback = std::move(cb);
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis, cb]() {
+        sharedThis->mDataCallback = std::move(cb);
+    });
 }
 
 void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
 {
-    mDisConnectCallback = std::move(cb);
+    auto sharedThis = shared_from_this();
+    mEventLoop->pushAsyncProc([sharedThis, cb]() {
+        sharedThis->mDisConnectCallback = std::move(cb);
+    });
 }
 
 const static size_t GROW_BUFFER_SIZE = 1024;

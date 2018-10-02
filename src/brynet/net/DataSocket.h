@@ -59,7 +59,6 @@ namespace brynet
             void                            send(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
             void                            sendInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-            //TODO::线程安全问题
             void                            setDataCallback(DATA_CALLBACK cb);
             void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
