@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_SOCKET_H_
-#define BRYNET_NET_SOCKET_H_
+#pragma once
 
 #include <memory>
 #include <string>
@@ -59,7 +58,7 @@ namespace brynet
         class AcceptError : public std::runtime_error
         {
         public:
-            AcceptError(int errorCode) 
+            explicit AcceptError(int errorCode)
                 : 
                 std::runtime_error(std::to_string(errorCode)), 
                 mErrorCode(errorCode)
@@ -104,5 +103,3 @@ namespace brynet
         };
     }
 }
-
-#endif

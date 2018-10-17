@@ -1,5 +1,4 @@
-﻿#ifndef BRYNET_NET_EVENTLOOP_H_
-#define BRYNET_NET_EVENTLOOP_H_
+﻿#pragma once
 
 #include <cstdint>
 #include <functional>
@@ -116,5 +115,3 @@ namespace brynet
         };
     }
 }
-
-#endif

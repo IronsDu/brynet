@@ -1,5 +1,4 @@
-#ifndef BRYNET_TIMER_H_
-#define BRYNET_TIMER_H_
+#pragma once
 
 #include <functional>
 #include <queue>
@@ -82,5 +81,3 @@ namespace brynet
         std::priority_queue<Timer::Ptr, std::vector<Timer::Ptr>, CompareTimer>  mTimers;
     };
 }
-
-#endif

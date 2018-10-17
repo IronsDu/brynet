@@ -1,5 +1,4 @@
-﻿#ifndef BRYNET_NET_HTTPSERVICE_H_
-#define BRYNET_NET_HTTPSERVICE_H_
+﻿#pragma once
 
 #include <memory>
 
@@ -90,5 +89,3 @@ namespace brynet
         };
     }
 }
-
-#endif

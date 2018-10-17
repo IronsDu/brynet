@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_SOCKETLIBFUNCTION_H_
-#define BRYNET_NET_SOCKETLIBFUNCTION_H_
+#pragma once
 
 #include <cstdbool>
 #include <string>
@@ -29,5 +28,3 @@ namespace brynet
         }
     }
 }
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _BRYNET_NET_ANY_H
-#define _BRYNET_NET_ANY_H
+#pragma once
 
 #include <brynet/utils/CPP_VERSION.h>
 
@@ -31,5 +30,3 @@ namespace brynet
 #endif
     }
 }
-
-#endif

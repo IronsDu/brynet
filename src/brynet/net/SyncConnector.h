@@ -1,5 +1,4 @@
-﻿#ifndef BRYNET_NET_SYNC_CONNECT_H_
-#define BRYNET_NET_SYNC_CONNECT_H_
+﻿#pragma once
 
 #include <chrono>
 #include <string>
@@ -25,5 +24,3 @@ namespace brynet
             brynet::net::AsyncConnector::PTR asyncConnector = nullptr);
     }
 }
-
-#endif

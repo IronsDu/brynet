@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_WEBSOCKETFORMAT_H_
-#define BRYNET_NET_WEBSOCKETFORMAT_H_
+#pragma once
 
 #include <string>
 #include <stdint.h>
@@ -47,7 +46,6 @@ namespace brynet
                 return response;
             }
 
-            // TODO::考虑分段超大payload(延续包）的情况
             static bool wsFrameBuild(const char* payload, 
                 size_t payloadLen, 
                 std::string& frame, 
@@ -92,10 +90,10 @@ namespace brynet
                 {
                     frame[1] = ((uint8_t)frame[1]) | 0x80;
                     uint8_t mask[4];
-                    for (size_t i = 0; i < sizeof(mask) / sizeof(mask[0]); i++)
+                    for (auto& m : mask)
                     {
-                        mask[i] = rand();
-                        frame.push_back(mask[i]);
+                        m = rand();
+                        frame.push_back(m);
                     }
 
                     frame.reserve(frame.size() + payloadLen);
@@ -129,7 +127,7 @@ namespace brynet
                 size_t& frameSize, 
                 bool& outfin)
             {
-                const unsigned char* buffer = (const unsigned char*)inbuffer;
+                const auto buffer = (const unsigned char*)inbuffer;
 
                 if (bufferSize < 2)
                 {
@@ -221,6 +219,3 @@ namespace brynet
         };
     }
 }
-
-
-#endif

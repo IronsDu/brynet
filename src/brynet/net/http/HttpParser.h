@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_HTTPPARSER_H_
-#define BRYNET_NET_HTTPPARSER_H_
+#pragma once
 
 #include <string>
 #include <map>
@@ -87,5 +86,3 @@ namespace brynet
         };
     }
 }
-
-#endif

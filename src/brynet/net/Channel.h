@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_CHANNEL_H_
-#define BRYNET_NET_CHANNEL_H_
+#pragma once
 
 namespace brynet
 {
@@ -21,5 +20,3 @@ namespace brynet
         };
     }
 }
-
-#endif

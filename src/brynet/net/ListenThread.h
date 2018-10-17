@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_TCP_ACCEPTOR_H_
-#define BRYNET_NET_TCP_ACCEPTOR_H_
+#pragma once
 
 #include <string>
 #include <functional>
@@ -44,5 +43,3 @@ namespace brynet
         };
     }
 }
-
-#endif

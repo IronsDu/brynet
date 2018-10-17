@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_CONNECTOR_H_
-#define BRYNET_NET_CONNECTOR_H_
+#pragma once
 
 #include <functional>
 #include <memory>
@@ -59,5 +58,3 @@ namespace brynet
         };
     }
 }
-
-#endif

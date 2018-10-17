@@ -1,5 +1,4 @@
-#ifndef _BRYNET_NET_FDSET_INCLUDED_H
-#define _BRYNET_NET_FDSET_INCLUDED_H
+#pragma once
 
 #include <stdbool.h>
 #include <brynet/net/SocketLibTypes.h>
@@ -29,6 +28,4 @@ bool ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type);
 
 #ifdef  __cplusplus
 }
-#endif
-
 #endif

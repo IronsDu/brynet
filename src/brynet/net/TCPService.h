@@ -1,5 +1,4 @@
-﻿#ifndef BRYNET_NET_TCP_SERVICE_H_
-#define BRYNET_NET_TCP_SERVICE_H_
+﻿#pragma once
 
 #include <vector>
 #include <string>
@@ -75,5 +74,3 @@ namespace brynet
         };
     }
 }
-
-#endif

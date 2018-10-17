@@ -1,5 +1,4 @@
-#ifndef BRYNET_MSGQUEUE_H_
-#define BRYNET_MSGQUEUE_H_
+#pragma once
 
 #include <mutex>
 #include <condition_variable>
@@ -170,5 +169,3 @@ namespace brynet
         Container                       mReadList;
     };
 }
-
-#endif

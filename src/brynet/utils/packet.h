@@ -1,5 +1,4 @@
-#ifndef _BRYNET_UTILS_PACKET_H
-#define _BRYNET_UTILS_PACKET_H
+#pragma once
 
 #include <stdint.h>
 #include <assert.h>
@@ -282,7 +281,7 @@ public:
     }
 
 private:
-    // 为了避免直接<<导致没有越是字节序导致隐藏BUG,因为此函数设置为私有
+    // 涓轰簡閬垮厤鐩存帴<<瀵艰嚧娌℃湁鎸囧畾瀛楄妭搴忓鑷撮殣钘廈UG,鍥犱负姝ゅ嚱鏁拌缃负绉佹湁
     template<typename T>
     BasePacketWriter & operator << (const T& v)
     {
@@ -312,7 +311,7 @@ protected:
             return;
         }
 
-        char* newBuffer = (char*)malloc(mMaxLen + len);
+        auto newBuffer = (char*)malloc(mMaxLen + len);
         if (newBuffer == nullptr)
         {
             return;
@@ -353,9 +352,7 @@ public:
         mBuffer = buffer;
     }
 
-    virtual ~BasePacketReader()
-    {
-    }
+    virtual ~BasePacketReader() = default;
 
     size_t          getLeft() const
     {
@@ -448,7 +445,7 @@ public:
     }
 
 private:
-    // 为了避免直接read(uintXXX)导致没有指定字节序造成隐患BUG,因为此函数设置为私有
+    // 涓轰簡閬垮厤鐩存帴read(uintXXX)瀵艰嚧娌℃湁鎸囧畾瀛楄妭搴忛�犳垚闅愭偅BUG,鍥犱负姝ゅ嚱鏁拌缃负绉佹湁
     template<typename T>
     void            read(T& value)
     {
@@ -478,7 +475,7 @@ template<size_t SIZE>
 class AutoMallocPacket : public BasePacketWriter
 {
 public:
-    AutoMallocPacket(bool useBigEndian = true,
+    explicit AutoMallocPacket(bool useBigEndian = true,
         bool isAutoMalloc = false)
         :
         BasePacketWriter(mData, SIZE, useBigEndian, isAutoMalloc)
@@ -488,5 +485,3 @@ private:
 };
 
 typedef AutoMallocPacket<32 * 1024>    BigPacket;
-
-#endif

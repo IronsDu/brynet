@@ -1,5 +1,4 @@
-﻿#ifndef _BRYNET_NET_PROMISE_RECEIVE_H
-#define _BRYNET_NET_PROMISE_RECEIVE_H
+﻿#pragma once
 
 #include <brynet/net/TCPService.h>
 
@@ -161,5 +160,3 @@ namespace brynet
         }
     }
 }
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef BRYNET_TYPEIDS_H_
-#define BRYNET_TYPEIDS_H_
+#pragma once
 
 #include <vector>
 #include <cassert>
@@ -100,5 +99,3 @@ namespace brynet
         std::vector<size_t> mIds;
     };
 }
-
-#endif

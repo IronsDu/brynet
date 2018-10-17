@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_HTTPFORMAT_H_
-#define BRYNET_NET_HTTPFORMAT_H_
+#pragma once
 
 #include <string>
 #include <array>
@@ -20,7 +19,7 @@ namespace brynet
 
             void        add(const std::string& k, const std::string& v)
             {
-                if (mParameter.size() > 0)
+                if (!mParameter.empty())
                 {
                     mParameter += "&";
                 }
@@ -223,5 +222,3 @@ namespace brynet
         };
     }
 }
-
-#endif

@@ -21,7 +21,7 @@ DataSocket::DataSocket(TcpSocket::PTR socket,
 #endif
     mIP(socket->GetIP()),
     mSocket(std::move(socket)),
-    mEventLoop(eventLoop),
+    mEventLoop(std::move(eventLoop)),
     mAlreadyClose(false),
     mMaxRecvBufferSize(maxRecvBufferSize)
 {
@@ -42,7 +42,7 @@ DataSocket::DataSocket(TcpSocket::PTR socket,
     mSSL = nullptr;
     mIsHandsharked = false;
 #endif
-    mEnterCallback = enterCallback;
+    mEnterCallback = std::move(enterCallback);
 }
 
 DataSocket::~DataSocket() BRYNET_NOEXCEPT
@@ -81,10 +81,14 @@ DataSocket::PTR DataSocket::Create(TcpSocket::PTR socket,
             ENTER_CALLBACK enterCallback, 
             EventLoop::PTR eventLoop)
             :
-            DataSocket(std::move(socket), maxRecvBufferSize, enterCallback, eventLoop)
+            DataSocket(std::move(socket), maxRecvBufferSize, std::move(enterCallback), std::move(eventLoop))
         {}
     };
-    return std::make_shared<make_shared_enabler>(std::move(socket), maxRecvBufferSize, enterCallback, eventLoop);
+    return std::make_shared<make_shared_enabler>(
+            std::move(socket),
+            maxRecvBufferSize,
+            std::move(enterCallback),
+            std::move(eventLoop));
 }
 
 bool DataSocket::onEnterEventLoop()
@@ -488,14 +492,12 @@ void DataSocket::quickFlush()
     {
         int num = 0;
         size_t ready_send_len = 0;
-        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+        for(const auto& p : mSendList)
         {
-            pending_packet& b = *it;
-            iov[num].iov_base = (void*)(b.data->c_str() + (b.data->size() - b.left));
-            iov[num].iov_len = b.left;
-            ready_send_len += b.left;
+            iov[num].iov_base = (void*)(p.data->c_str() + (p.data->size() - p.left));
+            iov[num].iov_len = p.left;
+            ready_send_len += p.left;
 
-            ++it;
             num++;
             if (num >= MAX_IOVEC)
             {
@@ -524,7 +526,7 @@ void DataSocket::quickFlush()
         }
 
         auto tmp_len = static_cast<size_t>(send_len);
-        for (PACKET_LIST_TYPE::iterator it = mSendList.begin(); it != mSendList.end();)
+        for (auto it = mSendList.begin(); it != mSendList.end();)
         {
             pending_packet& b = *it;
             if (b.left > tmp_len)
@@ -582,7 +584,7 @@ void DataSocket::procCloseInLoop()
         onClose();
     }
 #else
-    struct epoll_event ev = { 0, { 0 } };
+    struct epoll_event ev = { 0, { nullptr } };
     epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
     onClose();
 #endif

@@ -1,14 +1,10 @@
 #include <cassert>
 #include <set>
-#include <vector>
 #include <map>
 #include <thread>
-#include <string>
-#include <cstring>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/fdset.h>
-#include <brynet/utils/stack.h>
 
 #include <brynet/net/Connector.h>
 
@@ -22,16 +18,16 @@ namespace brynet
         class AsyncConnectAddr
         {
         public:
-            AsyncConnectAddr(const std::string& ip, 
+            AsyncConnectAddr(std::string ip,
                 int port, 
                 std::chrono::nanoseconds timeout, 
-                const AsyncConnector::COMPLETED_CALLBACK& successCB,
-                const AsyncConnector::FAILED_CALLBACK& failedCB) : 
-                mIP(ip),
+                AsyncConnector::COMPLETED_CALLBACK successCB,
+                AsyncConnector::FAILED_CALLBACK failedCB) :
+                mIP(std::move(ip)),
                 mPort(port), 
                 mTimeout(timeout), 
-                mSuccessCB(successCB),
-                mFailedCB(failedCB)
+                mSuccessCB(std::move(successCB)),
+                mFailedCB(std::move(failedCB))
             {
             }
 
@@ -61,11 +57,11 @@ namespace brynet
             }
 
         private:
-            std::string                         mIP;
-            int                                 mPort;
-            std::chrono::nanoseconds            mTimeout;
-            AsyncConnector::COMPLETED_CALLBACK  mSuccessCB;
-            AsyncConnector::FAILED_CALLBACK     mFailedCB;
+            const std::string                   mIP;
+            const int                           mPort;
+            const std::chrono::nanoseconds      mTimeout;
+            const AsyncConnector::COMPLETED_CALLBACK    mSuccessCB;
+            const AsyncConnector::FAILED_CALLBACK       mFailedCB;
         };
 
         class ConnectorWorkInfo final : public NonCopyable

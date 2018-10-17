@@ -1,7 +1,4 @@
-#ifndef _APP_STATUS_H
-#define _APP_STATUS_H
-
-/*  ½ø³Ì×´Ì¬¿ØÖÆ  */
+#pragma once
 
 #include <stdbool.h>
 
@@ -17,6 +14,4 @@ int     app_kbhit(void);
 
 #ifdef  __cplusplus
 }
-#endif
-
 #endif

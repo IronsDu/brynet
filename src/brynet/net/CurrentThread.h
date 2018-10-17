@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_CURRENTTHREAD_H_
-#define BRYNET_NET_CURRENTTHREAD_H_
+#pragma once
 
 #include <thread>
 #include <brynet/net/Platform.h>
@@ -29,5 +28,3 @@ namespace brynet
         }
     }
 }
-
-#endif

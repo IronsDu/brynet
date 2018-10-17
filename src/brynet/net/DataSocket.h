@@ -1,5 +1,4 @@
-﻿#ifndef BRYNET_NET_DATASOCKET_H_
-#define BRYNET_NET_DATASOCKET_H_
+﻿#pragma once
 
 #include <memory>
 #include <functional>
@@ -167,5 +166,3 @@ namespace brynet
         };
     }
 }
-
-#endif

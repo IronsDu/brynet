@@ -1,10 +1,5 @@
 ﻿#include <string>
-#include <cstring>
-#include <cassert>
 
-#include <brynet/utils/SHA1.h>
-#include <brynet/utils/base64.h>
-#include <brynet/net/http/http_parser.h>
 #include <brynet/net/http/WebSocketFormat.h>
 
 #include <brynet/net/http/HttpService.h>
@@ -28,7 +23,7 @@ const BrynetAny& HttpSession::getUD() const
 
 void HttpSession::setUD(BrynetAny ud)
 {
-    mUD = ud;
+    mUD = std::move(ud);
 }
 
 void HttpSession::setHttpCallback(HTTPPARSER_CALLBACK callback)
@@ -99,7 +94,7 @@ HttpSession::PTR HttpSession::Create(DataSocket::PTR session)
     struct make_shared_enabler : public HttpSession
     {
     public:
-        make_shared_enabler(DataSocket::PTR session) : HttpSession(std::move(session))
+        explicit make_shared_enabler(DataSocket::PTR session) : HttpSession(std::move(session))
         {}
     };
     return std::make_shared<make_shared_enabler>(std::move(session));
@@ -144,7 +139,8 @@ size_t HttpService::ProcessWebSocket(const char* buffer,
         // 如果当前fram的fin为false或者opcode为延续包，则将当前frame的payload添加到cache
         if (!isFin || opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
         {
-            cacheFrame += std::move(parseString);
+            cacheFrame += parseString;
+            parseString.clear();
         }
         // 如果当前fram的fin为false，并且opcode不为延续包，则表示收到分段payload的第一个段(frame)，需要缓存当前frame的opcode
         if (!isFin && opcode != WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)

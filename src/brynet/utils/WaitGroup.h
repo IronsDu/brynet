@@ -1,5 +1,4 @@
-#ifndef _WAIT_GROUP_H
-#define _WAIT_GROUP_H
+#pragma once
 
 #include <mutex>
 #include <atomic>
@@ -56,8 +55,7 @@ namespace brynet
         {
         }
 
-        virtual ~WaitGroup()
-        {}
+        virtual ~WaitGroup() = default;
 
     private:
         std::mutex              mMutex;
@@ -65,5 +63,3 @@ namespace brynet
         std::condition_variable mCond;
     };
 }
-
-#endif

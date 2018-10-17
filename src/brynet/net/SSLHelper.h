@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_SSL_HELPER_H_
-#define BRYNET_NET_SSL_HELPER_H_
+#pragma once
 
 #include <string>
 #include <memory>
@@ -48,5 +47,3 @@ namespace brynet
         };
     }
 }
-
-#endif

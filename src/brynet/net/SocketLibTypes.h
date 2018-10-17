@@ -1,5 +1,4 @@
-#ifndef DODO_NET_SOCKETLIBTYPES_H_
-#define DODO_NET_SOCKETLIBTYPES_H_
+#pragma once
 
 #include <brynet/net/Platform.h>
 
@@ -53,5 +52,3 @@ typedef int sock;
 typedef unsigned short int port;
 typedef unsigned long int ipaddress;
 #define IP_SIZE (20)
-
-#endif
