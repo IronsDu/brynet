@@ -11,6 +11,7 @@
 
 using namespace brynet;
 using namespace brynet::net;
+using namespace brynet::net::http;
 
 int main(int argc, char **argv)
 {

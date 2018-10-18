@@ -8,8 +8,9 @@
 
 #include <brynet/net/Noexcept.h>
 
-namespace brynet
-{
+namespace brynet { namespace timer {
+
+    using namespace std::chrono;
     class TimerMgr;
 
     class Timer
@@ -19,14 +20,12 @@ namespace brynet
         typedef std::weak_ptr<Timer>            WeakPtr;
         typedef std::function<void(void)>       Callback;
 
-        Timer(std::chrono::steady_clock::time_point startTime, 
-            std::chrono::nanoseconds lastTime, 
-            Callback f) BRYNET_NOEXCEPT;
+        Timer(steady_clock::time_point startTime, nanoseconds lastTime, Callback f) BRYNET_NOEXCEPT;
 
-        const std::chrono::steady_clock::time_point&    getStartTime() const;
-        const std::chrono::nanoseconds&         getLastTime() const;
+        const steady_clock::time_point&         getStartTime() const;
+        const nanoseconds&                      getLastTime() const;
 
-        std::chrono::nanoseconds                getLeftTime() const;
+        nanoseconds                             getLeftTime() const;
         void                                    cancel();
 
     private:
@@ -35,8 +34,8 @@ namespace brynet
     private:
         bool                                    mActive;
         Callback                                mCallback;
-        const std::chrono::steady_clock::time_point mStartTime;
-        std::chrono::nanoseconds                mLastTime;
+        const steady_clock::time_point          mStartTime;
+        nanoseconds                             mLastTime;
 
         friend class TimerMgr;
     };
@@ -47,13 +46,12 @@ namespace brynet
         typedef std::shared_ptr<TimerMgr>   PTR;
 
         template<typename F, typename ...TArgs>
-        Timer::WeakPtr                          addTimer(std::chrono::nanoseconds timeout, 
-                                                         F callback, 
-                                                         TArgs&& ...args)
+        Timer::WeakPtr                          addTimer(nanoseconds timeout, F callback, TArgs&& ...args)
         {
-            auto timer = std::make_shared<Timer>(std::chrono::steady_clock::now(),
-                                                std::chrono::nanoseconds(timeout),
-                                                std::bind(std::move(callback), std::forward<TArgs>(args)...));
+            auto timer = std::make_shared<Timer>(
+                steady_clock::now(), 
+                nanoseconds(timeout),
+                std::bind(std::move(callback), std::forward<TArgs>(args)...));
             mTimers.push(timer);
 
             return timer;
@@ -62,7 +60,7 @@ namespace brynet
         void                                    schedule();
         bool                                    isEmpty() const;
         // if timer empty, return zero
-        std::chrono::nanoseconds                nearLeftTime() const;
+        nanoseconds                             nearLeftTime() const;
         void                                    clear();
 
     private:
@@ -80,4 +78,5 @@ namespace brynet
 
         std::priority_queue<Timer::Ptr, std::vector<Timer::Ptr>, CompareTimer>  mTimers;
     };
-}
+
+} }

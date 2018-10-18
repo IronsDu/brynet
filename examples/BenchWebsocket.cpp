@@ -12,6 +12,8 @@
 
 using namespace brynet;
 using namespace brynet::net;
+using namespace brynet::net::http;
+using namespace brynet::utils;
 
 std::atomic<int32_t> count;
 

@@ -5,7 +5,7 @@
 #include <chrono>
 
 TEST_CASE("Timer are computed", "[timer]") {
-    auto timerMgr = std::make_shared<brynet::TimerMgr>();
+    auto timerMgr = std::make_shared<brynet::timer::TimerMgr>();
 
     int upvalue = 0;
     auto timer = timerMgr->addTimer(std::chrono::seconds(1), [&upvalue]() {

@@ -1,7 +1,7 @@
 #pragma once
 
-namespace brynet
-{
+namespace brynet { namespace utils {
+
     class NonCopyable
     {
     public:
@@ -12,4 +12,5 @@ namespace brynet
         NonCopyable() = default;
         ~NonCopyable() = default;
     };
-}
+
+} }

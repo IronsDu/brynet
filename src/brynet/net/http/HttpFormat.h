@@ -5,220 +5,218 @@
 #include <unordered_map>
 #include <cassert>
 
-namespace brynet
-{
-    namespace net
+namespace brynet { namespace net { namespace http {
+
+    class HttpQueryParameter
     {
-        class HttpQueryParameter
+    public:
+        void        add(const std::string& v)
         {
-        public:
-            void        add(const std::string& v)
+            mParameter += v;
+        }
+
+        void        add(const std::string& k, const std::string& v)
+        {
+            if (!mParameter.empty())
             {
-                mParameter += v;
+                mParameter += "&";
             }
 
-            void        add(const std::string& k, const std::string& v)
-            {
-                if (!mParameter.empty())
-                {
-                    mParameter += "&";
-                }
+            mParameter += k;
+            mParameter += "=";
+            mParameter += v;
+        }
 
-                mParameter += k;
-                mParameter += "=";
-                mParameter += v;
-            }
+        std::string getResult() const
+        {
+            return mParameter;
+        }
 
-            std::string getResult() const
-            {
-                return mParameter;
-            }
+    private:
+        std::string mParameter;
+    };
 
-        private:
-            std::string mParameter;
+    class HttpRequest
+    {
+    public:
+
+        enum class HTTP_METHOD
+        {
+            HTTP_METHOD_HEAD,
+            HTTP_METHOD_GET,
+            HTTP_METHOD_POST,
+            HTTP_METHOD_PUT,
+            HTTP_METHOD_DELETE,
+            HTTP_METHOD_MAX
         };
 
-        class HttpRequest
+        HttpRequest()
         {
-        public:
+            setMethod(HTTP_METHOD::HTTP_METHOD_GET);
+        }
 
-            enum class HTTP_METHOD
-            {
-                HTTP_METHOD_HEAD,
-                HTTP_METHOD_GET,
-                HTTP_METHOD_POST,
-                HTTP_METHOD_PUT,
-                HTTP_METHOD_DELETE,
-                HTTP_METHOD_MAX
-            };
+        void        setMethod(HTTP_METHOD protocol)
+        {
+            mMethod = protocol;
+            assert(mMethod > HTTP_METHOD::HTTP_METHOD_HEAD && mMethod < HTTP_METHOD::HTTP_METHOD_MAX);
+        }
 
-            HttpRequest()
+        void        setHost(const std::string& host)
+        {
+            addHeadValue("Host", host);
+        }
+
+        void        setUrl(const std::string& url)
+        {
+            mUrl = url;
+        }
+
+        void        setCookie(const std::string& v)
+        {
+            addHeadValue("Cookie", v);
+        }
+
+        void        setContentType(const std::string& v)
+        {
+            addHeadValue("Content-Type", v);
+        }
+
+        void        setQuery(const std::string& query)
+        {
+            mQuery = query;
+        }
+
+        void        setBody(const std::string& body)
+        {
+            mBody = body;
+            addHeadValue("Content-Length", std::to_string(body.size()));
+        }
+
+        void        addHeadValue(const std::string& field, const std::string& value)
+        {
+            mHeadField[field] = value;
+        }
+
+        std::string      getResult() const
+        {
+            const static std::array<std::string, static_cast<size_t>(HTTP_METHOD::HTTP_METHOD_MAX)> HttpMethodString =
+            { "HEAD", "GET", "POST", "PUT", "DELETE" };
+
+            std::string ret;
+            if (mMethod >= HTTP_METHOD::HTTP_METHOD_HEAD && mMethod < HTTP_METHOD::HTTP_METHOD_MAX)
             {
-                setMethod(HTTP_METHOD::HTTP_METHOD_GET);
+                ret += HttpMethodString[static_cast<size_t>(mMethod)];
             }
 
-            void        setMethod(HTTP_METHOD protocol)
+            ret += " ";
+            ret += mUrl;
+            if (!mQuery.empty())
             {
-                mMethod = protocol;
-                assert(mMethod > HTTP_METHOD::HTTP_METHOD_HEAD && mMethod < HTTP_METHOD::HTTP_METHOD_MAX);
+                ret += "?";
+                ret += mQuery;
             }
 
-            void        setHost(const std::string& host)
+            ret += " HTTP/1.1\r\n";
+
+            for (auto& v : mHeadField)
             {
-                addHeadValue("Host", host);
-            }
-
-            void        setUrl(const std::string& url)
-            {
-                mUrl = url;
-            }
-
-            void        setCookie(const std::string& v)
-            {
-                addHeadValue("Cookie", v);
-            }
-
-            void        setContentType(const std::string& v)
-            {
-                addHeadValue("Content-Type", v);
-            }
-
-            void        setQuery(const std::string& query)
-            {
-                mQuery = query;
-            }
-
-            void        setBody(const std::string& body)
-            {
-                mBody = body;
-                addHeadValue("Content-Length", std::to_string(body.size()));
-            }
-
-            void        addHeadValue(const std::string& field, const std::string& value)
-            {
-                mHeadField[field] = value;
-            }
-
-            std::string      getResult() const
-            {
-                const static std::array<std::string, static_cast<size_t>(HTTP_METHOD::HTTP_METHOD_MAX)> HttpMethodString =
-                        {"HEAD", "GET", "POST", "PUT", "DELETE"};
-
-                std::string ret;
-                if (mMethod >= HTTP_METHOD::HTTP_METHOD_HEAD && mMethod < HTTP_METHOD::HTTP_METHOD_MAX)
-                {
-                    ret += HttpMethodString[static_cast<size_t>(mMethod)];
-                }
-
-                ret += " ";
-                ret += mUrl;
-                if (!mQuery.empty())
-                {
-                    ret += "?";
-                    ret += mQuery;
-                }
-
-                ret += " HTTP/1.1\r\n";
-
-                for (auto& v : mHeadField)
-                {
-                    ret += v.first;
-                    ret += ": ";
-                    ret += v.second;
-                    ret += "\r\n";
-                }
-
+                ret += v.first;
+                ret += ": ";
+                ret += v.second;
                 ret += "\r\n";
-
-                if (!mBody.empty())
-                {
-                    ret += mBody;
-                }
-
-                return ret;
             }
 
-        private:
-            std::string                         mUrl;
-            std::string                         mQuery;
-            std::string                         mBody;
-            HTTP_METHOD                         mMethod;
-            std::unordered_map<std::string, std::string>  mHeadField;
+            ret += "\r\n";
+
+            if (!mBody.empty())
+            {
+                ret += mBody;
+            }
+
+            return ret;
+        }
+
+    private:
+        std::string                         mUrl;
+        std::string                         mQuery;
+        std::string                         mBody;
+        HTTP_METHOD                         mMethod;
+        std::unordered_map<std::string, std::string>  mHeadField;
+    };
+
+    class HttpResponse
+    {
+    public:
+
+        enum class HTTP_RESPONSE_STATUS
+        {
+            NONE,
+            OK = 200,
         };
 
-        class HttpResponse
+        HttpResponse() : mStatus(HTTP_RESPONSE_STATUS::OK)
         {
-        public:
+        }
 
-            enum class HTTP_RESPONSE_STATUS
-            {
-                NONE,
-                OK = 200,
-            };
+        void        setStatus(HTTP_RESPONSE_STATUS status)
+        {
+            mStatus = status;
+        }
 
-            HttpResponse() : mStatus(HTTP_RESPONSE_STATUS::OK)
+        void        setContentType(const std::string& v)
+        {
+            addHeadValue("Content-Type", v);
+        }
+
+        void        addHeadValue(const std::string& field, const std::string& value)
+        {
+            mHeadField[field] = value;
+        }
+
+        void        setBody(const std::string& body)
+        {
+            mBody = body;
+            addHeadValue("Content-Length", std::to_string(body.size()));
+        }
+
+        std::string      getResult() const
+        {
+            std::string ret = "HTTP/1.1 ";
+
+            ret += std::to_string(static_cast<int>(mStatus));
+            switch (mStatus)
             {
+            case HTTP_RESPONSE_STATUS::OK:
+                ret += " OK";
+            default:
+                ret += "UNKNOWN";
+                break;
             }
 
-            void        setStatus(HTTP_RESPONSE_STATUS status)
+            ret += "\r\n";
+
+            for (auto& v : mHeadField)
             {
-                mStatus = status;
-            }
-
-            void        setContentType(const std::string& v)
-            {
-                addHeadValue("Content-Type", v);
-            }
-
-            void        addHeadValue(const std::string& field, const std::string& value)
-            {
-                mHeadField[field] = value;
-            }
-
-            void        setBody(const std::string& body)
-            {
-                mBody = body;
-                addHeadValue("Content-Length", std::to_string(body.size()));
-            }
-
-            std::string      getResult() const
-            {
-                std::string ret = "HTTP/1.1 ";
-
-                ret += std::to_string(static_cast<int>(mStatus));
-                switch (mStatus)
-                {
-                case HTTP_RESPONSE_STATUS::OK:
-                    ret += " OK";
-                default:
-                    ret += "UNKNOWN";
-                    break;
-                }
-
+                ret += v.first;
+                ret += ": ";
+                ret += v.second;
                 ret += "\r\n";
-
-                for (auto& v : mHeadField)
-                {
-                    ret += v.first;
-                    ret += ": ";
-                    ret += v.second;
-                    ret += "\r\n";
-                }
-
-                ret += "\r\n";
-
-                if (!mBody.empty())
-                {
-                    ret += mBody;
-                }
-
-                return ret;
             }
 
-        private:
-            HTTP_RESPONSE_STATUS                mStatus;
-            std::unordered_map<std::string, std::string>  mHeadField;
-            std::string                         mBody;
-        };
-    }
-}
+            ret += "\r\n";
+
+            if (!mBody.empty())
+            {
+                ret += mBody;
+            }
+
+            return ret;
+        }
+
+    private:
+        HTTP_RESPONSE_STATUS                mStatus;
+        std::unordered_map<std::string, std::string>  mHeadField;
+        std::string                         mBody;
+    };
+
+} } }

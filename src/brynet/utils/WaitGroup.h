@@ -8,9 +8,9 @@
 
 #include <brynet/utils/NonCopyable.h>
 
-namespace brynet
-{
-    class WaitGroup : public brynet::NonCopyable
+namespace brynet { namespace utils {
+
+    class WaitGroup : public NonCopyable
     {
     public:
         typedef std::shared_ptr<WaitGroup> PTR;
@@ -62,4 +62,4 @@ namespace brynet
         std::atomic<int>        mCounter;
         std::condition_variable mCond;
     };
-}
+} }
