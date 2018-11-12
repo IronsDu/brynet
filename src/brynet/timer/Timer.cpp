@@ -28,8 +28,8 @@ namespace brynet { namespace timer {
         :
         mActive(true),
         mCallback(std::move(callback)),
-        mStartTime(std::move(startTime)),
-        mLastTime(std::move(lastTime))
+        mStartTime(startTime),
+        mLastTime(lastTime)
     {
     }
 

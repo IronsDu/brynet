@@ -143,7 +143,7 @@ namespace brynet { namespace net {
         auto packetCapture = packet;
         auto callbackCapture = callback;
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, packetCapture, callbackCapture]() {
+        mEventLoop->pushAsyncProc([sharedThis, packetCapture, callbackCapture]() mutable {
             const auto len = packetCapture->size();
             sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
             sharedThis->runAfterFlush();
@@ -688,7 +688,7 @@ namespace brynet { namespace net {
             mPostWriteCheck = true;
         }
 #else
-        struct epoll_event ev = { 0, { 0 } };
+        struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
@@ -700,7 +700,7 @@ namespace brynet { namespace net {
 #ifdef PLATFORM_LINUX
     void    DataSocket::removeCheckWrite()
     {
-        struct epoll_event ev = { 0, { 0 } };
+        struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
@@ -710,7 +710,7 @@ namespace brynet { namespace net {
     void DataSocket::setDataCallback(DATA_CALLBACK cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, cb]() {
+        mEventLoop->pushAsyncProc([sharedThis, cb]() mutable {
             sharedThis->mDataCallback = std::move(cb);
         });
     }
@@ -718,7 +718,7 @@ namespace brynet { namespace net {
     void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, cb]() {
+        mEventLoop->pushAsyncProc([sharedThis, cb]() mutable {
             sharedThis->mDisConnectCallback = std::move(cb);
         });
     }

@@ -52,7 +52,7 @@ namespace brynet { namespace net {
             return write(mFd, &one, sizeof one) > 0;
         }
 
-        ~WakeupChannel()
+        ~WakeupChannel() override
         {
             close(mFd);
             mFd = INVALID_SOCKET;
@@ -297,7 +297,7 @@ namespace brynet { namespace net {
 #ifdef PLATFORM_WINDOWS
         return CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0) != nullptr;
 #else
-        struct epoll_event ev = { 0, { 0 } };
+        struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (void*)ptr;
         return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;

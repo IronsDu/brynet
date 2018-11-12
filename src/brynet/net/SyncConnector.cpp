@@ -19,7 +19,7 @@ namespace brynet { namespace net {
 
         auto socketPromise = std::make_shared<std::promise<TcpSocket::PTR>>();
         asyncConnector->asyncConnect(
-            ip,
+            std::move(ip),
             port,
             timeout,
             [socketPromise](TcpSocket::PTR socket) {
@@ -51,7 +51,7 @@ namespace brynet { namespace net {
 
         auto sessionPromise = std::make_shared<std::promise<DataSocket::PTR>>();
         asyncConnector->asyncConnect(
-            ip,
+            std::move(ip),
             port,
             timeout,
             [=](TcpSocket::PTR socket) mutable {

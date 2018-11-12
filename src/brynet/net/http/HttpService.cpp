@@ -110,11 +110,14 @@ namespace brynet { namespace net { namespace http {
         HttpService::handle(httpSession);
     }
 
-    size_t HttpService::ProcessWebSocket(const char* buffer, size_t len, const HTTPParser::PTR& httpParser, const HttpSession::PTR& httpSession)
+    size_t HttpService::ProcessWebSocket(const char* buffer,
+                                         const size_t len,
+                                         const HTTPParser::PTR& httpParser,
+                                         const HttpSession::PTR& httpSession)
     {
-        const char* parse_str = buffer;
         size_t leftLen = len;
 
+        const auto& wsCallback = httpSession->getWSCallback();
         auto& cacheFrame = httpParser->getWSCacheFrame();
         auto& parseString = httpParser->getWSParseString();
 
@@ -126,7 +129,7 @@ namespace brynet { namespace net { namespace http {
             size_t frameSize = 0;
             bool isFin = false;
 
-            if (!WebSocketFormat::wsFrameExtractBuffer(parse_str, leftLen, parseString, opcode, frameSize, isFin))
+            if (!WebSocketFormat::wsFrameExtractBuffer(buffer, leftLen, parseString, opcode, frameSize, isFin))
             {
                 // 如果没有解析出完整的ws frame则退出函数
                 break;
@@ -144,34 +147,38 @@ namespace brynet { namespace net { namespace http {
                 httpParser->cacheWSFrameType(opcode);
             }
 
-            if (isFin)
-            {
-                // 如果fin为true，并且opcode为延续包，则表示分段payload全部接受完毕，因此需要获取之前第一次收到分段frame的opcode作为整个payload的类型
-                if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
-                {
-                    if (!cacheFrame.empty())
-                    {
-                        parseString = std::move(cacheFrame);
-                        cacheFrame.clear();
-                    }
-                    opcode = httpParser->getWSFrameType();
-                }
+            leftLen -= frameSize;
+            buffer += frameSize;
 
-                const auto& wsCallback = httpSession->getWSCallback();
-                if (wsCallback != nullptr)
-                {
-                    wsCallback(httpSession, opcode, parseString);
-                }
+            if (!isFin)
+            {
+                continue;
             }
 
-            leftLen -= frameSize;
-            parse_str += frameSize;
+            // 如果fin为true，并且opcode为延续包，则表示分段payload全部接受完毕，因此需要获取之前第一次收到分段frame的opcode作为整个payload的类型
+            if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
+            {
+                if (!cacheFrame.empty())
+                {
+                    parseString = std::move(cacheFrame);
+                    cacheFrame.clear();
+                }
+                opcode = httpParser->getWSFrameType();
+            }
+
+            if (wsCallback != nullptr)
+            {
+                wsCallback(httpSession, opcode, parseString);
+            }
         }
 
-        return parse_str - buffer;
+        return (len - leftLen);
     }
 
-    size_t HttpService::ProcessHttp(const char* buffer, size_t len, const HTTPParser::PTR& httpParser, const HttpSession::PTR& httpSession)
+    size_t HttpService::ProcessHttp(const char* buffer,
+                                    const size_t len,
+                                    const HTTPParser::PTR& httpParser,
+                                    const HttpSession::PTR& httpSession)
     {
         size_t retlen = len;
         if (!httpParser->isCompleted())
@@ -219,6 +226,7 @@ namespace brynet { namespace net { namespace http {
         auto& session = httpSession->getSession();
 
         session->setDisConnectCallback([httpSession](const DataSocket::PTR& session) {
+            (void)session;
             const auto& tmp = httpSession->getCloseCallback();
             if (tmp != nullptr)
             {
