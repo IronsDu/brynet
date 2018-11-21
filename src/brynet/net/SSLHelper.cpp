@@ -88,7 +88,7 @@ namespace brynet { namespace net {
         SSL_CTX_set_client_CA_list(mOpenSSLCTX, SSL_load_client_CA_file(certificate.c_str()));
         SSL_CTX_set_verify_depth(mOpenSSLCTX, 10);
 
-        if (SSL_CTX_use_certificate_file(mOpenSSLCTX, certificate.c_str(), SSL_FILETYPE_PEM) <= 0)
+        if (SSL_CTX_use_certificate_chain_file(mOpenSSLCTX, certificate.c_str()) <= 0)
         {
             SSL_CTX_free(mOpenSSLCTX);
             mOpenSSLCTX = nullptr;
