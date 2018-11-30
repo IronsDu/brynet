@@ -576,7 +576,7 @@ namespace brynet { namespace net {
             }
             if (mPostWriteCheck)
             {
-                CancelIoEx(HANDLE(mSocket->getFD()), &mOvlRecv.base);
+                CancelIoEx(HANDLE(mSocket->getFD()), &mOvlSend.base);
             }
         }
         else
@@ -763,9 +763,13 @@ namespace brynet { namespace net {
     {
         if (!mTimer.lock() && mCheckTime != std::chrono::steady_clock::duration::zero())
         {
-            auto sharedThis = shared_from_this();
-            mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [sharedThis]() {
-                sharedThis->PingCheck();
+            std::weak_ptr<DataSocket> weakedThis = shared_from_this();
+            mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [weakedThis]() {
+                auto sharedThis = weakedThis.lock();
+                if (sharedThis != nullptr)
+                {
+                    sharedThis->PingCheck();
+                }
             });
         }
     }
