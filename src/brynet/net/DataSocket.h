@@ -1,5 +1,4 @@
-﻿#ifndef BRYNET_NET_DATASOCKET_H_
-#define BRYNET_NET_DATASOCKET_H_
+﻿#pragma once
 
 #include <memory>
 #include <functional>
@@ -30,142 +29,138 @@ extern "C" {
 
 struct buffer_s;
 
-namespace brynet
-{
-    namespace net
+namespace brynet { namespace net {
+
+    class DataSocket : public Channel, public utils::NonCopyable, public std::enable_shared_from_this<DataSocket>
     {
-        class DataSocket : public Channel, public NonCopyable, public std::enable_shared_from_this<DataSocket>
-        {
-        public:
-            typedef std::shared_ptr<DataSocket>                                         PTR;
+    public:
+        typedef std::shared_ptr<DataSocket>                                         PTR;
 
-            typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
-            typedef std::function<size_t(const char* buffer, size_t len)>               DATA_CALLBACK;
-            typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
-            typedef std::function<void(void)>                                           PACKED_SENDED_CALLBACK;
+        typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
+        typedef std::function<size_t(const char* buffer, size_t len)>               DATA_CALLBACK;
+        typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
+        typedef std::function<void(void)>                                           PACKED_SENDED_CALLBACK;
 
-            typedef std::shared_ptr<std::string>                                        PACKET_PTR;
+        typedef std::shared_ptr<std::string>                                        PACKET_PTR;
 
-        public:
-            PTR static Create(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR);
+    public:
+        PTR static Create(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR);
 
-            /* must called in network thread */
-            bool                            onEnterEventLoop();
-            const EventLoop::PTR&           getEventLoop() const;
+        /* must called in network thread */
+        bool                            onEnterEventLoop();
+        const EventLoop::PTR&           getEventLoop() const;
 
-            //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
+        //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
 
-            void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                            send(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-            void                            sendInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+        void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
+        void                            send(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+        void                            sendInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
 
-            void                            setDataCallback(DATA_CALLBACK cb);
-            void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
+        void                            setDataCallback(DATA_CALLBACK cb);
+        void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
 
-            /* if checkTime is zero, will cancel check heartbeat */
-            void                            setHeartBeat(std::chrono::nanoseconds checkTime);
-            void                            postDisConnect();
-            void                            postShutdown();
+        /* if checkTime is zero, will cancel check heartbeat */
+        void                            setHeartBeat(std::chrono::nanoseconds checkTime);
+        void                            postDisConnect();
+        void                            postShutdown();
 
-            void                            setUD(BrynetAny value);
-            const BrynetAny&                getUD() const;
+        void                            setUD(BrynetAny value);
+        const BrynetAny&                getUD() const;
 
-            const std::string&              getIP() const;
+        const std::string&              getIP() const;
 
 #ifdef USE_OPENSSL
-            bool                            initAcceptSSL(SSL_CTX*);
-            bool                            initConnectSSL();
+        bool                            initAcceptSSL(SSL_CTX*);
+        bool                            initConnectSSL();
 #endif
 
-            static  DataSocket::PACKET_PTR  makePacket(const char* buffer, size_t len);
+        static  DataSocket::PACKET_PTR  makePacket(const char* buffer, size_t len);
 
-        protected:
-            DataSocket(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR) BRYNET_NOEXCEPT;
-            virtual ~DataSocket() BRYNET_NOEXCEPT;
+    protected:
+        DataSocket(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR) BRYNET_NOEXCEPT;
+        virtual ~DataSocket() BRYNET_NOEXCEPT;
 
-        private:
-            void                            growRecvBuffer();
+    private:
+        void                            growRecvBuffer();
 
-            void                            PingCheck();
-            void                            startPingCheckTimer();
+        void                            PingCheck();
+        void                            startPingCheckTimer();
 
-            void                            canRecv() override;
-            void                            canSend() override;
+        void                            canRecv() override;
+        void                            canSend() override;
 
-            bool                            checkRead();
-            bool                            checkWrite();
+        bool                            checkRead();
+        bool                            checkWrite();
 
-            void                            recv();
-            void                            flush();
-            void                            normalFlush();
-            void                            quickFlush();
+        void                            recv();
+        void                            flush();
+        void                            normalFlush();
+        void                            quickFlush();
 
-            void                            onClose() override;
-            void                            procCloseInLoop();
-            void                            procShutdownInLoop();
+        void                            onClose() override;
+        void                            procCloseInLoop();
+        void                            procShutdownInLoop();
 
-            void                            runAfterFlush();
+        void                            runAfterFlush();
 #ifdef PLATFORM_LINUX
-            void                            removeCheckWrite();
+        void                            removeCheckWrite();
 #endif
 #ifdef USE_OPENSSL
-            bool                            processSSLHandshake();
+        bool                            processSSLHandshake();
 #endif
-            void                            causeEnterCallback();
-        private:
+        void                            causeEnterCallback();
+    private:
 
 #ifdef PLATFORM_WINDOWS
-            struct EventLoop::ovl_ext_s     mOvlRecv;
-            struct EventLoop::ovl_ext_s     mOvlSend;
+        struct EventLoop::ovl_ext_s     mOvlRecv;
+        struct EventLoop::ovl_ext_s     mOvlSend;
 
-            bool                            mPostRecvCheck;
-            bool                            mPostWriteCheck;
-            bool                            mPostClose;
+        bool                            mPostRecvCheck;
+        bool                            mPostWriteCheck;
+        bool                            mPostClose;
 #endif
-            const std::string               mIP;
-            const TcpSocket::PTR            mSocket;
-            const EventLoop::PTR            mEventLoop;
-            bool                            mCanWrite;
-            bool                            mAlreadyClose;
+        const std::string               mIP;
+        const TcpSocket::PTR            mSocket;
+        const EventLoop::PTR            mEventLoop;
+        bool                            mCanWrite;
+        bool                            mAlreadyClose;
 
-            struct BufferDeleter
+        struct BufferDeleter
+        {
+            void operator()(struct buffer_s* ptr) const
             {
-                void operator()(struct buffer_s* ptr) const
-                {
-                    ox_buffer_delete(ptr);
-                }
-            };
-            std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
-            const size_t                    mMaxRecvBufferSize;
+                ox_buffer_delete(ptr);
+            }
+        };
+        std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
+        const size_t                    mMaxRecvBufferSize;
 
-            struct pending_packet
-            {
-                PACKET_PTR  data;
-                size_t      left;
-                PACKED_SENDED_CALLBACK  mCompleteCallback;
-            };
+        struct pending_packet
+        {
+            PACKET_PTR  data;
+            size_t      left;
+            PACKED_SENDED_CALLBACK  mCompleteCallback;
+        };
 
-            typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
-            PACKET_LIST_TYPE                mSendList;
+        typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
+        PACKET_LIST_TYPE                mSendList;
 
-            ENTER_CALLBACK                  mEnterCallback;
-            DATA_CALLBACK                   mDataCallback;
-            DISCONNECT_CALLBACK             mDisConnectCallback;
+        ENTER_CALLBACK                  mEnterCallback;
+        DATA_CALLBACK                   mDataCallback;
+        DISCONNECT_CALLBACK             mDisConnectCallback;
 
-            bool                            mIsPostFlush;
+        bool                            mIsPostFlush;
 
-            BrynetAny                       mUD;
+        BrynetAny                       mUD;
 
 #ifdef USE_OPENSSL
-            SSL_CTX*                        mSSLCtx;
-            SSL*                            mSSL;
-            bool                            mIsHandsharked;
+        SSL_CTX*                        mSSLCtx;
+        SSL*                            mSSL;
+        bool                            mIsHandsharked;
 #endif
-            bool                            mRecvData;
-            std::chrono::nanoseconds        mCheckTime;
-            Timer::WeakPtr                  mTimer;
-        };
-    }
-}
+        bool                            mRecvData;
+        std::chrono::nanoseconds        mCheckTime;
+        timer::Timer::WeakPtr           mTimer;
+    };
 
-#endif
+} }

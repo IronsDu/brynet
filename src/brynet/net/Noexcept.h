@@ -1,5 +1,4 @@
-#ifndef _BRYNET_NET_NOEXCEPT_H
-#define _BRYNET_NET_NOEXCEPT_H
+#pragma once
 
 #include <brynet/utils/CPP_VERSION.h>
 
@@ -7,6 +6,4 @@
 #define BRYNET_NOEXCEPT noexcept
 #else
 #define BRYNET_NOEXCEPT
-#endif
-
 #endif

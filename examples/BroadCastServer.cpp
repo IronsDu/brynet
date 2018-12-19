@@ -18,6 +18,7 @@
 
 using namespace brynet;
 using namespace brynet::net;
+using namespace brynet::utils;
 
 std::atomic_llong TotalSendLen = ATOMIC_VAR_INIT(0);
 std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);

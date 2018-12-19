@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_CURRENTTHREAD_H_
-#define BRYNET_NET_CURRENTTHREAD_H_
+#pragma once
 
 #include <thread>
 #include <brynet/net/Platform.h>
@@ -11,23 +10,16 @@
 #include <sys/types.h>
 #endif
 
-namespace brynet
-{
-    namespace net
-    {
-        namespace CurrentThread
-        {
+namespace brynet { namespace net { namespace current_thread {
+
 #ifdef PLATFORM_WINDOWS
-            typedef DWORD THREAD_ID_TYPE;
-            extern __declspec(thread) THREAD_ID_TYPE cachedTid;
+    using THREAD_ID_TYPE = DWORD;
+    extern __declspec(thread) THREAD_ID_TYPE cachedTid;
 #else
-            typedef int THREAD_ID_TYPE;
-            extern __thread THREAD_ID_TYPE cachedTid;
+    using THREAD_ID_TYPE = int;
+    extern __thread THREAD_ID_TYPE cachedTid;
 #endif
 
-            THREAD_ID_TYPE& tid();
-        }
-    }
-}
+    THREAD_ID_TYPE& tid();
 
-#endif
+} } }

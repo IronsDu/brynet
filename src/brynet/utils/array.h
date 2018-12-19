@@ -1,5 +1,4 @@
-#ifndef _ARRAY_H_INCLUDED_
-#define _ARRAY_H_INCLUDED_
+#pragma once
 
 #include <stdbool.h>
 
@@ -18,6 +17,4 @@ int ox_array_num(const struct array_s* self);
 
 #ifdef  __cplusplus
 }
-#endif
-
 #endif

@@ -1,5 +1,4 @@
-#ifndef _STACK_H_INCLUDED_
-#define _STACK_H_INCLUDED_
+#pragma once
 
 #include <stdbool.h>
 
@@ -23,6 +22,4 @@ int ox_stack_num(struct stack_s* self);
 
 #ifdef  __cplusplus
 }
-#endif
-
 #endif

@@ -20,6 +20,7 @@
 using namespace std;
 using namespace brynet;
 using namespace brynet::net;
+using namespace brynet::utils;
 
 atomic_llong  TotalRecvPacketNum = ATOMIC_VAR_INIT(0);
 atomic_llong TotalRecvSize = ATOMIC_VAR_INIT(0);

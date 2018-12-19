@@ -1,5 +1,4 @@
-#ifndef _WAIT_GROUP_H
-#define _WAIT_GROUP_H
+#pragma once
 
 #include <mutex>
 #include <atomic>
@@ -9,9 +8,9 @@
 
 #include <brynet/utils/NonCopyable.h>
 
-namespace brynet
-{
-    class WaitGroup : public brynet::NonCopyable
+namespace brynet { namespace utils {
+
+    class WaitGroup : public NonCopyable
     {
     public:
         typedef std::shared_ptr<WaitGroup> PTR;
@@ -56,14 +55,11 @@ namespace brynet
         {
         }
 
-        virtual ~WaitGroup()
-        {}
+        virtual ~WaitGroup() = default;
 
     private:
         std::mutex              mMutex;
         std::atomic<int>        mCounter;
         std::condition_variable mCond;
     };
-}
-
-#endif
+} }

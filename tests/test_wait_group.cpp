@@ -7,7 +7,7 @@
 #include <thread>
 
 TEST_CASE("WaitGroup are computed", "[waitgroup]") {
-    auto wg = brynet::WaitGroup::Create();
+    auto wg = brynet::utils::WaitGroup::Create();
     wg->wait();
 
     wg->add(2);

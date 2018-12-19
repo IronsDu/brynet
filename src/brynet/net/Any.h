@@ -1,5 +1,4 @@
-#ifndef _BRYNET_NET_ANY_H
-#define _BRYNET_NET_ANY_H
+#pragma once
 
 #include <brynet/utils/CPP_VERSION.h>
 
@@ -9,27 +8,23 @@
 #include <cstdint>
 #endif
 
-namespace brynet
-{
-    namespace net
-    {
+namespace brynet { namespace net {
+
 #ifdef HAVE_LANG_CXX17
-        typedef std::any BrynetAny;
+    using BrynetAny = std::any;
 
-        template<typename T>
-        auto cast(const BrynetAny& ud)
-        {
-            return std::any_cast<T>(&ud);
-        }
-#else
-        typedef int64_t BrynetAny;
-        template<typename T>
-        const T* cast(const BrynetAny& ud)
-        {
-            return static_cast<const T*>(&ud);
-        }
-#endif
+    template<typename T>
+    auto cast(const BrynetAny& ud)
+    {
+        return std::any_cast<T>(&ud);
     }
-}
-
+#else
+    using BrynetAny = int64_t;
+    template<typename T>
+    const T* cast(const BrynetAny& ud)
+    {
+        return static_cast<const T*>(&ud);
+    }
 #endif
+
+} }

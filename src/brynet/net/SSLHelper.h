@@ -1,5 +1,4 @@
-#ifndef BRYNET_NET_SSL_HELPER_H_
-#define BRYNET_NET_SSL_HELPER_H_
+#pragma once
 
 #include <string>
 #include <memory>
@@ -20,33 +19,29 @@ extern "C" {
 
 #endif
 
-namespace brynet
-{
-    namespace net
+namespace brynet { namespace net {
+
+    class SSLHelper : public utils::NonCopyable, public std::enable_shared_from_this<SSLHelper>
     {
-        class SSLHelper : public NonCopyable, public std::enable_shared_from_this<SSLHelper>
-        {
-        public:
-            typedef std::shared_ptr<SSLHelper>   PTR;
+    public:
+        typedef std::shared_ptr<SSLHelper>   PTR;
 
 #ifdef USE_OPENSSL
-            bool                                initSSL(const std::string& certificate, 
-                                                        const std::string& privatekey);
-            void                                destroySSL();
-            SSL_CTX*                            getOpenSSLCTX();
+        bool                                initSSL(const std::string& certificate,
+            const std::string& privatekey);
+        void                                destroySSL();
+        SSL_CTX*                            getOpenSSLCTX();
 #endif
-            static  PTR                         Create();
+        static  PTR                         Create();
 
-        private:
-            SSLHelper() BRYNET_NOEXCEPT;
-            virtual ~SSLHelper() BRYNET_NOEXCEPT;
+    private:
+        SSLHelper() BRYNET_NOEXCEPT;
+        virtual ~SSLHelper() BRYNET_NOEXCEPT;
 
-        private:
+    private:
 #ifdef USE_OPENSSL
-            SSL_CTX*                            mOpenSSLCTX;
+        SSL_CTX*                            mOpenSSLCTX;
 #endif
-        };
-    }
-}
+    };
 
-#endif
+} }

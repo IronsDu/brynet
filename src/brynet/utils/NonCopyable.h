@@ -1,17 +1,16 @@
-#ifndef BRYNET_NONCOPYABLE_H_
-#define BRYNET_NONCOPYABLE_H_
+#pragma once
 
-namespace brynet
-{
+namespace brynet { namespace utils {
+
     class NonCopyable
     {
+    public:
+        NonCopyable(const NonCopyable&) = delete;
+        const NonCopyable& operator=(const NonCopyable&) = delete;
+
     protected:
         NonCopyable() = default;
         ~NonCopyable() = default;
-
-        NonCopyable(const NonCopyable&) = delete;
-        const NonCopyable& operator=(const NonCopyable&) = delete;
     };
-}
 
-#endif
+} }

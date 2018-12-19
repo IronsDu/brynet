@@ -1,5 +1,4 @@
-#ifndef _BUFFER_H_INCLUDED
-#define _BUFFER_H_INCLUDED
+#pragma once
 
 #ifdef  __cplusplus
 extern "C" {
@@ -32,6 +31,4 @@ bool ox_buffer_write(struct buffer_s* self, const char* data, size_t len);
 
 #ifdef  __cplusplus
 }
-#endif
-
 #endif
