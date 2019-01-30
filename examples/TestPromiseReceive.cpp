@@ -24,9 +24,9 @@ int main(int argc, char **argv)
     auto server = TcpService::Create();
     auto listenThread = ListenThread::Create();
 
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
-        socket->SocketNodelay();
-        auto enterCallback = [](const DataSocket::PTR& session) {
+    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket){
+        socket->setNodelay();
+        auto enterCallback = [](const TcpConnection::Ptr& session) {
             auto promiseReceive = setupPromiseReceive(session);
             auto contentLength = std::make_shared<size_t>();
 
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
                 return false;
             });
         };
-        server->addDataSocket(std::move(socket),
+        server->addTcpConnection(std::move(socket),
             brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     });

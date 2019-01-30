@@ -26,10 +26,10 @@ int main(int argc, char **argv)
     auto server = TcpService::Create();
     auto listenThread = ListenThread::Create();
 
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
-        socket->SocketNodelay();
+    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket){
+        socket->setNodelay();
 
-        auto enterCallback = [](const DataSocket::PTR& session) {
+        auto enterCallback = [](const TcpConnection::Ptr& session) {
             total_client_num++;
 
             session->setDataCallback([session](const char* buffer, size_t len) {
@@ -39,12 +39,12 @@ int main(int argc, char **argv)
                 return len;
             });
 
-            session->setDisConnectCallback([](const DataSocket::PTR& session) {
+            session->setDisConnectCallback([](const TcpConnection::Ptr& session) {
                 total_client_num--;
             });
         };
 
-        server->addDataSocket(std::move(socket),
+        server->addTcpConnection(std::move(socket),
             brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
     });

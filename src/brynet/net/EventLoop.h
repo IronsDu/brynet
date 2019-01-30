@@ -17,30 +17,30 @@
 namespace brynet { namespace net {
 
     class Channel;
-    class DataSocket;
-    typedef std::shared_ptr<DataSocket> DataSocketPtr;
+    class TcpConnection;
+    using TcpConnectionPtr = std::shared_ptr<TcpConnection>;
     class WakeupChannel;
 
     class EventLoop : public utils::NonCopyable
     {
     public:
-        typedef std::shared_ptr<EventLoop>          PTR;
-        typedef std::function<void(void)>           USER_PROC;
+        using Ptr = std::shared_ptr<EventLoop>;
+        using UserFunctor = std::function<void(void)>;
 
 #ifdef PLATFORM_WINDOWS
-        enum class OLV_VALUE
+        enum class OverlappedType
         {
-            OVL_NONE = 0,
-            OVL_RECV,
-            OVL_SEND,
+            OverlappedNone = 0,
+            OverlappedRecv,
+            OverlappedSend,
         };
 
-        struct ovl_ext_s
+        struct OverlappedExt
         {
             OVERLAPPED  base;
-            const EventLoop::OLV_VALUE  OP;
+            const EventLoop::OverlappedType  OP;
 
-            ovl_ext_s(OLV_VALUE op) BRYNET_NOEXCEPT : OP(op)
+            OverlappedExt(OverlappedType op) BRYNET_NOEXCEPT : OP(op)
             {
                 memset(&base, 0, sizeof(base));
             }
@@ -54,11 +54,11 @@ namespace brynet { namespace net {
         void                            loop(int64_t milliseconds);
         bool                            wakeup();
 
-        void                            pushAsyncProc(USER_PROC f);
-        void                            pushAfterLoopProc(USER_PROC f);
+        void                            pushAsyncFunctor(UserFunctor f);
+        void                            pushAfterLoopFunctor(UserFunctor f);
 
         /* return nullptr if not called in net thread*/
-        timer::TimerMgr::PTR            getTimerMgr();
+        timer::TimerMgr::Ptr            getTimerMgr();
 
         inline bool                     isInLoopThread() const
         {
@@ -67,16 +67,16 @@ namespace brynet { namespace net {
 
     private:
         void                            reallocEventSize(size_t size);
-        void                            processAfterLoopProcs();
-        void                            processAsyncProcs();
+        void                            processAfterLoopFunctors();
+        void                            processAsyncFunctors();
 
 #ifndef PLATFORM_WINDOWS
         int                             getEpollHandle() const;
 #endif
         bool                            linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT;
-        DataSocketPtr                   getDataSocket(sock fd);
-        void                            addDataSocket(sock fd, DataSocketPtr);
-        void                            removeDataSocket(sock fd);
+        TcpConnectionPtr                getTcpConnection(sock fd);
+        void                            addTcpConnection(sock fd, TcpConnectionPtr);
+        void                            removeTcpConnection(sock fd);
         void                            tryInitThreadID();
 
     private:
@@ -96,20 +96,20 @@ namespace brynet { namespace net {
         std::atomic_bool                mIsInBlock;
         std::atomic_bool                mIsAlreadyPostWakeup;
 
-        std::mutex                      mAsyncProcsMutex;
-        std::vector<USER_PROC>          mAsyncProcs;
-        std::vector<USER_PROC>          mCopyAsyncProcs;
+        std::mutex                      mAsyncFunctorsMutex;
+        std::vector<UserFunctor>        mAsyncFunctors;
+        std::vector<UserFunctor>        mCopyAsyncFunctors;
 
-        std::vector<USER_PROC>          mAfterLoopProcs;
-        std::vector<USER_PROC>          mCopyAfterLoopProcs;
+        std::vector<UserFunctor>        mAfterLoopFunctors;
+        std::vector<UserFunctor>        mCopyAfterLoopFunctors;
 
         std::once_flag                  mOnceInitThreadID;
         current_thread::THREAD_ID_TYPE  mSelfThreadID;
 
-        timer::TimerMgr::PTR            mTimer;
-        std::unordered_map<sock, DataSocketPtr> mDataSockets;
+        timer::TimerMgr::Ptr            mTimer;
+        std::unordered_map<sock, TcpConnectionPtr> mTcpConnections;
 
-        friend class DataSocket;
+        friend class TcpConnection;
     };
 
 } }

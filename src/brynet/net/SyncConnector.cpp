@@ -6,10 +6,10 @@
 
 namespace brynet { namespace net {
 
-    TcpSocket::PTR SyncConnectSocket(std::string ip,
+    TcpSocket::Ptr SyncConnectSocket(std::string ip,
         int port,
         std::chrono::milliseconds timeout,
-        AsyncConnector::PTR asyncConnector)
+        AsyncConnector::Ptr asyncConnector)
     {
         if (asyncConnector == nullptr)
         {
@@ -17,12 +17,12 @@ namespace brynet { namespace net {
             asyncConnector->startWorkerThread();
         }
 
-        auto socketPromise = std::make_shared<std::promise<TcpSocket::PTR>>();
+        auto socketPromise = std::make_shared<std::promise<TcpSocket::Ptr>>();
         asyncConnector->asyncConnect(
             std::move(ip),
             port,
             timeout,
-            [socketPromise](TcpSocket::PTR socket) {
+            [socketPromise](TcpSocket::Ptr socket) {
             socketPromise->set_value(std::move(socket));
         }, [socketPromise]() {
             socketPromise->set_value(nullptr);
@@ -31,12 +31,12 @@ namespace brynet { namespace net {
         return socketPromise->get_future().get();
     }
 
-    DataSocket::PTR SyncConnectSession(std::string ip,
+    TcpConnection::Ptr SyncConnectSession(std::string ip,
         int port,
         std::chrono::milliseconds timeout,
-        TcpService::PTR service,
+        TcpService::Ptr service,
         const std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>& options,
-        AsyncConnector::PTR asyncConnector)
+        AsyncConnector::Ptr asyncConnector)
     {
         if (service == nullptr)
         {
@@ -49,20 +49,20 @@ namespace brynet { namespace net {
             asyncConnector->startWorkerThread();
         }
 
-        auto sessionPromise = std::make_shared<std::promise<DataSocket::PTR>>();
+        auto sessionPromise = std::make_shared<std::promise<TcpConnection::Ptr>>();
         asyncConnector->asyncConnect(
             std::move(ip),
             port,
             timeout,
-            [=](TcpSocket::PTR socket) mutable {
-            socket->SocketNodelay();
+            [=](TcpSocket::Ptr socket) mutable {
+            socket->setNodelay();
 
-            auto enterCallback = [sessionPromise](const DataSocket::PTR& session) mutable {
+            auto enterCallback = [sessionPromise](const TcpConnection::Ptr& session) mutable {
                 sessionPromise->set_value(session);
             };
             std::vector < TcpService::AddSocketOption::AddSocketOptionFunc> tmpOptions = options;
             tmpOptions.push_back(TcpService::AddSocketOption::WithEnterCallback(enterCallback));
-            service->addDataSocket(std::move(socket), tmpOptions);
+            service->addTcpConnection(std::move(socket), tmpOptions);
         }, [sessionPromise]() {
             sessionPromise->set_value(nullptr);
         });

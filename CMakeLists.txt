@@ -29,7 +29,7 @@ set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
 set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/net/EventLoop.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/CurrentThread.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/DataSocket.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/TcpConnection.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp

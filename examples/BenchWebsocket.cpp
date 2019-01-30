@@ -17,7 +17,7 @@ using namespace brynet::utils;
 
 std::atomic<int32_t> count;
 
-static void sendPacket(HttpSession::PTR session, const char* data, size_t len)
+static void sendPacket(HttpSession::Ptr session, const char* data, size_t len)
 {
     char buff[1024];
     BasePacketWriter bw(buff, sizeof(buff), true, true);
@@ -61,8 +61,8 @@ int main(int argc, char **argv)
         auto socket = TcpSocket::Create(fd, false);
         brynet::net::base::SocketNodelay(fd);
 
-        auto enterCallback = [host](const DataSocket::PTR& session) {
-            HttpService::setup(session, [host](const HttpSession::PTR& httpSession) {
+        auto enterCallback = [host](const TcpConnection::Ptr& session) {
+            HttpService::setup(session, [host](const HttpSession::Ptr& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
                 request.setUrl("/ws");
@@ -75,14 +75,14 @@ int main(int argc, char **argv)
                 std::string requestStr = request.getResult();
                 httpSession->send(requestStr.c_str(), requestStr.size());
 
-                httpSession->setWSConnected([](const HttpSession::PTR& session, const HTTPParser&) {
+                httpSession->setWSConnected([](const HttpSession::Ptr& session, const HTTPParser&) {
                     for (int i = 0; i < 200; i++)
                     {
                         sendPacket(session, "hello, world!", 13);
                     }
                 });
 
-                httpSession->setWSCallback([](const HttpSession::PTR& session,
+                httpSession->setWSCallback([](const HttpSession::Ptr& session,
                     WebSocketFormat::WebSocketFrameType, const std::string& payload) {
                     std::cout << payload << std::endl;
                     sendPacket(session, "hello, world!", 13);
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
             });
         };
 
-        service->addDataSocket(std::move(socket),
+        service->addTcpConnection(std::move(socket),
             brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024*1024));
     }

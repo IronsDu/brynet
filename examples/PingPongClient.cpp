@@ -28,11 +28,11 @@ int main(int argc, char **argv)
     {
         try
         {
-            connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](TcpSocket::PTR socket) {
+            connector->asyncConnect(argv[1], atoi(argv[2]), std::chrono::seconds(10), [server, tmp](TcpSocket::Ptr socket) {
                 std::cout << "connect success" << std::endl;
-                socket->SocketNodelay();
+                socket->setNodelay();
 
-                auto enterCallback = [tmp](const DataSocket::PTR& session) {
+                auto enterCallback = [tmp](const TcpConnection::Ptr& session) {
                     session->setDataCallback([session](const char* buffer, size_t len) {
                         session->send(buffer, len);
                         return len;
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
                     session->send(tmp.c_str(), tmp.size());
                 };
 
-                server->addDataSocket(std::move(socket),
+                server->addTcpConnection(std::move(socket),
                     brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
                     brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
             }, []() {

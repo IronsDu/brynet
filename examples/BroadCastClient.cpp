@@ -14,7 +14,7 @@
 #include <brynet/net/SocketLibFunction.h>
 
 #include <brynet/net/EventLoop.h>
-#include <brynet/net/DataSocket.h>
+#include <brynet/net/TcpConnection.h>
 #include <brynet/timer/Timer.h>
 
 using namespace std;
@@ -49,7 +49,7 @@ int main(int argc, char** argv)
         brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
         brynet::net::base::SocketNodelay(fd);
 
-        auto enterCallback = [packetLen](DataSocket::PTR datasSocket) {
+        auto enterCallback = [packetLen](TcpConnection::Ptr datasSocket) {
             static_assert(sizeof(datasSocket.get()) <= sizeof(int64_t), "");
 
             auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
@@ -111,15 +111,15 @@ int main(int argc, char** argv)
                 return totalProcLen;
             });
 
-            datasSocket->setDisConnectCallback([](DataSocket::PTR datasSocket) {
+            datasSocket->setDisConnectCallback([](TcpConnection::Ptr datasSocket) {
             });
         };
-        DataSocket::PTR datasSocket = DataSocket::Create(TcpSocket::Create(fd, false), 
+        auto tcpConnection = TcpConnection::Create(TcpSocket::Create(fd, false),
             1024 * 1024, 
             enterCallback, 
             clientEventLoop);
-        clientEventLoop->pushAsyncProc([clientEventLoop, datasSocket]() {
-            datasSocket->onEnterEventLoop();
+        clientEventLoop->pushAsyncFunctor([clientEventLoop, tcpConnection]() {
+            tcpConnection->onEnterEventLoop();
         });
     }
 

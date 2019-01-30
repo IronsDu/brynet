@@ -12,7 +12,7 @@ namespace brynet { namespace net {
     class WakeupChannel final : public Channel, public utils::NonCopyable
     {
     public:
-        explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
+        explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OverlappedType::OverlappedRecv)
         {
         }
 
@@ -35,8 +35,8 @@ namespace brynet { namespace net {
         }
 
     private:
-        HANDLE                  mIOCP;
-        EventLoop::ovl_ext_s    mWakeupOvl;
+        HANDLE                      mIOCP;
+        EventLoop::OverlappedExt    mWakeupOvl;
     };
 #else
     class WakeupChannel final : public Channel, public utils::NonCopyable
@@ -131,7 +131,7 @@ namespace brynet { namespace net {
 #endif
     }
 
-    timer::TimerMgr::PTR EventLoop::getTimerMgr()
+    timer::TimerMgr::Ptr EventLoop::getTimerMgr()
     {
         tryInitThreadID();
         assert(isInLoopThread());
@@ -157,7 +157,7 @@ namespace brynet { namespace net {
             return;
         }
 
-        if (!mAfterLoopProcs.empty())
+        if (!mAfterLoopFunctors.empty())
         {
             milliseconds = 0;
         }
@@ -201,12 +201,12 @@ namespace brynet { namespace net {
         {
             auto channel = (Channel*)mEventEntries[i].lpCompletionKey;
             assert(channel != nullptr);
-            const auto ovl = reinterpret_cast<const EventLoop::ovl_ext_s*>(mEventEntries[i].lpOverlapped);
-            if (ovl->OP == EventLoop::OLV_VALUE::OVL_RECV)
+            const auto ovl = reinterpret_cast<const EventLoop::OverlappedExt*>(mEventEntries[i].lpOverlapped);
+            if (ovl->OP == EventLoop::OverlappedType::OverlappedRecv)
             {
                 channel->canRecv();
             }
-            else if (ovl->OP == EventLoop::OLV_VALUE::OVL_SEND)
+            else if (ovl->OP == EventLoop::OverlappedType::OverlappedSend)
             {
                 channel->canSend();
             }
@@ -247,8 +247,8 @@ namespace brynet { namespace net {
         mIsAlreadyPostWakeup = false;
         mIsInBlock = true;
 
-        processAsyncProcs();
-        processAfterLoopProcs();
+        processAsyncFunctors();
+        processAfterLoopFunctors();
 
         if (static_cast<size_t>(numComplete) == mEventEntries.size())
         {
@@ -258,28 +258,28 @@ namespace brynet { namespace net {
         mTimer->schedule();
     }
 
-    void EventLoop::processAfterLoopProcs()
+    void EventLoop::processAfterLoopFunctors()
     {
-        mCopyAfterLoopProcs.swap(mAfterLoopProcs);
-        for (const auto& x : mCopyAfterLoopProcs)
+        mCopyAfterLoopFunctors.swap(mAfterLoopFunctors);
+        for (const auto& x : mCopyAfterLoopFunctors)
         {
             x();
         }
-        mCopyAfterLoopProcs.clear();
+        mCopyAfterLoopFunctors.clear();
     }
 
-    void EventLoop::processAsyncProcs()
+    void EventLoop::processAsyncFunctors()
     {
         {
-            std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
-            mCopyAsyncProcs.swap(mAsyncProcs);
+            std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
+            mCopyAsyncFunctors.swap(mAsyncFunctors);
         }
 
-        for (const auto& x : mCopyAsyncProcs)
+        for (const auto& x : mCopyAsyncFunctors)
         {
             x();
         }
-        mCopyAsyncProcs.clear();
+        mCopyAsyncFunctors.clear();
     }
 
     bool EventLoop::wakeup()
@@ -304,27 +304,27 @@ namespace brynet { namespace net {
 #endif
     }
 
-    DataSocketPtr EventLoop::getDataSocket(sock fd)
+    TcpConnectionPtr EventLoop::getTcpConnection(sock fd)
     {
-        auto it = mDataSockets.find(fd);
-        if (it != mDataSockets.end())
+        auto it = mTcpConnections.find(fd);
+        if (it != mTcpConnections.end())
         {
             return (*it).second;
         }
         return nullptr;
     }
 
-    void EventLoop::addDataSocket(sock fd, DataSocketPtr datasocket)
+    void EventLoop::addTcpConnection(sock fd, TcpConnectionPtr tcpConnection)
     {
-        mDataSockets[fd] = std::move(datasocket);
+        mTcpConnections[fd] = std::move(tcpConnection);
     }
 
-    void EventLoop::removeDataSocket(sock fd)
+    void EventLoop::removeTcpConnection(sock fd)
     {
-        mDataSockets.erase(fd);
+        mTcpConnections.erase(fd);
     }
 
-    void EventLoop::pushAsyncProc(USER_PROC f)
+    void EventLoop::pushAsyncFunctor(UserFunctor f)
     {
         if (isInLoopThread())
         {
@@ -333,19 +333,19 @@ namespace brynet { namespace net {
         else
         {
             {
-                std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
-                mAsyncProcs.emplace_back(std::move(f));
+                std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
+                mAsyncFunctors.emplace_back(std::move(f));
             }
             wakeup();
         }
     }
 
-    void EventLoop::pushAfterLoopProc(USER_PROC f)
+    void EventLoop::pushAfterLoopFunctor(UserFunctor f)
     {
         assert(isInLoopThread());
         if (isInLoopThread())
         {
-            mAfterLoopProcs.emplace_back(std::move(f));
+            mAfterLoopFunctors.emplace_back(std::move(f));
         }
     }
 

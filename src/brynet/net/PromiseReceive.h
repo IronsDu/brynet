@@ -33,20 +33,20 @@ namespace brynet { namespace net {
 
     class PromiseReceive;
 
-    std::shared_ptr<PromiseReceive> setupPromiseReceive(const DataSocket::PTR& session);
+    std::shared_ptr<PromiseReceive> setupPromiseReceive(const TcpConnection::Ptr& session);
 
     class PromiseReceive : public std::enable_shared_from_this<PromiseReceive>
     {
     public:
-        typedef std::shared_ptr<PromiseReceive> PTR;
-        typedef std::function<bool(const char* buffer, size_t len)> Handle;
+        using Ptr = std::shared_ptr<PromiseReceive>;
+        using Handle = std::function<bool(const char* buffer, size_t len)>;
 
-        PromiseReceive::PTR receive(size_t len, Handle handle)
+        PromiseReceive::Ptr receive(size_t len, Handle handle)
         {
             return receive(std::make_shared<size_t>(len), std::move(handle));
         }
 
-        PromiseReceive::PTR receive(std::shared_ptr<size_t> len, Handle handle)
+        PromiseReceive::Ptr receive(std::shared_ptr<size_t> len, Handle handle)
         {
             if (*len < 0)
             {
@@ -56,7 +56,7 @@ namespace brynet { namespace net {
             return helpReceive(std::move(len), "", std::move(handle));
         }
 
-        PromiseReceive::PTR receiveUntil(std::string str, Handle handle)
+        PromiseReceive::Ptr receiveUntil(std::string str, Handle handle)
         {
             if (str.empty())
             {
@@ -67,7 +67,7 @@ namespace brynet { namespace net {
         }
 
     private:
-        PromiseReceive::PTR helpReceive(std::shared_ptr<size_t> len, std::string str, Handle handle)
+        PromiseReceive::Ptr helpReceive(std::shared_ptr<size_t> len, std::string str, Handle handle)
         {
             auto pr = std::make_shared<PendingReceive>();
             pr->len = std::move(len);
@@ -143,10 +143,10 @@ namespace brynet { namespace net {
 
         std::deque<std::shared_ptr<PendingReceive>> mPendingReceives;
 
-        friend std::shared_ptr<PromiseReceive> setupPromiseReceive(const DataSocket::PTR& session);
+        friend std::shared_ptr<PromiseReceive> setupPromiseReceive(const TcpConnection::Ptr& session);
     };
 
-    std::shared_ptr<PromiseReceive> setupPromiseReceive(const DataSocket::PTR& session)
+    std::shared_ptr<PromiseReceive> setupPromiseReceive(const TcpConnection::Ptr& session)
     {
         auto promiseReceive = std::make_shared<PromiseReceive>();
         session->setDataCallback([promiseReceive](const char* buffer,

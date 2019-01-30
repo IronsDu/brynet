@@ -10,14 +10,14 @@
 
 namespace brynet { namespace net {
 
-    class AsyncConnectAddr
+    class AsyncConnectAddr final
     {
     public:
         AsyncConnectAddr(std::string ip,
             int port,
             std::chrono::nanoseconds timeout,
-            AsyncConnector::COMPLETED_CALLBACK successCB,
-            AsyncConnector::FAILED_CALLBACK failedCB)
+            AsyncConnector::CompletedCallback successCB,
+            AsyncConnector::FailedCallback failedCB)
             :
             mIP(std::move(ip)),
             mPort(port),
@@ -27,27 +27,27 @@ namespace brynet { namespace net {
         {
         }
 
-        const std::string&         getIP() const
+        const std::string&                          getIP() const
         {
             return mIP;
         }
 
-        int                         getPort() const
+        int                                         getPort() const
         {
             return mPort;
         }
 
-        const AsyncConnector::COMPLETED_CALLBACK&   getSuccessCB() const
+        const AsyncConnector::CompletedCallback&    getSuccessCB() const
         {
             return mSuccessCB;
         }
 
-        const AsyncConnector::FAILED_CALLBACK&  getFailedCB() const
+        const AsyncConnector::FailedCallback&       getFailedCB() const
         {
             return mFailedCB;
         }
 
-        std::chrono::nanoseconds                getTimeout() const
+        std::chrono::nanoseconds                    getTimeout() const
         {
             return mTimeout;
         }
@@ -56,14 +56,14 @@ namespace brynet { namespace net {
         const std::string                           mIP;
         const int                                   mPort;
         const std::chrono::nanoseconds              mTimeout;
-        const AsyncConnector::COMPLETED_CALLBACK    mSuccessCB;
-        const AsyncConnector::FAILED_CALLBACK       mFailedCB;
+        const AsyncConnector::CompletedCallback     mSuccessCB;
+        const AsyncConnector::FailedCallback        mFailedCB;
     };
 
     class ConnectorWorkInfo final : public utils::NonCopyable
     {
     public:
-        typedef std::shared_ptr<ConnectorWorkInfo>    PTR;
+        using Ptr = std::shared_ptr<ConnectorWorkInfo>;
 
         ConnectorWorkInfo() BRYNET_NOEXCEPT;
 
@@ -84,11 +84,11 @@ namespace brynet { namespace net {
 
             std::chrono::steady_clock::time_point   startConnectTime;
             std::chrono::nanoseconds                timeout;
-            AsyncConnector::COMPLETED_CALLBACK      successCB;
-            AsyncConnector::FAILED_CALLBACK         failedCB;
+            AsyncConnector::CompletedCallback       successCB;
+            AsyncConnector::FailedCallback          failedCB;
         };
 
-        std::map<sock, ConnectingInfo>  mConnectingInfos;
+        std::map<sock, ConnectingInfo>              mConnectingInfos;
 
         struct FDSetDeleter
         {
@@ -139,8 +139,8 @@ namespace brynet { namespace net {
             return;
         }
 
-        std::set<sock>  total_fds;
-        std::set<sock>  success_fds;
+        std::set<sock>  totalFds;
+        std::set<sock>  successFds;
 
         ox_fdset_visitor(mFDSet.get(), WriteCheck, mPollResult.get());
         while (true)
@@ -152,14 +152,14 @@ namespace brynet { namespace net {
             }
 
             const sock fd = *(sock*)p;
-            total_fds.insert(fd);
+            totalFds.insert(fd);
             if (isConnectSuccess(fd, false))
             {
-                success_fds.insert(fd);
+                successFds.insert(fd);
             }
         }
 
-        for (auto fd : total_fds)
+        for (auto fd : totalFds)
         {
             ox_fdset_remove(mFDSet.get(), fd);
 
@@ -170,7 +170,7 @@ namespace brynet { namespace net {
             }
 
             auto socket = TcpSocket::Create(fd, false);
-            if (success_fds.find(fd) != success_fds.end())
+            if (successFds.find(fd) != successFds.end())
             {
                 if (it->second.successCB != nullptr)
                 {
@@ -360,7 +360,7 @@ namespace brynet { namespace net {
             return;
         }
 
-        mEventLoop->pushAsyncProc([this]() {
+        mEventLoop->pushAsyncFunctor([this]() {
             *mIsRun = false;
         });
 
@@ -384,8 +384,8 @@ namespace brynet { namespace net {
     void AsyncConnector::asyncConnect(const std::string& ip,
         int port,
         std::chrono::nanoseconds timeout,
-        COMPLETED_CALLBACK successCB,
-        FAILED_CALLBACK failedCB)
+        CompletedCallback successCB,
+        FailedCallback failedCB)
     {
 #ifdef HAVE_LANG_CXX17
         std::shared_lock<std::shared_mutex> lck(mThreadGuard);
@@ -409,12 +409,12 @@ namespace brynet { namespace net {
             timeout,
             successCB,
             failedCB);
-        mEventLoop->pushAsyncProc([workInfo, address]() {
+        mEventLoop->pushAsyncFunctor([workInfo, address]() {
             workInfo->processConnect(address);
         });
     }
 
-    AsyncConnector::PTR AsyncConnector::Create()
+    AsyncConnector::Ptr AsyncConnector::Create()
     {
         struct make_shared_enabler : public AsyncConnector {};
         return std::make_shared<make_shared_enabler>();

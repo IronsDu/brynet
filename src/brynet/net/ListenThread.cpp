@@ -10,7 +10,7 @@
 
 namespace brynet { namespace net {
 
-    ListenThread::PTR ListenThread::Create()
+    ListenThread::Ptr ListenThread::Create()
     {
         struct make_shared_enabler : public ListenThread {};
         return std::make_shared<make_shared_enabler>();
@@ -28,11 +28,11 @@ namespace brynet { namespace net {
         stopListen();
     }
 
-    static brynet::net::TcpSocket::PTR runOnceListen(const std::shared_ptr<ListenSocket>& listenSocket)
+    static brynet::net::TcpSocket::Ptr runOnceListen(const std::shared_ptr<ListenSocket>& listenSocket)
     {
         try
         {
-            auto clientSocket = listenSocket->Accept();
+            auto clientSocket = listenSocket->accept();
             return clientSocket;
         }
         catch (const EintrError& e)
@@ -54,7 +54,7 @@ namespace brynet { namespace net {
     void ListenThread::startListen(bool isIPV6,
         const std::string& ip,
         int port,
-        ACCEPT_CALLBACK callback)
+        AccepCallback callback)
     {
         std::lock_guard<std::mutex> lck(mListenThreadGuard);
 

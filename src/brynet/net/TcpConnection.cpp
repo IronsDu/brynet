@@ -5,21 +5,21 @@
 #include <brynet/net/EventLoop.h>
 #include <brynet/utils/buffer.h>
 
-#include <brynet/net/DataSocket.h>
+#include <brynet/net/TcpConnection.h>
 
 namespace brynet { namespace net {
 
-    DataSocket::DataSocket(TcpSocket::PTR socket,
+    TcpConnection::TcpConnection(TcpSocket::Ptr socket,
         size_t maxRecvBufferSize,
-        ENTER_CALLBACK enterCallback,
-        EventLoop::PTR eventLoop) BRYNET_NOEXCEPT
+        EnterCallback enterCallback,
+        EventLoop::Ptr eventLoop) BRYNET_NOEXCEPT
         :
 #if defined PLATFORM_WINDOWS
-    mOvlRecv(EventLoop::OLV_VALUE::OVL_RECV),
-        mOvlSend(EventLoop::OLV_VALUE::OVL_SEND),
+    mOvlRecv(EventLoop::OverlappedType::OverlappedRecv),
+        mOvlSend(EventLoop::OverlappedType::OverlappedSend),
         mPostClose(false),
 #endif
-        mIP(socket->GetIP()),
+        mIP(socket->getRemoteIP()),
         mSocket(std::move(socket)),
         mEventLoop(std::move(eventLoop)),
         mAlreadyClose(false),
@@ -45,7 +45,7 @@ namespace brynet { namespace net {
         mEnterCallback = std::move(enterCallback);
     }
 
-    DataSocket::~DataSocket() BRYNET_NOEXCEPT
+    TcpConnection::~TcpConnection() BRYNET_NOEXCEPT
     {
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
@@ -60,7 +60,7 @@ namespace brynet { namespace net {
         }
 #endif
 
-        // 如果构造datasocket发生异常则mSocket也可能为nullptr
+        // 如果构造TcpConnection发生异常则mSocket也可能为nullptr
         assert(mSocket != nullptr);
 
         if (mTimer.lock())
@@ -69,19 +69,19 @@ namespace brynet { namespace net {
         }
     }
 
-    DataSocket::PTR DataSocket::Create(TcpSocket::PTR socket,
+    TcpConnection::Ptr TcpConnection::Create(TcpSocket::Ptr socket,
         size_t maxRecvBufferSize,
-        ENTER_CALLBACK enterCallback,
-        EventLoop::PTR eventLoop)
+        EnterCallback enterCallback,
+        EventLoop::Ptr eventLoop)
     {
-        struct make_shared_enabler : public DataSocket
+        struct make_shared_enabler : public TcpConnection
         {
-            make_shared_enabler(TcpSocket::PTR socket,
+            make_shared_enabler(TcpSocket::Ptr socket,
                 size_t maxRecvBufferSize,
-                ENTER_CALLBACK enterCallback,
-                EventLoop::PTR eventLoop)
+                EnterCallback enterCallback,
+                EventLoop::Ptr eventLoop)
                 :
-                DataSocket(std::move(socket), maxRecvBufferSize, std::move(enterCallback), std::move(eventLoop))
+                TcpConnection(std::move(socket), maxRecvBufferSize, std::move(enterCallback), std::move(eventLoop))
             {}
         };
         return std::make_shared<make_shared_enabler>(
@@ -91,7 +91,7 @@ namespace brynet { namespace net {
             std::move(eventLoop));
     }
 
-    bool DataSocket::onEnterEventLoop()
+    bool TcpConnection::onEnterEventLoop()
     {
         assert(mEventLoop->isInLoopThread());
         if (!mEventLoop->isInLoopThread())
@@ -105,13 +105,13 @@ namespace brynet { namespace net {
             return false;
         }
 
-        const auto findRet = mEventLoop->getDataSocket(mSocket->getFD());
+        const auto findRet = mEventLoop->getTcpConnection(mSocket->getFD());
         assert(findRet == nullptr);
 
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
-            mEventLoop->addDataSocket(mSocket->getFD(), shared_from_this());
+            mEventLoop->addTcpConnection(mSocket->getFD(), shared_from_this());
             processSSLHandshake();
             return true;
         }
@@ -122,35 +122,35 @@ namespace brynet { namespace net {
             return false;
         }
 
-        mEventLoop->addDataSocket(mSocket->getFD(), shared_from_this());
+        mEventLoop->addTcpConnection(mSocket->getFD(), shared_from_this());
         causeEnterCallback();
 
         return true;
     }
 
-    const EventLoop::PTR& DataSocket::getEventLoop() const
+    const EventLoop::Ptr& TcpConnection::getEventLoop() const
     {
         return mEventLoop;
     }
 
-    void DataSocket::send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback)
+    void TcpConnection::send(const char* buffer, size_t len, const PacketSendedCallback& callback)
     {
         send(makePacket(buffer, len), callback);
     }
 
-    void DataSocket::send(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+    void TcpConnection::send(const PacketPtr& packet, const PacketSendedCallback& callback)
     {
         auto packetCapture = packet;
         auto callbackCapture = callback;
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, packetCapture, callbackCapture]() mutable {
+        mEventLoop->pushAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
             const auto len = packetCapture->size();
             sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
             sharedThis->runAfterFlush();
         });
     }
 
-    void DataSocket::sendInLoop(const PACKET_PTR& packet, const PACKED_SENDED_CALLBACK& callback)
+    void TcpConnection::sendInLoop(const PacketPtr& packet, const PacketSendedCallback& callback)
     {
         assert(mEventLoop->isInLoopThread());
         if (mEventLoop->isInLoopThread())
@@ -161,7 +161,7 @@ namespace brynet { namespace net {
         }
     }
 
-    void DataSocket::canRecv()
+    void TcpConnection::canRecv()
     {
 #ifdef PLATFORM_WINDOWS
         mPostRecvCheck = false;
@@ -188,7 +188,7 @@ namespace brynet { namespace net {
         recv();
     }
 
-    void DataSocket::canSend()
+    void TcpConnection::canSend()
     {
 #ifdef PLATFORM_WINDOWS
         mPostWriteCheck = false;
@@ -218,12 +218,12 @@ namespace brynet { namespace net {
         runAfterFlush();
     }
 
-    void DataSocket::runAfterFlush()
+    void TcpConnection::runAfterFlush()
     {
         if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->pushAfterLoopProc([sharedThis]() {
+            mEventLoop->pushAfterLoopFunctor([sharedThis]() {
                 sharedThis->mIsPostFlush = false;
                 sharedThis->flush();
             });
@@ -232,7 +232,7 @@ namespace brynet { namespace net {
         }
     }
 
-    void DataSocket::recv()
+    void TcpConnection::recv()
     {
         bool must_close = false;
 #ifdef USE_OPENSSL
@@ -333,7 +333,7 @@ namespace brynet { namespace net {
         }
     }
 
-    void DataSocket::flush()
+    void TcpConnection::flush()
     {
 #ifdef PLATFORM_WINDOWS
         normalFlush();
@@ -359,7 +359,7 @@ namespace brynet { namespace net {
     __thread char* threadLocalSendBuf = nullptr;
 #endif
 
-    void DataSocket::normalFlush()
+    void TcpConnection::normalFlush()
     {
         static  const   int SENDBUF_SIZE = 1024 * 32;
         if (threadLocalSendBuf == nullptr)
@@ -478,7 +478,7 @@ namespace brynet { namespace net {
         }
     }
 
-    void DataSocket::quickFlush()
+    void TcpConnection::quickFlush()
     {
 #ifdef PLATFORM_LINUX
 #ifndef MAX_IOVEC
@@ -528,7 +528,7 @@ namespace brynet { namespace net {
             auto tmp_len = static_cast<size_t>(send_len);
             for (auto it = mSendList.begin(); it != mSendList.end();)
             {
-                pending_packet& b = *it;
+                PendingPacket& b = *it;
                 if (b.left > tmp_len)
                 {
                     b.left -= tmp_len;
@@ -558,7 +558,7 @@ namespace brynet { namespace net {
 #endif
     }
 
-    void DataSocket::procCloseInLoop()
+    void TcpConnection::procCloseInLoop()
     {
         mCanWrite = false;
 #ifdef PLATFORM_WINDOWS
@@ -569,7 +569,7 @@ namespace brynet { namespace net {
                 return;
             }
             mPostClose = true;
-            //windows下立即关闭socket可能导致fd被另外的DataSocket重用,而导致此对象在IOCP返回相关完成结果时内存已经释放
+            //windows下立即关闭socket可能导致fd被另外的TcpConnection重用,而导致此对象在IOCP返回相关完成结果时内存已经释放
             if (mPostRecvCheck)
             {
                 CancelIoEx(HANDLE(mSocket->getFD()), &mOvlRecv.base);
@@ -590,7 +590,7 @@ namespace brynet { namespace net {
 #endif
     }
 
-    void DataSocket::procShutdownInLoop()
+    void TcpConnection::procShutdownInLoop()
     {
         mCanWrite = false;
         assert(mSocket != nullptr);
@@ -604,7 +604,7 @@ namespace brynet { namespace net {
         }
     }
 
-    void DataSocket::onClose()
+    void TcpConnection::onClose()
     {
         if (mAlreadyClose)
         {
@@ -617,7 +617,7 @@ namespace brynet { namespace net {
         auto sharedThis = shared_from_this();
         auto eventLoop = mEventLoop;
         auto fd = mSocket->getFD();
-        mEventLoop->pushAfterLoopProc([callBack,
+        mEventLoop->pushAfterLoopFunctor([callBack,
             sharedThis,
             eventLoop,
             fd]() {
@@ -625,18 +625,18 @@ namespace brynet { namespace net {
             {
                 callBack(sharedThis);
             }
-            auto tmp = eventLoop->getDataSocket(fd);
+            auto tmp = eventLoop->getTcpConnection(fd);
             assert(tmp == sharedThis);
             if (tmp == sharedThis)
             {
-                eventLoop->removeDataSocket(fd);
+                eventLoop->removeTcpConnection(fd);
             }
         });
         mDisConnectCallback = nullptr;
         mDataCallback = nullptr;
     }
 
-    bool DataSocket::checkRead()
+    bool TcpConnection::checkRead()
     {
         bool check_ret = true;
 #ifdef PLATFORM_WINDOWS
@@ -665,7 +665,7 @@ namespace brynet { namespace net {
         return check_ret;
     }
 
-    bool    DataSocket::checkWrite()
+    bool    TcpConnection::checkWrite()
     {
         bool check_ret = true;
 #ifdef PLATFORM_WINDOWS
@@ -698,7 +698,7 @@ namespace brynet { namespace net {
     }
 
 #ifdef PLATFORM_LINUX
-    void    DataSocket::removeCheckWrite()
+    void    TcpConnection::removeCheckWrite()
     {
         struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
@@ -707,25 +707,25 @@ namespace brynet { namespace net {
     }
 #endif
 
-    void DataSocket::setDataCallback(DATA_CALLBACK cb)
+    void TcpConnection::setDataCallback(DataCallback cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, cb]() mutable {
+        mEventLoop->pushAsyncFunctor([sharedThis, cb]() mutable {
             sharedThis->mDataCallback = std::move(cb);
         });
     }
 
-    void DataSocket::setDisConnectCallback(DISCONNECT_CALLBACK cb)
+    void TcpConnection::setDisConnectCallback(DisconnectedCallback cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, cb]() mutable {
+        mEventLoop->pushAsyncFunctor([sharedThis, cb]() mutable {
             sharedThis->mDisConnectCallback = std::move(cb);
         });
     }
 
     const static size_t GROW_BUFFER_SIZE = 1024;
 
-    void DataSocket::growRecvBuffer()
+    void TcpConnection::growRecvBuffer()
     {
         if (mRecvBuffer == nullptr)
         {
@@ -745,7 +745,7 @@ namespace brynet { namespace net {
             mRecvBuffer = std::move(newBuffer);
         }
     }
-    void DataSocket::PingCheck()
+    void TcpConnection::pingCheck()
     {
         mTimer.reset();
         if (mRecvData)
@@ -759,25 +759,25 @@ namespace brynet { namespace net {
         }
     }
 
-    void DataSocket::startPingCheckTimer()
+    void TcpConnection::startPingCheckTimer()
     {
         if (!mTimer.lock() && mCheckTime != std::chrono::steady_clock::duration::zero())
         {
-            std::weak_ptr<DataSocket> weakedThis = shared_from_this();
+            std::weak_ptr<TcpConnection> weakedThis = shared_from_this();
             mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [weakedThis]() {
                 auto sharedThis = weakedThis.lock();
                 if (sharedThis != nullptr)
                 {
-                    sharedThis->PingCheck();
+                    sharedThis->pingCheck();
                 }
             });
         }
     }
 
-    void DataSocket::setHeartBeat(std::chrono::nanoseconds checkTime)
+    void TcpConnection::setHeartBeat(std::chrono::nanoseconds checkTime)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis, checkTime]() {
+        mEventLoop->pushAsyncFunctor([sharedThis, checkTime]() {
             if (sharedThis->mTimer.lock() != nullptr)
             {
                 sharedThis->mTimer.lock()->cancel();
@@ -790,40 +790,40 @@ namespace brynet { namespace net {
 
     }
 
-    void DataSocket::postDisConnect()
+    void TcpConnection::postDisConnect()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis]() {
+        mEventLoop->pushAsyncFunctor([sharedThis]() {
             sharedThis->procCloseInLoop();
         });
     }
 
-    void DataSocket::postShutdown()
+    void TcpConnection::postShutdown()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncProc([sharedThis]() {
-            sharedThis->mEventLoop->pushAfterLoopProc([sharedThis]() {
+        mEventLoop->pushAsyncFunctor([sharedThis]() {
+            sharedThis->mEventLoop->pushAfterLoopFunctor([sharedThis]() {
                 sharedThis->procShutdownInLoop();
             });
         });
     }
 
-    void DataSocket::setUD(BrynetAny value)
+    void TcpConnection::setUD(BrynetAny value)
     {
         mUD = std::move(value);
     }
 
-    const BrynetAny& DataSocket::getUD() const
+    const BrynetAny& TcpConnection::getUD() const
     {
         return mUD;
     }
 
-    const std::string& DataSocket::getIP() const
+    const std::string& TcpConnection::getIP() const
     {
         return mIP;
     }
 #ifdef USE_OPENSSL
-    bool DataSocket::initAcceptSSL(SSL_CTX* ctx)
+    bool TcpConnection::initAcceptSSL(SSL_CTX* ctx)
     {
         if (mSSL != nullptr)
         {
@@ -841,7 +841,7 @@ namespace brynet { namespace net {
         return true;
     }
 
-    bool DataSocket::initConnectSSL()
+    bool TcpConnection::initConnectSSL()
     {
         if (mSSLCtx != nullptr)
         {
@@ -861,7 +861,7 @@ namespace brynet { namespace net {
         return true;
     }
 
-    bool DataSocket::processSSLHandshake()
+    bool TcpConnection::processSSLHandshake()
     {
         if (mIsHandsharked)
         {
@@ -922,12 +922,12 @@ namespace brynet { namespace net {
     }
 #endif
 
-    DataSocket::PACKET_PTR DataSocket::makePacket(const char* buffer, size_t len)
+    TcpConnection::PacketPtr TcpConnection::makePacket(const char* buffer, size_t len)
     {
         return std::make_shared<std::string>(buffer, len);
     }
 
-    void DataSocket::causeEnterCallback()
+    void TcpConnection::causeEnterCallback()
     {
         assert(mEventLoop->isInLoopThread());
         if (mEventLoop->isInLoopThread() && mEnterCallback != nullptr)

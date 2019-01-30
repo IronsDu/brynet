@@ -19,7 +19,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
 
     {
         auto listenThread = brynet::net::ListenThread::Create();
-        listenThread->startListen(false, "127.0.0.7", port, [](brynet::net::TcpSocket::PTR) {
+        listenThread->startListen(false, "127.0.0.7", port, [](brynet::net::TcpSocket::Ptr) {
         });
 
         auto socket = brynet::net::SyncConnectSocket(ip, port, std::chrono::seconds(10));

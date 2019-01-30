@@ -17,15 +17,15 @@ namespace brynet { namespace net {
     class ListenThread : public utils::NonCopyable, public std::enable_shared_from_this<ListenThread>
     {
     public:
-        typedef std::shared_ptr<ListenThread>   PTR;
-        typedef std::function<void(TcpSocket::PTR)> ACCEPT_CALLBACK;
+        using Ptr = std::shared_ptr<ListenThread>;
+        using AccepCallback = std::function<void(TcpSocket::Ptr)>;
 
         void                                startListen(bool isIPV6,
                                                 const std::string& ip,
                                                 int port,
-                                                ACCEPT_CALLBACK callback);
+                                                AccepCallback callback);
         void                                stopListen();
-        static  PTR                         Create();
+        static  Ptr                         Create();
 
     private:
         ListenThread() BRYNET_NOEXCEPT;

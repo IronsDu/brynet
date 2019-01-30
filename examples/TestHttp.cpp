@@ -21,11 +21,11 @@ int main(int argc, char **argv)
     service->startWorkerThread(2);
 
     auto listenThread = ListenThread::Create();
-    listenThread->startListen(false, "0.0.0.0", 8080, [service, body](TcpSocket::PTR socket) {
-        auto enterCallback = [body](const DataSocket::PTR& session) {
-            HttpService::setup(session, [body](const HttpSession::PTR& httpSession) {
+    listenThread->startListen(false, "0.0.0.0", 8080, [service, body](TcpSocket::Ptr socket) {
+        auto enterCallback = [body](const TcpConnection::Ptr& session) {
+            HttpService::setup(session, [body](const HttpSession::Ptr& httpSession) {
                 httpSession->setHttpCallback([body](const HTTPParser& httpParser,
-                    const HttpSession::PTR& session) {
+                    const HttpSession::Ptr& session) {
                     HttpResponse response;
                     response.setBody(body);
                     std::string result = response.getResult();
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
                     });
                 });
 
-                httpSession->setWSCallback([](const HttpSession::PTR& httpSession,
+                httpSession->setWSCallback([](const HttpSession::Ptr& httpSession,
                     WebSocketFormat::WebSocketFrameType opcode,
                     const std::string& payload) {
                     // ping pong
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
                 });
             });
         };
-        service->addDataSocket(std::move(socket),
+        service->addTcpConnection(std::move(socket),
             brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     });
@@ -59,8 +59,8 @@ int main(int argc, char **argv)
     if (fd != INVALID_SOCKET)
     {
         auto socket = TcpSocket::Create(fd, false);
-        auto enterCallback = [](const DataSocket::PTR& session) {
-            HttpService::setup(session, [](const HttpSession::PTR& httpSession) {
+        auto enterCallback = [](const TcpConnection::Ptr& session) {
+            HttpService::setup(session, [](const HttpSession::Ptr& httpSession) {
                 HttpRequest request;
                 request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
                 request.setUrl("/httpgallery/chunked/chunkedimage.aspx");
@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 
                 std::string requestStr = request.getResult();
                 httpSession->send(requestStr.c_str(), requestStr.size());
-                httpSession->setHttpCallback([](const HTTPParser& httpParser, const HttpSession::PTR& session) {
+                httpSession->setHttpCallback([](const HTTPParser& httpParser, const HttpSession::Ptr& session) {
                     //http response handle
                     std::cout << httpParser.getBody() << std::endl;
                     std::cout << "len:" << httpParser.getBody().size() << std::endl;
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
             });
         };
 
-        service->addDataSocket(std::move(socket),
+        service->addTcpConnection(std::move(socket),
             brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
     }

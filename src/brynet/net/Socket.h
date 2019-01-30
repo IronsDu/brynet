@@ -10,7 +10,7 @@
 
 namespace brynet { namespace net {
 
-    class DataSocket;
+    class TcpConnection;
 
     class TcpSocket : public utils::NonCopyable
     {
@@ -24,30 +24,30 @@ namespace brynet { namespace net {
             }
         };
     public:
-        typedef std::unique_ptr<TcpSocket, TcpSocketDeleter> PTR;
+        using Ptr = std::unique_ptr<TcpSocket, TcpSocketDeleter>;
 
     public:
-        static PTR Create(sock fd, bool serverSide);
+        static Ptr Create(sock fd, bool serverSide);
 
     public:
-        void    SocketNodelay() const;
-        bool    SocketNonblock() const;
-        void    SetSendSize(int sdSize) const;
-        void    SetRecvSize(int rdSize) const;
-        std::string GetIP() const;
-        bool    isServerSide() const;
+        void            setNodelay() const;
+        bool            setNonblock() const;
+        void            setSendSize(int sdSize) const;
+        void            setRecvSize(int rdSize) const;
+        std::string     getRemoteIP() const;
+        bool            isServerSide() const;
 
     private:
         TcpSocket(sock fd, bool serverSide);
         virtual ~TcpSocket();
 
-        sock    getFD() const;
+        sock            getFD() const;
 
     private:
-        const sock    mFD;
-        const bool    mServerSide;
+        const sock      mFD;
+        const bool      mServerSide;
 
-        friend class DataSocket;
+        friend class TcpConnection;
     };
 
     class EintrError : public std::exception
@@ -83,13 +83,13 @@ namespace brynet { namespace net {
             }
         };
     public:
-        typedef std::unique_ptr<ListenSocket, ListenSocketDeleter> PTR;
+        using Ptr = std::unique_ptr<ListenSocket, ListenSocketDeleter>;
 
     public:
-        TcpSocket::PTR Accept();
+        TcpSocket::Ptr accept();
 
     public:
-        static PTR Create(sock fd);
+        static Ptr Create(sock fd);
 
     private:
         explicit ListenSocket(sock fd);
@@ -98,7 +98,7 @@ namespace brynet { namespace net {
     private:
         const sock  mFD;
 
-        friend class DataSocket;
+        friend class TcpConnection;
     };
 
 } }

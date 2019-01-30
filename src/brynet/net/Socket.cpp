@@ -2,7 +2,7 @@
 
 namespace brynet { namespace net {
 
-    TcpSocket::PTR TcpSocket::Create(
+    TcpSocket::Ptr TcpSocket::Create(
         sock fd,
         bool serverSide)
     {
@@ -14,7 +14,7 @@ namespace brynet { namespace net {
                 TcpSocket(fd, serverSide) {}
         };
 
-        return PTR(new make_unique_enabler(fd, serverSide));
+        return Ptr(new make_unique_enabler(fd, serverSide));
     }
 
     sock TcpSocket::getFD() const
@@ -27,27 +27,27 @@ namespace brynet { namespace net {
         return mServerSide;
     }
 
-    void TcpSocket::SocketNodelay() const
+    void TcpSocket::setNodelay() const
     {
         base::SocketNodelay(mFD);
     }
 
-    bool TcpSocket::SocketNonblock() const
+    bool TcpSocket::setNonblock() const
     {
         return base::SocketNonblock(mFD);
     }
 
-    void TcpSocket::SetSendSize(int sdSize) const
+    void TcpSocket::setSendSize(int sdSize) const
     {
         base::SocketSetSendSize(mFD, sdSize);
     }
 
-    void TcpSocket::SetRecvSize(int rdSize) const
+    void TcpSocket::setRecvSize(int rdSize) const
     {
         base::SocketSetRecvSize(mFD, rdSize);
     }
 
-    std::string TcpSocket::GetIP() const
+    std::string TcpSocket::getRemoteIP() const
     {
         return base::GetIPOfSocket(mFD);
     }
@@ -65,7 +65,7 @@ namespace brynet { namespace net {
         base::SocketClose(mFD);
     }
 
-    TcpSocket::PTR ListenSocket::Accept()
+    TcpSocket::Ptr ListenSocket::accept()
     {
         sock clientFD = base::Accept(mFD, nullptr, nullptr);
         if (clientFD == INVALID_SOCKET)
@@ -83,7 +83,7 @@ namespace brynet { namespace net {
         return TcpSocket::Create(clientFD, true);
     }
 
-    ListenSocket::PTR ListenSocket::Create(sock fd)
+    ListenSocket::Ptr ListenSocket::Create(sock fd)
     {
         struct make_unique_enabler : public ListenSocket
         {
@@ -91,7 +91,7 @@ namespace brynet { namespace net {
             make_unique_enabler(sock fd) : ListenSocket(fd) {}
         };
 
-        return PTR(new make_unique_enabler(fd));
+        return Ptr(new make_unique_enabler(fd));
     }
 
     ListenSocket::ListenSocket(sock fd)

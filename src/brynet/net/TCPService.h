@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <memory>
 
-#include <brynet/net/DataSocket.h>
+#include <brynet/net/TcpConnection.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/utils/Typeids.h>
 #include <brynet/net/SSLHelper.h>
@@ -18,50 +18,50 @@ namespace brynet { namespace net {
 
     class EventLoop;
     class IOLoopData;
-    typedef std::shared_ptr<IOLoopData> IOLoopDataPtr;
+    using IOLoopDataPtr = std::shared_ptr<IOLoopData>;
 
     class TcpService : public utils::NonCopyable, public std::enable_shared_from_this<TcpService>
     {
     public:
-        typedef std::shared_ptr<TcpService>                                         PTR;
+        using Ptr = std::shared_ptr<TcpService>;
 
-        typedef std::function<void(const EventLoop::PTR&)>                          FRAME_CALLBACK;
-        typedef std::function<void(const DataSocket::PTR&)>                         ENTER_CALLBACK;
+        using FrameCallback = std::function<void(const EventLoop::Ptr&)>;
+        using EnterCallback = std::function<void(const TcpConnection::Ptr&)>;
 
         class AddSocketOption
         {
         public:
             struct Options;
 
-            typedef std::function<void(Options& option)> AddSocketOptionFunc;
+            using AddSocketOptionFunc = std::function<void(Options& option)>;
 
-            static AddSocketOptionFunc WithEnterCallback(TcpService::ENTER_CALLBACK callback);
+            static AddSocketOptionFunc WithEnterCallback(TcpService::EnterCallback callback);
             static AddSocketOptionFunc WithClientSideSSL();
-            static AddSocketOptionFunc WithServerSideSSL(SSLHelper::PTR sslHelper);
+            static AddSocketOptionFunc WithServerSideSSL(SSLHelper::Ptr sslHelper);
             static AddSocketOptionFunc WithMaxRecvBufferSize(size_t size);
             static AddSocketOptionFunc WithForceSameThreadLoop(bool same);
         };
 
     public:
-        static  PTR                         Create();
+        static  Ptr                         Create();
 
-        void                                startWorkerThread(size_t threadNum, FRAME_CALLBACK callback = nullptr);
+        void                                startWorkerThread(size_t threadNum, FrameCallback callback = nullptr);
         void                                stopWorkerThread();
         template<class... Options>
-        bool                                addDataSocket(TcpSocket::PTR socket, const Options& ... options)
+        bool                                addTcpConnection(TcpSocket::Ptr socket, const Options& ... options)
         {
-            return _addDataSocket(std::move(socket), { options... });
+            return _addTcpConnection(std::move(socket), { options... });
         }
 
-        EventLoop::PTR                      getRandomEventLoop();
+        EventLoop::Ptr                      getRandomEventLoop();
 
     protected:
         TcpService() BRYNET_NOEXCEPT;
         virtual ~TcpService() BRYNET_NOEXCEPT;
 
-        bool                                _addDataSocket(TcpSocket::PTR socket,
+        bool                                _addTcpConnection(TcpSocket::Ptr socket,
             const std::vector<AddSocketOption::AddSocketOptionFunc>&);
-        EventLoop::PTR                      getSameThreadEventLoop();
+        EventLoop::Ptr                      getSameThreadEventLoop();
 
     private:
         std::vector<IOLoopDataPtr>          mIOLoopDatas;

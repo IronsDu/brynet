@@ -1,5 +1,5 @@
 # 概述
-`TCPService`是`brynet`中对`DataSocket`和`EventLoop`的封装组合。
+`TCPService`是`brynet`中对`TcpConnection`和`EventLoop`的封装组合。
 源代码见:[TCPService.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/TCPService.h).</br>
 
 # 接口
@@ -15,9 +15,9 @@
     (线程安全)开启工作线程，每一个工作线程有一个`EventLoop`负责事件检测。
 
 
-- `TcpService::addDataSocket(TcpSocket::PTR socket, Options...)`
+- `TcpService::addTcpConnection(TcpSocket::PTR socket, Options...)`
 
-    (线程安全),将一个DataSocket交给TcpService管理,其中Options请查阅`AddSocketOption的WithXXX系列函数`。
+    (线程安全),将一个TcpConnection交给TcpService管理,其中Options请查阅`AddSocketOption的WithXXX系列函数`。
 
 
 ## 示例
@@ -27,7 +27,7 @@ auto service = TcpService::Create();
 auto fd = ox_socket_connect(false, ip, port);
 auto socket = TcpSocket::Create(fd, false);
 
-service->addDataSocket(socket, AddSocketOption::WithMaxRecvBufferSize(1024*1024));
+service->addTcpConnection(socket, AddSocketOption::WithMaxRecvBufferSize(1024*1024));
 
 std::this_thread::sleep_for(2s);
 ```
