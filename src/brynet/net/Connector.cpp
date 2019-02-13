@@ -153,7 +153,7 @@ namespace brynet { namespace net {
 
             const sock fd = *(sock*)p;
             totalFds.insert(fd);
-            if (isConnectSuccess(fd, false))
+            if (isConnectSuccess(fd, false) && !brynet::net::base::IsSelfConnect(fd))
             {
                 successFds.insert(fd);
             }
@@ -240,9 +240,9 @@ namespace brynet { namespace net {
         sock clientfd = INVALID_SOCKET;
 
 #if defined PLATFORM_WINDOWS
-        const int check_error = WSAEWOULDBLOCK;
+        const int ExpectedError = WSAEWOULDBLOCK;
 #else
-        const int check_error = EINPROGRESS;
+        const int ExpectedError = EINPROGRESS;
 #endif
         int n = 0;
 
@@ -262,16 +262,20 @@ namespace brynet { namespace net {
         n = connect(clientfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr));
         if (n == 0)
         {
-            goto SUCCESS;
+            if (brynet::net::base::IsSelfConnect(clientfd))
+            {
+                goto FAILED;
+            }
+            else
+            {
+                goto SUCCESS;
+            }
         }
-
-        if (check_error != sErrno)
+        else if (sErrno != ExpectedError)
         {
-            brynet::net::base::SocketClose(clientfd);
-            clientfd = INVALID_SOCKET;
             goto FAILED;
         }
-
+        else
         {
             ConnectingInfo ci;
             ci.startConnectTime = std::chrono::steady_clock::now();
@@ -281,8 +285,9 @@ namespace brynet { namespace net {
 
             mConnectingInfos[clientfd] = ci;
             ox_fdset_add(mFDSet.get(), clientfd, WriteCheck);
+
+            return;
         }
-        return;
 
     SUCCESS:
         if (addr.getSuccessCB() != nullptr)
@@ -292,6 +297,11 @@ namespace brynet { namespace net {
         return;
 
     FAILED:
+        if (clientfd != INVALID_SOCKET)
+        {
+            brynet::net::base::SocketClose(clientfd);
+            clientfd = INVALID_SOCKET;
+        }
         if (addr.getFailedCB() != nullptr)
         {
             addr.getFailedCB()();

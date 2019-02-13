@@ -22,5 +22,6 @@ namespace brynet { namespace net { namespace base {
     int SocketSend(sock fd, const char* buffer, int len);
     sock Accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen);
     sock SocketCreate(int af, int type, int protocol);
+    bool IsSelfConnect(sock fd);
 
 } } }

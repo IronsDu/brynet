@@ -1,4 +1,3 @@
-os: Visual Studio 2017
 version: 1.1.0.{build}
 
 configuration:
@@ -7,23 +6,29 @@ configuration:
 
 environment:
   matrix:
-  - VS_VERSION: 12 2013
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2013
+    VS_VERSION: 12 2013
     VS_PLATFORM: win32
-  - VS_VERSION: 12 2013
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2013
+    VS_VERSION: 12 2013
     VS_PLATFORM: x64
-  - VS_VERSION: 14 2015
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    VS_VERSION: 14 2015
     VS_PLATFORM: win32
-  - VS_VERSION: 14 2015
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    VS_VERSION: 14 2015
     VS_PLATFORM: x64
-  - VS_VERSION: 15 2017
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    VS_VERSION: 15 2017
     VS_PLATFORM: win32
-  - VS_VERSION: 15 2017
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    VS_VERSION: 15 2017
     VS_PLATFORM: x64
 
 before_build:
   - git submodule update --init --recursive
   - echo Running cmake...
-  - cmake -G "Visual Studio %VS_VERSION%" -DCMAKE_GENERATOR_PLATFORM=%VS_PLATFORM%
+  - cmake . -G "Visual Studio %VS_VERSION%" -DCMAKE_GENERATOR_PLATFORM=%VS_PLATFORM%
 
 build:
   project: brynet.sln
