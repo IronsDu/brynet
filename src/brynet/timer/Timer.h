@@ -57,6 +57,11 @@ namespace brynet { namespace timer {
             return timer;
         }
 
+        void                                    addTimer(nanoseconds timeout, Timer::Ptr timer)
+        {
+            mTimers.push(timer);
+        }
+
         void                                    schedule();
         bool                                    isEmpty() const;
         // if timer empty, return zero

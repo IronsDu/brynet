@@ -91,12 +91,7 @@ namespace brynet { namespace net {
                 eventLoop]() {
                 while (*runIoLoop)
                 {
-                    auto timeout = std::chrono::milliseconds(sDefaultLoopTimeOutMS);
-                    if (!eventLoop->getTimerMgr()->isEmpty())
-                    {
-                        timeout = std::chrono::duration_cast<std::chrono::milliseconds>(eventLoop->getTimerMgr()->nearLeftTime());
-                    }
-                    eventLoop->loop(timeout.count());
+                    eventLoop->loopCompareNearTimer(sDefaultLoopTimeOutMS);
                     if (callback != nullptr)
                     {
                         callback(eventLoop);

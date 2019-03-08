@@ -16,6 +16,9 @@
 
 namespace brynet { namespace net {
 
+    using namespace std::chrono;
+    using namespace brynet::timer;
+
     class Channel;
     class TcpConnection;
     using TcpConnectionPtr = std::shared_ptr<TcpConnection>;
@@ -52,13 +55,15 @@ namespace brynet { namespace net {
         virtual ~EventLoop() BRYNET_NOEXCEPT;
 
         void                            loop(int64_t milliseconds);
+        // loop指定毫秒数,但如果定时器不为空,则loop时间为当前最近定时器的剩余时间和milliseconds的较小值
+        void                            loopCompareNearTimer(int64_t milliseconds);
+        // 返回true表示实际发生了wakeup所需的操作(此返回值不代表接口本身操作成功与否,因为此函数永远成功)
         bool                            wakeup();
 
         void                            pushAsyncFunctor(UserFunctor f);
         void                            pushAfterLoopFunctor(UserFunctor f);
 
-        /* return nullptr if not called in net thread*/
-        timer::TimerMgr::Ptr            getTimerMgr();
+        Timer::WeakPtr                  runAfter(nanoseconds timeout, std::function<void(void)> callback);
 
         inline bool                     isInLoopThread() const
         {

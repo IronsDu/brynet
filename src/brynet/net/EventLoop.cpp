@@ -1,5 +1,6 @@
 ﻿#include <cassert>
 #include <iostream>
+#include <algorithm>
 
 #include <brynet/net/Channel.h>
 #include <brynet/net/EventLoop.h>
@@ -131,11 +132,26 @@ namespace brynet { namespace net {
 #endif
     }
 
-    timer::TimerMgr::Ptr EventLoop::getTimerMgr()
+    Timer::WeakPtr EventLoop::runAfter(nanoseconds timeout, std::function<void(void)> callback)
     {
-        tryInitThreadID();
-        assert(isInLoopThread());
-        return isInLoopThread() ? mTimer : nullptr;
+        auto timer = std::make_shared<brynet::timer::Timer>(
+            steady_clock::now(),
+            nanoseconds(timeout),
+            callback);
+
+        if (isInLoopThread())
+        {
+            mTimer->addTimer(timeout, timer);
+        }
+        else
+        {
+            auto timerMgr = mTimer;
+            pushAsyncFunctor([timerMgr, timeout, timer]() {
+                timerMgr->addTimer(timeout, timer);
+            });
+        }
+
+        return timer;
     }
 
     inline void EventLoop::tryInitThreadID()
@@ -154,7 +170,7 @@ namespace brynet { namespace net {
 #endif
         if (!isInLoopThread())
         {
-            return;
+            throw std::runtime_error("only loop in io thread");
         }
 
         if (!mAfterLoopFunctors.empty())
@@ -258,6 +274,27 @@ namespace brynet { namespace net {
         mTimer->schedule();
     }
 
+    void EventLoop::loopCompareNearTimer(int64_t milliseconds)
+    {
+        tryInitThreadID();
+
+#ifndef NDEBUG
+        assert(isInLoopThread());
+#endif
+        if (!isInLoopThread())
+        {
+            throw std::runtime_error("only loop in io thread");
+        }
+
+        if (!mTimer->isEmpty())
+        {
+            auto nearTimeout = std::chrono::duration_cast<std::chrono::milliseconds>(mTimer->nearLeftTime());
+            milliseconds = std::min<int64_t>(milliseconds, nearTimeout.count());
+        }
+
+        loop(milliseconds);
+    }
+
     void EventLoop::processAfterLoopFunctors()
     {
         mCopyAfterLoopFunctors.swap(mAfterLoopFunctors);
@@ -343,10 +380,12 @@ namespace brynet { namespace net {
     void EventLoop::pushAfterLoopFunctor(UserFunctor f)
     {
         assert(isInLoopThread());
-        if (isInLoopThread())
+        if (!isInLoopThread())
         {
-            mAfterLoopFunctors.emplace_back(std::move(f));
+            throw std::runtime_error("only push after functor in io thread");
         }
+
+        mAfterLoopFunctors.emplace_back(std::move(f));
     }
 
 #ifndef PLATFORM_WINDOWS

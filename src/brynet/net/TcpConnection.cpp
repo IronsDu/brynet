@@ -764,7 +764,7 @@ namespace brynet { namespace net {
         if (!mTimer.lock() && mCheckTime != std::chrono::steady_clock::duration::zero())
         {
             std::weak_ptr<TcpConnection> weakedThis = shared_from_this();
-            mTimer = mEventLoop->getTimerMgr()->addTimer(mCheckTime, [weakedThis]() {
+            mTimer = mEventLoop->runAfter(mCheckTime, [weakedThis]() {
                 auto sharedThis = weakedThis.lock();
                 if (sharedThis != nullptr)
                 {
