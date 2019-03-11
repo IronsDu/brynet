@@ -87,12 +87,12 @@ int main(int argc, char** argv)
         socket->setRecvSize(32 * 1024);
 
         auto enterCallback = [mainLoop](const TcpConnection::Ptr& session) {
-            mainLoop->pushAsyncFunctor([session]() {
+            mainLoop->runAsyncFunctor([session]() {
                 addClientID(session);
             });
 
             session->setDisConnectCallback([mainLoop](const TcpConnection::Ptr& session) {
-                mainLoop->pushAsyncFunctor([session]() {
+                mainLoop->runAsyncFunctor([session]() {
                     removeClientID(session);
                 });
             });
@@ -113,7 +113,7 @@ int main(int argc, char** argv)
                         if (leftLen >= packet_len && packet_len >= HEAD_LEN)
                         {
                             auto packet = TcpConnection::makePacket(parseStr, packet_len);
-                            mainLoop->pushAsyncFunctor([packet]() {
+                            mainLoop->runAsyncFunctor([packet]() {
                                 broadCastPacket(packet);
                             });
 

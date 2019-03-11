@@ -118,7 +118,7 @@ int main(int argc, char** argv)
             1024 * 1024, 
             enterCallback, 
             clientEventLoop);
-        clientEventLoop->pushAsyncFunctor([clientEventLoop, tcpConnection]() {
+        clientEventLoop->runAsyncFunctor([clientEventLoop, tcpConnection]() {
             tcpConnection->onEnterEventLoop();
         });
     }

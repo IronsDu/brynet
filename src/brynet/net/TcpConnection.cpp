@@ -15,8 +15,8 @@ namespace brynet { namespace net {
         EventLoop::Ptr eventLoop) BRYNET_NOEXCEPT
         :
 #if defined PLATFORM_WINDOWS
-    mOvlRecv(EventLoop::OverlappedType::OverlappedRecv),
-        mOvlSend(EventLoop::OverlappedType::OverlappedSend),
+        mOvlRecv(port::Win::OverlappedType::OverlappedRecv),
+        mOvlSend(port::Win::OverlappedType::OverlappedSend),
         mPostClose(false),
 #endif
         mIP(socket->getRemoteIP()),
@@ -143,7 +143,7 @@ namespace brynet { namespace net {
         auto packetCapture = packet;
         auto callbackCapture = callback;
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
+        mEventLoop->runAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
             const auto len = packetCapture->size();
             sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
             sharedThis->runAfterFlush();
@@ -223,7 +223,7 @@ namespace brynet { namespace net {
         if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->pushAfterLoopFunctor([sharedThis]() {
+            mEventLoop->runFunctorAfterLoop([sharedThis]() {
                 sharedThis->mIsPostFlush = false;
                 sharedThis->flush();
             });
@@ -617,7 +617,7 @@ namespace brynet { namespace net {
         auto sharedThis = shared_from_this();
         auto eventLoop = mEventLoop;
         auto fd = mSocket->getFD();
-        mEventLoop->pushAfterLoopFunctor([callBack,
+        mEventLoop->runFunctorAfterLoop([callBack,
             sharedThis,
             eventLoop,
             fd]() {
@@ -710,7 +710,7 @@ namespace brynet { namespace net {
     void TcpConnection::setDataCallback(DataCallback cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncFunctor([sharedThis, cb]() mutable {
+        mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
             sharedThis->mDataCallback = std::move(cb);
         });
     }
@@ -718,7 +718,7 @@ namespace brynet { namespace net {
     void TcpConnection::setDisConnectCallback(DisconnectedCallback cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncFunctor([sharedThis, cb]() mutable {
+        mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
             sharedThis->mDisConnectCallback = std::move(cb);
         });
     }
@@ -777,7 +777,7 @@ namespace brynet { namespace net {
     void TcpConnection::setHeartBeat(std::chrono::nanoseconds checkTime)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncFunctor([sharedThis, checkTime]() {
+        mEventLoop->runAsyncFunctor([sharedThis, checkTime]() {
             if (sharedThis->mTimer.lock() != nullptr)
             {
                 sharedThis->mTimer.lock()->cancel();
@@ -793,7 +793,7 @@ namespace brynet { namespace net {
     void TcpConnection::postDisConnect()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncFunctor([sharedThis]() {
+        mEventLoop->runAsyncFunctor([sharedThis]() {
             sharedThis->procCloseInLoop();
         });
     }
@@ -801,8 +801,8 @@ namespace brynet { namespace net {
     void TcpConnection::postShutdown()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->pushAsyncFunctor([sharedThis]() {
-            sharedThis->mEventLoop->pushAfterLoopFunctor([sharedThis]() {
+        mEventLoop->runAsyncFunctor([sharedThis]() {
+            sharedThis->mEventLoop->runFunctorAfterLoop([sharedThis]() {
                 sharedThis->procShutdownInLoop();
             });
         });

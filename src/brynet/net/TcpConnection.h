@@ -112,8 +112,8 @@ namespace brynet { namespace net {
     private:
 
 #ifdef PLATFORM_WINDOWS
-        struct EventLoop::OverlappedExt     mOvlRecv;
-        struct EventLoop::OverlappedExt     mOvlSend;
+        struct port::Win::OverlappedExt mOvlRecv;
+        struct port::Win::OverlappedExt mOvlSend;
 
         bool                            mPostRecvCheck;
         bool                            mPostWriteCheck;

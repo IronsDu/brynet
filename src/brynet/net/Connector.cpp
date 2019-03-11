@@ -4,7 +4,7 @@
 #include <thread>
 
 #include <brynet/net/SocketLibFunction.h>
-#include <brynet/net/fdset.h>
+#include <brynet/net/poller.h>
 
 #include <brynet/net/Connector.h>
 
@@ -90,11 +90,11 @@ namespace brynet { namespace net {
 
         std::map<sock, ConnectingInfo>              mConnectingInfos;
 
-        struct FDSetDeleter
+        struct PollerDeleter
         {
-            void operator()(struct fdset_s* ptr) const
+            void operator()(struct poller_s* ptr) const
             {
-                ox_fdset_delete(ptr);
+                ox_poller_delete(ptr);
             }
         };
         struct StackDeleter
@@ -105,19 +105,19 @@ namespace brynet { namespace net {
             }
         };
 
-        std::unique_ptr<struct fdset_s, FDSetDeleter> mFDSet;
+        std::unique_ptr<struct poller_s, PollerDeleter> mPoller;
         std::unique_ptr<struct stack_s, StackDeleter> mPollResult;
     };
 
     ConnectorWorkInfo::ConnectorWorkInfo() BRYNET_NOEXCEPT
     {
-        mFDSet.reset(ox_fdset_new());
+        mPoller.reset(ox_poller_new());
         mPollResult.reset(ox_stack_new(1024, sizeof(sock)));
     }
 
     bool ConnectorWorkInfo::isConnectSuccess(sock clientfd, bool willCheckWrite) const
     {
-        if (willCheckWrite && !ox_fdset_check(mFDSet.get(), clientfd, WriteCheck))
+        if (willCheckWrite && !ox_poller_check(mPoller.get(), clientfd, WriteCheck))
         {
             return false;
         }
@@ -134,7 +134,7 @@ namespace brynet { namespace net {
 
     void ConnectorWorkInfo::checkConnectStatus(int millsecond)
     {
-        if (ox_fdset_poll(mFDSet.get(), millsecond) <= 0)
+        if (ox_poller_poll(mPoller.get(), millsecond) <= 0)
         {
             return;
         }
@@ -142,7 +142,7 @@ namespace brynet { namespace net {
         std::set<sock>  totalFds;
         std::set<sock>  successFds;
 
-        ox_fdset_visitor(mFDSet.get(), WriteCheck, mPollResult.get());
+        ox_poller_visitor(mPoller.get(), WriteCheck, mPollResult.get());
         while (true)
         {
             auto p = ox_stack_popfront(mPollResult.get());
@@ -161,7 +161,7 @@ namespace brynet { namespace net {
 
         for (auto fd : totalFds)
         {
-            ox_fdset_remove(mFDSet.get(), fd);
+            ox_poller_remove(mPoller.get(), fd);
 
             auto it = mConnectingInfos.find(fd);
             if (it == mConnectingInfos.end())
@@ -203,7 +203,7 @@ namespace brynet { namespace net {
             auto fd = it->first;
             auto cb = it->second.failedCB;
 
-            ox_fdset_remove(mFDSet.get(), fd);
+            ox_poller_remove(mPoller.get(), fd);
             mConnectingInfos.erase(it++);
 
             brynet::net::base::SocketClose(fd);
@@ -225,7 +225,7 @@ namespace brynet { namespace net {
             auto fd = v.first;
             auto cb = v.second.failedCB;
 
-            ox_fdset_remove(mFDSet.get(), fd);
+            ox_poller_remove(mPoller.get(), fd);
             brynet::net::base::SocketClose(fd);
             if (cb != nullptr)
             {
@@ -284,7 +284,7 @@ namespace brynet { namespace net {
             ci.timeout = addr.getTimeout();
 
             mConnectingInfos[clientfd] = ci;
-            ox_fdset_add(mFDSet.get(), clientfd, WriteCheck);
+            ox_poller_add(mPoller.get(), clientfd, WriteCheck);
 
             return;
         }
@@ -370,7 +370,7 @@ namespace brynet { namespace net {
             return;
         }
 
-        mEventLoop->pushAsyncFunctor([this]() {
+        mEventLoop->runAsyncFunctor([this]() {
             *mIsRun = false;
         });
 
@@ -419,7 +419,7 @@ namespace brynet { namespace net {
             timeout,
             successCB,
             failedCB);
-        mEventLoop->pushAsyncFunctor([workInfo, address]() {
+        mEventLoop->runAsyncFunctor([workInfo, address]() {
             workInfo->processConnect(address);
         });
     }

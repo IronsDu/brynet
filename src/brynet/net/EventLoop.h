@@ -13,6 +13,7 @@
 #include <brynet/timer/Timer.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/port/Win.h>
 
 namespace brynet { namespace net {
 
@@ -30,26 +31,6 @@ namespace brynet { namespace net {
         using Ptr = std::shared_ptr<EventLoop>;
         using UserFunctor = std::function<void(void)>;
 
-#ifdef PLATFORM_WINDOWS
-        enum class OverlappedType
-        {
-            OverlappedNone = 0,
-            OverlappedRecv,
-            OverlappedSend,
-        };
-
-        struct OverlappedExt
-        {
-            OVERLAPPED  base;
-            const EventLoop::OverlappedType  OP;
-
-            OverlappedExt(OverlappedType op) BRYNET_NOEXCEPT : OP(op)
-            {
-                memset(&base, 0, sizeof(base));
-            }
-        };
-#endif
-
     public:
         EventLoop() BRYNET_NOEXCEPT;
         virtual ~EventLoop() BRYNET_NOEXCEPT;
@@ -60,9 +41,8 @@ namespace brynet { namespace net {
         // 返回true表示实际发生了wakeup所需的操作(此返回值不代表接口本身操作成功与否,因为此函数永远成功)
         bool                            wakeup();
 
-        void                            pushAsyncFunctor(UserFunctor f);
-        void                            pushAfterLoopFunctor(UserFunctor f);
-
+        void                            runAsyncFunctor(UserFunctor f);
+        void                            runFunctorAfterLoop(UserFunctor f);
         Timer::WeakPtr                  runAfter(nanoseconds timeout, std::function<void(void)> callback);
 
         inline bool                     isInLoopThread() const

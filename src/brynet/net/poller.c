@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include <brynet/net/fdset.h>
+#include <brynet/net/poller.h>
 
 #if defined PLATFORM_LINUX
 #include <poll.h>
@@ -16,7 +16,7 @@
 #define CHECK_ERROR_FLAG (POLLERR | POLLHUP)
 #endif
 
-struct fdset_s
+struct poller_s
 {
     struct pollfd* pollFds;
     int nfds;
@@ -24,7 +24,7 @@ struct fdset_s
 };
 
 static
-void upstepPollfd(struct fdset_s* self, int upSize)
+void upstepPollfd(struct poller_s* self, int upSize)
 {
     if (upSize <= 0)
     {
@@ -48,7 +48,7 @@ void upstepPollfd(struct fdset_s* self, int upSize)
 }
 
 static
-struct pollfd* findPollfd(struct fdset_s* self, sock fd)
+struct pollfd* findPollfd(struct poller_s* self, sock fd)
 {
     int i = 0;
     for (; i < self->nfds; i++)
@@ -63,7 +63,7 @@ struct pollfd* findPollfd(struct fdset_s* self, sock fd)
 }
 
 static
-void TryRemovePollFd(struct fdset_s* self, sock fd)
+void TryRemovePollFd(struct poller_s* self, sock fd)
 {
     int pos = -1;
     int i = 0;
@@ -84,10 +84,10 @@ void TryRemovePollFd(struct fdset_s* self, sock fd)
     }
 }
 
-struct fdset_s*
-ox_fdset_new(void)
+struct poller_s*
+ox_poller_new(void)
 {
-    struct fdset_s* ret = (struct fdset_s*)malloc(sizeof(struct fdset_s));
+    struct poller_s* ret = (struct poller_s*)malloc(sizeof(struct poller_s));
     if(ret != NULL)
     {
         ret->pollFds = NULL;
@@ -100,7 +100,7 @@ ox_fdset_new(void)
 }
 
 void 
-ox_fdset_delete(struct fdset_s* self)
+ox_poller_delete(struct poller_s* self)
 {
     free(self->pollFds);
     self->pollFds = NULL;
@@ -112,7 +112,7 @@ ox_fdset_delete(struct fdset_s* self)
 }
 
 void
-ox_fdset_add(struct fdset_s* self, sock fd, int type)
+ox_poller_add(struct poller_s* self, sock fd, int type)
 {
     if (self->limitSize == self->nfds)
     {
@@ -152,7 +152,7 @@ ox_fdset_add(struct fdset_s* self, sock fd, int type)
 }
 
 void
-ox_fdset_del(struct fdset_s* self, sock fd, int type)
+ox_poller_del(struct poller_s* self, sock fd, int type)
 {
     struct pollfd* pf = findPollfd(self, fd);
     if (pf == NULL)
@@ -182,7 +182,7 @@ ox_fdset_del(struct fdset_s* self, sock fd, int type)
 }
 
 void
-ox_fdset_remove(struct fdset_s* self, sock fd)
+ox_poller_remove(struct poller_s* self, sock fd)
 {
     TryRemovePollFd(self, fd);
 }
@@ -217,7 +217,7 @@ check_event(const struct pollfd* pf, enum CheckType type)
 }
 
 void
-ox_fdset_visitor(struct fdset_s* self, enum CheckType type, struct stack_s* result)
+ox_poller_visitor(struct poller_s* self, enum CheckType type, struct stack_s* result)
 {
     int i = 0;
     for (; i < self->nfds; i++)
@@ -230,7 +230,7 @@ ox_fdset_visitor(struct fdset_s* self, enum CheckType type, struct stack_s* resu
 }
 
 int 
-ox_fdset_poll(struct fdset_s* self, long overtime)
+ox_poller_poll(struct poller_s* self, long overtime)
 {
 #if defined PLATFORM_WINDOWS
     int ret = WSAPoll(&self->pollFds[0], self->nfds, overtime);
@@ -247,7 +247,7 @@ ox_fdset_poll(struct fdset_s* self, long overtime)
 }
 
 bool 
-ox_fdset_check(struct fdset_s* self, sock fd, enum CheckType type)
+ox_poller_check(struct poller_s* self, sock fd, enum CheckType type)
 {
     int i = 0;
     const struct pollfd* pf = findPollfd(self, fd);

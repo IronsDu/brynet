@@ -205,7 +205,7 @@ namespace brynet { namespace net {
             return false;
         }
 #endif
-        eventLoop->pushAsyncFunctor([tcpConnection]() {
+        eventLoop->runAsyncFunctor([tcpConnection]() {
             tcpConnection->onEnterEventLoop();
         });
 

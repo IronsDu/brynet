@@ -13,7 +13,7 @@ namespace brynet { namespace net {
     class WakeupChannel final : public Channel, public utils::NonCopyable
     {
     public:
-        explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OverlappedType::OverlappedRecv)
+        explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(port::Win::OverlappedType::OverlappedRecv)
         {
         }
 
@@ -37,7 +37,7 @@ namespace brynet { namespace net {
 
     private:
         HANDLE                      mIOCP;
-        EventLoop::OverlappedExt    mWakeupOvl;
+        port::Win::OverlappedExt    mWakeupOvl;
     };
 #else
     class WakeupChannel final : public Channel, public utils::NonCopyable
@@ -146,7 +146,7 @@ namespace brynet { namespace net {
         else
         {
             auto timerMgr = mTimer;
-            pushAsyncFunctor([timerMgr, timeout, timer]() {
+            runAsyncFunctor([timerMgr, timeout, timer]() {
                 timerMgr->addTimer(timeout, timer);
             });
         }
@@ -217,12 +217,12 @@ namespace brynet { namespace net {
         {
             auto channel = (Channel*)mEventEntries[i].lpCompletionKey;
             assert(channel != nullptr);
-            const auto ovl = reinterpret_cast<const EventLoop::OverlappedExt*>(mEventEntries[i].lpOverlapped);
-            if (ovl->OP == EventLoop::OverlappedType::OverlappedRecv)
+            const auto ovl = reinterpret_cast<const port::Win::OverlappedExt*>(mEventEntries[i].lpOverlapped);
+            if (ovl->OP == port::Win::OverlappedType::OverlappedRecv)
             {
                 channel->canRecv();
             }
-            else if (ovl->OP == EventLoop::OverlappedType::OverlappedSend)
+            else if (ovl->OP == port::Win::OverlappedType::OverlappedSend)
             {
                 channel->canSend();
             }
@@ -361,7 +361,7 @@ namespace brynet { namespace net {
         mTcpConnections.erase(fd);
     }
 
-    void EventLoop::pushAsyncFunctor(UserFunctor f)
+    void EventLoop::runAsyncFunctor(UserFunctor f)
     {
         if (isInLoopThread())
         {
@@ -377,7 +377,7 @@ namespace brynet { namespace net {
         }
     }
 
-    void EventLoop::pushAfterLoopFunctor(UserFunctor f)
+    void EventLoop::runFunctorAfterLoop(UserFunctor f)
     {
         assert(isInLoopThread());
         if (!isInLoopThread())
