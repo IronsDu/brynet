@@ -26,15 +26,28 @@ namespace brynet { namespace net {
     public:
         using Ptr = std::shared_ptr<AsyncConnector>;
         using CompletedCallback = std::function<void(TcpSocket::Ptr)>;
+        using ProcessTcpSocketCallback = std::function<void(TcpSocket&)>;
         using FailedCallback = std::function<void()>;
+
+        class ConnectOptions
+        {
+        public:
+            struct Options;
+
+            using ConnectOptionFunc = std::function<void(Options& option)>;
+
+            static ConnectOptionFunc WithAddr(const std::string& ip, int port);
+            static ConnectOptionFunc WithTimeout(std::chrono::nanoseconds timeout);
+            static ConnectOptionFunc WithCompletedCallback(CompletedCallback callback);
+            static ConnectOptionFunc AddProcessTcpSocketCallback(ProcessTcpSocketCallback process);
+            static ConnectOptionFunc WithFailedCallback(FailedCallback callback);
+
+            static std::chrono::nanoseconds ExtractTimeout(const std::vector<ConnectOptions::ConnectOptionFunc>& options);
+        };
 
         void                                startWorkerThread();
         void                                stopWorkerThread();
-        void                                asyncConnect(const std::string& ip,
-                                                        int port,
-                                                        std::chrono::nanoseconds timeout,
-                                                        CompletedCallback,
-                                                        FailedCallback);
+        void                                asyncConnect(const std::vector<ConnectOptions::ConnectOptionFunc>& options);
 
         static  Ptr                         Create();
 

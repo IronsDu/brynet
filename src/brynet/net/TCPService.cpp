@@ -124,7 +124,7 @@ namespace brynet { namespace net {
         {
             useSSL = false;
             forceSameThreadLoop = false;
-            maxRecvBufferSize = 0;
+            maxRecvBufferSize = 128;
         }
 
         std::vector<TcpService::EnterCallback>  enterCallback;
@@ -251,7 +251,7 @@ namespace brynet { namespace net {
         return mIOThread;
     }
 
-    TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithEnterCallback(TcpService::EnterCallback callback)
+    TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::AddEnterCallback(TcpService::EnterCallback callback)
     {
         return [=](TcpService::AddSocketOption::Options& option) {
             option.enterCallback.push_back(callback);

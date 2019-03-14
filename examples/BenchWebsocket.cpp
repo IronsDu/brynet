@@ -92,7 +92,7 @@ int main(int argc, char **argv)
         };
 
         service->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024*1024));
     }
 

@@ -17,13 +17,15 @@ namespace brynet { namespace net {
             int port,
             std::chrono::nanoseconds timeout,
             AsyncConnector::CompletedCallback successCB,
-            AsyncConnector::FailedCallback failedCB)
+            AsyncConnector::FailedCallback failedCB,
+            std::vector<AsyncConnector::ProcessTcpSocketCallback> processCallbacks)
             :
             mIP(std::move(ip)),
             mPort(port),
             mTimeout(timeout),
             mSuccessCB(std::move(successCB)),
-            mFailedCB(std::move(failedCB))
+            mFailedCB(std::move(failedCB)),
+            mProcessCallbacks(std::move(processCallbacks))
         {
         }
 
@@ -47,6 +49,11 @@ namespace brynet { namespace net {
             return mFailedCB;
         }
 
+        const std::vector<AsyncConnector::ProcessTcpSocketCallback>& getProcessCallbacks() const
+        {
+            return mProcessCallbacks;
+        }
+
         std::chrono::nanoseconds                    getTimeout() const
         {
             return mTimeout;
@@ -58,6 +65,7 @@ namespace brynet { namespace net {
         const std::chrono::nanoseconds              mTimeout;
         const AsyncConnector::CompletedCallback     mSuccessCB;
         const AsyncConnector::FailedCallback        mFailedCB;
+        const std::vector<AsyncConnector::ProcessTcpSocketCallback>    mProcessCallbacks;
     };
 
     class ConnectorWorkInfo final : public utils::NonCopyable
@@ -86,6 +94,7 @@ namespace brynet { namespace net {
             std::chrono::nanoseconds                timeout;
             AsyncConnector::CompletedCallback       successCB;
             AsyncConnector::FailedCallback          failedCB;
+            std::vector<AsyncConnector::ProcessTcpSocketCallback> processCallbacks;
         };
 
         std::map<sock, ConnectingInfo>              mConnectingInfos;
@@ -168,20 +177,27 @@ namespace brynet { namespace net {
             {
                 continue;
             }
-
-            auto socket = TcpSocket::Create(fd, false);
-            if (successFds.find(fd) != successFds.end())
-            {
-                if (it->second.successCB != nullptr)
-                {
-                    it->second.successCB(std::move(socket));
-                }
-            }
             else
             {
-                if (it->second.failedCB != nullptr)
+                auto socket = TcpSocket::Create(fd, false);
+                const auto& connectingInfo = it->second;
+                if (successFds.find(fd) != successFds.end())
                 {
-                    it->second.failedCB();
+                    for (const auto& process : connectingInfo.processCallbacks)
+                    {
+                        process(*socket);
+                    }
+                    if (connectingInfo.successCB != nullptr)
+                    {
+                        connectingInfo.successCB(std::move(socket));
+                    }
+                }
+                else
+                {
+                    if (connectingInfo.failedCB != nullptr)
+                    {
+                        connectingInfo.failedCB();
+                    }
                 }
             }
 
@@ -282,6 +298,7 @@ namespace brynet { namespace net {
             ci.successCB = addr.getSuccessCB();
             ci.failedCB = addr.getFailedCB();
             ci.timeout = addr.getTimeout();
+            ci.processCallbacks = addr.getProcessCallbacks();
 
             mConnectingInfos[clientfd] = ci;
             ox_poller_add(mPoller.get(), clientfd, WriteCheck);
@@ -292,7 +309,12 @@ namespace brynet { namespace net {
     SUCCESS:
         if (addr.getSuccessCB() != nullptr)
         {
-            addr.getSuccessCB()(TcpSocket::Create(clientfd, false));
+            auto tcpSocket = TcpSocket::Create(clientfd, false);
+            for (const auto& process : addr.getProcessCallbacks())
+            {
+                process(*tcpSocket);
+            }
+            addr.getSuccessCB()(std::move(tcpSocket));
         }
         return;
 
@@ -391,21 +413,87 @@ namespace brynet { namespace net {
         mThread = nullptr;
     }
 
-    void AsyncConnector::asyncConnect(const std::string& ip,
-        int port,
-        std::chrono::nanoseconds timeout,
-        CompletedCallback successCB,
-        FailedCallback failedCB)
+    struct AsyncConnector::ConnectOptions::Options
+    {
+        Options()
+        {
+            timeout = std::chrono::seconds(10);
+        }
+
+        std::string ip;
+        int port;
+        std::chrono::nanoseconds timeout;
+        std::vector<ProcessTcpSocketCallback> processCallbacks;
+        CompletedCallback completedCallback;
+        FailedCallback faledCallback;
+    };
+
+    AsyncConnector::ConnectOptions::ConnectOptionFunc AsyncConnector::ConnectOptions::WithAddr(const std::string& ip, int port)
+    {
+        return [=](AsyncConnector::ConnectOptions::Options& option) {
+            option.ip = ip;
+            option.port = port;
+        };
+    }
+
+    AsyncConnector::ConnectOptions::ConnectOptionFunc AsyncConnector::ConnectOptions::WithTimeout(std::chrono::nanoseconds timeout)
+    {
+        return [=](AsyncConnector::ConnectOptions::Options& option) {
+            option.timeout = timeout;
+        };
+    }
+
+    AsyncConnector::ConnectOptions::ConnectOptionFunc AsyncConnector::ConnectOptions::WithCompletedCallback(CompletedCallback callback)
+    {
+        return [=](AsyncConnector::ConnectOptions::Options& option) {
+            option.completedCallback = callback;
+        };
+    }
+
+    AsyncConnector::ConnectOptions::ConnectOptionFunc AsyncConnector::ConnectOptions::AddProcessTcpSocketCallback(ProcessTcpSocketCallback process)
+    {
+        return [=](AsyncConnector::ConnectOptions::Options& option) {
+            option.processCallbacks.push_back(process);
+        };
+    }
+
+    AsyncConnector::ConnectOptions::ConnectOptionFunc AsyncConnector::ConnectOptions::WithFailedCallback(FailedCallback callback)
+    {
+        return [=](AsyncConnector::ConnectOptions::Options& option) {
+            option.faledCallback = callback;
+        };
+    }
+
+    std::chrono::nanoseconds AsyncConnector::ConnectOptions::ExtractTimeout(const std::vector<ConnectOptions::ConnectOptionFunc>& options)
+    {
+        Options option;
+        for (const auto& func : options)
+        {
+            func(option);
+        }
+        return option.timeout;
+    }
+
+    void AsyncConnector::asyncConnect(const std::vector<ConnectOptions::ConnectOptionFunc>& options)
     {
 #ifdef HAVE_LANG_CXX17
         std::shared_lock<std::shared_mutex> lck(mThreadGuard);
 #else
         std::lock_guard<std::mutex> lck(mThreadGuard);
 #endif
+        AsyncConnector::ConnectOptions::Options option;
+        for (const auto& func : options)
+        {
+            func(option);
+        }
 
-        if (successCB == nullptr || failedCB == nullptr)
+        if (option.completedCallback == nullptr && option.faledCallback == nullptr)
         {
             throw std::runtime_error("all callback is nullptr");
+        }
+        if (option.ip.empty())
+        {
+            throw std::runtime_error("addr is empty");
         }
 
         if (!(*mIsRun))
@@ -414,11 +502,12 @@ namespace brynet { namespace net {
         }
 
         auto workInfo = mWorkInfo;
-        auto address = AsyncConnectAddr(ip,
-            port,
-            timeout,
-            successCB,
-            failedCB);
+        auto address = AsyncConnectAddr(option.ip,
+            option.port,
+            option.timeout,
+            option.completedCallback,
+            option.faledCallback,
+            option.processCallbacks);
         mEventLoop->runAsyncFunctor([workInfo, address]() {
             workInfo->processConnect(address);
         });

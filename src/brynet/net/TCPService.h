@@ -35,7 +35,7 @@ namespace brynet { namespace net {
 
             using AddSocketOptionFunc = std::function<void(Options& option)>;
 
-            static AddSocketOptionFunc WithEnterCallback(TcpService::EnterCallback callback);
+            static AddSocketOptionFunc AddEnterCallback(TcpService::EnterCallback callback);
             static AddSocketOptionFunc WithClientSideSSL();
             static AddSocketOptionFunc WithServerSideSSL(SSLHelper::Ptr sslHelper);
             static AddSocketOptionFunc WithMaxRecvBufferSize(size_t size);

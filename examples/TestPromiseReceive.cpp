@@ -22,9 +22,7 @@ int main(int argc, char **argv)
     }
 
     auto server = TcpService::Create();
-    auto listenThread = ListenThread::Create();
-
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket){
+    auto listenThread = ListenThread::Create(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket) {
         socket->setNodelay();
         auto enterCallback = [](const TcpConnection::Ptr& session) {
             auto promiseReceive = setupPromiseReceive(session);
@@ -34,38 +32,40 @@ int main(int argc, char **argv)
                 auto headline = std::string(buffer, len);
                 std::cout << headline << std::endl;
                 return false;
-            })->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
-                auto headerValue = std::string(buffer, len);
-                std::cout << headerValue << std::endl;
-                if (len > 2)
-                {
-                    const static std::string ContentLenghtFlag = "Content-Length: ";
-                    auto pos = headerValue.find(ContentLenghtFlag);
-                    if (pos != std::string::npos)
+                })->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
+                    auto headerValue = std::string(buffer, len);
+                    std::cout << headerValue << std::endl;
+                    if (len > 2)
                     {
-                        auto lenStr = headerValue.substr(pos+ ContentLenghtFlag.size(), headerValue.size());
-                        *contentLength = std::stoi(lenStr);
+                        const static std::string ContentLenghtFlag = "Content-Length: ";
+                        auto pos = headerValue.find(ContentLenghtFlag);
+                        if (pos != std::string::npos)
+                        {
+                            auto lenStr = headerValue.substr(pos + ContentLenghtFlag.size(), headerValue.size());
+                            *contentLength = std::stoi(lenStr);
+                        }
+                        return true;
                     }
-                    return true;
-                }
-                return false;
-            })->receive(contentLength, [session](const char* buffer, size_t len) {
-                HttpResponse response;
-                response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
-                response.setContentType("text/html; charset=utf-8");
-                response.setBody("<html>hello world </html>");
+                    return false;
+                    })->receive(contentLength, [session](const char* buffer, size_t len) {
+                        HttpResponse response;
+                        response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
+                        response.setContentType("text/html; charset=utf-8");
+                        response.setBody("<html>hello world </html>");
 
-                auto result = response.getResult();
-                session->send(result.c_str(), result.size());
-                session->postShutdown();
+                        auto result = response.getResult();
+                        session->send(result.c_str(), result.size());
+                        session->postShutdown();
 
-                return false;
-            });
+                        return false;
+                        });
         };
         server->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
-    });
+        });
+
+    listenThread->startListen();
 
     server->startWorkerThread(atoi(argv[2]));
 

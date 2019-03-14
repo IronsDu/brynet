@@ -79,9 +79,7 @@ int main(int argc, char** argv)
 
     service = TcpService::Create();
     auto mainLoop = std::make_shared<EventLoop>();
-    auto listenThrean = ListenThread::Create();
-
-    listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](TcpSocket::Ptr socket) {
+    auto listenThread = ListenThread::Create(false, "0.0.0.0", port, [mainLoop](TcpSocket::Ptr socket) {
         socket->setNodelay();
         socket->setSendSize(32 * 1024);
         socket->setRecvSize(32 * 1024);
@@ -89,13 +87,13 @@ int main(int argc, char** argv)
         auto enterCallback = [mainLoop](const TcpConnection::Ptr& session) {
             mainLoop->runAsyncFunctor([session]() {
                 addClientID(session);
-            });
+                });
 
             session->setDisConnectCallback([mainLoop](const TcpConnection::Ptr& session) {
                 mainLoop->runAsyncFunctor([session]() {
                     removeClientID(session);
+                    });
                 });
-            });
 
             session->setDataCallback([mainLoop](const char* buffer, size_t len) {
                 const char* parseStr = buffer;
@@ -115,7 +113,7 @@ int main(int argc, char** argv)
                             auto packet = TcpConnection::makePacket(parseStr, packet_len);
                             mainLoop->runAsyncFunctor([packet]() {
                                 broadCastPacket(packet);
-                            });
+                                });
 
                             totalProcLen += packet_len;
                             parseStr += packet_len;
@@ -132,13 +130,14 @@ int main(int argc, char** argv)
                 }
 
                 return totalProcLen;
-            });
+                });
         };
         service->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
-    });
+        });
 
+    listenThread->startListen();
     service->startWorkerThread(2);
 
     auto now = std::chrono::steady_clock::now();
