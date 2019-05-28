@@ -24,15 +24,15 @@ namespace brynet { namespace net {
     class SSLHelper : public utils::NonCopyable, public std::enable_shared_from_this<SSLHelper>
     {
     public:
-        typedef std::shared_ptr<SSLHelper>   PTR;
+        using Ptr = std::shared_ptr<SSLHelper>;
 
 #ifdef USE_OPENSSL
         bool                                initSSL(const std::string& certificate,
-            const std::string& privatekey);
+                                                const std::string& privatekey);
         void                                destroySSL();
         SSL_CTX*                            getOpenSSLCTX();
 #endif
-        static  PTR                         Create();
+        static  Ptr                         Create();
 
     private:
         SSLHelper() BRYNET_NOEXCEPT;

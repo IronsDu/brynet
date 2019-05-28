@@ -24,35 +24,48 @@ namespace brynet { namespace net {
     class AsyncConnector : utils::NonCopyable, public std::enable_shared_from_this<AsyncConnector>
     {
     public:
-        typedef std::shared_ptr<AsyncConnector> PTR;
-        typedef std::function<void(TcpSocket::PTR)> COMPLETED_CALLBACK;
-        typedef std::function<void()> FAILED_CALLBACK;
+        using Ptr = std::shared_ptr<AsyncConnector>;
+        using CompletedCallback = std::function<void(TcpSocket::Ptr)>;
+        using ProcessTcpSocketCallback = std::function<void(TcpSocket&)>;
+        using FailedCallback = std::function<void()>;
 
-        void                startWorkerThread();
-        void                stopWorkerThread();
-        void                asyncConnect(const std::string& ip,
-            int port,
-            std::chrono::nanoseconds timeout,
-            COMPLETED_CALLBACK,
-            FAILED_CALLBACK);
+        class ConnectOptions
+        {
+        public:
+            struct Options;
 
-        static  PTR         Create();
+            using ConnectOptionFunc = std::function<void(Options& option)>;
+
+            static ConnectOptionFunc WithAddr(const std::string& ip, int port);
+            static ConnectOptionFunc WithTimeout(std::chrono::nanoseconds timeout);
+            static ConnectOptionFunc WithCompletedCallback(CompletedCallback callback);
+            static ConnectOptionFunc AddProcessTcpSocketCallback(ProcessTcpSocketCallback process);
+            static ConnectOptionFunc WithFailedCallback(FailedCallback callback);
+
+            static std::chrono::nanoseconds ExtractTimeout(const std::vector<ConnectOptions::ConnectOptionFunc>& options);
+        };
+
+        void                                startWorkerThread();
+        void                                stopWorkerThread();
+        void                                asyncConnect(const std::vector<ConnectOptions::ConnectOptionFunc>& options);
+
+        static  Ptr                         Create();
 
     private:
         AsyncConnector();
         virtual ~AsyncConnector();
 
     private:
-        std::shared_ptr<EventLoop>      mEventLoop;
+        std::shared_ptr<EventLoop>          mEventLoop;
 
-        std::shared_ptr<ConnectorWorkInfo> mWorkInfo;
-        std::shared_ptr<std::thread>    mThread;
+        std::shared_ptr<ConnectorWorkInfo>  mWorkInfo;
+        std::shared_ptr<std::thread>        mThread;
 #ifdef HAVE_LANG_CXX17
-        std::shared_mutex               mThreadGuard;
+        std::shared_mutex                   mThreadGuard;
 #else
-        std::mutex                      mThreadGuard;
+        std::mutex                          mThreadGuard;
 #endif
-        std::shared_ptr<bool>           mIsRun;
+        std::shared_ptr<bool>               mIsRun;
     };
 
 } }

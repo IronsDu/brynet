@@ -12,7 +12,7 @@
 #include <brynet/net/SocketLibFunction.h>
 
 #include <brynet/net/EventLoop.h>
-#include <brynet/net/DataSocket.h>
+#include <brynet/net/TcpConnection.h>
 #include <brynet/net/TCPService.h>
 #include <brynet/net/ListenThread.h>
 
@@ -26,15 +26,15 @@ std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
 std::atomic_llong  SendPacketNum = ATOMIC_VAR_INIT(0);
 std::atomic_llong  RecvPacketNum = ATOMIC_VAR_INIT(0);
 
-std::vector<DataSocket::PTR> clients;
-TcpService::PTR service;
+std::vector<TcpConnection::Ptr> clients;
+TcpService::Ptr service;
 
-static void addClientID(const DataSocket::PTR& session)
+static void addClientID(const TcpConnection::Ptr& session)
 {
     clients.push_back(session);
 }
 
-static void removeClientID(const DataSocket::PTR& session)
+static void removeClientID(const TcpConnection::Ptr& session)
 {
     for (auto it = clients.begin(); it != clients.end(); ++it)
     {
@@ -51,7 +51,7 @@ static size_t getClientNum()
     return clients.size();
 }
 
-static void broadCastPacket(const DataSocket::PACKET_PTR& packet)
+static void broadCastPacket(const TcpConnection::PacketPtr& packet)
 {
     auto packetLen = packet->size();
     RecvPacketNum++;
@@ -79,23 +79,21 @@ int main(int argc, char** argv)
 
     service = TcpService::Create();
     auto mainLoop = std::make_shared<EventLoop>();
-    auto listenThrean = ListenThread::Create();
+    auto listenThread = ListenThread::Create(false, "0.0.0.0", port, [mainLoop](TcpSocket::Ptr socket) {
+        socket->setNodelay();
+        socket->setSendSize(32 * 1024);
+        socket->setRecvSize(32 * 1024);
 
-    listenThrean->startListen(false, "0.0.0.0", port, [mainLoop, listenThrean](TcpSocket::PTR socket) {
-        socket->SocketNodelay();
-        socket->SetSendSize(32 * 1024);
-        socket->SetRecvSize(32 * 1024);
-
-        auto enterCallback = [mainLoop](const DataSocket::PTR& session) {
-            mainLoop->pushAsyncProc([session]() {
+        auto enterCallback = [mainLoop](const TcpConnection::Ptr& session) {
+            mainLoop->runAsyncFunctor([session]() {
                 addClientID(session);
-            });
-
-            session->setDisConnectCallback([mainLoop](const DataSocket::PTR& session) {
-                mainLoop->pushAsyncProc([session]() {
-                    removeClientID(session);
                 });
-            });
+
+            session->setDisConnectCallback([mainLoop](const TcpConnection::Ptr& session) {
+                mainLoop->runAsyncFunctor([session]() {
+                    removeClientID(session);
+                    });
+                });
 
             session->setDataCallback([mainLoop](const char* buffer, size_t len) {
                 const char* parseStr = buffer;
@@ -112,10 +110,10 @@ int main(int argc, char** argv)
                         auto packet_len = rp.readUINT32();
                         if (leftLen >= packet_len && packet_len >= HEAD_LEN)
                         {
-                            auto packet = DataSocket::makePacket(parseStr, packet_len);
-                            mainLoop->pushAsyncProc([packet]() {
+                            auto packet = TcpConnection::makePacket(parseStr, packet_len);
+                            mainLoop->runAsyncFunctor([packet]() {
                                 broadCastPacket(packet);
-                            });
+                                });
 
                             totalProcLen += packet_len;
                             parseStr += packet_len;
@@ -132,13 +130,14 @@ int main(int argc, char** argv)
                 }
 
                 return totalProcLen;
-            });
+                });
         };
-        service->addDataSocket(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+        service->addTcpConnection(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
-    });
+        });
 
+    listenThread->startListen();
     service->startWorkerThread(2);
 
     auto now = std::chrono::steady_clock::now();

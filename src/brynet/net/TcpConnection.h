@@ -31,33 +31,33 @@ struct buffer_s;
 
 namespace brynet { namespace net {
 
-    class DataSocket : public Channel, public utils::NonCopyable, public std::enable_shared_from_this<DataSocket>
+    class TcpConnection : public Channel, public utils::NonCopyable, public std::enable_shared_from_this<TcpConnection>
     {
     public:
-        typedef std::shared_ptr<DataSocket>                                         PTR;
+        using Ptr = std::shared_ptr<TcpConnection>;
 
-        typedef std::function<void(PTR)>                                            ENTER_CALLBACK;
-        typedef std::function<size_t(const char* buffer, size_t len)>               DATA_CALLBACK;
-        typedef std::function<void(PTR)>                                            DISCONNECT_CALLBACK;
-        typedef std::function<void(void)>                                           PACKED_SENDED_CALLBACK;
+        using EnterCallback = std::function<void(Ptr)>;
+        using DataCallback = std::function<size_t(const char* buffer, size_t len)>;
+        using DisconnectedCallback = std::function<void(Ptr)>;
+        using PacketSendedCallback = std::function<void(void)>;
 
-        typedef std::shared_ptr<std::string>                                        PACKET_PTR;
+        using PacketPtr = std::shared_ptr<std::string>;
 
     public:
-        PTR static Create(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR);
+        Ptr static Create(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback, EventLoop::Ptr);
 
         /* must called in network thread */
         bool                            onEnterEventLoop();
-        const EventLoop::PTR&           getEventLoop() const;
+        const EventLoop::Ptr&           getEventLoop() const;
 
         //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
 
-        void                            send(const char* buffer, size_t len, const PACKED_SENDED_CALLBACK& callback = nullptr);
-        void                            send(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
-        void                            sendInLoop(const PACKET_PTR&, const PACKED_SENDED_CALLBACK& callback = nullptr);
+        void                            send(const char* buffer, size_t len, const PacketSendedCallback& callback = nullptr);
+        void                            send(const PacketPtr&, const PacketSendedCallback& callback = nullptr);
+        void                            sendInLoop(const PacketPtr&, const PacketSendedCallback& callback = nullptr);
 
-        void                            setDataCallback(DATA_CALLBACK cb);
-        void                            setDisConnectCallback(DISCONNECT_CALLBACK cb);
+        void                            setDataCallback(DataCallback cb);
+        void                            setDisConnectCallback(DisconnectedCallback cb);
 
         /* if checkTime is zero, will cancel check heartbeat */
         void                            setHeartBeat(std::chrono::nanoseconds checkTime);
@@ -74,16 +74,16 @@ namespace brynet { namespace net {
         bool                            initConnectSSL();
 #endif
 
-        static  DataSocket::PACKET_PTR  makePacket(const char* buffer, size_t len);
+        static  TcpConnection::PacketPtr  makePacket(const char* buffer, size_t len);
 
     protected:
-        DataSocket(TcpSocket::PTR, size_t maxRecvBufferSize, ENTER_CALLBACK, EventLoop::PTR) BRYNET_NOEXCEPT;
-        virtual ~DataSocket() BRYNET_NOEXCEPT;
+        TcpConnection(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback, EventLoop::Ptr) BRYNET_NOEXCEPT;
+        virtual ~TcpConnection() BRYNET_NOEXCEPT;
 
     private:
         void                            growRecvBuffer();
 
-        void                            PingCheck();
+        void                            pingCheck();
         void                            startPingCheckTimer();
 
         void                            canRecv() override;
@@ -112,16 +112,16 @@ namespace brynet { namespace net {
     private:
 
 #ifdef PLATFORM_WINDOWS
-        struct EventLoop::ovl_ext_s     mOvlRecv;
-        struct EventLoop::ovl_ext_s     mOvlSend;
+        struct port::Win::OverlappedExt mOvlRecv;
+        struct port::Win::OverlappedExt mOvlSend;
 
         bool                            mPostRecvCheck;
         bool                            mPostWriteCheck;
         bool                            mPostClose;
 #endif
         const std::string               mIP;
-        const TcpSocket::PTR            mSocket;
-        const EventLoop::PTR            mEventLoop;
+        const TcpSocket::Ptr            mSocket;
+        const EventLoop::Ptr            mEventLoop;
         bool                            mCanWrite;
         bool                            mAlreadyClose;
 
@@ -135,19 +135,19 @@ namespace brynet { namespace net {
         std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
         const size_t                    mMaxRecvBufferSize;
 
-        struct pending_packet
+        struct PendingPacket
         {
-            PACKET_PTR  data;
+            PacketPtr  data;
             size_t      left;
-            PACKED_SENDED_CALLBACK  mCompleteCallback;
+            PacketSendedCallback  mCompleteCallback;
         };
 
-        typedef std::deque<pending_packet>   PACKET_LIST_TYPE;
-        PACKET_LIST_TYPE                mSendList;
+        using PacketListType = std::deque<PendingPacket>;
+        PacketListType                  mSendList;
 
-        ENTER_CALLBACK                  mEnterCallback;
-        DATA_CALLBACK                   mDataCallback;
-        DISCONNECT_CALLBACK             mDisConnectCallback;
+        EnterCallback                   mEnterCallback;
+        DataCallback                    mDataCallback;
+        DisconnectedCallback            mDisConnectCallback;
 
         bool                            mIsPostFlush;
 

@@ -31,12 +31,12 @@ set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
 set(net_src_list
 	${PROJECT_SOURCE_DIR}/src/brynet/net/EventLoop.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/CurrentThread.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/DataSocket.cpp
+	${PROJECT_SOURCE_DIR}/src/brynet/net/TcpConnection.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/ListenThread.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/fdset.c
+	${PROJECT_SOURCE_DIR}/src/brynet/net/poller.c
 	${PROJECT_SOURCE_DIR}/src/brynet/net/SSLHelper.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/Socket.cpp
 	${PROJECT_SOURCE_DIR}/src/brynet/net/SyncConnector.cpp
@@ -85,6 +85,9 @@ install (FILES ${BRYNET_UTILS_PUBLIC_HEADERS} DESTINATION "include/brynet/utils"
 
 file(GLOB BRYNET_HTTP_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/net/http/*.h)
 install (FILES ${BRYNET_HTTP_PUBLIC_HEADERS} DESTINATION "include/brynet/net/http")
+
+file(GLOB BRYNET_PORT_PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/src/brynet/net/port/*.h)
+install (FILES ${BRYNET_PORT_PUBLIC_HEADERS} DESTINATION "include/brynet/net/port")
 
 option(brynet_BUILD_EXAMPLES "Build examples" OFF)
 option(brynet_BUILD_TESTS "Build test" OFF)

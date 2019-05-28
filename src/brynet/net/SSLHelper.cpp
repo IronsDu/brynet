@@ -9,7 +9,7 @@
                                               
 namespace brynet { namespace net {
 
-    SSLHelper::PTR SSLHelper::Create()
+    SSLHelper::Ptr SSLHelper::Create()
     {
         struct make_shared_enabler : public SSLHelper {};
         return std::make_shared<make_shared_enabler>();

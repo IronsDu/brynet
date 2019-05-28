@@ -1,5 +1,6 @@
 ﻿#include <cassert>
 #include <iostream>
+#include <algorithm>
 
 #include <brynet/net/Channel.h>
 #include <brynet/net/EventLoop.h>
@@ -12,7 +13,7 @@ namespace brynet { namespace net {
     class WakeupChannel final : public Channel, public utils::NonCopyable
     {
     public:
-        explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(EventLoop::OLV_VALUE::OVL_RECV)
+        explicit WakeupChannel(HANDLE iocp) : mIOCP(iocp), mWakeupOvl(port::Win::OverlappedType::OverlappedRecv)
         {
         }
 
@@ -35,8 +36,8 @@ namespace brynet { namespace net {
         }
 
     private:
-        HANDLE                  mIOCP;
-        EventLoop::ovl_ext_s    mWakeupOvl;
+        HANDLE                      mIOCP;
+        port::Win::OverlappedExt    mWakeupOvl;
     };
 #else
     class WakeupChannel final : public Channel, public utils::NonCopyable
@@ -131,11 +132,26 @@ namespace brynet { namespace net {
 #endif
     }
 
-    timer::TimerMgr::PTR EventLoop::getTimerMgr()
+    Timer::WeakPtr EventLoop::runAfter(nanoseconds timeout, std::function<void(void)> callback)
     {
-        tryInitThreadID();
-        assert(isInLoopThread());
-        return isInLoopThread() ? mTimer : nullptr;
+        auto timer = std::make_shared<brynet::timer::Timer>(
+            steady_clock::now(),
+            nanoseconds(timeout),
+            callback);
+
+        if (isInLoopThread())
+        {
+            mTimer->addTimer(timeout, timer);
+        }
+        else
+        {
+            auto timerMgr = mTimer;
+            runAsyncFunctor([timerMgr, timeout, timer]() {
+                timerMgr->addTimer(timeout, timer);
+            });
+        }
+
+        return timer;
     }
 
     inline void EventLoop::tryInitThreadID()
@@ -154,10 +170,10 @@ namespace brynet { namespace net {
 #endif
         if (!isInLoopThread())
         {
-            return;
+            throw std::runtime_error("only loop in io thread");
         }
 
-        if (!mAfterLoopProcs.empty())
+        if (!mAfterLoopFunctors.empty())
         {
             milliseconds = 0;
         }
@@ -201,12 +217,12 @@ namespace brynet { namespace net {
         {
             auto channel = (Channel*)mEventEntries[i].lpCompletionKey;
             assert(channel != nullptr);
-            const auto ovl = reinterpret_cast<const EventLoop::ovl_ext_s*>(mEventEntries[i].lpOverlapped);
-            if (ovl->OP == EventLoop::OLV_VALUE::OVL_RECV)
+            const auto ovl = reinterpret_cast<const port::Win::OverlappedExt*>(mEventEntries[i].lpOverlapped);
+            if (ovl->OP == port::Win::OverlappedType::OverlappedRecv)
             {
                 channel->canRecv();
             }
-            else if (ovl->OP == EventLoop::OLV_VALUE::OVL_SEND)
+            else if (ovl->OP == port::Win::OverlappedType::OverlappedSend)
             {
                 channel->canSend();
             }
@@ -247,8 +263,8 @@ namespace brynet { namespace net {
         mIsAlreadyPostWakeup = false;
         mIsInBlock = true;
 
-        processAsyncProcs();
-        processAfterLoopProcs();
+        processAsyncFunctors();
+        processAfterLoopFunctors();
 
         if (static_cast<size_t>(numComplete) == mEventEntries.size())
         {
@@ -258,28 +274,49 @@ namespace brynet { namespace net {
         mTimer->schedule();
     }
 
-    void EventLoop::processAfterLoopProcs()
+    void EventLoop::loopCompareNearTimer(int64_t milliseconds)
     {
-        mCopyAfterLoopProcs.swap(mAfterLoopProcs);
-        for (const auto& x : mCopyAfterLoopProcs)
+        tryInitThreadID();
+
+#ifndef NDEBUG
+        assert(isInLoopThread());
+#endif
+        if (!isInLoopThread())
         {
-            x();
+            throw std::runtime_error("only loop in io thread");
         }
-        mCopyAfterLoopProcs.clear();
+
+        if (!mTimer->isEmpty())
+        {
+            auto nearTimeout = std::chrono::duration_cast<std::chrono::milliseconds>(mTimer->nearLeftTime());
+            milliseconds = std::min<int64_t>(milliseconds, nearTimeout.count());
+        }
+
+        loop(milliseconds);
     }
 
-    void EventLoop::processAsyncProcs()
+    void EventLoop::processAfterLoopFunctors()
     {
-        {
-            std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
-            mCopyAsyncProcs.swap(mAsyncProcs);
-        }
-
-        for (const auto& x : mCopyAsyncProcs)
+        mCopyAfterLoopFunctors.swap(mAfterLoopFunctors);
+        for (const auto& x : mCopyAfterLoopFunctors)
         {
             x();
         }
-        mCopyAsyncProcs.clear();
+        mCopyAfterLoopFunctors.clear();
+    }
+
+    void EventLoop::processAsyncFunctors()
+    {
+        {
+            std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
+            mCopyAsyncFunctors.swap(mAsyncFunctors);
+        }
+
+        for (const auto& x : mCopyAsyncFunctors)
+        {
+            x();
+        }
+        mCopyAsyncFunctors.clear();
     }
 
     bool EventLoop::wakeup()
@@ -304,27 +341,27 @@ namespace brynet { namespace net {
 #endif
     }
 
-    DataSocketPtr EventLoop::getDataSocket(sock fd)
+    TcpConnectionPtr EventLoop::getTcpConnection(sock fd)
     {
-        auto it = mDataSockets.find(fd);
-        if (it != mDataSockets.end())
+        auto it = mTcpConnections.find(fd);
+        if (it != mTcpConnections.end())
         {
             return (*it).second;
         }
         return nullptr;
     }
 
-    void EventLoop::addDataSocket(sock fd, DataSocketPtr datasocket)
+    void EventLoop::addTcpConnection(sock fd, TcpConnectionPtr tcpConnection)
     {
-        mDataSockets[fd] = std::move(datasocket);
+        mTcpConnections[fd] = std::move(tcpConnection);
     }
 
-    void EventLoop::removeDataSocket(sock fd)
+    void EventLoop::removeTcpConnection(sock fd)
     {
-        mDataSockets.erase(fd);
+        mTcpConnections.erase(fd);
     }
 
-    void EventLoop::pushAsyncProc(USER_PROC f)
+    void EventLoop::runAsyncFunctor(UserFunctor f)
     {
         if (isInLoopThread())
         {
@@ -333,20 +370,22 @@ namespace brynet { namespace net {
         else
         {
             {
-                std::lock_guard<std::mutex> lck(mAsyncProcsMutex);
-                mAsyncProcs.emplace_back(std::move(f));
+                std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
+                mAsyncFunctors.emplace_back(std::move(f));
             }
             wakeup();
         }
     }
 
-    void EventLoop::pushAfterLoopProc(USER_PROC f)
+    void EventLoop::runFunctorAfterLoop(UserFunctor f)
     {
         assert(isInLoopThread());
-        if (isInLoopThread())
+        if (!isInLoopThread())
         {
-            mAfterLoopProcs.emplace_back(std::move(f));
+            throw std::runtime_error("only push after functor in io thread");
         }
+
+        mAfterLoopFunctors.emplace_back(std::move(f));
     }
 
 #ifndef PLATFORM_WINDOWS

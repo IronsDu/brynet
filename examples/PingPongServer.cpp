@@ -24,12 +24,10 @@ int main(int argc, char **argv)
     }
 
     auto server = TcpService::Create();
-    auto listenThread = ListenThread::Create();
+    auto listenThread = ListenThread::Create(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket) {
+        socket->setNodelay();
 
-    listenThread->startListen(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::PTR socket){
-        socket->SocketNodelay();
-
-        auto enterCallback = [](const DataSocket::PTR& session) {
+        auto enterCallback = [](const TcpConnection::Ptr& session) {
             total_client_num++;
 
             session->setDataCallback([session](const char* buffer, size_t len) {
@@ -37,17 +35,19 @@ int main(int argc, char **argv)
                 TotalRecvSize += len;
                 total_packet_num++;
                 return len;
-            });
+                });
 
-            session->setDisConnectCallback([](const DataSocket::PTR& session) {
+            session->setDisConnectCallback([](const TcpConnection::Ptr& session) {
                 total_client_num--;
-            });
+                });
         };
 
-        server->addDataSocket(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::WithEnterCallback(enterCallback),
+        server->addTcpConnection(std::move(socket),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
-    });
+        });
+
+    listenThread->startListen();
 
     server->startWorkerThread(atoi(argv[2]));
 

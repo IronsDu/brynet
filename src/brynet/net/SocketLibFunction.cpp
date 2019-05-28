@@ -79,7 +79,7 @@ namespace brynet { namespace net { namespace base {
         return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
     }
 
-    // TODO::Connect是否直接返回TcpSocket::PTR
+    // TODO::Connect是否直接返回TcpSocket::Ptr
     sock Connect(bool isIPV6, const std::string& server_ip, int port)
     {
         InitSocket();
@@ -139,7 +139,7 @@ namespace brynet { namespace net { namespace base {
     {
         InitSocket();
 
-        struct  sockaddr_in ip4Addr = { 0 };
+        struct sockaddr_in ip4Addr = { 0 };
         struct sockaddr_in6 ip6Addr = { 0 };
         struct sockaddr_in* paddr = &ip4Addr;
         int addrLen = sizeof(ip4Addr);
@@ -202,7 +202,7 @@ namespace brynet { namespace net { namespace base {
 #endif
     }
 
-    static std::string get_ip_str(const struct sockaddr *sa)
+    static std::string getIPString(const struct sockaddr *sa)
     {
         char tmp[INET6_ADDRSTRLEN] = { 0 };
         switch (sa->sa_family)
@@ -229,14 +229,14 @@ namespace brynet { namespace net { namespace base {
         int namelen = sizeof(name);
         if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
         {
-            return get_ip_str(&name);
+            return getIPString(&name);
         }
 #else
         struct sockaddr_in name;
         socklen_t namelen = sizeof(name);
         if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
         {
-            return get_ip_str((const struct sockaddr*)&name);
+            return getIPString((const struct sockaddr*)&name);
         }
 #endif
 
@@ -255,7 +255,7 @@ namespace brynet { namespace net { namespace base {
         return transnum;
     }
 
-    // TODO::Accept是否直接返回TcpSocket::PTR
+    // TODO::Accept是否直接返回TcpSocket::Ptr
     sock Accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen)
     {
         return accept(listenSocket, addr, addrLen);
@@ -264,6 +264,54 @@ namespace brynet { namespace net { namespace base {
     sock SocketCreate(int af, int type, int protocol)
     {
         return socket(af, type, protocol);
+    }
+
+    static struct sockaddr_in6 getLocalAddr(sock sockfd)
+    {
+        struct sockaddr_in6 localaddr;
+        memset(&localaddr, 0, sizeof localaddr);
+        socklen_t addrlen = static_cast<socklen_t>(sizeof localaddr);
+        if (::getsockname(sockfd, (struct sockaddr*)(&localaddr), &addrlen) < 0)
+        {
+            return localaddr;
+        }
+        return localaddr;
+    }
+
+    static struct sockaddr_in6 getPeerAddr(sock sockfd)
+    {
+        struct sockaddr_in6 peeraddr;
+        memset(&peeraddr, 0, sizeof peeraddr);
+        socklen_t addrlen = static_cast<socklen_t>(sizeof peeraddr);
+        if (::getpeername(sockfd, (struct sockaddr*)(&peeraddr), &addrlen) < 0)
+        {
+            return peeraddr;
+        }
+        return peeraddr;
+    }
+
+    /* copy from muduo */
+    bool IsSelfConnect(sock fd)
+    {
+        struct sockaddr_in6 localaddr = getLocalAddr(fd);
+        struct sockaddr_in6 peeraddr = getPeerAddr(fd);
+
+        if (localaddr.sin6_family == AF_INET)
+        {
+            const struct sockaddr_in* laddr4 = reinterpret_cast<struct sockaddr_in*>(&localaddr);
+            const struct sockaddr_in* raddr4 = reinterpret_cast<struct sockaddr_in*>(&peeraddr);
+            return laddr4->sin_port == raddr4->sin_port
+                && laddr4->sin_addr.s_addr == raddr4->sin_addr.s_addr;
+        }
+        else if (localaddr.sin6_family == AF_INET6)
+        {
+            return localaddr.sin6_port == peeraddr.sin6_port
+                && memcmp(&localaddr.sin6_addr, &peeraddr.sin6_addr, sizeof localaddr.sin6_addr) == 0;
+        }
+        else
+        {
+            return false;
+        }
     }
 
 } } }

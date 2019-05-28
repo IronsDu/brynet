@@ -26,5 +26,3 @@ elseif(UNIX)
   target_link_libraries(test_sync_connect pthread brynet)
 endif()
 add_test(TestSyncConnect test_sync_connect)
-
-

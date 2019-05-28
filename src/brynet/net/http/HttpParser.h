@@ -14,7 +14,7 @@ namespace brynet { namespace net { namespace http {
     class HTTPParser
     {
     public:
-        typedef std::shared_ptr<HTTPParser> PTR;
+        using Ptr = std::shared_ptr<HTTPParser>;
 
         explicit HTTPParser(http_parser_type parserType);
 

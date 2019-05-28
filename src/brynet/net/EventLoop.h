@@ -13,52 +13,37 @@
 #include <brynet/timer/Timer.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/port/Win.h>
 
 namespace brynet { namespace net {
 
+    using namespace std::chrono;
+    using namespace brynet::timer;
+
     class Channel;
-    class DataSocket;
-    typedef std::shared_ptr<DataSocket> DataSocketPtr;
+    class TcpConnection;
+    using TcpConnectionPtr = std::shared_ptr<TcpConnection>;
     class WakeupChannel;
 
     class EventLoop : public utils::NonCopyable
     {
     public:
-        typedef std::shared_ptr<EventLoop>          PTR;
-        typedef std::function<void(void)>           USER_PROC;
-
-#ifdef PLATFORM_WINDOWS
-        enum class OLV_VALUE
-        {
-            OVL_NONE = 0,
-            OVL_RECV,
-            OVL_SEND,
-        };
-
-        struct ovl_ext_s
-        {
-            OVERLAPPED  base;
-            const EventLoop::OLV_VALUE  OP;
-
-            ovl_ext_s(OLV_VALUE op) BRYNET_NOEXCEPT : OP(op)
-            {
-                memset(&base, 0, sizeof(base));
-            }
-        };
-#endif
+        using Ptr = std::shared_ptr<EventLoop>;
+        using UserFunctor = std::function<void(void)>;
 
     public:
         EventLoop() BRYNET_NOEXCEPT;
         virtual ~EventLoop() BRYNET_NOEXCEPT;
 
         void                            loop(int64_t milliseconds);
+        // loop指定毫秒数,但如果定时器不为空,则loop时间为当前最近定时器的剩余时间和milliseconds的较小值
+        void                            loopCompareNearTimer(int64_t milliseconds);
+        // 返回true表示实际发生了wakeup所需的操作(此返回值不代表接口本身操作成功与否,因为此函数永远成功)
         bool                            wakeup();
 
-        void                            pushAsyncProc(USER_PROC f);
-        void                            pushAfterLoopProc(USER_PROC f);
-
-        /* return nullptr if not called in net thread*/
-        timer::TimerMgr::PTR            getTimerMgr();
+        void                            runAsyncFunctor(UserFunctor f);
+        void                            runFunctorAfterLoop(UserFunctor f);
+        Timer::WeakPtr                  runAfter(nanoseconds timeout, std::function<void(void)> callback);
 
         inline bool                     isInLoopThread() const
         {
@@ -67,16 +52,16 @@ namespace brynet { namespace net {
 
     private:
         void                            reallocEventSize(size_t size);
-        void                            processAfterLoopProcs();
-        void                            processAsyncProcs();
+        void                            processAfterLoopFunctors();
+        void                            processAsyncFunctors();
 
 #ifndef PLATFORM_WINDOWS
         int                             getEpollHandle() const;
 #endif
         bool                            linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT;
-        DataSocketPtr                   getDataSocket(sock fd);
-        void                            addDataSocket(sock fd, DataSocketPtr);
-        void                            removeDataSocket(sock fd);
+        TcpConnectionPtr                getTcpConnection(sock fd);
+        void                            addTcpConnection(sock fd, TcpConnectionPtr);
+        void                            removeTcpConnection(sock fd);
         void                            tryInitThreadID();
 
     private:
@@ -96,20 +81,20 @@ namespace brynet { namespace net {
         std::atomic_bool                mIsInBlock;
         std::atomic_bool                mIsAlreadyPostWakeup;
 
-        std::mutex                      mAsyncProcsMutex;
-        std::vector<USER_PROC>          mAsyncProcs;
-        std::vector<USER_PROC>          mCopyAsyncProcs;
+        std::mutex                      mAsyncFunctorsMutex;
+        std::vector<UserFunctor>        mAsyncFunctors;
+        std::vector<UserFunctor>        mCopyAsyncFunctors;
 
-        std::vector<USER_PROC>          mAfterLoopProcs;
-        std::vector<USER_PROC>          mCopyAfterLoopProcs;
+        std::vector<UserFunctor>        mAfterLoopFunctors;
+        std::vector<UserFunctor>        mCopyAfterLoopFunctors;
 
         std::once_flag                  mOnceInitThreadID;
         current_thread::THREAD_ID_TYPE  mSelfThreadID;
 
-        timer::TimerMgr::PTR            mTimer;
-        std::unordered_map<sock, DataSocketPtr> mDataSockets;
+        timer::TimerMgr::Ptr            mTimer;
+        std::unordered_map<sock, TcpConnectionPtr> mTcpConnections;
 
-        friend class DataSocket;
+        friend class TcpConnection;
     };
 
 } }

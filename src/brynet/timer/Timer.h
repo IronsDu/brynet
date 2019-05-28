@@ -13,12 +13,12 @@ namespace brynet { namespace timer {
     using namespace std::chrono;
     class TimerMgr;
 
-    class Timer
+    class Timer final
     {
     public:
-        typedef std::shared_ptr<Timer>          Ptr;
-        typedef std::weak_ptr<Timer>            WeakPtr;
-        typedef std::function<void(void)>       Callback;
+        using Ptr = std::shared_ptr<Timer>;
+        using WeakPtr = std::weak_ptr<Timer>;
+        using Callback = std::function<void(void)>;
 
         Timer(steady_clock::time_point startTime, nanoseconds lastTime, Callback f) BRYNET_NOEXCEPT;
 
@@ -40,10 +40,10 @@ namespace brynet { namespace timer {
         friend class TimerMgr;
     };
 
-    class TimerMgr
+    class TimerMgr final
     {
     public:
-        typedef std::shared_ptr<TimerMgr>   PTR;
+        using Ptr = std::shared_ptr<TimerMgr>;
 
         template<typename F, typename ...TArgs>
         Timer::WeakPtr                          addTimer(nanoseconds timeout, F callback, TArgs&& ...args)
@@ -55,6 +55,11 @@ namespace brynet { namespace timer {
             mTimers.push(timer);
 
             return timer;
+        }
+
+        void                                    addTimer(nanoseconds timeout, Timer::Ptr timer)
+        {
+            mTimers.push(timer);
         }
 
         void                                    schedule();
