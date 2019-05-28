@@ -28,47 +28,17 @@ endif()
 
 set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
 
-set(net_src_list
-	${PROJECT_SOURCE_DIR}/src/brynet/net/EventLoop.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/CurrentThread.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/TcpConnection.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/SocketLibFunction.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/TCPService.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/Connector.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/ListenThread.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/poller.c
-	${PROJECT_SOURCE_DIR}/src/brynet/net/SSLHelper.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/Socket.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/SyncConnector.cpp
-)
-
-set(timer_src_list
-	${PROJECT_SOURCE_DIR}/src/brynet/timer/Timer.cpp
-)
-
-set(http_src_list
-	${PROJECT_SOURCE_DIR}/src/brynet/net/http/http_parser.c
-	${PROJECT_SOURCE_DIR}/src/brynet/net/http/HttpParser.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/net/http/HttpService.cpp
-)
-
-set(utils_src_list
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/base64.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/md5calc.cpp
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/SHA1.cpp
-    ${PROJECT_SOURCE_DIR}/src/brynet/utils/stack.c
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/array.c
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/buffer.c
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/app_status.c
-	${PROJECT_SOURCE_DIR}/src/brynet/utils/ox_file.cpp
-)
+file(GLOB_RECURSE ALL_SRC 
+  ${PROJECT_SOURCE_DIR}/src/*.cpp 
+  ${PROJECT_SOURCE_DIR}/src/*.cc 
+  ${PROJECT_SOURCE_DIR}/src/*.c)
 
 include_directories("${PROJECT_SOURCE_DIR}/src/")
 if(WIN32)
-	add_library(brynet ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
+	add_library(brynet ${ALL_SRC})
 	set_target_properties(brynet PROPERTIES OUTPUT_NAME_DEBUG "brynetd")
 elseif(UNIX)
-  add_library(brynet STATIC ${net_src_list} ${timer_src_list} ${http_src_list} ${utils_src_list})
+  add_library(brynet STATIC ${ALL_SRC})
   find_package(Threads REQUIRED)
   target_link_libraries(brynet pthread)
 endif()
