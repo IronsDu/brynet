@@ -54,7 +54,6 @@ namespace brynet { namespace net {
 
         void                            send(const char* buffer, size_t len, const PacketSendedCallback& callback = nullptr);
         void                            send(const PacketPtr&, const PacketSendedCallback& callback = nullptr);
-        void                            sendInLoop(const PacketPtr&, const PacketSendedCallback& callback = nullptr);
 
         void                            setDataCallback(DataCallback cb);
         void                            setDisConnectCallback(DisconnectedCallback cb);

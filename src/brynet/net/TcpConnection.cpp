@@ -150,17 +150,6 @@ namespace brynet { namespace net {
         });
     }
 
-    void TcpConnection::sendInLoop(const PacketPtr& packet, const PacketSendedCallback& callback)
-    {
-        assert(mEventLoop->isInLoopThread());
-        if (mEventLoop->isInLoopThread())
-        {
-            const auto len = packet->size();
-            mSendList.push_back({ packet, len, callback });
-            runAfterFlush();
-        }
-    }
-
     void TcpConnection::canRecv()
     {
 #ifdef PLATFORM_WINDOWS
