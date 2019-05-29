@@ -60,9 +60,6 @@ namespace brynet { namespace net {
         }
 #endif
 
-        // 如果构造TcpConnection发生异常则mSocket也可能为nullptr
-        assert(mSocket != nullptr);
-
         if (mTimer.lock())
         {
             mTimer.lock()->cancel();
@@ -605,24 +602,27 @@ namespace brynet { namespace net {
         auto callBack = mDisConnectCallback;
         auto sharedThis = shared_from_this();
         auto eventLoop = mEventLoop;
-        auto fd = mSocket->getFD();
+        std::shared_ptr<TcpSocket> socket = std::move(const_cast<TcpSocket::Ptr&&>(mSocket));
         mEventLoop->runFunctorAfterLoop([callBack,
             sharedThis,
             eventLoop,
-            fd]() {
+            socket]() {
             if (callBack != nullptr)
             {
                 callBack(sharedThis);
             }
-            auto tmp = eventLoop->getTcpConnection(fd);
+            auto tmp = eventLoop->getTcpConnection(socket->getFD());
             assert(tmp == sharedThis);
             if (tmp == sharedThis)
             {
-                eventLoop->removeTcpConnection(fd);
+                eventLoop->removeTcpConnection(socket->getFD());
             }
         });
+
+        mCanWrite = false;
         mDisConnectCallback = nullptr;
         mDataCallback = nullptr;
+        mRecvBuffer = nullptr;
     }
 
     bool TcpConnection::checkRead()
