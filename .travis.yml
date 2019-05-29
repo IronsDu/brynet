@@ -58,7 +58,7 @@ matrix:
       env: COMPILER='g++-7' CPP14=1
 
 install:
-  - cmake .
+  - cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
 
 before_script:
   - export CXX=${COMPILER}
