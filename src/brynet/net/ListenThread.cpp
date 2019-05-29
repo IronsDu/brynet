@@ -4,7 +4,8 @@
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/Noexcept.h>
 #include <brynet/net/Socket.h>
-#include <brynet/net/SyncConnector.h>
+#include <brynet/net/Wrapper.h>
+#include <brynet/net/Connector.h>
 
 #include <brynet/net/ListenThread.h>
 
@@ -134,10 +135,18 @@ namespace brynet { namespace net {
         {
             selfIP = "127.0.0.1";
         }
-        ;
-        brynet::net::SyncConnectSocket({ 
-            AsyncConnector::ConnectOptions::WithAddr(selfIP, mPort),
-            AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10))});
+        
+        auto connector = AsyncConnector::Create();
+        connector->startWorkerThread();
+
+        wrapper::SocketConnectBuilder connectBuilder;
+        connectBuilder
+            .configureConnector(connector)
+            .configureConnectOptions({
+                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                AsyncConnector::ConnectOptions::WithAddr(selfIP, mPort)
+            })
+            .syncConnect();
 
         try
         {
