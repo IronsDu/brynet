@@ -9,6 +9,7 @@
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/http/WebSocketFormat.h>
 #include <brynet/net/Connector.h>
+#include <brynet/net/Wrapper.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -49,7 +50,6 @@ int main(int argc, char **argv)
     auto connector = brynet::net::AsyncConnector::Create();
     connector->startWorkerThread();
 
-
     auto listenThread = ListenThread::Create(false, "0.0.0.0", 8080, [service](TcpSocket::Ptr socket) {
         std::string body = "<html>hello world </html>";
         auto enterCallback = [body](const TcpConnection::Ptr& session) {
@@ -85,6 +85,19 @@ int main(int argc, char **argv)
         });
     listenThread->startListen();
 
+    wrapper::SocketConnectBuilder sb;
+    auto s = sb.configureConnector(connector)
+        .configureConnectOptions({
+            AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+            AsyncConnector::ConnectOptions::WithAddr("127.0.0.1", 8010)
+            })
+        .syncConnect();
+    s = sb.configureConnector(connector)
+        .configureConnectOptions({
+            AsyncConnector::ConnectOptions::WithAddr("127.0.0.1", 8080)
+            })
+        .syncConnect();
+
     HttpRequest request;
     request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
     request.setUrl("/ISteamUserAuth/AuthenticateUserTicket/v1/");
@@ -98,12 +111,12 @@ int main(int argc, char **argv)
 
     std::string requestStr = request.getResult();
 
-    std::atomic<int> couner{0};
+    std::atomic<int> couner{ 0 };
 
     for (size_t i = 0; i < 10; i++)
     {
-        reqHttp(service, 
-            connector, 
+        reqHttp(service,
+            connector,
             requestStr,
             {
                 AsyncConnector::ConnectOptions::WithAddr("23.73.140.64", 80),
@@ -115,6 +128,44 @@ int main(int argc, char **argv)
                 std::cout << ++couner << std::endl;
             });
     }
+
+    wrapper::HttpConnectionBuilder()
+        .configureConnector(connector)
+        .configureService(service)
+        .configureConnectOptions({
+            AsyncConnector::ConnectOptions::WithAddr("180.97.33.108", 80),
+            AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
+            AsyncConnector::ConnectOptions::WithFailedCallback([]() {
+                    std::cout << "failed" << std::endl;
+                }),
+        })
+        .configureConnectionOptions({
+            TcpService::AddSocketOption::WithMaxRecvBufferSize(1024),
+            TcpService::AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
+                // do something for session
+                std::cout << "success" << std::endl;
+            })
+        })
+        .configureEnterCallback([](HttpSession::Ptr session) {
+            std::cout << "success" << std::endl;
+        })
+        .asyncConnect();
+
+    wrapper::ListenerBuilder listenBuilder;
+    listenBuilder.configureService(service)
+        .configureSocketOptions({
+                [](TcpSocket& socket) {
+                    socket.setNodelay();
+            },
+        })
+        .configureConnectionOptions({
+            TcpService::AddSocketOption::WithMaxRecvBufferSize(1024),
+        })
+        .configureListen([](wrapper::BuildListenConfig builder) {
+            builder.setAddr(false, "0.0.0.0", 80);
+        })
+        .asyncRun();
+
     std::cin.get();
     return 0;
 }
