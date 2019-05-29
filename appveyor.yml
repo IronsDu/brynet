@@ -28,7 +28,7 @@ environment:
 before_build:
   - git submodule update --init --recursive
   - echo Running cmake...
-  - cmake . -G "Visual Studio %VS_VERSION%" -DCMAKE_GENERATOR_PLATFORM=%VS_PLATFORM%
+  - cmake . -G "Visual Studio %VS_VERSION%" -DCMAKE_GENERATOR_PLATFORM=%VS_PLATFORM% -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
 
 build:
   project: brynet.sln
