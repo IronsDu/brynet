@@ -12,7 +12,7 @@ TEST_CASE("WaitGroup are computed", "[waitgroup]") {
 
     wg->add(2);
 
-    std::atomic<int> upvalue = 0;
+    std::atomic<int> upvalue = ATOMIC_VAR_INIT(1);
     auto a = std::thread([&]() {
         upvalue++;
         wg->done();
