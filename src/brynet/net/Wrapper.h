@@ -8,51 +8,63 @@
 
 namespace brynet { namespace net { namespace wrapper {
 
-    class SocketConnectBuilder
+    template<typename Derived>
+    class BaseSocketConnectBuilder
     {
     public:
-        virtual ~SocketConnectBuilder() = default;
-        
-        SocketConnectBuilder& configureConnector(AsyncConnector::Ptr connector)
+        virtual ~BaseSocketConnectBuilder() = default;
+
+        Derived& configureConnector(AsyncConnector::Ptr connector)
         {
             mConnector = std::move(connector);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
-        SocketConnectBuilder& configureConnectOptions(
+        Derived& configureConnectOptions(
             std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> options)
         {
             mConnectOptions = std::move(options);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
         void    asyncConnect() const
+        {
+            asyncConnect(mConnectOptions);
+        }
+
+        TcpSocket::Ptr    syncConnect() const
+        {
+            return syncConnect(mConnectOptions);
+        }
+
+    protected:
+        void    asyncConnect(std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> connectOptions) const
         {
             if (mConnector == nullptr)
             {
                 throw std::runtime_error("connector is nullptr");
             }
-            if (mConnectOptions.empty())
+            if (connectOptions.empty())
             {
                 throw std::runtime_error("options is empty");
             }
 
-            mConnector->asyncConnect(mConnectOptions);
+            mConnector->asyncConnect(connectOptions);
         }
 
-        TcpSocket::Ptr    syncConnect()
+        TcpSocket::Ptr  syncConnect(std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> connectOptions) const
         {
-            auto timeout = AsyncConnector::ConnectOptions::ExtractTimeout(mConnectOptions);
+            auto timeout = AsyncConnector::ConnectOptions::ExtractTimeout(connectOptions);
 
             auto socketPromise = std::make_shared<std::promise<TcpSocket::Ptr>>();
-            mConnectOptions.push_back(AsyncConnector::ConnectOptions::WithCompletedCallback([socketPromise](TcpSocket::Ptr socket) {
-                socketPromise->set_value(std::move(socket));
-            }));
-            mConnectOptions.push_back(AsyncConnector::ConnectOptions::WithFailedCallback([socketPromise]() {
-                socketPromise->set_value(nullptr);
-            }));
+            connectOptions.push_back(AsyncConnector::ConnectOptions::WithCompletedCallback([socketPromise](TcpSocket::Ptr socket) {
+                    socketPromise->set_value(std::move(socket));
+                }));
+            connectOptions.push_back(AsyncConnector::ConnectOptions::WithFailedCallback([socketPromise]() {
+                    socketPromise->set_value(nullptr);
+                }));
 
-            asyncConnect();
+            asyncConnect(connectOptions);
 
             auto future = socketPromise->get_future();
             if (future.wait_for(timeout) != std::future_status::ready)
@@ -63,78 +75,85 @@ namespace brynet { namespace net { namespace wrapper {
             return future.get();
         }
 
+        std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc>  getConnectOptions() const
+        {
+            return mConnectOptions;
+        }
+
     private:
         AsyncConnector::Ptr                                             mConnector;
         std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc>  mConnectOptions;
     };
 
-    class ConnectionBuilder
+    class SocketConnectBuilder : public BaseSocketConnectBuilder<SocketConnectBuilder>
+    {
+    };
+
+    template<typename Derived>
+    class BaseConnectionBuilder : public BaseSocketConnectBuilder<Derived>
     {
     public:
-        virtual ~ConnectionBuilder() = default;
-
-        ConnectionBuilder& configureService(TcpService::Ptr service)
+        Derived& configureService(TcpService::Ptr service)
         {
             mTcpService = std::move(service);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
-        ConnectionBuilder& configureConnector(AsyncConnector::Ptr connector)
-        {
-            mConnector = std::move(connector);
-            return *this;
-        }
-
-        ConnectionBuilder& configureConnectOptions(std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> options)
-        {
-            mConnectOptions = std::move(options);
-            return *this;
-        }
-
-        ConnectionBuilder& configureConnectionOptions(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> options)
+        Derived& configureConnectionOptions(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> options)
         {
             mConnectionOptions = std::move(options);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
         void    asyncConnect() const
         {
-            if (mTcpService == nullptr || mConnector == nullptr)
+            asyncConnect(BaseSocketConnectBuilder<Derived>::getConnectOptions(), mConnectionOptions);
+        }
+
+        TcpConnection::Ptr    syncConnect() const
+        {
+            return syncConnect(BaseSocketConnectBuilder<Derived>::getConnectOptions(), mConnectionOptions);
+        }
+
+    protected:
+        void    asyncConnect(std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> connectOptions,
+            std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> connectionOptions) const
+        {
+            if (mTcpService == nullptr)
             {
-                throw std::runtime_error("tcp service or connector is nullptr");
+                throw std::runtime_error("tcp serviceis nullptr");
             }
-            if (mConnectOptions.empty() || mConnectionOptions.empty())
+            if (connectionOptions.empty())
             {
                 throw std::runtime_error("options is empty");
             }
 
             auto service = mTcpService;
-            auto connectOptions = mConnectOptions;
-            auto connectionOptions = mConnectionOptions;
-
             auto enterCallback = [=](TcpSocket::Ptr socket) mutable {
                 service->addTcpConnection(std::move(socket), connectionOptions);
             };
             connectOptions.push_back(AsyncConnector::ConnectOptions::WithCompletedCallback(enterCallback));
 
-            mConnector->asyncConnect(connectOptions);
+            BaseSocketConnectBuilder<Derived>::asyncConnect(connectOptions);
         }
 
-        TcpConnection::Ptr    syncConnect()
+        TcpConnection::Ptr  syncConnect(std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> connectOptions,
+            std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> connectionOptions) const
         {
-            auto timeout = AsyncConnector::ConnectOptions::ExtractTimeout(mConnectOptions);
+            auto timeout = AsyncConnector::ConnectOptions::ExtractTimeout(connectOptions);
             auto sessionPromise = std::make_shared<std::promise<TcpConnection::Ptr>>();
-            mConnectOptions.push_back(AsyncConnector::ConnectOptions::WithFailedCallback(
-                [sessionPromise]() {
-                sessionPromise->set_value(nullptr);
-            }));
 
-            mConnectionOptions.push_back(TcpService::AddSocketOption::AddEnterCallback(
+            connectOptions.push_back(AsyncConnector::ConnectOptions::WithFailedCallback(
+                [sessionPromise]() {
+                    sessionPromise->set_value(nullptr);
+                }));
+
+            connectionOptions.push_back(TcpService::AddSocketOption::AddEnterCallback(
                 [sessionPromise](const TcpConnection::Ptr& session) {
                     sessionPromise->set_value(session);
                 }));
 
-            asyncConnect();
+            asyncConnect(connectOptions, connectionOptions);
 
             auto future = sessionPromise->get_future();
             if (future.wait_for(timeout) != std::future_status::ready)
@@ -145,42 +164,23 @@ namespace brynet { namespace net { namespace wrapper {
             return future.get();
         }
 
-    protected:
+        std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   getConnectionOptions() const
+        {
+            return mConnectionOptions;
+        }
+
+    private:
         TcpService::Ptr                                                 mTcpService;
-        AsyncConnector::Ptr                                             mConnector;
-        std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc>  mConnectOptions;
         std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   mConnectionOptions;
     };
 
-    class HttpConnectionBuilder
+    class ConnectionBuilder : public BaseConnectionBuilder<ConnectionBuilder>
+    {
+    };
+
+    class HttpConnectionBuilder : public BaseConnectionBuilder<HttpConnectionBuilder>
     {
     public:
-        virtual ~HttpConnectionBuilder() = default;
-
-        HttpConnectionBuilder& configureService(TcpService::Ptr service)
-        {
-            mTcpService = std::move(service);
-            return *this;
-        }
-
-        HttpConnectionBuilder& configureConnector(AsyncConnector::Ptr connector)
-        {
-            mConnector = std::move(connector);
-            return *this;
-        }
-
-        HttpConnectionBuilder& configureConnectOptions(std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc> options)
-        {
-            mConnectOptions = std::move(options);
-            return *this;
-        }
-
-        HttpConnectionBuilder& configureConnectionOptions(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> options)
-        {
-            mConnectionOptions = std::move(options);
-            return *this;
-        }
-
         HttpConnectionBuilder& configureEnterCallback(http::HttpSession::EnterCallback callback)
         {
             mHttpEnterCallback = callback;
@@ -189,42 +189,24 @@ namespace brynet { namespace net { namespace wrapper {
 
         void    asyncConnect() const
         {
-            if (mTcpService == nullptr || mConnector == nullptr)
-            {
-                throw std::runtime_error("tcp service or connector is nullptr");
-            }
-            if (mConnectOptions.empty() || mConnectionOptions.empty())
-            {
-                throw std::runtime_error("options is empty");
-            }
             if (mHttpEnterCallback == nullptr)
             {
                 throw std::runtime_error("not setting http enter callback");
             }
 
-            auto service = mTcpService;
-            auto connectOptions = mConnectOptions;
-            auto connectionOptions = mConnectionOptions;
+            auto connectionOptions = BaseConnectionBuilder<HttpConnectionBuilder>::getConnectionOptions();
             auto callback = mHttpEnterCallback;
+
             connectionOptions.push_back(
                 TcpService::AddSocketOption::AddEnterCallback([=](const TcpConnection::Ptr& session) {
                         http::HttpService::setup(session, callback);
                     }));
 
-            auto enterCallback = [=](TcpSocket::Ptr socket) mutable {
-                service->addTcpConnection(std::move(socket), connectionOptions);
-            };
-            connectOptions.push_back(AsyncConnector::ConnectOptions::WithCompletedCallback(enterCallback));
-
-            mConnector->asyncConnect(connectOptions);
+            BaseConnectionBuilder<HttpConnectionBuilder>::asyncConnect(BaseConnectionBuilder<HttpConnectionBuilder>::getConnectOptions(), connectionOptions);
         }
 
     protected:
-        TcpService::Ptr                                                 mTcpService;
-        AsyncConnector::Ptr                                             mConnector;
-        std::vector<AsyncConnector::ConnectOptions::ConnectOptionFunc>  mConnectOptions;
-        std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   mConnectionOptions;
-        http::HttpSession::EnterCallback                                mHttpEnterCallback;
+        http::HttpSession::EnterCallback    mHttpEnterCallback;
     };
 
     class ListenConfig final
@@ -287,63 +269,42 @@ namespace brynet { namespace net { namespace wrapper {
         ListenConfig* mConfig;
     };
 
-    class ListenerBuilder
+    template<typename Derived>
+    class BaseListenerBuilder
     {
     public:
         using ListenConfigSetting = std::function<void(BuildListenConfig)>;
 
-        virtual ~ListenerBuilder() = default;
+        virtual ~BaseListenerBuilder() = default;
 
-        ListenerBuilder& configureService(TcpService::Ptr service)
+        Derived& configureService(TcpService::Ptr service)
         {
             mTcpService = std::move(service);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
-        ListenerBuilder& configureSocketOptions(std::vector<ListenThread::TcpSocketProcessCallback> options)
+        Derived& configureSocketOptions(std::vector<ListenThread::TcpSocketProcessCallback> options)
         {
-            mSocketOptions = options;
-            return *this;
+            mSocketOptions = std::move(options);
+            return static_cast<Derived&>(*this);
         }
 
-        ListenerBuilder& configureConnectionOptions(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> options)
+        Derived& configureConnectionOptions(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> options)
         {
             mConnectionOptions = std::move(options);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
-        ListenerBuilder& configureListen(ListenConfigSetting builder)
+        Derived& configureListen(ListenConfigSetting builder)
         {
             BuildListenConfig buildConfig(&mListenConfig);
             builder(buildConfig);
-            return *this;
+            return static_cast<Derived&>(*this);
         }
 
         void asyncRun()
         {
-            if (mTcpService == nullptr)
-            {
-                throw std::runtime_error("tcp service is nullptr");
-            }
-            if (mConnectionOptions.empty())
-            {
-                throw std::runtime_error("options is empty");
-            }
-            if (!mListenConfig.hasSetting())
-            {
-                throw std::runtime_error("not config listen addr");
-            }
-
-            auto service = mTcpService;
-            auto connectionOptions = mConnectionOptions;
-            mListenThread = ListenThread::Create(mListenConfig.useIpV6(),
-                mListenConfig.ip(),
-                mListenConfig.port(),
-                [=](brynet::net::TcpSocket::Ptr socket) {
-                    service->addTcpConnection(std::move(socket), connectionOptions);
-                },
-                mSocketOptions);
-            mListenThread->startListen();
+            asyncRun(getConnectionOptions());
         }
 
         void    stop()
@@ -354,53 +315,19 @@ namespace brynet { namespace net { namespace wrapper {
             }
         }
 
+        std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   getConnectionOptions() const
+        {
+            return mConnectionOptions;
+        }
+
     protected:
-        TcpService::Ptr                                                 mTcpService;
-        std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   mConnectionOptions;
-        std::vector<ListenThread::TcpSocketProcessCallback>             mSocketOptions;
-        ListenConfig                                                    mListenConfig;
-        ListenThread::Ptr                                               mListenThread;
-    };
-
-    class HttpListenerBuilder
-    {
-    public:
-        using ListenConfigSetting = std::function<void(BuildListenConfig)>;
-
-        virtual ~HttpListenerBuilder() = default;
-
-        HttpListenerBuilder& configureService(TcpService::Ptr service)
-        {
-            mTcpService = std::move(service);
-            return *this;
-        }
-
-        HttpListenerBuilder& configureSocketOptions(std::vector<ListenThread::TcpSocketProcessCallback> options)
-        {
-            mSocketOptions = options;
-            return *this;
-        }
-
-        HttpListenerBuilder& configureConnectionOptions(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> options)
-        {
-            mConnectionOptions = std::move(options);
-            return *this;
-        }
-
-        HttpListenerBuilder& configureListen(ListenConfigSetting builder)
-        {
-            BuildListenConfig buildConfig(&mListenConfig);
-            builder(buildConfig);
-            return *this;
-        }
-
-        void asyncRun()
+        void asyncRun(std::vector<TcpService::AddSocketOption::AddSocketOptionFunc> connectionOptions)
         {
             if (mTcpService == nullptr)
             {
                 throw std::runtime_error("tcp service is nullptr");
             }
-            if (mConnectionOptions.empty())
+            if (connectionOptions.empty())
             {
                 throw std::runtime_error("options is empty");
             }
@@ -408,19 +335,8 @@ namespace brynet { namespace net { namespace wrapper {
             {
                 throw std::runtime_error("not config listen addr");
             }
-            if (mHttpEnterCallback == nullptr)
-            {
-                throw std::runtime_error("not setting http enter callback");
-            }
 
             auto service = mTcpService;
-            auto connectionOptions = mConnectionOptions;
-            auto callback = mHttpEnterCallback;
-            connectionOptions.push_back(
-                TcpService::AddSocketOption::AddEnterCallback([=](const TcpConnection::Ptr& session) {
-                    http::HttpService::setup(session, callback);
-                }));
-
             mListenThread = ListenThread::Create(mListenConfig.useIpV6(),
                 mListenConfig.ip(),
                 mListenConfig.port(),
@@ -431,26 +347,47 @@ namespace brynet { namespace net { namespace wrapper {
             mListenThread->startListen();
         }
 
+    private:
+        TcpService::Ptr                                                 mTcpService;
+        std::vector<ListenThread::TcpSocketProcessCallback>             mSocketOptions;
+        ListenConfig                                                    mListenConfig;
+        ListenThread::Ptr                                               mListenThread;
+
+    private:
+        std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   mConnectionOptions;
+    };
+
+    class ListenerBuilder : public BaseListenerBuilder<ListenerBuilder>
+    {
+    };
+
+    class HttpListenerBuilder : public BaseListenerBuilder<HttpListenerBuilder>
+    {
+    public:
         HttpListenerBuilder& configureEnterCallback(http::HttpSession::EnterCallback callback)
         {
             mHttpEnterCallback = callback;
             return *this;
         }
 
-        void    stop()
+        void asyncRun()
         {
-            if (mListenThread)
+            if (mHttpEnterCallback == nullptr)
             {
-                mListenThread->stopListen();
+                throw std::runtime_error("not setting http enter callback");
             }
+
+            auto connectionOptions = BaseListenerBuilder<HttpListenerBuilder>::getConnectionOptions();
+            auto callback = mHttpEnterCallback;
+            connectionOptions.push_back(
+                TcpService::AddSocketOption::AddEnterCallback([=](const TcpConnection::Ptr& session) {
+                    http::HttpService::setup(session, callback);
+                }));
+            BaseListenerBuilder<HttpListenerBuilder>::asyncRun(connectionOptions);
         }
 
     protected:
-        TcpService::Ptr                                                 mTcpService;
-        std::vector<TcpService::AddSocketOption::AddSocketOptionFunc>   mConnectionOptions;
-        std::vector<ListenThread::TcpSocketProcessCallback>             mSocketOptions;
-        ListenConfig                                                    mListenConfig;
-        ListenThread::Ptr                                               mListenThread;
         http::HttpSession::EnterCallback                                mHttpEnterCallback;
     };
+
 } } }

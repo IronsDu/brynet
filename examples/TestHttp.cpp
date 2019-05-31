@@ -42,6 +42,7 @@ void reqHttp(TcpService::Ptr service,
     connector->asyncConnect(options);
 };
 
+
 int main(int argc, char **argv)
 {
     auto service = TcpService::Create();
@@ -97,6 +98,16 @@ int main(int argc, char **argv)
             AsyncConnector::ConnectOptions::WithAddr("127.0.0.1", 8080)
             })
         .syncConnect();
+
+    {
+        wrapper::ConnectionBuilder sb;
+        auto s = sb.configureConnector(connector)
+            .configureConnectOptions({
+                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                AsyncConnector::ConnectOptions::WithAddr("127.0.0.1", 8010)
+                })
+            .syncConnect();
+    }
 
     HttpRequest request;
     request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
