@@ -2,11 +2,9 @@
 #include <mutex>
 #include <atomic>
 
-#include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/TCPService.h>
-#include <brynet/net/ListenThread.h>
-#include <brynet/net/Socket.h>
+#include <brynet/net/Wrapper.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -23,33 +21,39 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    auto server = TcpService::Create();
-    auto listenThread = ListenThread::Create(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket) {
-        socket->setNodelay();
+    auto service = TcpService::Create();
+    service->startWorkerThread(atoi(argv[2]));
 
-        auto enterCallback = [](const TcpConnection::Ptr& session) {
-            total_client_num++;
+    auto enterCallback = [](const TcpConnection::Ptr& session) {
+        total_client_num++;
 
-            session->setDataCallback([session](const char* buffer, size_t len) {
+        session->setDataCallback([session](const char* buffer, size_t len) {
                 session->send(buffer, len);
                 TotalRecvSize += len;
                 total_packet_num++;
                 return len;
-                });
+            });
 
-            session->setDisConnectCallback([](const TcpConnection::Ptr& session) {
+        session->setDisConnectCallback([](const TcpConnection::Ptr& session) {
                 total_client_num--;
-                });
-        };
+            });
+    };
 
-        server->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
-        });
-
-    listenThread->startListen();
-
-    server->startWorkerThread(atoi(argv[2]));
+    wrapper::ListenerBuilder listener;
+    listener.configureService(service)
+        .configureSocketOptions({
+            [](TcpSocket& socket) {
+                socket.setNodelay();
+            }
+        })
+        .configureConnectionOptions({
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback)
+        })
+        .configureListen([=](wrapper::BuildListenConfig config) {
+            config.setAddr(false, "0.0.0.0", atoi(argv[1]));
+        })
+        .asyncRun();
 
     EventLoop mainLoop;
     while (true)

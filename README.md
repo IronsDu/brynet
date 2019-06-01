@@ -96,8 +96,8 @@ Examples
 
 Users
 ----------------------------
+* [ARK - distributed plugin framework](https://github.com/ArkNX/ARK)
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
-* [Distributed game server framework](https://github.com/IronsDu/DServerFramework)
+* [gayrpc](https://github.com/IronsDu/gayrpc)
 * [Joynet - Lua network library](https://github.com/IronsDu/Joynet)
-* [HTTP-RPC](https://github.com/IronsDu/http-rpc)
 * [grpc-gateway](https://github.com/IronsDu/grpc-gateway)

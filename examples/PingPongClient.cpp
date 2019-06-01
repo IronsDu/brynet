@@ -4,6 +4,7 @@
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/TCPService.h>
 #include <brynet/net/Connector.h>
+#include <brynet/net/Wrapper.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -18,42 +19,45 @@ int main(int argc, char **argv)
 
     std::string tmp(atoi(argv[5]), 'a');
 
-    auto server = TcpService::Create();
-    server->startWorkerThread(atoi(argv[3]));
+    auto service = TcpService::Create();
+    service->startWorkerThread(atoi(argv[3]));
 
     auto connector = AsyncConnector::Create();
     connector->startWorkerThread();
+
+    auto enterCallback = [tmp](const TcpConnection::Ptr& session) {
+        session->setDataCallback([session](const char* buffer, size_t len) {
+                session->send(buffer, len);
+                return len;
+            });
+        session->send(tmp.c_str(), tmp.size());
+    };
+
+    auto failedCallback = []() {
+        std::cout << "connect failed" << std::endl;
+    };
+
+    wrapper::ConnectionBuilder connectionBuilder;
+    connectionBuilder.configureService(service)
+        .configureConnector(connector)
+        .configureConnectionOptions({
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
+        });
 
     for (auto i = 0; i < atoi(argv[4]); i++)
     {
         try
         {
-            auto enterCallback = [server, tmp](TcpSocket::Ptr socket) {
-                std::cout << "connect success" << std::endl;
-                socket->setNodelay();
-
-                auto enterCallback = [tmp](const TcpConnection::Ptr& session) {
-                    session->setDataCallback([session](const char* buffer, size_t len) {
-                        session->send(buffer, len);
-                        return len;
-                        });
-                    session->send(tmp.c_str(), tmp.size());
-                };
-
-                server->addTcpConnection(std::move(socket),
-                    brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-                    brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
-            };
-
-            auto failedCallback = []() {
-                std::cout << "connect failed" << std::endl;
-            };
-
-            connector->asyncConnect({
-                AsyncConnector::ConnectOptions::WithAddr(argv[1], atoi(argv[2])),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
-                AsyncConnector::ConnectOptions::WithCompletedCallback(enterCallback),
-                AsyncConnector::ConnectOptions::WithFailedCallback(failedCallback)});
+            connectionBuilder.configureConnectOptions({
+                    AsyncConnector::ConnectOptions::WithAddr(argv[1], atoi(argv[2])),
+                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
+                    AsyncConnector::ConnectOptions::WithFailedCallback(failedCallback),
+                    AsyncConnector::ConnectOptions::AddProcessTcpSocketCallback([](TcpSocket& socket) {
+                        socket.setNodelay();
+                    })
+                })
+                .asyncConnect();
         }
         catch (std::runtime_error& e)
         {

@@ -9,6 +9,7 @@
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/http/WebSocketFormat.h>
 #include <brynet/utils/packet.h>
+#include <brynet/net/Wrapper.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -51,49 +52,59 @@ int main(int argc, char **argv)
     size_t workers = argc > 4 ? std::atoi(argv[4]) : std::thread::hardware_concurrency();
     
     std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << workers << std::endl;
-    
+
+    auto enterCallback = [host](const HttpSession::Ptr& httpSession) {
+        HttpRequest request;
+        request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
+        request.setUrl("/ws");
+        request.addHeadValue("Host", host);
+        request.addHeadValue("Upgrade", "websocket");
+        request.addHeadValue("Connection", "Upgrade");
+        request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
+        request.addHeadValue("Sec-WebSocket-Version", "13");
+
+        std::string requestStr = request.getResult();
+        httpSession->send(requestStr.c_str(), requestStr.size());
+
+        httpSession->setWSConnected([](const HttpSession::Ptr& session, const HTTPParser&) {
+                for (int i = 0; i < 200; i++)
+                {
+                    sendPacket(session, "hello, world!", 13);
+                }
+            });
+
+        httpSession->setWSCallback([](const HttpSession::Ptr& session,
+            WebSocketFormat::WebSocketFrameType, const std::string& payload) {
+                std::cout << payload << std::endl;
+                sendPacket(session, "hello, world!", 13);
+                count += 1;
+            });
+    };
+
     auto service = TcpService::Create();
     service->startWorkerThread(workers);
 
+    auto connector = AsyncConnector::Create();
+    connector->startWorkerThread();
+
+    wrapper::HttpConnectionBuilder connectionBuilder;
+    connectionBuilder.configureService(service)
+        .configureConnector(connector)
+        .configureConnectionOptions({
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
+        });
+
     for (int i = 0; i < connections; i++)
     {
-        sock fd = brynet::net::base::Connect(false, host, port);
-        auto socket = TcpSocket::Create(fd, false);
-        brynet::net::base::SocketNodelay(fd);
-
-        auto enterCallback = [host](const TcpConnection::Ptr& session) {
-            HttpService::setup(session, [host](const HttpSession::Ptr& httpSession) {
-                HttpRequest request;
-                request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-                request.setUrl("/ws");
-                request.addHeadValue("Host", host);
-                request.addHeadValue("Upgrade", "websocket");
-                request.addHeadValue("Connection", "Upgrade");
-                request.addHeadValue("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
-                request.addHeadValue("Sec-WebSocket-Version", "13");
-
-                std::string requestStr = request.getResult();
-                httpSession->send(requestStr.c_str(), requestStr.size());
-
-                httpSession->setWSConnected([](const HttpSession::Ptr& session, const HTTPParser&) {
-                    for (int i = 0; i < 200; i++)
-                    {
-                        sendPacket(session, "hello, world!", 13);
-                    }
-                });
-
-                httpSession->setWSCallback([](const HttpSession::Ptr& session,
-                    WebSocketFormat::WebSocketFrameType, const std::string& payload) {
-                    std::cout << payload << std::endl;
-                    sendPacket(session, "hello, world!", 13);
-                    count += 1;
-                });
-            });
-        };
-
-        service->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024*1024));
+        connectionBuilder.configureConnectOptions({
+                AsyncConnector::ConnectOptions::WithAddr(host, port),
+                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
+                AsyncConnector::ConnectOptions::AddProcessTcpSocketCallback([](TcpSocket& socket) {
+                    socket.setNodelay();
+                })
+            })
+            .configureEnterCallback(enterCallback)
+            .asyncConnect();
     }
 
     brynet::net::EventLoop mainLoop;
