@@ -5,6 +5,7 @@
 #include <brynet/net/TCPService.h>
 #include <brynet/net/Connector.h>
 #include <brynet/net/http/HttpService.h>
+#include <brynet/net/Exception.h>
 
 namespace brynet { namespace net { namespace wrapper {
 
@@ -42,11 +43,11 @@ namespace brynet { namespace net { namespace wrapper {
         {
             if (mConnector == nullptr)
             {
-                throw std::runtime_error("connector is nullptr");
+                throw BrynetCommonException("connector is nullptr");
             }
             if (connectOptions.empty())
             {
-                throw std::runtime_error("options is empty");
+                throw BrynetCommonException("options is empty");
             }
 
             mConnector->asyncConnect(connectOptions);
@@ -121,15 +122,15 @@ namespace brynet { namespace net { namespace wrapper {
         {
             if (mTcpService == nullptr)
             {
-                throw std::runtime_error("tcp serviceis nullptr");
+                throw BrynetCommonException("tcp serviceis nullptr");
             }
             if (connectionOptions.empty())
             {
-                throw std::runtime_error("options is empty");
+                throw BrynetCommonException("options is empty");
             }
 
             auto service = mTcpService;
-            auto enterCallback = [=](TcpSocket::Ptr socket) mutable {
+            auto enterCallback = [service, connectionOptions](TcpSocket::Ptr socket) mutable {
                 service->addTcpConnection(std::move(socket), connectionOptions);
             };
             connectOptions.push_back(AsyncConnector::ConnectOptions::WithCompletedCallback(enterCallback));
@@ -181,9 +182,9 @@ namespace brynet { namespace net { namespace wrapper {
     class HttpConnectionBuilder : public BaseConnectionBuilder<HttpConnectionBuilder>
     {
     public:
-        HttpConnectionBuilder& configureEnterCallback(http::HttpSession::EnterCallback callback)
+        HttpConnectionBuilder& configureEnterCallback(http::HttpSession::EnterCallback&& callback)
         {
-            mHttpEnterCallback = callback;
+            mHttpEnterCallback = std::forward<http::HttpSession::EnterCallback>(callback);
             return *this;
         }
 
@@ -191,21 +192,21 @@ namespace brynet { namespace net { namespace wrapper {
         {
             if (mHttpEnterCallback == nullptr)
             {
-                throw std::runtime_error("not setting http enter callback");
+                throw BrynetCommonException("not setting http enter callback");
             }
 
             auto connectionOptions = BaseConnectionBuilder<HttpConnectionBuilder>::getConnectionOptions();
             auto callback = mHttpEnterCallback;
 
             connectionOptions.push_back(
-                TcpService::AddSocketOption::AddEnterCallback([=](const TcpConnection::Ptr& session) {
+                TcpService::AddSocketOption::AddEnterCallback([callback](const TcpConnection::Ptr& session) {
                         http::HttpService::setup(session, callback);
                     }));
 
             BaseConnectionBuilder<HttpConnectionBuilder>::asyncConnect(BaseConnectionBuilder<HttpConnectionBuilder>::getConnectOptions(), connectionOptions);
         }
 
-    protected:
+    private:
         http::HttpSession::EnterCallback    mHttpEnterCallback;
     };
 
@@ -256,15 +257,17 @@ namespace brynet { namespace net { namespace wrapper {
     class BuildListenConfig
     {
     public:
-        BuildListenConfig(ListenConfig* config)
+        explicit BuildListenConfig(ListenConfig* config)
+            :
+            mConfig(config)
         {
-            mConfig = config;
         }
 
         void        setAddr(bool ipV6, std::string ip, int port)
         {
             mConfig->setAddr(ipV6, ip, port);
         }
+
     private:
         ListenConfig* mConfig;
     };
@@ -295,7 +298,8 @@ namespace brynet { namespace net { namespace wrapper {
             return static_cast<Derived&>(*this);
         }
 
-        Derived& configureListen(ListenConfigSetting builder)
+        template<typename BuilderFunc>
+        Derived& configureListen(const BuilderFunc& builder)
         {
             BuildListenConfig buildConfig(&mListenConfig);
             builder(buildConfig);
@@ -325,22 +329,22 @@ namespace brynet { namespace net { namespace wrapper {
         {
             if (mTcpService == nullptr)
             {
-                throw std::runtime_error("tcp service is nullptr");
+                throw BrynetCommonException("tcp service is nullptr");
             }
             if (connectionOptions.empty())
             {
-                throw std::runtime_error("options is empty");
+                throw BrynetCommonException("options is empty");
             }
             if (!mListenConfig.hasSetting())
             {
-                throw std::runtime_error("not config listen addr");
+                throw BrynetCommonException("not config listen addr");
             }
 
             auto service = mTcpService;
             mListenThread = ListenThread::Create(mListenConfig.useIpV6(),
                 mListenConfig.ip(),
                 mListenConfig.port(),
-                [=](brynet::net::TcpSocket::Ptr socket) {
+                [service, connectionOptions](brynet::net::TcpSocket::Ptr socket) {
                     service->addTcpConnection(std::move(socket), connectionOptions);
                 },
                 mSocketOptions);
@@ -364,9 +368,9 @@ namespace brynet { namespace net { namespace wrapper {
     class HttpListenerBuilder : public BaseListenerBuilder<HttpListenerBuilder>
     {
     public:
-        HttpListenerBuilder& configureEnterCallback(http::HttpSession::EnterCallback callback)
+        HttpListenerBuilder& configureEnterCallback(http::HttpSession::EnterCallback&& callback)
         {
-            mHttpEnterCallback = callback;
+            mHttpEnterCallback = std::forward<http::HttpSession::EnterCallback>(callback);
             return *this;
         }
 
@@ -374,19 +378,19 @@ namespace brynet { namespace net { namespace wrapper {
         {
             if (mHttpEnterCallback == nullptr)
             {
-                throw std::runtime_error("not setting http enter callback");
+                throw BrynetCommonException("not setting http enter callback");
             }
 
             auto connectionOptions = BaseListenerBuilder<HttpListenerBuilder>::getConnectionOptions();
             auto callback = mHttpEnterCallback;
             connectionOptions.push_back(
-                TcpService::AddSocketOption::AddEnterCallback([=](const TcpConnection::Ptr& session) {
+                TcpService::AddSocketOption::AddEnterCallback([callback](const TcpConnection::Ptr& session) {
                     http::HttpService::setup(session, callback);
                 }));
             BaseListenerBuilder<HttpListenerBuilder>::asyncRun(connectionOptions);
         }
 
-    protected:
+    private:
         http::HttpSession::EnterCallback                                mHttpEnterCallback;
     };
 

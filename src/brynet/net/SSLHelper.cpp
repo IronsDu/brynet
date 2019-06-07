@@ -11,7 +11,7 @@ namespace brynet { namespace net {
 
     SSLHelper::Ptr SSLHelper::Create()
     {
-        struct make_shared_enabler : public SSLHelper {};
+        class make_shared_enabler : public SSLHelper {};
         return std::make_shared<make_shared_enabler>();
     }
 
@@ -49,6 +49,8 @@ namespace brynet { namespace net {
         int type,
         const char *file, int line)
     {
+        (void)file;
+        (void)line;
         if (mode & CRYPTO_LOCK)
         {
             cryptoLocks[type]->lock();

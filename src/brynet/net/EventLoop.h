@@ -13,7 +13,9 @@
 #include <brynet/timer/Timer.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Noexcept.h>
+#if defined PLATFORM_WINDOWS
 #include <brynet/net/port/Win.h>
+#endif
 
 namespace brynet { namespace net {
 
@@ -41,9 +43,9 @@ namespace brynet { namespace net {
         // 返回true表示实际发生了wakeup所需的操作(此返回值不代表接口本身操作成功与否,因为此函数永远成功)
         bool                            wakeup();
 
-        void                            runAsyncFunctor(UserFunctor f);
-        void                            runFunctorAfterLoop(UserFunctor f);
-        Timer::WeakPtr                  runAfter(nanoseconds timeout, std::function<void(void)> callback);
+        void                            runAsyncFunctor(UserFunctor&& f);
+        void                            runFunctorAfterLoop(UserFunctor&& f);
+        Timer::WeakPtr                  runAfter(nanoseconds timeout, UserFunctor&& callback);
 
         inline bool                     isInLoopThread() const
         {
@@ -54,6 +56,8 @@ namespace brynet { namespace net {
         void                            reallocEventSize(size_t size);
         void                            processAfterLoopFunctors();
         void                            processAsyncFunctors();
+        void                            swapAsyncFunctors();
+        void                            pushAsyncFunctor(UserFunctor&& f);
 
 #ifndef PLATFORM_WINDOWS
         int                             getEpollHandle() const;

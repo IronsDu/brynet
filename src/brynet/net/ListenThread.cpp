@@ -17,8 +17,9 @@ namespace brynet { namespace net {
         const AccepCallback& callback,
         const std::vector<TcpSocketProcessCallback>& processCallbacks)
     {
-        struct make_shared_enabler : public ListenThread
+        class make_shared_enabler : public ListenThread
         {
+        public:
             make_shared_enabler(bool isIPV6,
                 const std::string& ip,
                 int port,
@@ -45,7 +46,7 @@ namespace brynet { namespace net {
     {
         if (mCallback == nullptr)
         {
-            throw std::runtime_error("accept callback is nullptr");
+            throw BrynetCommonException("accept callback is nullptr");
         }
         mRunListen = std::make_shared<bool>(false);
     }
@@ -70,10 +71,6 @@ namespace brynet { namespace net {
         {
             std::cerr << "accept execption:" << e.what() << std::endl;
         }
-        catch (...)
-        {
-            std::cerr << "accept unknow execption:" << std::endl;
-        }
 
         return nullptr;
     }
@@ -90,7 +87,7 @@ namespace brynet { namespace net {
         const sock fd = brynet::net::base::Listen(mIsIPV6, mIP.c_str(), mPort, 512);
         if (fd == INVALID_SOCKET)
         {
-            throw std::runtime_error(std::string("listen error of:") + std::to_string(sErrno));;
+            throw BrynetCommonException(std::string("listen error of:") + std::to_string(sErrno));
         }
 
         mRunListen = std::make_shared<bool>(true);
@@ -155,8 +152,9 @@ namespace brynet { namespace net {
                 mListenThread->join();
             }
         }
-        catch (...)
+        catch (std::system_error& e)
         {
+            (void)e;
         }
         mListenThread = nullptr;
     }

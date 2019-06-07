@@ -2,6 +2,8 @@
 
 #include <string>
 #include <stdint.h>
+#include <random>
+#include <time.h>
 
 #include <brynet/utils/SHA1.h>
 #include <brynet/utils/base64.h>
@@ -51,6 +53,8 @@ namespace brynet { namespace net { namespace http {
             bool isFin = true,
             bool masking = false)
         {
+            static std::mt19937 random(time(0));
+
             static_assert(std::is_same<std::string::value_type, char>::value, "");
 
             const uint8_t head = static_cast<uint8_t>(frame_type) | (isFin ? 0x80 : 0x00);
@@ -90,7 +94,7 @@ namespace brynet { namespace net { namespace http {
                 uint8_t mask[4];
                 for (auto& m : mask)
                 {
-                    m = rand();
+                    m = random();
                     frame.push_back(m);
                 }
 

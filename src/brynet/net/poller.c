@@ -249,7 +249,6 @@ ox_poller_poll(struct poller_s* self, long overtime)
 bool 
 ox_poller_check(struct poller_s* self, sock fd, enum CheckType type)
 {
-    int i = 0;
     const struct pollfd* pf = findPollfd(self, fd);
     if (pf == NULL)
     {

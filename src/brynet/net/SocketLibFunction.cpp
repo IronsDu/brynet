@@ -305,8 +305,13 @@ namespace brynet { namespace net { namespace base {
         }
         else if (localaddr.sin6_family == AF_INET6)
         {
+#if defined PLATFORM_WINDOWS
             return localaddr.sin6_port == peeraddr.sin6_port
-                && memcmp(&localaddr.sin6_addr, &peeraddr.sin6_addr, sizeof localaddr.sin6_addr) == 0;
+                && memcmp(&localaddr.sin6_addr.u.Byte, &peeraddr.sin6_addr.u.Byte, sizeof localaddr.sin6_addr.u.Byte) == 0;
+#else
+            return localaddr.sin6_port == peeraddr.sin6_port
+                && memcmp(&localaddr.sin6_addr.s6_addr, &peeraddr.sin6_addr.s6_addr, sizeof localaddr.sin6_addr.s6_addr) == 0;
+#endif
         }
         else
         {

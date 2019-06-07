@@ -44,7 +44,7 @@ namespace brynet { namespace net {
         using PacketPtr = std::shared_ptr<std::string>;
 
     public:
-        Ptr static Create(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback, EventLoop::Ptr);
+        Ptr static Create(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback&&, EventLoop::Ptr);
 
         /* must called in network thread */
         bool                            onEnterEventLoop();
@@ -52,11 +52,22 @@ namespace brynet { namespace net {
 
         //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
 
-        void                            send(const char* buffer, size_t len, const PacketSendedCallback& callback = nullptr);
-        void                            send(const PacketPtr&, const PacketSendedCallback& callback = nullptr);
+        void                            send(const char* buffer, size_t len, PacketSendedCallback&& callback = nullptr);
+        template<typename PacketType>
+        void                            send(PacketType&& packet, PacketSendedCallback&& callback = nullptr)
+        {
+            auto packetCapture = std::forward<PacketType>(packet);
+            auto callbackCapture = std::forward<PacketSendedCallback>(callback);
+            auto sharedThis = shared_from_this();
+            mEventLoop->runAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
+                    const auto len = packetCapture->size();
+                    sharedThis->mSendList.emplace_back(PendingPacket{ std::move(packetCapture), len, std::move(callbackCapture) });
+                    sharedThis->runAfterFlush();
+                });
+        }
 
-        void                            setDataCallback(DataCallback cb);
-        void                            setDisConnectCallback(DisconnectedCallback cb);
+        void                            setDataCallback(DataCallback&& cb);
+        void                            setDisConnectCallback(DisconnectedCallback&& cb);
 
         /* if checkTime is zero, will cancel check heartbeat */
         void                            setHeartBeat(std::chrono::nanoseconds checkTime);
@@ -76,7 +87,7 @@ namespace brynet { namespace net {
         static  TcpConnection::PacketPtr  makePacket(const char* buffer, size_t len);
 
     protected:
-        TcpConnection(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback, EventLoop::Ptr) BRYNET_NOEXCEPT;
+        TcpConnection(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback&&, EventLoop::Ptr) BRYNET_NOEXCEPT;
         virtual ~TcpConnection() BRYNET_NOEXCEPT;
 
     private:
@@ -94,7 +105,9 @@ namespace brynet { namespace net {
         void                            recv();
         void                            flush();
         void                            normalFlush();
+#ifdef PLATFORM_LINUX
         void                            quickFlush();
+#endif
 
         void                            onClose() override;
         void                            procCloseInLoop();
@@ -108,6 +121,7 @@ namespace brynet { namespace net {
         bool                            processSSLHandshake();
 #endif
         void                            causeEnterCallback();
+
     private:
 
 #ifdef PLATFORM_WINDOWS
@@ -124,8 +138,9 @@ namespace brynet { namespace net {
         bool                            mCanWrite;
         bool                            mAlreadyClose;
 
-        struct BufferDeleter
+        class BufferDeleter
         {
+        public:
             void operator()(struct buffer_s* ptr) const
             {
                 ox_buffer_delete(ptr);
