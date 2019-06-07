@@ -3,6 +3,8 @@
 #include <algorithm>
 
 #include <brynet/net/Channel.h>
+#include <brynet/net/Socket.h>
+#include <brynet/net/Exception.h>
 #include <brynet/net/EventLoop.h>
 
 using namespace brynet::net;
@@ -25,17 +27,19 @@ namespace brynet { namespace net {
     private:
         void    canRecv() BRYNET_NOEXCEPT override
         {
+            ;
         }
 
         void    canSend() BRYNET_NOEXCEPT override
         {
+            ;
         }
 
         void    onClose() BRYNET_NOEXCEPT override
         {
+            ;
         }
 
-    private:
         HANDLE                      mIOCP;
         port::Win::OverlappedExt    mWakeupOvl;
     };
@@ -43,20 +47,14 @@ namespace brynet { namespace net {
     class WakeupChannel final : public Channel, public utils::NonCopyable
     {
     public:
-        explicit WakeupChannel(sock fd) : mFd(fd)
+        explicit WakeupChannel(sock fd) : mUniqueFd(fd)
         {
         }
 
         bool    wakeup()
         {
             uint64_t one = 1;
-            return write(mFd, &one, sizeof one) > 0;
-        }
-
-        ~WakeupChannel() override
-        {
-            close(mFd);
-            mFd = INVALID_SOCKET;
+            return write(mUniqueFd.getFD(), &one, sizeof one) > 0;
         }
 
     private:
@@ -65,7 +63,7 @@ namespace brynet { namespace net {
             char temp[1024 * 10];
             while (true)
             {
-                auto n = read(mFd, temp, sizeof(temp));
+                auto n = read(mUniqueFd.getFD(), temp, sizeof(temp));
                 if (n == -1 || static_cast<size_t>(n) < sizeof(temp))
                 {
                     break;
@@ -82,7 +80,7 @@ namespace brynet { namespace net {
         }
 
     private:
-        sock    mFd;
+        UniqueFd    mUniqueFd;
     };
 #endif
     EventLoop::EventLoop()
@@ -132,12 +130,12 @@ namespace brynet { namespace net {
 #endif
     }
 
-    Timer::WeakPtr EventLoop::runAfter(nanoseconds timeout, std::function<void(void)> callback)
+    Timer::WeakPtr EventLoop::runAfter(nanoseconds timeout, UserFunctor&& callback)
     {
         auto timer = std::make_shared<brynet::timer::Timer>(
             steady_clock::now(),
             nanoseconds(timeout),
-            callback);
+            std::forward<UserFunctor>(callback));
 
         if (isInLoopThread())
         {
@@ -170,7 +168,7 @@ namespace brynet { namespace net {
 #endif
         if (!isInLoopThread())
         {
-            throw std::runtime_error("only loop in io thread");
+            throw BrynetCommonException("only loop in io thread");
         }
 
         if (!mAfterLoopFunctors.empty())
@@ -283,7 +281,7 @@ namespace brynet { namespace net {
 #endif
         if (!isInLoopThread())
         {
-            throw std::runtime_error("only loop in io thread");
+            throw BrynetCommonException("only loop in io thread");
         }
 
         if (!mTimer->isEmpty())
@@ -305,12 +303,16 @@ namespace brynet { namespace net {
         mCopyAfterLoopFunctors.clear();
     }
 
+    void EventLoop::swapAsyncFunctors()
+    {
+        std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
+        assert(mCopyAsyncFunctors.empty());
+        mCopyAsyncFunctors.swap(mAsyncFunctors);
+    }
+
     void EventLoop::processAsyncFunctors()
     {
-        {
-            std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
-            mCopyAsyncFunctors.swap(mAsyncFunctors);
-        }
+        swapAsyncFunctors();
 
         for (const auto& x : mCopyAsyncFunctors)
         {
@@ -361,7 +363,13 @@ namespace brynet { namespace net {
         mTcpConnections.erase(fd);
     }
 
-    void EventLoop::runAsyncFunctor(UserFunctor f)
+    void EventLoop::pushAsyncFunctor(UserFunctor&& f)
+    {
+        std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
+        mAsyncFunctors.emplace_back(std::forward<UserFunctor>(f));
+    }
+
+    void EventLoop::runAsyncFunctor(UserFunctor&& f)
     {
         if (isInLoopThread())
         {
@@ -369,23 +377,20 @@ namespace brynet { namespace net {
         }
         else
         {
-            {
-                std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
-                mAsyncFunctors.emplace_back(std::move(f));
-            }
+            pushAsyncFunctor(std::forward<UserFunctor>(f));
             wakeup();
         }
     }
 
-    void EventLoop::runFunctorAfterLoop(UserFunctor f)
+    void EventLoop::runFunctorAfterLoop(UserFunctor&& f)
     {
         assert(isInLoopThread());
         if (!isInLoopThread())
         {
-            throw std::runtime_error("only push after functor in io thread");
+            throw BrynetCommonException("only push after functor in io thread");
         }
 
-        mAfterLoopFunctors.emplace_back(std::move(f));
+        mAfterLoopFunctors.emplace_back(std::forward<UserFunctor>(f));
     }
 
 #ifndef PLATFORM_WINDOWS

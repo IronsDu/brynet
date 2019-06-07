@@ -24,10 +24,10 @@ namespace brynet { namespace timer {
 
     Timer::Timer(steady_clock::time_point startTime, 
         nanoseconds lastTime, 
-        Callback callback) BRYNET_NOEXCEPT
+        Callback&& callback) BRYNET_NOEXCEPT
         :
         mActive(true),
-        mCallback(std::move(callback)),
+        mCallback(std::forward<Callback>(callback)),
         mStartTime(startTime),
         mLastTime(lastTime)
     {

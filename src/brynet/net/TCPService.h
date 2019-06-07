@@ -6,6 +6,7 @@
 #include <thread>
 #include <cstdint>
 #include <memory>
+#include <random>
 
 #include <brynet/net/TcpConnection.h>
 #include <brynet/utils/NonCopyable.h>
@@ -31,11 +32,11 @@ namespace brynet { namespace net {
         class AddSocketOption
         {
         public:
-            struct Options;
+            class Options;
 
             using AddSocketOptionFunc = std::function<void(Options& option)>;
 
-            static AddSocketOptionFunc AddEnterCallback(TcpService::EnterCallback callback);
+            static AddSocketOptionFunc AddEnterCallback(TcpService::EnterCallback&& callback);
             static AddSocketOptionFunc WithClientSideSSL();
             static AddSocketOptionFunc WithServerSideSSL(SSLHelper::Ptr sslHelper);
             static AddSocketOptionFunc WithMaxRecvBufferSize(size_t size);
@@ -45,7 +46,7 @@ namespace brynet { namespace net {
     public:
         static  Ptr                         Create();
 
-        void                                startWorkerThread(size_t threadNum, FrameCallback callback = nullptr);
+        void                                startWorkerThread(size_t threadNum, FrameCallback&& callback = nullptr);
         void                                stopWorkerThread();
         template<class... Options>
         bool                                addTcpConnection(TcpSocket::Ptr socket, const Options& ... options)
@@ -69,6 +70,7 @@ namespace brynet { namespace net {
         std::shared_ptr<bool>               mRunIOLoop;
 
         std::mutex                          mServiceGuard;
+        std::mt19937                        mRandom;
     };
 
 } }

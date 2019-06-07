@@ -1,5 +1,4 @@
 ﻿#include <string>
-
 #include <brynet/net/http/WebSocketFormat.h>
 
 #include <brynet/net/http/HttpService.h>
@@ -26,24 +25,24 @@ namespace brynet { namespace net { namespace http {
         mUD = std::move(ud);
     }
 
-    void HttpSession::setHttpCallback(HttpParserCallback callback)
+    void HttpSession::setHttpCallback(HttpParserCallback&& callback)
     {
-        mHttpRequestCallback = std::move(callback);
+        mHttpRequestCallback = std::forward<HttpParserCallback>(callback);
     }
 
-    void HttpSession::setClosedCallback(ClosedCallback callback)
+    void HttpSession::setClosedCallback(ClosedCallback&& callback)
     {
-        mCloseCallback = std::move(callback);
+        mCloseCallback = std::forward<ClosedCallback>(callback);
     }
 
-    void HttpSession::setWSCallback(WsCallback callback)
+    void HttpSession::setWSCallback(WsCallback&& callback)
     {
-        mWSCallback = std::move(callback);
+        mWSCallback = std::forward<WsCallback>(callback);
     }
 
-    void HttpSession::setWSConnected(WsConnectedCallback callback)
+    void HttpSession::setWSConnected(WsConnectedCallback&& callback)
     {
-        mWSConnectedCallback = std::move(callback);
+        mWSConnectedCallback = std::forward<WsConnectedCallback>(callback);
     }
 
     const HttpSession::HttpParserCallback& HttpSession::getHttpCallback() const
@@ -66,17 +65,11 @@ namespace brynet { namespace net { namespace http {
         return mWSConnectedCallback;
     }
 
-    void HttpSession::send(const TcpConnection::PacketPtr& packet,
-        const TcpConnection::PacketSendedCallback& callback /* = nullptr */)
-    {
-        mSession->send(packet, callback);
-    }
-
     void HttpSession::send(const char* packet,
         size_t len,
-        const TcpConnection::PacketSendedCallback& callback)
+        TcpConnection::PacketSendedCallback&& callback)
     {
-        mSession->send(packet, len, callback);
+        mSession->send(packet, len, std::forward<TcpConnection::PacketSendedCallback>(callback));
     }
 
     void HttpSession::postShutdown() const
@@ -91,7 +84,7 @@ namespace brynet { namespace net { namespace http {
 
     HttpSession::Ptr HttpSession::Create(TcpConnection::Ptr session)
     {
-        struct make_shared_enabler : public HttpSession
+        class make_shared_enabler : public HttpSession
         {
         public:
             explicit make_shared_enabler(TcpConnection::Ptr session) : HttpSession(std::move(session))
@@ -225,8 +218,7 @@ namespace brynet { namespace net { namespace http {
         /*TODO::keep alive and timeout close */
         auto& session = httpSession->getSession();
 
-        session->setDisConnectCallback([httpSession](const TcpConnection::Ptr& session) {
-            (void)session;
+        session->setDisConnectCallback([httpSession](const TcpConnection::Ptr&) {
             const auto& tmp = httpSession->getCloseCallback();
             if (tmp != nullptr)
             {

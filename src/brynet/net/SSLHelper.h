@@ -34,7 +34,7 @@ namespace brynet { namespace net {
 #endif
         static  Ptr                         Create();
 
-    private:
+    protected:
         SSLHelper() BRYNET_NOEXCEPT;
         virtual ~SSLHelper() BRYNET_NOEXCEPT;
 

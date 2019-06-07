@@ -20,7 +20,7 @@ namespace brynet { namespace timer {
         using WeakPtr = std::weak_ptr<Timer>;
         using Callback = std::function<void(void)>;
 
-        Timer(steady_clock::time_point startTime, nanoseconds lastTime, Callback f) BRYNET_NOEXCEPT;
+        Timer(steady_clock::time_point startTime, nanoseconds lastTime, Callback&& f) BRYNET_NOEXCEPT;
 
         const steady_clock::time_point&         getStartTime() const;
         const nanoseconds&                      getLastTime() const;
@@ -46,12 +46,12 @@ namespace brynet { namespace timer {
         using Ptr = std::shared_ptr<TimerMgr>;
 
         template<typename F, typename ...TArgs>
-        Timer::WeakPtr                          addTimer(nanoseconds timeout, F callback, TArgs&& ...args)
+        Timer::WeakPtr                          addTimer(nanoseconds timeout, F&& callback, TArgs&& ...args)
         {
             auto timer = std::make_shared<Timer>(
                 steady_clock::now(), 
                 nanoseconds(timeout),
-                std::bind(std::move(callback), std::forward<TArgs>(args)...));
+                std::bind(std::forward<F>(callback), std::forward<TArgs>(args)...));
             mTimers.push(timer);
 
             return timer;
