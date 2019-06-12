@@ -196,11 +196,18 @@ namespace brynet { namespace net {
     {
         if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
         {
+#if defined HAVE_LANG_CXX11 && !defined HAVE_LANG_CXX14
             auto sharedThis = shared_from_this();
             mEventLoop->runFunctorAfterLoop([sharedThis]() {
-                sharedThis->mIsPostFlush = false;
-                sharedThis->flush();
-            });
+                    sharedThis->mIsPostFlush = false;
+                    sharedThis->flush();
+                });
+#else
+            mEventLoop->runFunctorAfterLoop([sharedThis = shared_from_this()]() {
+                    sharedThis->mIsPostFlush = false;
+                    sharedThis->flush();
+                });
+#endif
 
             mIsPostFlush = true;
         }

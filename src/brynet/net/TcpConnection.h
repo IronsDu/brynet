@@ -13,6 +13,7 @@
 #include <brynet/net/Noexcept.h>
 #include <brynet/net/Socket.h>
 #include <brynet/utils/buffer.h>
+#include <brynet/utils/CPP_VERSION.h>
 
 #ifdef USE_OPENSSL
 
@@ -56,14 +57,39 @@ namespace brynet { namespace net {
         template<typename PacketType>
         void                            send(PacketType&& packet, PacketSendedCallback&& callback = nullptr)
         {
-            auto packetCapture = std::forward<PacketType>(packet);
-            auto callbackCapture = std::forward<PacketSendedCallback>(callback);
-            auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
-                    const auto len = packetCapture->size();
-                    sharedThis->mSendList.emplace_back(PendingPacket{ std::move(packetCapture), len, std::move(callbackCapture) });
-                    sharedThis->runAfterFlush();
-                });
+            const auto len = packet->size();
+            if (mEventLoop->isInLoopThread())
+            {
+                mSendList.emplace_back(PendingPacket{ std::move(packet), len, std::move(callback) });
+                runAfterFlush();
+            }
+            else
+            {
+#if defined HAVE_LANG_CXX11 && !defined HAVE_LANG_CXX14
+                auto flushFunctor = std::bind([len](
+                    const TcpConnection::Ptr& sharedThis, 
+                    const PacketType& packet, 
+                    const PacketSendedCallback& callback) mutable {
+                        sharedThis->mSendList.emplace_back(PendingPacket{ 
+                            std::move(const_cast<PacketType&&>(packet)), 
+                            len, 
+                            const_cast<PacketSendedCallback&&>(callback) });
+                        sharedThis->runAfterFlush();
+                    }, 
+                    shared_from_this(),
+                    std::forward<PacketType>(packet),
+                    std::forward<PacketSendedCallback>(callback));
+                mEventLoop->runAsyncFunctor(std::move(flushFunctor));
+#else
+                mEventLoop->runAsyncFunctor([len,
+                    sharedThis = shared_from_this(),
+                    packet = std::forward<PacketType>(packet),
+                    callback = std::forward<PacketSendedCallback>(callback)]() mutable {
+                        sharedThis->mSendList.emplace_back(PendingPacket{ std::move(packet), len, std::move(callback) });
+                        sharedThis->runAfterFlush();
+                    });
+#endif
+            }
         }
 
         void                            setDataCallback(DataCallback&& cb);
