@@ -1,5 +1,4 @@
-﻿#include <iostream>
-#include <stdexcept>
+﻿#include <stdexcept>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>

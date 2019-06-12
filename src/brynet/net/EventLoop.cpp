@@ -1,5 +1,4 @@
 ﻿#include <cassert>
-#include <iostream>
 #include <algorithm>
 
 #include <brynet/net/Channel.h>
@@ -130,11 +129,11 @@ namespace brynet { namespace net {
 #endif
     }
 
-    Timer::WeakPtr EventLoop::runAfter(nanoseconds timeout, UserFunctor&& callback)
+    brynet::timer::Timer::WeakPtr EventLoop::runAfter(std::chrono::nanoseconds timeout, UserFunctor&& callback)
     {
         auto timer = std::make_shared<brynet::timer::Timer>(
-            steady_clock::now(),
-            nanoseconds(timeout),
+            std::chrono::steady_clock::now(),
+            std::chrono::nanoseconds(timeout),
             std::forward<UserFunctor>(callback));
 
         if (isInLoopThread())

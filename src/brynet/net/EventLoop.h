@@ -19,9 +19,6 @@
 
 namespace brynet { namespace net {
 
-    using namespace std::chrono;
-    using namespace brynet::timer;
-
     class Channel;
     class TcpConnection;
     using TcpConnectionPtr = std::shared_ptr<TcpConnection>;
@@ -45,7 +42,7 @@ namespace brynet { namespace net {
 
         void                            runAsyncFunctor(UserFunctor&& f);
         void                            runFunctorAfterLoop(UserFunctor&& f);
-        Timer::WeakPtr                  runAfter(nanoseconds timeout, UserFunctor&& callback);
+        brynet::timer::Timer::WeakPtr   runAfter(std::chrono::nanoseconds timeout, UserFunctor&& callback);
 
         inline bool                     isInLoopThread() const
         {
@@ -95,7 +92,7 @@ namespace brynet { namespace net {
         std::once_flag                  mOnceInitThreadID;
         current_thread::THREAD_ID_TYPE  mSelfThreadID;
 
-        timer::TimerMgr::Ptr            mTimer;
+        brynet::timer::TimerMgr::Ptr    mTimer;
         std::unordered_map<sock, TcpConnectionPtr> mTcpConnections;
 
         friend class TcpConnection;

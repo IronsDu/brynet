@@ -17,36 +17,36 @@ namespace brynet { namespace net {
 
     SSLHelper::SSLHelper() BRYNET_NOEXCEPT
     {
-        #ifdef USE_OPENSSL
+#ifdef USE_OPENSSL
         mOpenSSLCTX = nullptr;
-        #endif
+#endif
     }
 
     SSLHelper::~SSLHelper() BRYNET_NOEXCEPT
     {
-        #ifdef USE_OPENSSL
+#ifdef USE_OPENSSL
         destroySSL();
-        #endif
+#endif
     }
 
-    #ifdef USE_OPENSSL
+#ifdef USE_OPENSSL
     SSL_CTX* SSLHelper::getOpenSSLCTX()
     {
         return mOpenSSLCTX;
     }
 
-    #ifndef CRYPTO_THREADID_set_callback
+#ifndef CRYPTO_THREADID_set_callback
     static void cryptoSetThreadIDCallback(CRYPTO_THREADID* id)
     {
-        #ifdef PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(GetCurrentThreadId()));
-        #else
+#else
         CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(pthread_self()));
-        #endif
+#endif
     }
-    #endif
+#endif
 
-    #ifndef CRYPTO_set_locking_callback
+#ifndef CRYPTO_set_locking_callback
     static std::unordered_map<int, std::shared_ptr<std::mutex>> cryptoLocks;
     static void cryptoLockingCallback(int mode,
         int type,
@@ -63,22 +63,22 @@ namespace brynet { namespace net {
             cryptoLocks[type]->unlock();
         }
     }
-    #endif
+#endif
 
     static std::once_flag initCryptoThreadSafeSupportOnceFlag;
     static void InitCryptoThreadSafeSupport()
     {
-        #ifndef CRYPTO_THREADID_set_callback
+#ifndef CRYPTO_THREADID_set_callback
         CRYPTO_THREADID_set_callback(cryptoSetThreadIDCallback);
-        #endif
+#endif
 
-        #ifndef CRYPTO_set_locking_callback
+#ifndef CRYPTO_set_locking_callback
         for (int i = 0; i < CRYPTO_num_locks(); i++)
         {
             cryptoLocks[i] = std::make_shared<std::mutex>();
         }
         CRYPTO_set_locking_callback(cryptoLockingCallback);
-        #endif
+#endif
     }
 
     bool SSLHelper::initSSL(const std::string& certificate, const std::string& privatekey)
@@ -130,6 +130,6 @@ namespace brynet { namespace net {
             mOpenSSLCTX = nullptr;
         }
     }
-    #endif
+#endif
 
 } }

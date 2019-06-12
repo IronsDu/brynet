@@ -79,7 +79,6 @@ namespace brynet { namespace net { namespace base {
         return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
     }
 
-    // TODO::Connect是否直接返回TcpSocket::Ptr
     sock Connect(bool isIPV6, const std::string& server_ip, int port)
     {
         InitSocket();
@@ -255,7 +254,6 @@ namespace brynet { namespace net { namespace base {
         return transnum;
     }
 
-    // TODO::Accept是否直接返回TcpSocket::Ptr
     sock Accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen)
     {
         return accept(listenSocket, addr, addrLen);

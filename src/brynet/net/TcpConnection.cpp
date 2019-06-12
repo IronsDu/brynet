@@ -104,6 +104,7 @@ namespace brynet { namespace net {
         }
 
         const auto findRet = mEventLoop->getTcpConnection(mSocket->getFD());
+        (void)findRet;
         assert(findRet == nullptr);
 
 #ifdef USE_OPENSSL
