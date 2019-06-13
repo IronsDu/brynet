@@ -28,16 +28,21 @@ namespace brynet { namespace net { namespace http {
         using WsConnectedCallback = std::function <void(const HttpSession::Ptr&, const HTTPParser&)>;
 
     public:
-        void                        setHttpCallback(HttpParserCallback callback);
-        void                        setClosedCallback(ClosedCallback callback);
-        void                        setWSCallback(WsCallback callback);
-        void                        setWSConnected(WsConnectedCallback callback);
+        void                        setHttpCallback(HttpParserCallback&& callback);
+        void                        setClosedCallback(ClosedCallback&& callback);
+        void                        setWSCallback(WsCallback&& callback);
+        void                        setWSConnected(WsConnectedCallback&& callback);
 
-        void                        send(const TcpConnection::PacketPtr& packet,
-                                        const TcpConnection::PacketSendedCallback& callback = nullptr);
+        template<typename PacketType>
+        void                        send(PacketType&& packet,
+            TcpConnection::PacketSendedCallback&& callback = nullptr)
+        {
+            mSession->send(std::forward<TcpConnection::PacketPtr>(packet),
+                std::forward<TcpConnection::PacketSendedCallback>(callback));
+        }
         void                        send(const char* packet,
                                         size_t len,
-                                        const TcpConnection::PacketSendedCallback& callback = nullptr);
+                                        TcpConnection::PacketSendedCallback&& callback = nullptr);
 
         void                        postShutdown() const;
         void                        postClose() const;

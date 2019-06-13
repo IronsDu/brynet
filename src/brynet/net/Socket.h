@@ -12,6 +12,21 @@ namespace brynet { namespace net {
 
     class TcpConnection;
 
+    class UniqueFd final : public utils::NonCopyable
+    {
+    public:
+        explicit UniqueFd(sock fd);
+        ~UniqueFd();
+
+        UniqueFd(const UniqueFd& other) = delete;
+        UniqueFd& operator=(const UniqueFd& other) = delete;
+
+        sock            getFD() const;
+
+    private:
+        sock            mFD;
+    };
+
     class TcpSocket : public utils::NonCopyable
     {
     private:
@@ -37,7 +52,7 @@ namespace brynet { namespace net {
         std::string     getRemoteIP() const;
         bool            isServerSide() const;
 
-    private:
+    protected:
         TcpSocket(sock fd, bool serverSide);
         virtual ~TcpSocket();
 
@@ -91,7 +106,7 @@ namespace brynet { namespace net {
     public:
         static Ptr Create(sock fd);
 
-    private:
+    protected:
         explicit ListenSocket(sock fd);
         virtual ~ListenSocket();
 

@@ -11,7 +11,7 @@ namespace brynet { namespace net {
 
     SSLHelper::Ptr SSLHelper::Create()
     {
-        struct make_shared_enabler : public SSLHelper {};
+        class make_shared_enabler : public SSLHelper {};
         return std::make_shared<make_shared_enabler>();
     }
 
@@ -35,6 +35,7 @@ namespace brynet { namespace net {
         return mOpenSSLCTX;
     }
 
+#ifndef CRYPTO_THREADID_set_callback
     static void cryptoSetThreadIDCallback(CRYPTO_THREADID* id)
     {
 #ifdef PLATFORM_WINDOWS
@@ -43,12 +44,16 @@ namespace brynet { namespace net {
         CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(pthread_self()));
 #endif
     }
+#endif
 
+#ifndef CRYPTO_set_locking_callback
     static std::unordered_map<int, std::shared_ptr<std::mutex>> cryptoLocks;
     static void cryptoLockingCallback(int mode,
         int type,
         const char *file, int line)
     {
+        (void)file;
+        (void)line;
         if (mode & CRYPTO_LOCK)
         {
             cryptoLocks[type]->lock();
@@ -58,17 +63,22 @@ namespace brynet { namespace net {
             cryptoLocks[type]->unlock();
         }
     }
+#endif
 
     static std::once_flag initCryptoThreadSafeSupportOnceFlag;
     static void InitCryptoThreadSafeSupport()
     {
+#ifndef CRYPTO_THREADID_set_callback
+        CRYPTO_THREADID_set_callback(cryptoSetThreadIDCallback);
+#endif
+
+#ifndef CRYPTO_set_locking_callback
         for (int i = 0; i < CRYPTO_num_locks(); i++)
         {
             cryptoLocks[i] = std::make_shared<std::mutex>();
         }
-
-        CRYPTO_THREADID_set_callback(cryptoSetThreadIDCallback);
         CRYPTO_set_locking_callback(cryptoLockingCallback);
+#endif
     }
 
     bool SSLHelper::initSSL(const std::string& certificate, const std::string& privatekey)

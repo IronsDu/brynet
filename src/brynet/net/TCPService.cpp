@@ -1,9 +1,9 @@
-﻿#include <iostream>
-#include <stdexcept>
+﻿#include <stdexcept>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
 #include <brynet/net/Noexcept.h>
+#include <brynet/net/Exception.h>
 
 #include <brynet/net/TCPService.h>
 
@@ -16,26 +16,27 @@ namespace brynet { namespace net {
     public:
         using Ptr = std::shared_ptr<IOLoopData>;
 
-    public:
         static  Ptr                     Create(EventLoop::Ptr eventLoop,
                                             std::shared_ptr<std::thread> ioThread);
-    public:
         const EventLoop::Ptr&           getEventLoop() const;
 
-    private:
+    protected:
         const std::shared_ptr<std::thread>& getIOThread() const;
 
         IOLoopData(EventLoop::Ptr eventLoop, std::shared_ptr<std::thread> ioThread);
         virtual                         ~IOLoopData() = default;
 
-    private:
         const EventLoop::Ptr            mEventLoop;
+
+    private:
         std::shared_ptr<std::thread>    mIOThread;
 
         friend class TcpService;
     };
 
     TcpService::TcpService() BRYNET_NOEXCEPT
+        :
+        mRandom(time(0))
     {
         mRunIOLoop = std::make_shared<bool>(false);
     }
@@ -62,14 +63,15 @@ namespace brynet { namespace net {
                     v->getIOThread()->join();
                 }
             }
-            catch (...)
+            catch (std::system_error& e)
             {
+                (void)e;
             }
         }
         mIOLoopDatas.clear();
     }
 
-    void TcpService::startWorkerThread(size_t threadNum, FrameCallback callback)
+    void TcpService::startWorkerThread(size_t threadNum, FrameCallback&& callback)
     {
         std::lock_guard<std::mutex> lck(mServiceGuard);
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
@@ -103,7 +105,7 @@ namespace brynet { namespace net {
 
     EventLoop::Ptr TcpService::getRandomEventLoop()
     {
-        const auto randNum = rand();
+        const auto randNum = mRandom();
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
         if (mIOLoopDatas.empty())
         {
@@ -114,12 +116,13 @@ namespace brynet { namespace net {
 
     TcpService::Ptr TcpService::Create()
     {
-        struct make_shared_enabler : public TcpService {};
+        struct make_shared_enabler : TcpService {};
         return std::make_shared<make_shared_enabler>();
     }
 
-    struct brynet::net::TcpService::AddSocketOption::Options
+    class brynet::net::TcpService::AddSocketOption::Options
     {
+    public:
         Options()
         {
             useSSL = false;
@@ -138,7 +141,7 @@ namespace brynet { namespace net {
     bool TcpService::_addTcpConnection(TcpSocket::Ptr socket,
         const std::vector<AddSocketOption::AddSocketOptionFunc>& optionFuncs)
     {
-        struct TcpService::AddSocketOption::Options options;
+        TcpService::AddSocketOption::Options options;
         for (const auto& v : optionFuncs)
         {
             if (v != nullptr)
@@ -149,7 +152,7 @@ namespace brynet { namespace net {
 
         if (options.maxRecvBufferSize <= 0)
         {
-            throw std::runtime_error("buffer size is zero");
+            throw BrynetCommonException("buffer size is zero");
         }
 
         EventLoop::Ptr eventLoop;
@@ -227,8 +230,9 @@ namespace brynet { namespace net {
 
     IOLoopData::Ptr IOLoopData::Create(EventLoop::Ptr eventLoop, std::shared_ptr<std::thread> ioThread)
     {
-        struct make_shared_enabler : public IOLoopData
+        class make_shared_enabler :  public IOLoopData
         {
+        public:
             make_shared_enabler(EventLoop::Ptr eventLoop, std::shared_ptr<std::thread> ioThread) :
                 IOLoopData(std::move(eventLoop), std::move(ioThread))
             {}
@@ -251,23 +255,23 @@ namespace brynet { namespace net {
         return mIOThread;
     }
 
-    TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::AddEnterCallback(TcpService::EnterCallback callback)
+    TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::AddEnterCallback(TcpService::EnterCallback&& callback)
     {
-        return [=](TcpService::AddSocketOption::Options& option) {
+        return [callback](TcpService::AddSocketOption::Options& option) {
             option.enterCallback.push_back(callback);
         };
     }
 
     TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithClientSideSSL()
     {
-        return [=](TcpService::AddSocketOption::Options& option) {
+        return [](TcpService::AddSocketOption::Options& option) {
             option.useSSL = true;
         };
     }
 
     TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithServerSideSSL(SSLHelper::Ptr sslHelper)
     {
-        return [=](TcpService::AddSocketOption::Options& option) {
+        return [sslHelper](TcpService::AddSocketOption::Options& option) {
             option.sslHelper = sslHelper;
             option.useSSL = true;
         };
@@ -275,14 +279,14 @@ namespace brynet { namespace net {
 
     TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithMaxRecvBufferSize(size_t size)
     {
-        return [=](TcpService::AddSocketOption::Options& option) {
+        return [size](TcpService::AddSocketOption::Options& option) {
             option.maxRecvBufferSize = size;
         };
     }
 
     TcpService::AddSocketOption::AddSocketOptionFunc TcpService::AddSocketOption::WithForceSameThreadLoop(bool same)
     {
-        return [=](AddSocketOption::Options& option) {
+        return [same](AddSocketOption::Options& option) {
             option.forceSameThreadLoop = same;
         };
     }

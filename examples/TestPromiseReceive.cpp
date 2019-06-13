@@ -8,6 +8,7 @@
 #include <brynet/net/PromiseReceive.h>
 #include <brynet/net/http/HttpFormat.h>
 #include <brynet/net/ListenThread.h>
+#include <brynet/net/Wrapper.h>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -21,53 +22,63 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    auto server = TcpService::Create();
-    auto listenThread = ListenThread::Create(false, "0.0.0.0", atoi(argv[1]), [=](TcpSocket::Ptr socket) {
-        socket->setNodelay();
-        auto enterCallback = [](const TcpConnection::Ptr& session) {
-            auto promiseReceive = setupPromiseReceive(session);
-            auto contentLength = std::make_shared<size_t>();
+    auto service = TcpService::Create();
+    service->startWorkerThread(atoi(argv[2]));
 
-            promiseReceive->receiveUntil("\r\n", [](const char* buffer, size_t len) {
+    auto enterCallback = [](const TcpConnection::Ptr& session) {
+        auto promiseReceive = setupPromiseReceive(session);
+        auto contentLength = std::make_shared<size_t>();
+
+        promiseReceive
+            ->receiveUntil("\r\n", [](const char* buffer, size_t len) {
                 auto headline = std::string(buffer, len);
                 std::cout << headline << std::endl;
                 return false;
-                })->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
-                    auto headerValue = std::string(buffer, len);
-                    std::cout << headerValue << std::endl;
-                    if (len > 2)
+            })
+            ->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
+                auto headerValue = std::string(buffer, len);
+                std::cout << headerValue << std::endl;
+                if (len > 2)
+                {
+                    const static std::string ContentLenghtFlag = "Content-Length: ";
+                    auto pos = headerValue.find(ContentLenghtFlag);
+                    if (pos != std::string::npos)
                     {
-                        const static std::string ContentLenghtFlag = "Content-Length: ";
-                        auto pos = headerValue.find(ContentLenghtFlag);
-                        if (pos != std::string::npos)
-                        {
-                            auto lenStr = headerValue.substr(pos + ContentLenghtFlag.size(), headerValue.size());
-                            *contentLength = std::stoi(lenStr);
-                        }
-                        return true;
+                        auto lenStr = headerValue.substr(pos + ContentLenghtFlag.size(), headerValue.size());
+                        *contentLength = std::stoi(lenStr);
                     }
-                    return false;
-                    })->receive(contentLength, [session](const char* buffer, size_t len) {
-                        HttpResponse response;
-                        response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
-                        response.setContentType("text/html; charset=utf-8");
-                        response.setBody("<html>hello world </html>");
+                    return true;
+                }
+                return false;
+            })->receive(contentLength, [session](const char* buffer, size_t len) {
+                HttpResponse response;
+                response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
+                response.setContentType("text/html; charset=utf-8");
+                response.setBody("<html>hello world </html>");
 
-                        auto result = response.getResult();
-                        session->send(result.c_str(), result.size());
-                        session->postShutdown();
+                auto result = response.getResult();
+                session->send(result.c_str(), result.size());
+                session->postShutdown();
 
-                        return false;
-                        });
-        };
-        server->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(10));
-        });
+                return false;
+            });
+    };
 
-    listenThread->startListen();
-
-    server->startWorkerThread(atoi(argv[2]));
+    wrapper::ListenerBuilder listener;
+    listener.configureService(service)
+        .configureSocketOptions({
+            [](TcpSocket& socket) {
+                socket.setNodelay();
+            }
+        })
+        .configureConnectionOptions({
+            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024),
+            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback)
+        })
+        .configureListen([=](wrapper::BuildListenConfig config) {
+            config.setAddr(false, "0.0.0.0", atoi(argv[1]));
+        })
+        .asyncRun();
 
     EventLoop mainLoop;
     while (true)

@@ -79,7 +79,6 @@ namespace brynet { namespace net { namespace base {
         return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
     }
 
-    // TODO::Connect是否直接返回TcpSocket::Ptr
     sock Connect(bool isIPV6, const std::string& server_ip, int port)
     {
         InitSocket();
@@ -255,7 +254,6 @@ namespace brynet { namespace net { namespace base {
         return transnum;
     }
 
-    // TODO::Accept是否直接返回TcpSocket::Ptr
     sock Accept(sock listenSocket, struct sockaddr* addr, socklen_t* addrLen)
     {
         return accept(listenSocket, addr, addrLen);
@@ -305,8 +303,13 @@ namespace brynet { namespace net { namespace base {
         }
         else if (localaddr.sin6_family == AF_INET6)
         {
+#if defined PLATFORM_WINDOWS
             return localaddr.sin6_port == peeraddr.sin6_port
-                && memcmp(&localaddr.sin6_addr, &peeraddr.sin6_addr, sizeof localaddr.sin6_addr) == 0;
+                && memcmp(&localaddr.sin6_addr.u.Byte, &peeraddr.sin6_addr.u.Byte, sizeof localaddr.sin6_addr.u.Byte) == 0;
+#else
+            return localaddr.sin6_port == peeraddr.sin6_port
+                && memcmp(&localaddr.sin6_addr.s6_addr, &peeraddr.sin6_addr.s6_addr, sizeof localaddr.sin6_addr.s6_addr) == 0;
+#endif
         }
         else
         {

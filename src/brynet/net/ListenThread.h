@@ -32,7 +32,7 @@ namespace brynet { namespace net {
                                                 const AccepCallback& callback,
                                                 const std::vector<TcpSocketProcessCallback>& = {});
 
-    private:
+    protected:
         ListenThread(bool isIPV6, 
             const std::string& ip, 
             int port, 

@@ -8,62 +8,78 @@ common_sources: &all_sources
 matrix:
   include:
     - os: linux
-      compiler: gcc
       addons:
         apt:
          sources: ['ubuntu-toolchain-r-test']
          packages: ['g++-4.8']
-      env: COMPILER='g++-4.8'
+         #sonarcloud
+        sonarcloud:
+          organization: "ironsdu-github"
+          token: 
+            secure: "VMoRHn3Ra2xAeirV/27uyJw4E1jeNZUJA8SiawZY3PLgov+cUQpBleZB8TK5miiEs7PLPX9ezk8nOF2r2M7r/cOs7jCV3Gqw6kc9xLDxI+GLEUgfofpdlG0zhqPKF7foPo7HSmYH4Zdtec93+NzhmMsTpSbiIeb2sP5ujKDK7eRRW3L3jGgMTbZWV4ppN1bwqgYQoL3gKkDbKDiELOUa/00KCBb+J6ME0ZydS81m/T09+Wct78KQ8QNXbrVCUiVyKBiTbDYJROeWdwYAd3OXKnJdyop7W+UgU0BHlYwXXZLv8Kpjanr+CTx6Z0dboNtdKbV59pITypBhSA2KrR8nSP9UlNpvTDdSUbFGWvLb9YPmsnDw3Q+pL9y59ifofIYMqtfHeA0usGWOevvojabDeIW4T9YZbL/Q3R2/MAZxQWmExe8qFF70MgIKq3mT8ft1byUsiyyoH+T8cxS4WZzM4kU+TgQaNWjuXteWldYX7EWvevyeQKGpggN+b+N+pPDa7kYK0ysA0MB16/lhEluikLcE1yXWXCBfLC5KQQpdZZYJhKw1j7NKnzcW8S7I2hu1Qoj7GfZ7FeDPRpavyTCoOvbi1eqiXQeFfu2J9K1oj+bk1XUo2eFveaHGwhde+U/vq6QOuRTEWKnSPG0/aG8DaRwjn9n6zTd5L0t1qsrYBbI="
+      env: 
+        - MATRIX_EVAL="CC=gcc-4.8 && CXX=g++-4.8"
 
     - os: linux
-      compiler: gcc
       addons:
         apt:
           sources: *all_sources
           packages: ['g++-4.9']
-      env: COMPILER='g++-4.9'
+          #sonarcloud
+        sonarcloud:
+          organization: "ironsdu-github"
+          token: 
+            secure: "VMoRHn3Ra2xAeirV/27uyJw4E1jeNZUJA8SiawZY3PLgov+cUQpBleZB8TK5miiEs7PLPX9ezk8nOF2r2M7r/cOs7jCV3Gqw6kc9xLDxI+GLEUgfofpdlG0zhqPKF7foPo7HSmYH4Zdtec93+NzhmMsTpSbiIeb2sP5ujKDK7eRRW3L3jGgMTbZWV4ppN1bwqgYQoL3gKkDbKDiELOUa/00KCBb+J6ME0ZydS81m/T09+Wct78KQ8QNXbrVCUiVyKBiTbDYJROeWdwYAd3OXKnJdyop7W+UgU0BHlYwXXZLv8Kpjanr+CTx6Z0dboNtdKbV59pITypBhSA2KrR8nSP9UlNpvTDdSUbFGWvLb9YPmsnDw3Q+pL9y59ifofIYMqtfHeA0usGWOevvojabDeIW4T9YZbL/Q3R2/MAZxQWmExe8qFF70MgIKq3mT8ft1byUsiyyoH+T8cxS4WZzM4kU+TgQaNWjuXteWldYX7EWvevyeQKGpggN+b+N+pPDa7kYK0ysA0MB16/lhEluikLcE1yXWXCBfLC5KQQpdZZYJhKw1j7NKnzcW8S7I2hu1Qoj7GfZ7FeDPRpavyTCoOvbi1eqiXQeFfu2J9K1oj+bk1XUo2eFveaHGwhde+U/vq6QOuRTEWKnSPG0/aG8DaRwjn9n6zTd5L0t1qsrYBbI="
+      env: 
+        - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
 
     - os: linux
-      compiler: gcc
       addons:
         apt:
           sources: *all_sources
           packages: ['g++-5']
-      env: COMPILER='g++-5'
+          #sonarcloud
+        sonarcloud:
+          organization: "ironsdu-github"
+          token: 
+            secure: "VMoRHn3Ra2xAeirV/27uyJw4E1jeNZUJA8SiawZY3PLgov+cUQpBleZB8TK5miiEs7PLPX9ezk8nOF2r2M7r/cOs7jCV3Gqw6kc9xLDxI+GLEUgfofpdlG0zhqPKF7foPo7HSmYH4Zdtec93+NzhmMsTpSbiIeb2sP5ujKDK7eRRW3L3jGgMTbZWV4ppN1bwqgYQoL3gKkDbKDiELOUa/00KCBb+J6ME0ZydS81m/T09+Wct78KQ8QNXbrVCUiVyKBiTbDYJROeWdwYAd3OXKnJdyop7W+UgU0BHlYwXXZLv8Kpjanr+CTx6Z0dboNtdKbV59pITypBhSA2KrR8nSP9UlNpvTDdSUbFGWvLb9YPmsnDw3Q+pL9y59ifofIYMqtfHeA0usGWOevvojabDeIW4T9YZbL/Q3R2/MAZxQWmExe8qFF70MgIKq3mT8ft1byUsiyyoH+T8cxS4WZzM4kU+TgQaNWjuXteWldYX7EWvevyeQKGpggN+b+N+pPDa7kYK0ysA0MB16/lhEluikLcE1yXWXCBfLC5KQQpdZZYJhKw1j7NKnzcW8S7I2hu1Qoj7GfZ7FeDPRpavyTCoOvbi1eqiXQeFfu2J9K1oj+bk1XUo2eFveaHGwhde+U/vq6QOuRTEWKnSPG0/aG8DaRwjn9n6zTd5L0t1qsrYBbI="
+      env: 
+        - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
 
     - os: linux
-      compiler: gcc
       addons: &gcc6
         apt:
           sources: *all_sources
           packages: ['g++-6']
-      env: COMPILER='g++-6'
+          #sonarcloud
+        sonarcloud:
+          organization: "ironsdu-github"
+          token: 
+            secure: "VMoRHn3Ra2xAeirV/27uyJw4E1jeNZUJA8SiawZY3PLgov+cUQpBleZB8TK5miiEs7PLPX9ezk8nOF2r2M7r/cOs7jCV3Gqw6kc9xLDxI+GLEUgfofpdlG0zhqPKF7foPo7HSmYH4Zdtec93+NzhmMsTpSbiIeb2sP5ujKDK7eRRW3L3jGgMTbZWV4ppN1bwqgYQoL3gKkDbKDiELOUa/00KCBb+J6ME0ZydS81m/T09+Wct78KQ8QNXbrVCUiVyKBiTbDYJROeWdwYAd3OXKnJdyop7W+UgU0BHlYwXXZLv8Kpjanr+CTx6Z0dboNtdKbV59pITypBhSA2KrR8nSP9UlNpvTDdSUbFGWvLb9YPmsnDw3Q+pL9y59ifofIYMqtfHeA0usGWOevvojabDeIW4T9YZbL/Q3R2/MAZxQWmExe8qFF70MgIKq3mT8ft1byUsiyyoH+T8cxS4WZzM4kU+TgQaNWjuXteWldYX7EWvevyeQKGpggN+b+N+pPDa7kYK0ysA0MB16/lhEluikLcE1yXWXCBfLC5KQQpdZZYJhKw1j7NKnzcW8S7I2hu1Qoj7GfZ7FeDPRpavyTCoOvbi1eqiXQeFfu2J9K1oj+bk1XUo2eFveaHGwhde+U/vq6QOuRTEWKnSPG0/aG8DaRwjn9n6zTd5L0t1qsrYBbI="
+      env: 
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
 
     - os: linux
-      compiler: gcc
       addons: &gcc7
         apt:
           sources: *all_sources
           packages: ['g++-7']
-      env: COMPILER='g++-7'
-
-    - os: linux
-      compiler: gcc
-      addons: *gcc6
-      env: COMPILER='g++-6' CPP14=1
-
-    - os: linux
-      compiler: gcc
-      addons: *gcc7
-      env: COMPILER='g++-7' CPP14=1
-
-install:
-  - cmake .
+        #sonarcloud
+        sonarcloud:
+          organization: "ironsdu-github"
+          token: 
+            secure: "VMoRHn3Ra2xAeirV/27uyJw4E1jeNZUJA8SiawZY3PLgov+cUQpBleZB8TK5miiEs7PLPX9ezk8nOF2r2M7r/cOs7jCV3Gqw6kc9xLDxI+GLEUgfofpdlG0zhqPKF7foPo7HSmYH4Zdtec93+NzhmMsTpSbiIeb2sP5ujKDK7eRRW3L3jGgMTbZWV4ppN1bwqgYQoL3gKkDbKDiELOUa/00KCBb+J6ME0ZydS81m/T09+Wct78KQ8QNXbrVCUiVyKBiTbDYJROeWdwYAd3OXKnJdyop7W+UgU0BHlYwXXZLv8Kpjanr+CTx6Z0dboNtdKbV59pITypBhSA2KrR8nSP9UlNpvTDdSUbFGWvLb9YPmsnDw3Q+pL9y59ifofIYMqtfHeA0usGWOevvojabDeIW4T9YZbL/Q3R2/MAZxQWmExe8qFF70MgIKq3mT8ft1byUsiyyoH+T8cxS4WZzM4kU+TgQaNWjuXteWldYX7EWvevyeQKGpggN+b+N+pPDa7kYK0ysA0MB16/lhEluikLcE1yXWXCBfLC5KQQpdZZYJhKw1j7NKnzcW8S7I2hu1Qoj7GfZ7FeDPRpavyTCoOvbi1eqiXQeFfu2J9K1oj+bk1XUo2eFveaHGwhde+U/vq6QOuRTEWKnSPG0/aG8DaRwjn9n6zTd5L0t1qsrYBbI="
+      env: 
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
 
 before_script:
-  - export CXX=${COMPILER}
-
+   - eval "${MATRIX_EVAL}"
+   - env
+   - export CC_FOR_BUILD=$CC
+   - export CXX_FOR_BUILD=$CXX
 script:
-  - make
-  - cd tests
-  - ctest -V
+  - cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
+  # make
+  - build-wrapper-linux-x86-64 --out-dir bw-output make
+  - sonar-scanner -X
+  - cd tests && ctest -V

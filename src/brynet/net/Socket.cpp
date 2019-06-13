@@ -2,11 +2,27 @@
 
 namespace brynet { namespace net {
 
+    UniqueFd::UniqueFd(sock fd)
+        :
+        mFD(fd)
+    {
+    }
+
+    UniqueFd::~UniqueFd()
+    {
+        base::SocketClose(mFD);
+    }
+
+    sock UniqueFd::getFD() const
+    {
+        return mFD;
+    }
+
     TcpSocket::Ptr TcpSocket::Create(
         sock fd,
         bool serverSide)
     {
-        struct make_unique_enabler : public TcpSocket
+        class make_unique_enabler : public TcpSocket
         {
         public:
             make_unique_enabler(sock fd, bool serverSide)
@@ -85,10 +101,10 @@ namespace brynet { namespace net {
 
     ListenSocket::Ptr ListenSocket::Create(sock fd)
     {
-        struct make_unique_enabler : public ListenSocket
+        class make_unique_enabler : public ListenSocket
         {
         public:
-            make_unique_enabler(sock fd) : ListenSocket(fd) {}
+            explicit make_unique_enabler(sock fd) : ListenSocket(fd) {}
         };
 
         return Ptr(new make_unique_enabler(fd));

@@ -1,85 +1,175 @@
 ﻿#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
-#include <brynet/net/SyncConnector.h>
+#include <brynet/net/Wrapper.h>
 #include <brynet/net/ListenThread.h>
 
 TEST_CASE("SyncConnector are computed", "[sync_connect]") {
     
     using namespace brynet::net;
 
-    const std::string ip = "127.0.0.7";
+    const std::string ip = "127.0.0.1";
     const auto port = 9999;
 
+    // 监听服务未开启
     {
-        // 监听服务未开启
-        auto socket = brynet::net::SyncConnectSocket({
-                AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2))});
-        REQUIRE(socket == nullptr);
+        {
+            auto connector = AsyncConnector::Create();
+            connector->startWorkerThread();
+            wrapper::SocketConnectBuilder connectBuilder;
+            auto socket = connectBuilder
+                .configureConnector(connector)
+                .configureConnectOptions({
+                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                    })
+                .syncConnect();
 
-        auto session = brynet::net::SyncConnectSession(nullptr,
+            REQUIRE(socket == nullptr);
+        }
+
+        {
+            auto connector = AsyncConnector::Create();
+            connector->startWorkerThread();
+            auto service = TcpService::Create();
+            service->startWorkerThread(1);
+
+            wrapper::ConnectionBuilder connectionBuilder;
+            auto session = connectionBuilder
+                .configureService(service)
+                .configureConnector(connector)
+                .configureConnectOptions({
+                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                })
+                .syncConnect();
+
+            REQUIRE(session == nullptr);
+        }
+    }
+
+    // 使用ListenerBuilder开启监听
+    {
+        auto service = TcpService::Create();
+        service->startWorkerThread(1);
+        wrapper::ListenerBuilder listenerBuilder;
+        listenerBuilder.configureService(service)
+            .configureConnectionOptions({
+                TcpService::AddSocketOption::WithMaxRecvBufferSize(10)
+            })
+            .configureSocketOptions({})
+            .configureListen([=](wrapper::BuildListenConfig config) {
+                config.setAddr(false, ip, port);
+            })
+            .asyncRun();
+
             {
-                AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2))
-            }, 
-            {});
-        REQUIRE(session == nullptr);
+                auto connector = AsyncConnector::Create();
+                connector->startWorkerThread();
+                wrapper::SocketConnectBuilder connectBuilder;
+                auto socket = connectBuilder
+                    .configureConnector(connector)
+                    .configureConnectOptions({
+                        AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                        AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                        })
+                    .syncConnect();
+
+                REQUIRE(socket != nullptr);
+            }
     }
 
     {
+        auto connector = AsyncConnector::Create();
+        connector->startWorkerThread();
+        wrapper::SocketConnectBuilder connectBuilder;
+        auto socket = connectBuilder
+            .configureConnector(connector)
+            .configureConnectOptions({
+                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                })
+            .syncConnect();
+
+        REQUIRE(socket == nullptr);
+    }
+
+    // 开启监听服务
+    {
         auto listenThread = brynet::net::ListenThread::Create(false, 
-            "127.0.0.7", 
+            ip, 
             port, 
             [](brynet::net::TcpSocket::Ptr) {
             });
         listenThread->startListen();
 
-        auto socket = brynet::net::SyncConnectSocket({
-                AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)) });
-        REQUIRE(socket != nullptr);
-        
-        // 没有service
-        auto session = brynet::net::SyncConnectSession(nullptr,
-            {
-                AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2))
-            },
-            {});
-        REQUIRE(session == nullptr);
-
         {
-            auto service = brynet::net::TcpService::Create();
+            auto connector = AsyncConnector::Create();
+            connector->startWorkerThread();
+            wrapper::SocketConnectBuilder connectBuilder;
+            auto socket = connectBuilder
+                .configureConnector(connector)
+                .configureConnectOptions({
+                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                })
+                .syncConnect();
+
+            REQUIRE(socket != nullptr);
+        }
+        
+        // Tcp Service 开启工作线程
+        {
+            auto connector = AsyncConnector::Create();
+            connector->startWorkerThread();
+            auto service = TcpService::Create();
             service->startWorkerThread(1);
-            session = brynet::net::SyncConnectSession(service,
-                {
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2))
-                },
-                {
-                    TcpService::AddSocketOption::WithMaxRecvBufferSize(1),
-                });
+
+            wrapper::ConnectionBuilder connectionBuilder;
+            auto session = connectionBuilder
+                .configureService(service)
+                .configureConnector(connector)
+                .configureConnectOptions({
+                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                })
+                .syncConnect();
+
             REQUIRE(session != nullptr);
         }
 
+        // Tcp Service 没开启工作线程
         {
-            // 没有开启service工作线程
-            auto service = brynet::net::TcpService::Create();
-            session = brynet::net::SyncConnectSession(service,
-                {
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2))
-                },
-                {
-                    TcpService::AddSocketOption::WithMaxRecvBufferSize(1),
-                });
+            auto connector = AsyncConnector::Create();
+            connector->startWorkerThread();
+            auto service = TcpService::Create();
+
+            wrapper::ConnectionBuilder connectionBuilder;
+            auto session = connectionBuilder
+                .configureService(service)
+                .configureConnector(connector)
+                .configureConnectOptions({
+                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                })
+                .syncConnect();
+
             REQUIRE(session == nullptr);
         }
     }
 
     // 上个语句块的监听线程结束
-    auto socket = brynet::net::SyncConnectSocket({
-                AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)) });
-    REQUIRE(socket == nullptr);
+    {
+        auto connector = AsyncConnector::Create();
+        connector->startWorkerThread();
+        wrapper::SocketConnectBuilder connectBuilder;
+        auto socket = connectBuilder
+            .configureConnector(connector)
+            .configureConnectOptions({
+                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
+                AsyncConnector::ConnectOptions::WithAddr(ip, port)
+            })
+            .syncConnect();
+
+        REQUIRE(socket == nullptr);
+    }
 }

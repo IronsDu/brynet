@@ -21,7 +21,7 @@ namespace brynet { namespace net {
 
     class ConnectorWorkInfo;
 
-    class AsyncConnector : utils::NonCopyable, public std::enable_shared_from_this<AsyncConnector>
+    class AsyncConnector : public utils::NonCopyable, public std::enable_shared_from_this<AsyncConnector>
     {
     public:
         using Ptr = std::shared_ptr<AsyncConnector>;
@@ -32,15 +32,15 @@ namespace brynet { namespace net {
         class ConnectOptions
         {
         public:
-            struct Options;
+            class Options;
 
             using ConnectOptionFunc = std::function<void(Options& option)>;
 
             static ConnectOptionFunc WithAddr(const std::string& ip, int port);
             static ConnectOptionFunc WithTimeout(std::chrono::nanoseconds timeout);
-            static ConnectOptionFunc WithCompletedCallback(CompletedCallback callback);
-            static ConnectOptionFunc AddProcessTcpSocketCallback(ProcessTcpSocketCallback process);
-            static ConnectOptionFunc WithFailedCallback(FailedCallback callback);
+            static ConnectOptionFunc WithCompletedCallback(CompletedCallback&& callback);
+            static ConnectOptionFunc AddProcessTcpSocketCallback(ProcessTcpSocketCallback&& process);
+            static ConnectOptionFunc WithFailedCallback(FailedCallback&& callback);
 
             static std::chrono::nanoseconds ExtractTimeout(const std::vector<ConnectOptions::ConnectOptionFunc>& options);
         };

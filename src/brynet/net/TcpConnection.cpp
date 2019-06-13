@@ -11,7 +11,7 @@ namespace brynet { namespace net {
 
     TcpConnection::TcpConnection(TcpSocket::Ptr socket,
         size_t maxRecvBufferSize,
-        EnterCallback enterCallback,
+        EnterCallback&& enterCallback,
         EventLoop::Ptr eventLoop) BRYNET_NOEXCEPT
         :
 #if defined PLATFORM_WINDOWS
@@ -23,7 +23,8 @@ namespace brynet { namespace net {
         mSocket(std::move(socket)),
         mEventLoop(std::move(eventLoop)),
         mAlreadyClose(false),
-        mMaxRecvBufferSize(maxRecvBufferSize)
+        mMaxRecvBufferSize(maxRecvBufferSize),
+        mEnterCallback(std::forward<EnterCallback>(enterCallback))
     {
         mRecvData = false;
         mCheckTime = std::chrono::steady_clock::duration::zero();
@@ -42,7 +43,6 @@ namespace brynet { namespace net {
         mSSL = nullptr;
         mIsHandsharked = false;
 #endif
-        mEnterCallback = std::move(enterCallback);
     }
 
     TcpConnection::~TcpConnection() BRYNET_NOEXCEPT
@@ -60,9 +60,6 @@ namespace brynet { namespace net {
         }
 #endif
 
-        // 如果构造TcpConnection发生异常则mSocket也可能为nullptr
-        assert(mSocket != nullptr);
-
         if (mTimer.lock())
         {
             mTimer.lock()->cancel();
@@ -71,23 +68,24 @@ namespace brynet { namespace net {
 
     TcpConnection::Ptr TcpConnection::Create(TcpSocket::Ptr socket,
         size_t maxRecvBufferSize,
-        EnterCallback enterCallback,
+        EnterCallback&& enterCallback,
         EventLoop::Ptr eventLoop)
     {
-        struct make_shared_enabler : public TcpConnection
+        class make_shared_enabler : public TcpConnection
         {
+        public:
             make_shared_enabler(TcpSocket::Ptr socket,
                 size_t maxRecvBufferSize,
-                EnterCallback enterCallback,
+                EnterCallback&& enterCallback,
                 EventLoop::Ptr eventLoop)
                 :
-                TcpConnection(std::move(socket), maxRecvBufferSize, std::move(enterCallback), std::move(eventLoop))
+                TcpConnection(std::move(socket), maxRecvBufferSize, std::forward<EnterCallback>(enterCallback), std::move(eventLoop))
             {}
         };
         return std::make_shared<make_shared_enabler>(
             std::move(socket),
             maxRecvBufferSize,
-            std::move(enterCallback),
+            std::forward<EnterCallback>(enterCallback),
             std::move(eventLoop));
     }
 
@@ -106,6 +104,7 @@ namespace brynet { namespace net {
         }
 
         const auto findRet = mEventLoop->getTcpConnection(mSocket->getFD());
+        (void)findRet;
         assert(findRet == nullptr);
 
 #ifdef USE_OPENSSL
@@ -133,32 +132,9 @@ namespace brynet { namespace net {
         return mEventLoop;
     }
 
-    void TcpConnection::send(const char* buffer, size_t len, const PacketSendedCallback& callback)
+    void TcpConnection::send(const char* buffer, size_t len, PacketSendedCallback&& callback)
     {
-        send(makePacket(buffer, len), callback);
-    }
-
-    void TcpConnection::send(const PacketPtr& packet, const PacketSendedCallback& callback)
-    {
-        auto packetCapture = packet;
-        auto callbackCapture = callback;
-        auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
-            const auto len = packetCapture->size();
-            sharedThis->mSendList.push_back({ std::move(packetCapture), len, std::move(callbackCapture) });
-            sharedThis->runAfterFlush();
-        });
-    }
-
-    void TcpConnection::sendInLoop(const PacketPtr& packet, const PacketSendedCallback& callback)
-    {
-        assert(mEventLoop->isInLoopThread());
-        if (mEventLoop->isInLoopThread())
-        {
-            const auto len = packet->size();
-            mSendList.push_back({ packet, len, callback });
-            runAfterFlush();
-        }
+        send(makePacket(buffer, len), std::forward<PacketSendedCallback>(callback));
     }
 
     void TcpConnection::canRecv()
@@ -176,12 +152,11 @@ namespace brynet { namespace net {
 #endif
 
 #ifdef USE_OPENSSL
-        if (!mIsHandsharked && mSSL != nullptr)
+        if (mSSL != nullptr
+            && !mIsHandsharked
+            && (!processSSLHandshake() || !mIsHandsharked))
         {
-            if (!processSSLHandshake() || !mIsHandsharked)
-            {
-                return;
-            }
+            return;
         }
 #endif
 
@@ -206,12 +181,11 @@ namespace brynet { namespace net {
         mCanWrite = true;
 
 #ifdef USE_OPENSSL
-        if (!mIsHandsharked && mSSL != nullptr)
+        if (mSSL != nullptr
+            && !mIsHandsharked
+            && (!processSSLHandshake() || !mIsHandsharked))
         {
-            if (!processSSLHandshake() || !mIsHandsharked)
-            {
-                return;
-            }
+            return;
         }
 #endif
 
@@ -478,11 +452,11 @@ namespace brynet { namespace net {
         }
     }
 
+#ifdef PLATFORM_LINUX
     void TcpConnection::quickFlush()
     {
-#ifdef PLATFORM_LINUX
 #ifndef MAX_IOVEC
-#define  MAX_IOVEC 1024
+        constexpr size_t MAX_IOVEC = 1024;
 #endif
 
         struct iovec iov[MAX_IOVEC];
@@ -490,7 +464,7 @@ namespace brynet { namespace net {
 
         while (!mSendList.empty() && mCanWrite)
         {
-            int num = 0;
+            size_t num = 0;
             size_t ready_send_len = 0;
             for (const auto& p : mSendList)
             {
@@ -510,7 +484,7 @@ namespace brynet { namespace net {
                 break;
             }
 
-            const int send_len = writev(mSocket->getFD(), iov, num);
+            const int send_len = writev(mSocket->getFD(), iov, static_cast<int>(num));
             if (send_len <= 0)
             {
                 if (sErrno == S_EWOULDBLOCK)
@@ -555,8 +529,8 @@ namespace brynet { namespace net {
         {
             procCloseInLoop();
         }
-#endif
     }
+#endif
 
     void TcpConnection::procCloseInLoop()
     {
@@ -616,24 +590,27 @@ namespace brynet { namespace net {
         auto callBack = mDisConnectCallback;
         auto sharedThis = shared_from_this();
         auto eventLoop = mEventLoop;
-        auto fd = mSocket->getFD();
+        std::shared_ptr<TcpSocket> socket = std::move(const_cast<TcpSocket::Ptr&&>(mSocket));
         mEventLoop->runFunctorAfterLoop([callBack,
             sharedThis,
             eventLoop,
-            fd]() {
+            socket]() {
             if (callBack != nullptr)
             {
                 callBack(sharedThis);
             }
-            auto tmp = eventLoop->getTcpConnection(fd);
+            auto tmp = eventLoop->getTcpConnection(socket->getFD());
             assert(tmp == sharedThis);
             if (tmp == sharedThis)
             {
-                eventLoop->removeTcpConnection(fd);
+                eventLoop->removeTcpConnection(socket->getFD());
             }
         });
+
+        mCanWrite = false;
         mDisConnectCallback = nullptr;
         mDataCallback = nullptr;
+        mRecvBuffer = nullptr;
     }
 
     bool TcpConnection::checkRead()
@@ -707,7 +684,7 @@ namespace brynet { namespace net {
     }
 #endif
 
-    void TcpConnection::setDataCallback(DataCallback cb)
+    void TcpConnection::setDataCallback(DataCallback&& cb)
     {
         auto sharedThis = shared_from_this();
         mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
@@ -715,7 +692,7 @@ namespace brynet { namespace net {
         });
     }
 
-    void TcpConnection::setDisConnectCallback(DisconnectedCallback cb)
+    void TcpConnection::setDisConnectCallback(DisconnectedCallback&& cb)
     {
         auto sharedThis = shared_from_this();
         mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {

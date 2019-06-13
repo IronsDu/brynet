@@ -139,10 +139,12 @@ namespace brynet { namespace net { namespace http {
 
     int HTTPParser::sChunkHeader(http_parser* hp)
     {
+        (void)hp;
         return 0;
     }
     int HTTPParser::sChunkComplete(http_parser* hp)
     {
+        (void)hp;
         return 0;
     }
     int HTTPParser::sMessageBegin(http_parser* hp)
@@ -190,7 +192,7 @@ namespace brynet { namespace net { namespace http {
         }
 
         httpParser->mPath = std::string(httpParser->mUrl.data() + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
-        if ((u.field_set & (1 << UF_QUERY)))
+        if (u.field_set & (1 << UF_QUERY))
         {
             httpParser->mQuery = std::string(httpParser->mUrl.data() + u.field_data[UF_QUERY].off, u.field_data[UF_QUERY].len);
         }
