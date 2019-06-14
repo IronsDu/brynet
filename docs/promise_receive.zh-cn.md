@@ -25,36 +25,44 @@
 
 ## 示例
 ```C++
-auto service = std::make_shared<WrapTcpService>();
-// use blocking connect for test
-auto fd = ox_socket_connect(false, ip, port);
-
-service->addSession(fd,
-    [](const TCPSession::PTR& session) {
-        session->setUD(1);
-
-        session->setCloseCallback([](const TCPSession::PTR& session) {
-            auto ud = brynet::net::cast<int64_t>(session->getUD());
-            std::cout << "close by" << *ud << std::endl;
-        });
-
+auto enterCallback = [](const TcpConnection::Ptr& session) {
         auto promiseReceive = setupPromiseReceive(session);
-        promiseReceive->receiveUntil("\r\n", [](const char* buffer, size_t len) {
-            std::cout << std::string(buffer, len);
-            return false;
-        })->receiveUntil("\r\n", [promiseReceive](const char* buffer, size_t len) {
-            std::cout << std::string(buffer, len);
-            return false;
-        })->receive(10, [](const char* buffer, size_t len) {
-            return false;
-        });
-    },
-    false,
-    nullptr,
-    1024,
-    false);
+        auto contentLength = std::make_shared<size_t>();
 
-std::this_thread::sleep_for(2s);
+        promiseReceive
+            ->receiveUntil("\r\n", [](const char* buffer, size_t len) {
+                auto headline = std::string(buffer, len);
+                std::cout << headline << std::endl;
+                return false;
+            })
+            ->receiveUntil("\r\n", [promiseReceive, contentLength](const char* buffer, size_t len) {
+                auto headerValue = std::string(buffer, len);
+                std::cout << headerValue << std::endl;
+                if (len > 2)
+                {
+                    const static std::string ContentLenghtFlag = "Content-Length: ";
+                    auto pos = headerValue.find(ContentLenghtFlag);
+                    if (pos != std::string::npos)
+                    {
+                        auto lenStr = headerValue.substr(pos + ContentLenghtFlag.size(), headerValue.size());
+                        *contentLength = std::stoi(lenStr);
+                    }
+                    return true;
+                }
+                return false;
+            })->receive(contentLength, [session](const char* buffer, size_t len) {
+                HttpResponse response;
+                response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
+                response.setContentType("text/html; charset=utf-8");
+                response.setBody("<html>hello world </html>");
+
+                auto result = response.getResult();
+                session->send(result.c_str(), result.size());
+                session->postShutdown();
+
+                return false;
+            });
+    };
 ```
 
 # 注意事项

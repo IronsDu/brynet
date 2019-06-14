@@ -3,32 +3,33 @@
 
 # 接口
 
-- `TcpSocket::Create`
+- `TcpSocket::Create(sock fd, bool serverSide)`
     
 
-    必须(只能)使用此静态方法创建`TcpSocket::PTR`智能指针对象,用于后续工作.
+    必须(只能)使用此静态方法创建`TcpSocket::PTR`智能指针对象,用于后续工作.`serverSide`表示是否服务端socket，如果是accept返回的fd，那么`serverSide`则为true，
+    如果是`connect`返回的fd，则为false。
 
 - `TcpSocket::isServerSide(void)`
     
-    检测`socket`是否为服务端server（即为accept返回的），如果为false，则表示是客户端socket。
+    检测`socket`是否为服务端server（即为accept返回的），如果为false，则表示是客户端socket（即为connect返回的fd)。
 
-- `TcpSocket::SocketNodelay(void)`
+- `TcpSocket::setNodelay(void)`
 
     设置`TCP_NODELAY`
 
-- `TcpSocket::SocketNonblock(void)`
+- `TcpSocket::setNonblock(void)`
 
     设置非阻塞
 
-- `TcpSocket::SetSendSize(int size)`
+- `TcpSocket::setSendSize(int size)`
 
     设置`SO_SNDBUF`发送缓冲区大小(通常不建议修改)
 
-- `TcpSocket::SetRecvSize(int size)`
+- `TcpSocket::setRecvSize(int size)`
 
     设置`SO_RCVBUF`发送缓冲区大小(通常不建议修改)
 
-- `TcpSocket::GetIP(void)`
+- `TcpSocket::getRemoteIP(void)`
 
     获取socket的远端IP地址
 

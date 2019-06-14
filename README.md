@@ -1,8 +1,14 @@
 Brynet
 =======
-Cross platform high performance TCP network library using C++ 11.[![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)[![LICENSE](https://img.shields.io/badge/license-NPL%20(The%20996%20Prohibited%20License)-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
+Cross platform high performance TCP network library using C++ 11.
 
-Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umbwwdb01k/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/brynet/branch/master) Linux : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet)
+[![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
+[![LICENSE](https://img.shields.io/badge/license-NPL%20(The%20996%20Prohibited%20License)-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
+[![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=brynet&metric=alert_status)](https://sonarcloud.io/dashboard/index/brynet)
+
+## Build status
+Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umbwwdb01k/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/brynet/branch/master) 
+Linux : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet)
 
 ## Features
 * Cross platform (Linux | Windows)
@@ -22,7 +28,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umb
 * Not Support Mac OS X
 
 ## Build
-1. `cmake .`
+1. `cmake .` (if you want run example, you can execute `cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON`)
 2. If you use Windows, please open brynet.sln then build. If on Linux, only enter `make`.
 
 ## Usages
@@ -99,5 +105,6 @@ Users
 * [ARK - distributed plugin framework](https://github.com/ArkNX/ARK)
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [gayrpc](https://github.com/IronsDu/gayrpc)
+* [gaylord - distributed virtual actor framework](https://github.com/IronsDu/gaylord)
 * [Joynet - Lua network library](https://github.com/IronsDu/Joynet)
 * [grpc-gateway](https://github.com/IronsDu/grpc-gateway)
