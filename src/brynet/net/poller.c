@@ -5,14 +5,14 @@
 
 #include <brynet/net/poller.h>
 
-#if defined PLATFORM_LINUX
+#ifdef PLATFORM_WINDOWS
+#define CHECK_READ_FLAG (POLLIN | POLLRDNORM | POLLRDBAND)
+#define CHECK_WRITE_FLAG (POLLOUT | POLLWRNORM)
+#define CHECK_ERROR_FLAG (POLLERR | POLLHUP)
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
 #include <poll.h>
 #define CHECK_READ_FLAG (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)
 #define CHECK_WRITE_FLAG (POLLOUT | POLLWRNORM | POLLWRBAND)
-#define CHECK_ERROR_FLAG (POLLERR | POLLHUP)
-#else
-#define CHECK_READ_FLAG (POLLIN | POLLRDNORM | POLLRDBAND)
-#define CHECK_WRITE_FLAG (POLLOUT | POLLWRNORM)
 #define CHECK_ERROR_FLAG (POLLERR | POLLHUP)
 #endif
 
@@ -232,9 +232,9 @@ ox_poller_visitor(struct poller_s* self, enum CheckType type, struct stack_s* re
 int 
 ox_poller_poll(struct poller_s* self, long overtime)
 {
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
     int ret = WSAPoll(&self->pollFds[0], self->nfds, overtime);
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
     int ret = poll(self->pollFds, self->nfds, overtime);
 #endif
 

@@ -14,7 +14,7 @@ namespace brynet { namespace net {
         EnterCallback&& enterCallback,
         EventLoop::Ptr eventLoop) BRYNET_NOEXCEPT
         :
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         mOvlRecv(port::Win::OverlappedType::OverlappedRecv),
         mOvlSend(port::Win::OverlappedType::OverlappedSend),
         mPostClose(false),
@@ -175,7 +175,7 @@ namespace brynet { namespace net {
             }
             return;
         }
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         removeCheckWrite();
 #endif
         mCanWrite = true;
@@ -311,7 +311,7 @@ namespace brynet { namespace net {
     {
 #ifdef PLATFORM_WINDOWS
         normalFlush();
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
 #ifdef USE_OPENSSL
         if (mSSL != nullptr)
         {
@@ -329,7 +329,7 @@ namespace brynet { namespace net {
 
 #ifdef PLATFORM_WINDOWS
     __declspec(thread) char* threadLocalSendBuf = nullptr;
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
     __thread char* threadLocalSendBuf = nullptr;
 #endif
 
@@ -452,7 +452,7 @@ namespace brynet { namespace net {
         }
     }
 
-#ifdef PLATFORM_LINUX
+#if defined PLATFORM_LINUX || defined PLATFORM_DARWIN
     void TcpConnection::quickFlush()
     {
 #ifndef MAX_IOVEC
@@ -557,9 +557,20 @@ namespace brynet { namespace net {
         {
             onClose();
         }
-#else
+#elif defined PLATFORM_LINUX
         struct epoll_event ev = { 0, { nullptr } };
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
+        onClose();
+#elif defined PLATFORM_DARWIN
+        struct kevent ev[2];
+        memset(&ev, 0, sizeof(ev));
+        int n = 0;
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_DELETE, 0, 0, NULL);
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+
+        struct timespec now = { 0, 0 };
+        kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
+
         onClose();
 #endif
     }
@@ -572,7 +583,7 @@ namespace brynet { namespace net {
         {
 #ifdef PLATFORM_WINDOWS
             shutdown(mSocket->getFD(), SD_SEND);
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
             shutdown(mSocket->getFD(), SHUT_WR);
 #endif
         }
@@ -664,11 +675,20 @@ namespace brynet { namespace net {
         {
             mPostWriteCheck = true;
         }
-#else
+#elif defined PLATFORM_LINUX
         struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
+#elif defined PLATFORM_DARWIN
+        struct kevent ev[2];
+        memset(&ev, 0, sizeof(ev));
+        int n = 0;
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_ENABLE, 0, 0, (Channel *)(this));
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_ENABLE, 0, 0, (Channel *)(this));
+
+        struct timespec now = { 0, 0 };
+        kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
 #endif
 
         return check_ret;
@@ -681,6 +701,16 @@ namespace brynet { namespace net {
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
+    }
+#elif defined PLATFORM_DARWIN
+    void TcpConnection::removeCheckWrite()
+    {
+        struct kevent ev;
+        memset(&ev, 0, sizeof(ev));
+        EV_SET(&ev, mSocket->getFD(), EVFILT_WRITE, EV_DISABLE, 0, 0, (Channel *)(this));
+
+        struct timespec now = { 0, 0 };
+        kevent(mEventLoop->getKqueueHandle(), &ev, 1, NULL, 0, &now);
     }
 #endif
 

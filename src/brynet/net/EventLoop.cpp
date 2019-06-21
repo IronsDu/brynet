@@ -42,7 +42,7 @@ namespace brynet { namespace net {
         HANDLE                      mIOCP;
         port::Win::OverlappedExt    mWakeupOvl;
     };
-#else
+#elif defined PLATFORM_LINUX
     class WakeupChannel final : public Channel, public utils::NonCopyable
     {
     public:
@@ -81,17 +81,52 @@ namespace brynet { namespace net {
     private:
         UniqueFd    mUniqueFd;
     };
+
+#elif defined PLATFORM_DARWIN
+    class WakeupChannel final : public Channel, public utils::NonCopyable
+    {
+    public:
+        explicit WakeupChannel(int kqueuefd, int ident) : mKqueueFd(kqueuefd), mUserEvent(ident)
+        {
+        }
+
+        bool wakeup()
+        {
+            struct kevent ev;
+            EV_SET(&ev, mUserEvent, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
+
+            struct timespec timeout = {0, 0};
+            return kevent(mKqueueFd, &ev, 1, NULL, 0, &timeout) == 0;
+        }
+
+    private:
+        void canRecv() override
+        {
+        }
+
+        void canSend() override
+        {
+        }
+
+        void onClose() override
+        {
+        }
+
+    private:
+        int    mKqueueFd;
+        int    mUserEvent;
+    };
 #endif
     EventLoop::EventLoop()
-#ifdef PLATFORM_WINDOWS
         BRYNET_NOEXCEPT
-        : 
+        :
+#ifdef PLATFORM_WINDOWS
     mIOCP(CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 1)), 
     mWakeupChannel(std::make_unique<WakeupChannel>(mIOCP))
-#else
-    BRYNET_NOEXCEPT
-        :
+#elif defined PLATFORM_LINUX
     mEpollFd(epoll_create(1))
+#elif defined PLATFORM_DARWIN
+    mKqueueFd(kqueue())
 #endif
     {
 #ifdef PLATFORM_WINDOWS
@@ -103,10 +138,13 @@ namespace brynet { namespace net {
                 "GetQueuedCompletionStatusEx"));
             FreeLibrary(kernel32_module);
         }
-#else
+#elif defined PLATFORM_LINUX
         auto eventfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
         mWakeupChannel.reset(new WakeupChannel(eventfd));
         linkChannel(eventfd, mWakeupChannel.get());
+#elif defined PLATFORM_DARWIN
+        const int NOTIFY_IDENT = 42; // Magic number we use for our filter ID.
+        mWakeupChannel.reset(new WakeupChannel(mKqueueFd, NOTIFY_IDENT));
 #endif
 
         mIsAlreadyPostWakeup = false;
@@ -123,9 +161,12 @@ namespace brynet { namespace net {
 #ifdef PLATFORM_WINDOWS
         CloseHandle(mIOCP);
         mIOCP = INVALID_HANDLE_VALUE;
-#else
+#elif defined PLATFORM_LINUX
         close(mEpollFd);
         mEpollFd = -1;
+#elif defined PLATFORM_DARWIN
+        close(mKqueueFd);
+        mKqueueFd = -1;
 #endif
     }
 
@@ -228,7 +269,7 @@ namespace brynet { namespace net {
                 assert(false);
             }
         }
-#else
+#elif defined PLATFORM_LINUX
         int numComplete = epoll_wait(mEpollFd, mEventEntries.data(), mEventEntries.size(), milliseconds);
 
         mIsInBlock = false;
@@ -251,6 +292,32 @@ namespace brynet { namespace net {
             }
 
             if (event_data & EPOLLOUT)
+            {
+                channel->canSend();
+            }
+        }
+#elif defined PLATFORM_DARWIN
+        struct timespec timeout = { milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000 };
+        int numComplete = kevent(mKqueueFd, NULL, 0, mEventEntries.data(), mEventEntries.size(), &timeout);
+
+        mIsInBlock = false;
+
+        for (int i = 0; i < numComplete; ++i)
+        {
+            auto channel = (Channel *)(mEventEntries[i].udata);
+            const struct kevent &event = mEventEntries[i];
+
+            if (event.filter == EVFILT_USER)
+            {
+                continue;
+            }
+
+            if (event.filter == EVFILT_READ)
+            {
+                channel->canRecv();
+            }
+
+            if (event.filter == EVFILT_WRITE)
             {
                 channel->canSend();
             }
@@ -280,7 +347,7 @@ namespace brynet { namespace net {
 #endif
         if (!isInLoopThread())
         {
-            throw BrynetCommonException("only loop in io thread");
+            throw BrynetCommonException("only loop in IO thread");
         }
 
         if (!mTimer->isEmpty())
@@ -334,11 +401,18 @@ namespace brynet { namespace net {
     {
 #ifdef PLATFORM_WINDOWS
         return CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0) != nullptr;
-#else
+#elif defined PLATFORM_LINUX
         struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (void*)ptr;
         return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;
+#elif defined PLATFORM_DARWIN
+        struct kevent ev;
+        memset(&ev, 0, sizeof(ev));
+        EV_SET(&ev, fd, EVFILT_READ, EV_ADD | EV_ENABLE, NOTE_TRIGGER, 0, (void *)ptr);
+
+        struct timespec now = { 0, 0 };
+        return kevent(mKqueueFd, &ev, 1, NULL, 0, &now) == 0;
 #endif
     }
 
@@ -392,10 +466,15 @@ namespace brynet { namespace net {
         mAfterLoopFunctors.emplace_back(std::forward<UserFunctor>(f));
     }
 
-#ifndef PLATFORM_WINDOWS
+#ifdef PLATFORM_LINUX
     int EventLoop::getEpollHandle() const
     {
         return mEpollFd;
+    }
+#elif defined PLATFORM_DARWIN
+    int EventLoop::getKqueueHandle() const
+    {
+        return mKqueueFd;
     }
 #endif
 
