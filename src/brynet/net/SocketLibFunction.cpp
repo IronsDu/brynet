@@ -8,7 +8,7 @@ namespace brynet { namespace net { namespace base {
     bool InitSocket(void)
     {
         bool ret = true;
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         static WSADATA g_WSAData;
         static bool WinSockIsInit = false;
         if (WinSockIsInit)
@@ -23,7 +23,7 @@ namespace brynet { namespace net { namespace base {
         {
             ret = false;
         }
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         signal(SIGPIPE, SIG_IGN);
 #endif
 
@@ -32,7 +32,7 @@ namespace brynet { namespace net { namespace base {
 
     void DestroySocket(void)
     {
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         WSACleanup();
 #endif
     }
@@ -47,9 +47,9 @@ namespace brynet { namespace net { namespace base {
     {
         int err;
         unsigned long ul = false;
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         err = ioctlsocket(fd, FIONBIO, &ul);
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         err = ioctl(fd, FIONBIO, &ul);
 #endif
 
@@ -60,9 +60,9 @@ namespace brynet { namespace net { namespace base {
     {
         int err;
         unsigned long ul = true;
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         err = ioctlsocket(fd, FIONBIO, &ul);
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         err = ioctl(fd, FIONBIO, &ul);
 #endif
 
@@ -194,9 +194,9 @@ namespace brynet { namespace net { namespace base {
 
     void SocketClose(sock fd)
     {
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         closesocket(fd);
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         close(fd);
 #endif
     }
@@ -223,14 +223,14 @@ namespace brynet { namespace net { namespace base {
 
     std::string GetIPOfSocket(sock fd)
     {
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         struct sockaddr name = { 0 };
         int namelen = sizeof(name);
         if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
         {
             return getIPString(&name);
         }
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         struct sockaddr_in name;
         socklen_t namelen = sizeof(name);
         if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
@@ -303,10 +303,10 @@ namespace brynet { namespace net { namespace base {
         }
         else if (localaddr.sin6_family == AF_INET6)
         {
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
             return localaddr.sin6_port == peeraddr.sin6_port
                 && memcmp(&localaddr.sin6_addr.u.Byte, &peeraddr.sin6_addr.u.Byte, sizeof localaddr.sin6_addr.u.Byte) == 0;
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
             return localaddr.sin6_port == peeraddr.sin6_port
                 && memcmp(&localaddr.sin6_addr.s6_addr, &peeraddr.sin6_addr.s6_addr, sizeof localaddr.sin6_addr.s6_addr) == 0;
 #endif

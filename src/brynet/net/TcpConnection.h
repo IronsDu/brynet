@@ -105,7 +105,7 @@ namespace brynet { namespace net {
         void                            recv();
         void                            flush();
         void                            normalFlush();
-#ifdef PLATFORM_LINUX
+#if defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         void                            quickFlush();
 #endif
 
@@ -114,7 +114,7 @@ namespace brynet { namespace net {
         void                            procShutdownInLoop();
 
         void                            runAfterFlush();
-#ifdef PLATFORM_LINUX
+#if defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         void                            removeCheckWrite();
 #endif
 #ifdef USE_OPENSSL

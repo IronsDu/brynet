@@ -13,7 +13,7 @@
 #include <brynet/timer/Timer.h>
 #include <brynet/utils/NonCopyable.h>
 #include <brynet/net/Noexcept.h>
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
 #include <brynet/net/port/Win.h>
 #endif
 
@@ -56,8 +56,10 @@ namespace brynet { namespace net {
         void                            swapAsyncFunctors();
         void                            pushAsyncFunctor(UserFunctor&& f);
 
-#ifndef PLATFORM_WINDOWS
+#ifdef PLATFORM_LINUX
         int                             getEpollHandle() const;
+#elif defined PLATFORM_DARWIN
+        int                             getKqueueHandle() const;
 #endif
         bool                            linkChannel(sock fd, const Channel* ptr) BRYNET_NOEXCEPT;
         TcpConnectionPtr                getTcpConnection(sock fd);
@@ -73,9 +75,12 @@ namespace brynet { namespace net {
         typedef BOOL(WINAPI *sGetQueuedCompletionStatusEx) (HANDLE, LPOVERLAPPED_ENTRY, ULONG, PULONG, DWORD, BOOL);
         sGetQueuedCompletionStatusEx    mPGetQueuedCompletionStatusEx;
         HANDLE                          mIOCP;
-#else
+#elif defined PLATFORM_LINUX
         std::vector<epoll_event>        mEventEntries;
         int                             mEpollFd;
+#elif defined PLATFORM_DARWIN
+        std::vector<struct kevent>      mEventEntries;
+        int                             mKqueueFd;
 #endif
         std::unique_ptr<WakeupChannel>  mWakeupChannel;
 

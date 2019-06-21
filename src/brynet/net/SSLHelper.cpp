@@ -40,7 +40,7 @@ namespace brynet { namespace net {
     {
 #ifdef PLATFORM_WINDOWS
         CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(GetCurrentThreadId()));
-#else
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(pthread_self()));
 #endif
     }

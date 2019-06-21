@@ -8,8 +8,10 @@
 
 #include <brynet/net/SocketLibTypes.h>
 
-#ifndef PLATFORM_WINDOWS
+#ifdef PLATFORM_LINUX
 #include <endian.h>
+#elif defined PLATFORM_DARWIN
+#include <sys/_endian.h>
 #endif
 
 namespace brynet { namespace utils { namespace socketendian {
@@ -75,7 +77,7 @@ namespace brynet { namespace utils { namespace socketendian {
     {
         return convert ? ntohs(net16) : net16;
     }
-#else
+#elif defined PLATFORM_LINUX
     inline uint64_t hostToNetwork64(uint64_t host64, bool convert = true)
     {
         return convert ? htobe64(host64) : host64;
@@ -103,6 +105,35 @@ namespace brynet { namespace utils { namespace socketendian {
     inline uint16_t networkToHost16(uint16_t net16, bool convert = true)
     {
         return convert ? be16toh(net16) : net16;
+    }
+#elif defined PLATFORM_DARWIN
+    inline uint64_t hostToNetwork64(uint64_t host64, bool convert = true)
+    {
+        return convert ? hl64ton(host64) : host64;
+    }
+    inline uint32_t hostToNetwork32(uint32_t host32, bool convert = true)
+    {
+        return convert ? htonl(host32) : host32;
+    }
+
+    inline uint16_t hostToNetwork16(uint16_t host16, bool convert = true)
+    {
+        return convert ? htons(host16) : host16;
+    }
+
+    inline uint64_t networkToHost64(uint64_t net64, bool convert = true)
+    {
+        return convert ? ntohl64(net64) : net64;
+    }
+
+    inline uint32_t networkToHost32(uint32_t net32, bool convert = true)
+    {
+        return convert ? ntohl(net32) : net32;
+    }
+
+    inline uint16_t networkToHost16(uint16_t net16, bool convert = true)
+    {
+        return convert ? ntohs(net16) : net16;
     }
 #endif
 

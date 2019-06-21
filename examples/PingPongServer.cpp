@@ -59,7 +59,19 @@ int main(int argc, char **argv)
     while (true)
     {
         mainLoop.loop(1000);
-        std::cout << "total recv : " << (TotalRecvSize / 1024) / 1024 << " M /s, of client num:" << total_client_num << std::endl;
+        if (TotalRecvSize / 1024 == 0)
+        {
+            std::cout << "total recv : " << TotalRecvSize << " bytes/s, of client num:" << total_client_num << std::endl;
+        }
+        else if ((TotalRecvSize / 1024) / 1024 == 0)
+        {
+            std::cout << "total recv : " << TotalRecvSize / 1024 << " K/s, of client num:" << total_client_num << std::endl;
+        }
+        else
+        {
+            std::cout << "total recv : " << (TotalRecvSize / 1024) / 1024 << " M/s, of client num:" << total_client_num << std::endl;
+        }
+
         std::cout << "packet num:" << total_packet_num << std::endl;
         total_packet_num = 0;
         TotalRecvSize = 0;

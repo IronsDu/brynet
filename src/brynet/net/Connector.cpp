@@ -259,7 +259,7 @@ namespace brynet { namespace net {
         struct sockaddr_in server_addr = { 0 };
         sock clientfd = INVALID_SOCKET;
 
-#if defined PLATFORM_WINDOWS
+#ifdef PLATFORM_WINDOWS
         const int ExpectedError = WSAEWOULDBLOCK;
 #else
         const int ExpectedError = EINPROGRESS;

@@ -68,13 +68,14 @@ static void broadCastPacket(const TcpConnection::PacketPtr& packet)
 
 int main(int argc, char** argv)
 {
-    if (argc != 2)
+    if (argc != 3)
     {
-        fprintf(stderr, "Usage : <listen port> \n");
+        fprintf(stderr, "Usage : <listen port> <thread num> \n");
         exit(-1);
     }
 
     int port = atoi(argv[1]);
+    int threadnum = atoi(argv[2]);
     brynet::net::base::InitSocket();
 
     service = TcpService::Create();
@@ -138,7 +139,7 @@ int main(int argc, char** argv)
         });
 
     listenThread->startListen();
-    service->startWorkerThread(2);
+    service->startWorkerThread(threadnum);
 
     auto now = std::chrono::steady_clock::now();
     while (true)

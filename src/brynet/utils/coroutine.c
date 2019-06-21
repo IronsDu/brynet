@@ -1,4 +1,9 @@
 #include <brynet/utils/coroutine.h>
+
+#if defined(__APPLE_CC__) || defined(__APPLE__)
+#define _XOPEN_SOURCE
+#endif
+
 #ifndef _WIN32
 #include <stdio.h>
 #include <stdlib.h>

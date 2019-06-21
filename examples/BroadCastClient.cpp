@@ -129,7 +129,18 @@ int main(int argc, char** argv)
         clientEventLoop->loop(10);
         if ((std::chrono::steady_clock::now() - now) >= std::chrono::seconds(1))
         {
-            cout << "total recv:" << (TotalRecvSize / 1024) / 1024 << " M /s" << " , num " <<  TotalRecvPacketNum << endl;
+            if (TotalRecvSize / 1024 == 0)
+            {
+                std::cout << "total recv : " << TotalRecvSize << " bytes/s" << ", num " << TotalRecvPacketNum << endl;
+            }
+            else if ((TotalRecvSize / 1024) / 1024 == 0)
+            {
+                std::cout << "total recv : " << TotalRecvSize / 1024 << " K/s" << ", num " << TotalRecvPacketNum << endl;
+            }
+            else
+            {
+                std::cout << "total recv : " << (TotalRecvSize / 1024) / 1024 << " M/s" << ", num " << TotalRecvPacketNum << endl;
+            }
 
             now = std::chrono::steady_clock::now();
             TotalRecvSize = 0;
