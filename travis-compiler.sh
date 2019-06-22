@@ -4,5 +4,5 @@ if [ "$os_name" = GNU/Linux ]
 then
 	build-wrapper-linux-x86-64 --out-dir bw-output make
 else
-	wrapper-macosx-x86 --out-dir bw-output make
+	build-wrapper-macosx-x86 --out-dir bw-output make
 fi
