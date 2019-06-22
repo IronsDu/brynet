@@ -89,6 +89,6 @@ before_script:
 script:
   - cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
   # make
-  - build-wrapper-linux-x86-64 --out-dir bw-output make
+  - bash ./travis-compiler.sh
   - sonar-scanner -X
   - cd tests && ctest -V
