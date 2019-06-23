@@ -89,6 +89,6 @@ before_script:
 script:
   - cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
   # make
-  - bash ./travis-compiler.sh
+  - bash ./scripts/travis-compiler.sh
   - sonar-scanner -X
   - cd tests && ctest -V

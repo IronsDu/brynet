@@ -5,13 +5,14 @@ Cross platform high performance TCP network library using C++ 11.
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![LICENSE](https://img.shields.io/badge/license-NPL%20(The%20996%20Prohibited%20License)-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
 [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=brynet&metric=alert_status)](https://sonarcloud.io/dashboard/index/brynet)
+[![Platform](https://img.shields.io/badge/Platform-Linux,%20Windows,%20MacOS-green.svg?style=flat-square)](https://github.com/IronsDu/brynet)
 
 ## Build status
 Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umbwwdb01k/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/brynet/branch/master) 
-Linux : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet)
+Linux/MacOS : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet)
 
 ## Features
-* Cross platform (Linux | Windows)
+* Cross platform (Linux | Windows | MacOS)
 * High performance and safety use.
 * None depend
 * Multi-threaded
@@ -29,7 +30,7 @@ Linux : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)
 
 ## Build
 1. `cmake .` (if you want run example, you can execute `cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON`)
-2. If you use Windows, please open brynet.sln then build. If on Linux, only enter `make`.
+2. If you use Windows, please open brynet.sln then build. If on Linux or MacOS, only enter `make`.
 
 ## Usages
 * [Examples](#examples)
