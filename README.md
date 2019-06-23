@@ -24,9 +24,9 @@ Linux/MacOS : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=m
 - [简体中文](https://github.com/IronsDu/brynet/blob/master/docs/main.zh-cn.md)
 
 ## Compatibility
-* Visual C++ 2013+ on Windows (32/64-bit)
-* GCC 4.8+ on Linux (32/64-bit)
-* Not Support Mac OS X
+* Visual C++ 2013+ (32/64-bit)
+* GCC 4.8+ (32/64-bit)
+* Clang (Supported C++ 11)
 
 ## Build
 1. `cmake .` (if you want run example, you can execute `cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON`)
