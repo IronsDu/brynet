@@ -93,7 +93,7 @@ namespace brynet { namespace net {
         bool wakeup()
         {
             struct kevent ev;
-            EV_SET(&ev, mUserEvent, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
+            EV_SET(&ev, mUserEvent, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
 
             struct timespec timeout = {0, 0};
             return kevent(mKqueueFd, &ev, 1, NULL, 0, &timeout) == 0;
@@ -145,6 +145,12 @@ namespace brynet { namespace net {
 #elif defined PLATFORM_DARWIN
         const int NOTIFY_IDENT = 42; // Magic number we use for our filter ID.
         mWakeupChannel.reset(new WakeupChannel(mKqueueFd, NOTIFY_IDENT));
+        //Add user event
+        struct kevent ev;
+        EV_SET(&ev, NOTIFY_IDENT, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
+
+        struct timespec timeout = {0, 0};
+        kevent(mKqueueFd, &ev, 1, NULL, 0, &timeout);
 #endif
 
         mIsAlreadyPostWakeup = false;
