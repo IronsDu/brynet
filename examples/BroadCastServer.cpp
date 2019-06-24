@@ -151,7 +151,7 @@ int main(int argc, char** argv)
             auto msDiff = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
             std::cout << "cost " << 
                 msDiff << " ms, clientnum:" << 
-                getClientNum() << ", recv" <<
+                getClientNum() << ", recv " <<
                 (TotalRecvLen / 1024) * 1000 / msDiff  << 
                 " K/s, " << "num : " << 
                 RecvPacketNum * 1000 / msDiff << ", send " <<
