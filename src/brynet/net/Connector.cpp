@@ -256,7 +256,7 @@ namespace brynet { namespace net {
 
     void ConnectorWorkInfo::processConnect(const AsyncConnectAddr& addr)
     {
-        struct sockaddr_in server_addr = { 0 };
+        struct sockaddr_in server_addr = sockaddr_in();
         sock clientfd = INVALID_SOCKET;
 
 #ifdef PLATFORM_WINDOWS

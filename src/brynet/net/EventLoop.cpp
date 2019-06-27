@@ -185,13 +185,13 @@ namespace brynet { namespace net {
 
         if (isInLoopThread())
         {
-            mTimer->addTimer(timeout, timer);
+            mTimer->addTimer(timer);
         }
         else
         {
             auto timerMgr = mTimer;
-            runAsyncFunctor([timerMgr, timeout, timer]() {
-                timerMgr->addTimer(timeout, timer);
+            runAsyncFunctor([timerMgr, timer]() {
+                timerMgr->addTimer(timer);
             });
         }
 
@@ -228,7 +228,7 @@ namespace brynet { namespace net {
         {
             if (!mPGetQueuedCompletionStatusEx(mIOCP,
                 mEventEntries.data(),
-                mEventEntries.size(),
+                static_cast<ULONG>(mEventEntries.size()),
                 &numComplete,
                 static_cast<DWORD>(milliseconds),
                 false))

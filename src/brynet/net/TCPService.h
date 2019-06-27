@@ -48,7 +48,7 @@ namespace brynet { namespace net {
 
         void                                startWorkerThread(size_t threadNum, FrameCallback&& callback = nullptr);
         void                                stopWorkerThread();
-        template<class... Options>
+        template<typename... Options>
         bool                                addTcpConnection(TcpSocket::Ptr socket, const Options& ... options)
         {
             return _addTcpConnection(std::move(socket), { options... });

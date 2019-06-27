@@ -8,11 +8,6 @@
 #include <brynet/net/http/WebSocketFormat.h>
 #include <brynet/net/Connector.h>
 
-typedef  uint32_t PACKET_LEN_TYPE;
-
-//Unused warning in clang
-//const static PACKET_LEN_TYPE PACKET_HEAD_LEN = sizeof(PACKET_LEN_TYPE);
-
 using namespace std;
 using namespace brynet;
 using namespace brynet::net;

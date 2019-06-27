@@ -56,7 +56,7 @@ namespace brynet { namespace timer {
             return timer;
         }
 
-        void                                    addTimer(std::chrono::nanoseconds timeout, Timer::Ptr timer)
+        void                                    addTimer(const Timer::Ptr& timer)
         {
             mTimers.push(timer);
         }

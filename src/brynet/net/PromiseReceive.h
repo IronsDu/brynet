@@ -48,11 +48,6 @@ namespace brynet { namespace net {
 
         PromiseReceive::Ptr receive(std::shared_ptr<size_t> len, Handle handle)
         {
-            if (*len < 0)
-            {
-                throw std::runtime_error("len less than zero");
-            }
-
             return helpReceive(std::move(len), "", std::move(handle));
         }
 

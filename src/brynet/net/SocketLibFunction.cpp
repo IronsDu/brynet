@@ -40,7 +40,7 @@ namespace brynet { namespace net { namespace base {
     int SocketNodelay(sock fd)
     {
         const int flag = 1;
-        return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+        return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const char *)&flag, sizeof(flag));
     }
 
     bool SocketBlock(sock fd)
@@ -83,8 +83,8 @@ namespace brynet { namespace net { namespace base {
     {
         InitSocket();
 
-        struct sockaddr_in ip4Addr = { 0 };
-        struct sockaddr_in6 ip6Addr = { 0 };
+        struct sockaddr_in ip4Addr = sockaddr_in();
+        struct sockaddr_in6 ip6Addr = sockaddr_in6();
         struct sockaddr_in* paddr = &ip4Addr;
         int addrLen = sizeof(ip4Addr);
 
@@ -100,7 +100,6 @@ namespace brynet { namespace net { namespace base {
         bool ptonResult = false;
         if (isIPV6)
         {
-            memset(&ip6Addr, 0, sizeof(ip6Addr));
             ip6Addr.sin6_family = AF_INET6;
             ip6Addr.sin6_port = htons(port);
             ptonResult = inet_pton(AF_INET6, server_ip.c_str(), &ip6Addr.sin6_addr) > 0;
@@ -138,8 +137,8 @@ namespace brynet { namespace net { namespace base {
     {
         InitSocket();
 
-        struct sockaddr_in ip4Addr = { 0 };
-        struct sockaddr_in6 ip6Addr = { 0 };
+        struct sockaddr_in ip4Addr = sockaddr_in();
+        struct sockaddr_in6 ip6Addr = sockaddr_in6();
         struct sockaddr_in* paddr = &ip4Addr;
         int addrLen = sizeof(ip4Addr);
 
@@ -154,7 +153,6 @@ namespace brynet { namespace net { namespace base {
         bool ptonResult = false;
         if (isIPV6)
         {
-            memset(&ip6Addr, 0, sizeof(ip6Addr));
             ip6Addr.sin6_family = AF_INET6;
             ip6Addr.sin6_port = htons(port);
             ptonResult = inet_pton(AF_INET6, ip, &ip6Addr.sin6_addr) > 0;
@@ -203,15 +201,20 @@ namespace brynet { namespace net { namespace base {
 
     static std::string getIPString(const struct sockaddr *sa)
     {
+#ifdef PLATFORM_WINDOWS
+        using PAddrType = PVOID;
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+        using PAddrType = const void*;
+#endif
         char tmp[INET6_ADDRSTRLEN] = { 0 };
         switch (sa->sa_family)
         {
         case AF_INET:
-            inet_ntop(AF_INET, &(((struct sockaddr_in *)sa)->sin_addr),
+            inet_ntop(AF_INET, (PAddrType)(&(((const struct sockaddr_in*)sa)->sin_addr)),
                 tmp, sizeof(tmp));
             break;
         case AF_INET6:
-            inet_ntop(AF_INET6, &(((struct sockaddr_in6 *)sa)->sin6_addr),
+            inet_ntop(AF_INET6, (PAddrType)(&(((const struct sockaddr_in6*)sa)->sin6_addr)),
                 tmp, sizeof(tmp));
             break;
         default:
@@ -224,14 +227,14 @@ namespace brynet { namespace net { namespace base {
     std::string GetIPOfSocket(sock fd)
     {
 #ifdef PLATFORM_WINDOWS
-        struct sockaddr name = { 0 };
+        struct sockaddr name = sockaddr();
         int namelen = sizeof(name);
         if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
         {
             return getIPString(&name);
         }
 #elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
-        struct sockaddr_in name;
+        struct sockaddr_in name = sockaddr_in();
         socklen_t namelen = sizeof(name);
         if (getpeername(fd, (struct sockaddr*)&name, &namelen) == 0)
         {
@@ -266,8 +269,7 @@ namespace brynet { namespace net { namespace base {
 
     static struct sockaddr_in6 getLocalAddr(sock sockfd)
     {
-        struct sockaddr_in6 localaddr;
-        memset(&localaddr, 0, sizeof localaddr);
+        struct sockaddr_in6 localaddr = sockaddr_in6();
         socklen_t addrlen = static_cast<socklen_t>(sizeof localaddr);
         if (::getsockname(sockfd, (struct sockaddr*)(&localaddr), &addrlen) < 0)
         {
@@ -278,8 +280,7 @@ namespace brynet { namespace net { namespace base {
 
     static struct sockaddr_in6 getPeerAddr(sock sockfd)
     {
-        struct sockaddr_in6 peeraddr;
-        memset(&peeraddr, 0, sizeof peeraddr);
+        struct sockaddr_in6 peeraddr = sockaddr_in6();
         socklen_t addrlen = static_cast<socklen_t>(sizeof peeraddr);
         if (::getpeername(sockfd, (struct sockaddr*)(&peeraddr), &addrlen) < 0)
         {

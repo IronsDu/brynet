@@ -188,6 +188,7 @@ namespace brynet { namespace net { namespace http {
             {
             case HTTP_RESPONSE_STATUS::OK:
                 ret += " OK";
+                break;
             default:
                 ret += "UNKNOWN";
                 break;
