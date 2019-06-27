@@ -88,7 +88,7 @@ namespace brynet { namespace net {
 
     protected:
         TcpConnection(TcpSocket::Ptr, size_t maxRecvBufferSize, EnterCallback&&, EventLoop::Ptr) BRYNET_NOEXCEPT;
-        virtual ~TcpConnection() BRYNET_NOEXCEPT;
+        ~TcpConnection() BRYNET_NOEXCEPT override;
 
     private:
         void                            growRecvBuffer();

@@ -390,6 +390,10 @@ namespace brynet { namespace utils {
 
         size_t          getLeft() const
         {
+            if (mPos > mMaxLen)
+            {
+                throw std::out_of_range("current pos is greater than max len");
+            }
             return mMaxLen - mPos;
         }
 
@@ -413,13 +417,15 @@ namespace brynet { namespace utils {
             return mMaxLen;
         }
 
-        void            addPos(int value)
+        void            addPos(size_t diff)
         {
-            auto tmp = mPos + value;
-            if (tmp >= 0 && tmp <= mMaxLen)
+            const auto tmpPos = mPos + diff;
+            if (tmpPos > mMaxLen)
             {
-                mPos = tmp;
+                throw std::out_of_range("diff is to big");
             }
+
+            mPos = tmpPos;
         }
 
         bool            readBool()
@@ -486,15 +492,13 @@ namespace brynet { namespace utils {
             static_assert(std::is_same < T, typename std::remove_pointer<T>::type>::value, "T must a nomal type");
             static_assert(std::is_pod <T>::value, "T must a pod type");
 
-            if ((mPos + sizeof(value) <= mMaxLen))
+            if ((mPos + sizeof(value)) > mMaxLen)
             {
-                value = *(T*)(mBuffer + mPos);
-                mPos += sizeof(value);
+                throw std::out_of_range("T size is to big");
             }
-            else
-            {
-                assert(mPos + sizeof(value) <= mMaxLen);
-            }
+
+            value = *(T*)(mBuffer + mPos);
+            mPos += sizeof(value);
         }
 
     protected:
