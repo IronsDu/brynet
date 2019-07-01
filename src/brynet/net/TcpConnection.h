@@ -121,7 +121,7 @@ namespace brynet { namespace net {
         bool                            processSSLHandshake();
 #endif
         void                            causeEnterCallback();
-
+        void                            processRecvMessage();
     private:
 
 #ifdef PLATFORM_WINDOWS

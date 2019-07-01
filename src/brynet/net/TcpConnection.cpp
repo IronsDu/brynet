@@ -267,27 +267,14 @@ namespace brynet { namespace net {
                 break;
             }
 
+            mRecvData = true;
             ox_buffer_addwritepos(mRecvBuffer.get(), retlen);
             if (ox_buffer_getreadvalidcount(mRecvBuffer.get()) == ox_buffer_getsize(mRecvBuffer.get()))
             {
                 growRecvBuffer();
             }
 
-            if (mDataCallback != nullptr)
-            {
-                mRecvData = true;
-                auto proclen = mDataCallback(ox_buffer_getreadptr(mRecvBuffer.get()),
-                    ox_buffer_getreadvalidcount(mRecvBuffer.get()));
-                assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
-                if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
-                {
-                    ox_buffer_addreadpos(mRecvBuffer.get(), proclen);
-                }
-                else
-                {
-                    break;
-                }
-            }
+            processRecvMessage();
 
             if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
             {
@@ -719,6 +706,7 @@ namespace brynet { namespace net {
         auto sharedThis = shared_from_this();
         mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
             sharedThis->mDataCallback = std::move(cb);
+            sharedThis->processRecvMessage();
         });
     }
 
@@ -942,6 +930,20 @@ namespace brynet { namespace net {
             auto tmp = mEnterCallback;
             mEnterCallback = nullptr;
             tmp(shared_from_this());
+        }
+    }
+
+    void TcpConnection::processRecvMessage()
+    {
+        if (mDataCallback != nullptr && ox_buffer_getreadvalidcount(mRecvBuffer.get()) > 0)
+        {
+            const auto proclen = mDataCallback(ox_buffer_getreadptr(mRecvBuffer.get()),
+                ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+            assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
+            if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
+            {
+                ox_buffer_addreadpos(mRecvBuffer.get(), proclen);
+            }
         }
     }
 
