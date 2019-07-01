@@ -217,9 +217,20 @@ namespace brynet { namespace net {
 
         while (true)
         {
+            if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0
+                    || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
+            {
+                ox_buffer_adjustto_head(mRecvBuffer.get());
+            }
+
             const auto tryRecvLen = ox_buffer_getwritevalidcount(mRecvBuffer.get());
             if (tryRecvLen == 0)
             {
+#ifdef PLATFORM_WINDOWS
+                checkRead();
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+                recheckEvent();
+#endif
                 break;
             }
 
@@ -267,18 +278,11 @@ namespace brynet { namespace net {
                 break;
             }
 
-            mRecvData = true;
-            ox_buffer_addwritepos(mRecvBuffer.get(), retlen);
-            if (ox_buffer_getreadvalidcount(mRecvBuffer.get()) == ox_buffer_getsize(mRecvBuffer.get()))
+            ox_buffer_addwritepos(mRecvBuffer.get(), static_cast<size_t>(retlen));
+            if (ox_buffer_getreadvalidcount(mRecvBuffer.get())
+                    == ox_buffer_getsize(mRecvBuffer.get()))
             {
                 growRecvBuffer();
-            }
-
-            processRecvMessage();
-
-            if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
-            {
-                ox_buffer_adjustto_head(mRecvBuffer.get());
             }
 
             if (notInSSL && retlen < static_cast<int>(tryRecvLen))
@@ -287,6 +291,8 @@ namespace brynet { namespace net {
                 break;
             }
         }
+
+        processRecvMessage();
 
         if (must_close)
         {
@@ -554,7 +560,6 @@ namespace brynet { namespace net {
     void TcpConnection::procShutdownInLoop()
     {
         mCanWrite = false;
-        assert(mSocket != nullptr);
         if (mSocket != nullptr)
         {
 #ifdef PLATFORM_WINDOWS
@@ -655,26 +660,22 @@ namespace brynet { namespace net {
         {
             mPostWriteCheck = true;
         }
-#elif defined PLATFORM_LINUX
-        struct epoll_event ev = { 0, { nullptr } };
-        ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
-        ev.data.ptr = (Channel*)(this);
-        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
-#elif defined PLATFORM_DARWIN
-        struct kevent ev[2];
-        memset(&ev, 0, sizeof(ev));
-        int n = 0;
-        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_ENABLE, 0, 0, (Channel *)(this));
-        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_ENABLE, 0, 0, (Channel *)(this));
-
-        struct timespec now = { 0, 0 };
-        kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+        recheckEvent();
 #endif
 
         return check_ret;
     }
 
 #ifdef PLATFORM_LINUX
+    void TcpConnection::recheckEvent()
+    {
+        struct epoll_event ev = { 0, { nullptr } };
+        ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
+        ev.data.ptr = (Channel*)(this);
+        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
+    }
+
     void TcpConnection::removeCheckWrite()
     {
         struct epoll_event ev = { 0, { nullptr } };
@@ -689,6 +690,18 @@ namespace brynet { namespace net {
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
     }
 #elif defined PLATFORM_DARWIN
+    void TcpConnection::recheckEvent()
+    {
+        struct kevent ev[2];
+        memset(&ev, 0, sizeof(ev));
+        int n = 0;
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_ENABLE, 0, 0, (Channel *)(this));
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_ENABLE, 0, 0, (Channel *)(this));
+
+        struct timespec now = { 0, 0 };
+        kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
+    }
+
     void TcpConnection::removeCheckWrite()
     {
         struct kevent ev;
@@ -729,8 +742,6 @@ namespace brynet { namespace net {
         });
     }
 
-    const static size_t GROW_BUFFER_SIZE = 1024;
-
     void TcpConnection::growRecvBuffer()
     {
         if (mRecvBuffer == nullptr)
@@ -739,11 +750,13 @@ namespace brynet { namespace net {
         }
         else
         {
-            const auto NewSize = ox_buffer_getsize(mRecvBuffer.get()) + GROW_BUFFER_SIZE;
-            if (NewSize > mMaxRecvBufferSize)
+            if (ox_buffer_getsize(mRecvBuffer.get()) >= mMaxRecvBufferSize)
             {
                 return;
             }
+
+            const auto NewSize = std::min<size_t>(ox_buffer_getsize(mRecvBuffer.get())*2,
+                                                  mMaxRecvBufferSize);
             std::unique_ptr<struct buffer_s, BufferDeleter> newBuffer(ox_buffer_new(NewSize));
             ox_buffer_write(newBuffer.get(),
                 ox_buffer_getreadptr(mRecvBuffer.get()),
