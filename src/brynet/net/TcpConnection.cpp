@@ -545,19 +545,8 @@ namespace brynet { namespace net {
             onClose();
         }
 #elif defined PLATFORM_LINUX
-        struct epoll_event ev = { 0, { nullptr } };
-        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
         onClose();
 #elif defined PLATFORM_DARWIN
-        struct kevent ev[2];
-        memset(&ev, 0, sizeof(ev));
-        int n = 0;
-        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_DELETE, 0, 0, NULL);
-        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-
-        struct timespec now = { 0, 0 };
-        kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
-
         onClose();
 #endif
     }
@@ -583,6 +572,10 @@ namespace brynet { namespace net {
             return;
         }
         mAlreadyClose = true;
+
+#if defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+        unregisterPollerEvent();
+#endif
 
         assert(mEnterCallback == nullptr);
         auto callBack = mDisConnectCallback;
@@ -682,12 +675,18 @@ namespace brynet { namespace net {
     }
 
 #ifdef PLATFORM_LINUX
-    void    TcpConnection::removeCheckWrite()
+    void TcpConnection::removeCheckWrite()
     {
         struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
+    }
+
+    void TcpConnection::unregisterPollerEvent()
+    {
+        struct epoll_event ev = { 0, { nullptr } };
+        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
     }
 #elif defined PLATFORM_DARWIN
     void TcpConnection::removeCheckWrite()
@@ -698,6 +697,18 @@ namespace brynet { namespace net {
 
         struct timespec now = { 0, 0 };
         kevent(mEventLoop->getKqueueHandle(), &ev, 1, NULL, 0, &now);
+    }
+
+    void TcpConnection::unregisterPollerEvent()
+    {
+        struct kevent ev[2];
+        memset(&ev, 0, sizeof(ev));
+        int n = 0;
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_DELETE, 0, 0, NULL);
+        EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+
+        struct timespec now = { 0, 0 };
+        kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
     }
 #endif
 
