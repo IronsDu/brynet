@@ -175,8 +175,6 @@ namespace brynet { namespace net {
             }
             return;
         }
-#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
-        removeCheckWrite();
 #endif
         mCanWrite = true;
 
@@ -229,6 +227,7 @@ namespace brynet { namespace net {
 #ifdef PLATFORM_WINDOWS
                 checkRead();
 #elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+                //force recheck IN-OUT Event
                 recheckEvent();
 #endif
                 break;
@@ -660,10 +659,7 @@ namespace brynet { namespace net {
         {
             mPostWriteCheck = true;
         }
-#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
-        recheckEvent();
 #endif
-
         return check_ret;
     }
 
@@ -672,14 +668,6 @@ namespace brynet { namespace net {
     {
         struct epoll_event ev = { 0, { nullptr } };
         ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
-        ev.data.ptr = (Channel*)(this);
-        epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
-    }
-
-    void TcpConnection::removeCheckWrite()
-    {
-        struct epoll_event ev = { 0, { nullptr } };
-        ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
         ev.data.ptr = (Channel*)(this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
     }
@@ -700,16 +688,6 @@ namespace brynet { namespace net {
 
         struct timespec now = { 0, 0 };
         kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
-    }
-
-    void TcpConnection::removeCheckWrite()
-    {
-        struct kevent ev;
-        memset(&ev, 0, sizeof(ev));
-        EV_SET(&ev, mSocket->getFD(), EVFILT_WRITE, EV_DISABLE, 0, 0, (Channel *)(this));
-
-        struct timespec now = { 0, 0 };
-        kevent(mEventLoop->getKqueueHandle(), &ev, 1, NULL, 0, &now);
     }
 
     void TcpConnection::unregisterPollerEvent()

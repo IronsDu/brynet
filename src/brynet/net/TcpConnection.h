@@ -116,7 +116,6 @@ namespace brynet { namespace net {
         void                            runAfterFlush();
 #if defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         void                            recheckEvent();
-        void                            removeCheckWrite();
         void                            unregisterPollerEvent();
 #endif
 #ifdef USE_OPENSSL

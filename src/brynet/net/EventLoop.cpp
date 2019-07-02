@@ -409,16 +409,18 @@ namespace brynet { namespace net {
         return CreateIoCompletionPort((HANDLE)fd, mIOCP, (ULONG_PTR)ptr, 0) != nullptr;
 #elif defined PLATFORM_LINUX
         struct epoll_event ev = { 0, { nullptr } };
-        ev.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
+        ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         ev.data.ptr = (void*)ptr;
         return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;
 #elif defined PLATFORM_DARWIN
-        struct kevent ev;
+        struct kevent ev[2];
         memset(&ev, 0, sizeof(ev));
-        EV_SET(&ev, fd, EVFILT_READ, EV_ADD | EV_ENABLE, NOTE_TRIGGER, 0, (void *)ptr);
+        int n = 0;
+        EV_SET(&ev[n++], fd, EVFILT_READ, EV_ADD | EV_CLEAR, NOTE_TRIGGER, 0, (void*)ptr);
+        EV_SET(&ev[n++], fd, EVFILT_WRITE, EV_ADD | EV_CLEAR, NOTE_TRIGGER, 0, (void*)ptr);
 
         struct timespec now = { 0, 0 };
-        return kevent(mKqueueFd, &ev, 1, NULL, 0, &now) == 0;
+        return kevent(mKqueueFd, ev, n, NULL, 0, &now) == 0;
 #endif
     }
 
