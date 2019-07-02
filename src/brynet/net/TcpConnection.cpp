@@ -1,5 +1,6 @@
 ﻿#include <cassert>
 #include <cstring>
+#include <algorithm>
 
 #include <brynet/net/SocketLibFunction.h>
 #include <brynet/net/EventLoop.h>
@@ -24,6 +25,7 @@ namespace brynet { namespace net {
         mEventLoop(std::move(eventLoop)),
         mAlreadyClose(false),
         mMaxRecvBufferSize(maxRecvBufferSize),
+        mPostSending(false),
         mEnterCallback(std::forward<EnterCallback>(enterCallback))
     {
         mRecvData = false;
@@ -137,6 +139,47 @@ namespace brynet { namespace net {
         send(makePacket(buffer, len), std::forward<PacketSendedCallback>(callback));
     }
 
+    bool TcpConnection::checkCanPostSend()
+    {
+        return  !mPostSending
+            && (!mSendList.empty()
+                || !mReadyList.empty())
+            && mCanWrite;
+    }
+
+    void TcpConnection::postSend()
+    {
+        auto sharedThis = shared_from_this();
+        if (mEventLoop->isInLoopThread())
+        {
+            mEventLoop->runFunctorAfterLoop([sharedThis]() {
+                sharedThis->runFlush();
+            });
+        }
+        else
+        {
+            mEventLoop->runAsyncFunctor([sharedThis]() {
+                sharedThis->getEventLoop()->runFunctorAfterLoop([sharedThis]() {
+                    sharedThis->runFlush();
+                });
+            });
+        }
+    }
+
+    void TcpConnection::tryPostSend()
+    {
+        {
+            std::lock_guard<std::mutex> lck(mReadySendGuard);
+            if (!checkCanPostSend())
+            {
+                return;
+            }
+            mPostSending = true;
+        }
+
+        postSend();
+    }
+
     void TcpConnection::canRecv()
     {
 #ifdef PLATFORM_WINDOWS
@@ -197,20 +240,38 @@ namespace brynet { namespace net {
         }
 #endif
 
-        runAfterFlush();
+        tryPostSend();
     }
 
-    void TcpConnection::runAfterFlush()
+    void TcpConnection::runFlush()
     {
-        if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
         {
-            auto sharedThis = shared_from_this();
-            mEventLoop->runFunctorAfterLoop([sharedThis]() {
-                sharedThis->mIsPostFlush = false;
-                sharedThis->flush();
-            });
+            assert(mReadyListCopy.empty());
+            std::lock_guard<std::mutex> lck(mReadySendGuard);
+            mReadyListCopy.swap(mReadyList);
+            mPostSending = false;
+        }
 
-            mIsPostFlush = true;
+        {
+            if (mSendList.size() >= mReadyListCopy.size())
+            {
+                std::copy(mReadyListCopy.begin(), mReadyListCopy.end(), std::back_inserter(mSendList));
+                mReadyListCopy.clear();
+            }
+            else
+            {
+                for (auto&& msg : mSendList)
+                {
+                    mReadyListCopy.push_front(std::move(msg));
+                }
+                mSendList.clear();
+                mSendList.swap(mReadyListCopy);
+            }
+        }
+
+        if (!mSendList.empty() && mCanWrite)
+        {
+            flush();
         }
     }
 
@@ -617,6 +678,8 @@ namespace brynet { namespace net {
         mDisConnectCallback = nullptr;
         mDataCallback = nullptr;
         mRecvBuffer = nullptr;
+        PacketListType().swap(mReadyListCopy);
+        PacketListType().swap(mSendList);
     }
 
     bool TcpConnection::checkRead()

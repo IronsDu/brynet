@@ -56,14 +56,18 @@ namespace brynet { namespace net {
         template<typename PacketType>
         void                            send(PacketType&& packet, PacketSendedCallback&& callback = nullptr)
         {
-            auto packetCapture = std::forward<PacketType>(packet);
-            auto callbackCapture = std::forward<PacketSendedCallback>(callback);
-            auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis, packetCapture, callbackCapture]() mutable {
-                    const auto len = packetCapture->size();
-                    sharedThis->mSendList.emplace_back(PendingPacket{ std::move(packetCapture), len, std::move(callbackCapture) });
-                    sharedThis->runAfterFlush();
-                });
+            {
+                std::lock_guard<std::mutex> lck(mReadySendGuard);
+                const auto len = packet->size();
+                mReadyList.push_back({ std::forward<PacketType>(packet), len, std::forward<PacketSendedCallback>(callback) });
+                if (!checkCanPostSend())
+                {
+                    return;
+                }
+                mPostSending = true;
+            }
+
+            postSend();
         }
 
         void                            setDataCallback(DataCallback&& cb);
@@ -91,6 +95,10 @@ namespace brynet { namespace net {
         ~TcpConnection() BRYNET_NOEXCEPT override;
 
     private:
+        bool                            checkCanPostSend();
+        void                            postSend();
+        void                            tryPostSend();
+
         void                            growRecvBuffer();
 
         void                            pingCheck();
@@ -113,7 +121,7 @@ namespace brynet { namespace net {
         void                            procCloseInLoop();
         void                            procShutdownInLoop();
 
-        void                            runAfterFlush();
+        void                            runFlush();
 #if defined PLATFORM_LINUX || defined PLATFORM_DARWIN
         void                            recheckEvent();
         void                            unregisterPollerEvent();
@@ -158,7 +166,11 @@ namespace brynet { namespace net {
         };
 
         using PacketListType = std::deque<PendingPacket>;
+        PacketListType                  mReadyList;
+        PacketListType                  mReadyListCopy;
         PacketListType                  mSendList;
+        std::mutex                      mReadySendGuard;
+        bool                            mPostSending;
 
         EnterCallback                   mEnterCallback;
         DataCallback                    mDataCallback;
