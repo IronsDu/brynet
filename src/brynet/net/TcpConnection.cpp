@@ -149,6 +149,11 @@ namespace brynet { namespace net {
             }
             return;
         }
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+        if (mAlreadyClose)
+        {
+            return;
+        }
 #endif
 
 #ifdef USE_OPENSSL
@@ -173,6 +178,11 @@ namespace brynet { namespace net {
             {
                 onClose();
             }
+            return;
+        }
+#elif defined PLATFORM_LINUX || defined PLATFORM_DARWIN
+        if (mAlreadyClose)
+        {
             return;
         }
 #endif
