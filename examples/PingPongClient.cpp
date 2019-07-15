@@ -45,12 +45,15 @@ int main(int argc, char **argv)
             brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
         });
 
-    for (auto i = 0; i < atoi(argv[4]); i++)
+    const auto num = std::atoi(argv[4]);
+    const auto ip = argv[1];
+    const auto port = std::atoi(argv[2]);
+    for (auto i = 0; i < num; i++)
     {
         try
         {
             connectionBuilder.configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithAddr(argv[1], atoi(argv[2])),
+                    AsyncConnector::ConnectOptions::WithAddr(ip, port),
                     AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
                     AsyncConnector::ConnectOptions::WithFailedCallback(failedCallback),
                     AsyncConnector::ConnectOptions::AddProcessTcpSocketCallback([](TcpSocket& socket) {

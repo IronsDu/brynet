@@ -95,9 +95,10 @@ Examples
 * [PingPongClient](https://github.com/IronsDu/dodo/blob/master/examples/PingPongClient.cpp)
 * [BroadCastServer](https://github.com/IronsDu/dodo/blob/master/examples/BroadCastServer.cpp)
 * [BroadCastClient](https://github.com/IronsDu/dodo/blob/master/examples/BroadCastClient.cpp)
-* [SimpleHttpServer](https://github.com/IronsDu/dodo/blob/master/examples/TestHttp.cpp) show how to start http/ws service and request http
+* [Http&Websocket Server](https://github.com/IronsDu/dodo/blob/master/examples/HttpServer.cpp)
+* [HttpServerClient](https://github.com/IronsDu/dodo/blob/master/examples/HttpClient.cpp)
 * [BenchWebsocket](https://github.com/IronsDu/dodo/blob/master/examples/BenchWebsocket.cpp) benchmark websocket client
-* [PromiseReceive](https://github.com/IronsDu/brynet/blob/master/examples/TestPromiseReceive.cpp) use the promise style receive http response
+* [PromiseReceive](https://github.com/IronsDu/brynet/blob/master/examples/PromiseReceive.cpp) use the promise style receive http response
 * [WebSocketProxy](https://github.com/IronsDu/dodo/blob/master/examples/WebBinaryProxy.cpp) one proxy server between websocket client and binary protocol server
 * more examples please see [examples](https://github.com/IronsDu/dodo/tree/master/examples);
 
