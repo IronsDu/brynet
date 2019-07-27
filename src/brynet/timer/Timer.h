@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <chrono>
+#include <mutex>
 
 #include <brynet/net/Noexcept.h>
 
@@ -31,7 +32,7 @@ namespace brynet { namespace timer {
         void operator()                                 ();
 
     private:
-        bool                                            mActive;
+        std::once_flag                                  mExecuteOnceFlag;
         Callback                                        mCallback;
         const std::chrono::steady_clock::time_point     mStartTime;
         std::chrono::nanoseconds                        mLastTime;

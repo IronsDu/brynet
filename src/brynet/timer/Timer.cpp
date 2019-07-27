@@ -19,14 +19,15 @@ namespace brynet { namespace timer {
 
     void Timer::cancel()
     {
-        mActive = false;
+        std::call_once(mExecuteOnceFlag, [this]() {
+                mCallback = nullptr;
+            });
     }
 
     Timer::Timer(std::chrono::steady_clock::time_point startTime,
         std::chrono::nanoseconds lastTime,
         Callback&& callback) BRYNET_NOEXCEPT
         :
-        mActive(true),
         mCallback(std::forward<Callback>(callback)),
         mStartTime(startTime),
         mLastTime(lastTime)
@@ -35,10 +36,10 @@ namespace brynet { namespace timer {
 
     void Timer::operator() ()
     {
-        if (mActive)
-        {
-            mCallback();
-        }
+        std::call_once(mExecuteOnceFlag, [this]() {
+                mCallback();
+                mCallback = nullptr;
+            });
     }
 
     void TimerMgr::schedule()
