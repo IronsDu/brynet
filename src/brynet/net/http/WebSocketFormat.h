@@ -3,7 +3,7 @@
 #include <string>
 #include <stdint.h>
 #include <random>
-#include <time.h>
+#include <chrono>
 
 #include <brynet/utils/SHA1.h>
 #include <brynet/utils/base64.h>
@@ -53,7 +53,7 @@ namespace brynet { namespace net { namespace http {
             bool isFin = true,
             bool masking = false)
         {
-            static std::mt19937 random(time(0));
+            static std::mt19937 random(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
 
             static_assert(std::is_same<std::string::value_type, char>::value, "");
 

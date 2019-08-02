@@ -36,7 +36,7 @@ namespace brynet { namespace net {
 
     TcpService::TcpService() BRYNET_NOEXCEPT
         :
-        mRandom(time(0))
+        mRandom(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()))
     {
         mRunIOLoop = std::make_shared<bool>(false);
     }
