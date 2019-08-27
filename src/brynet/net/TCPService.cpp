@@ -105,13 +105,21 @@ namespace brynet { namespace net {
 
     EventLoop::Ptr TcpService::getRandomEventLoop()
     {
-        const auto randNum = mRandom();
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
-        if (mIOLoopDatas.empty())
+
+        const auto ioLoopSize = mIOLoopDatas.size();
+        if (ioLoopSize == 0)
         {
             return nullptr;
         }
-        return mIOLoopDatas[randNum % mIOLoopDatas.size()]->getEventLoop();
+        else if (ioLoopSize == 1)
+        {
+            return mIOLoopDatas.front()->getEventLoop();
+        }
+        else
+        {
+            return mIOLoopDatas[mRandom() % ioLoopSize]->getEventLoop();
+        }
     }
 
     TcpService::Ptr TcpService::Create()
