@@ -11,9 +11,21 @@ TEST_CASE("Timer are computed", "[timer]") {
     auto timer = timerMgr->addTimer(std::chrono::seconds(1), [&upvalue]() {
         upvalue++;
     });
-    timer = timerMgr->addTimer(std::chrono::seconds(1), [&upvalue]() {
+    std::function<void(void)> fuck;
+    bool testCancelFlag = false;
+    timer = timerMgr->addTimer(std::chrono::seconds(1), [&upvalue, &fuck]() {
+        fuck();
         upvalue++;
     });
+
+    fuck = [&]() {
+        auto t = timer.lock();
+        if (t != nullptr)
+        {
+            t->cancel();
+            testCancelFlag = true;
+        }
+    };
     auto leftTime = timerMgr->nearLeftTime();
     REQUIRE_FALSE(leftTime > std::chrono::seconds(1));
     REQUIRE(timerMgr->isEmpty() == false);
@@ -22,6 +34,7 @@ TEST_CASE("Timer are computed", "[timer]") {
         timerMgr->schedule();
     }
     REQUIRE(upvalue == 2);
+    REQUIRE(testCancelFlag);
 
     timer = timerMgr->addTimer(std::chrono::seconds(1), [&upvalue]() {
         upvalue++;

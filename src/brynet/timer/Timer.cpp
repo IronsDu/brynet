@@ -36,10 +36,16 @@ namespace brynet { namespace timer {
 
     void Timer::operator() ()
     {
-        std::call_once(mExecuteOnceFlag, [this]() {
-                mCallback();
+        Callback callback;
+        std::call_once(mExecuteOnceFlag, [&, this]() {
+                callback = std::move(mCallback);
                 mCallback = nullptr;
             });
+
+        if (callback != nullptr)
+        {
+            callback();
+        }
     }
 
     void TimerMgr::schedule()
