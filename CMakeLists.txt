@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 project(brynet)
 
 if(APPLE)
-  set(CMAKE_MACOSX_RPATH 0)
+  set(CMAKE_MACOSX_RPATH 1)
 endif()
 
 if(NOT APPLE)
