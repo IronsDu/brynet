@@ -1,6 +1,6 @@
 Brynet
 =======
-Cross platform high performance TCP network library using C++ 11.
+Header Only Cross platform high performance TCP network library using C++ 11.
 
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![LICENSE](https://img.shields.io/badge/license-NPL%20(The%20996%20Prohibited%20License)-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
@@ -12,6 +12,7 @@ Windows : [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umb
 Linux/MacOS : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet)
 
 ## Features
+* Header only
 * Cross platform (Linux | Windows | MacOS)
 * High performance and safety use.
 * None depend
@@ -28,9 +29,13 @@ Linux/MacOS : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=m
 * GCC 4.8+ (32/64-bit)
 * Clang (Supported C++ 11)
 
-## Build
-1. `cmake .` (if you want run example, you can execute `cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON`)
+## Build Example
+1. `cmake .`
 2. If you use Windows, please open brynet.sln then build. If on Linux or MacOS, only enter `make`.
+
+## Install
+1. `cmake .`
+2. `sudo make install`
 
 ## Usages
 * [Examples](#examples)

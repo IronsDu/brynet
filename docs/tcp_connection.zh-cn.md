@@ -1,5 +1,5 @@
 # 概述
-`TcpConnection::Ptr`是对TCP连接的封装.源代码见:[TcpConnection.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/TcpConnection.h).
+`TcpConnection::Ptr`是对TCP连接的封装.源代码见:[TcpConnection.h](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/TcpConnection.hpp).
 
 # 接口
 

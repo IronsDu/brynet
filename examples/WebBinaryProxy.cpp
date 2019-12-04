@@ -2,11 +2,12 @@
 #include <string>
 #include <thread>
 
-#include <brynet/net/SocketLibFunction.h>
-#include <brynet/net/http/HttpService.h>
-#include <brynet/net/http/HttpFormat.h>
-#include <brynet/net/http/WebSocketFormat.h>
-#include <brynet/net/Connector.h>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/http/HttpService.hpp>
+#include <brynet/net/http/HttpFormat.hpp>
+#include <brynet/net/http/WebSocketFormat.hpp>
+#include <brynet/net/AsyncConnector.hpp>
+#include <brynet/net/ListenThread.hpp>
 
 using namespace std;
 using namespace brynet;
@@ -41,7 +42,7 @@ int main(int argc, char **argv)
 
                 auto enterCallback = [tcpService, session, shareBackendSession, cachePacket](TcpSocket::Ptr socket) {
                     auto enterCallback = [=](const TcpConnection::Ptr& backendSession) {
-                        auto ud = brynet::net::cast<int64_t>(session->getUD());
+                        auto ud = brynet::base::cast<int64_t>(session->getUD());
                         if (*ud == -1)   /*if http client already close*/
                         {
                             backendSession->postDisConnect();
@@ -58,7 +59,7 @@ int main(int argc, char **argv)
 
                         backendSession->setDisConnectCallback([=](const TcpConnection::Ptr& backendSession) {
                             *shareBackendSession = nullptr;
-                            auto ud = brynet::net::cast<int64_t>(session->getUD());
+                            auto ud = brynet::base::cast<int64_t>(session->getUD());
                             if (*ud != -1)
                             {
                                 session->postDisConnect();
@@ -74,16 +75,16 @@ int main(int argc, char **argv)
                     };
 
                     tcpService->addTcpConnection(std::move(socket),
-                        brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-                        brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
+                        brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
+                        brynet::net::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
                 };
                
 
                 /* new connect to backend server */
                 asyncConnector->asyncConnect({
-                    AsyncConnector::ConnectOptions::WithAddr(backendIP.c_str(), backendPort),
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
-                    AsyncConnector::ConnectOptions::WithCompletedCallback(enterCallback) });
+                    ConnectOption::WithAddr(backendIP.c_str(), backendPort),
+                    ConnectOption::WithTimeout(std::chrono::seconds(10)),
+                    ConnectOption::WithCompletedCallback(enterCallback) });
 
                 session->setDataCallback([=](const char* buffer, size_t size) {
                     TcpConnection::Ptr backendSession = *shareBackendSession;
@@ -114,8 +115,8 @@ int main(int argc, char **argv)
             };
 
             tcpService->addTcpConnection(std::move(socket),
-                brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-                brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
+                brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
+                brynet::net::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
         });
 
     // listen for front http client

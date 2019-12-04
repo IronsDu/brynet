@@ -1,7 +1,7 @@
 # 概述
 `EventLoop`用于socket的读写检测,以及线程间通信.
 
-源码见：[EventLoop.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/EventLoop.h)，
+源码见：[EventLoop.hpp](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/EventLoop.hpp)，
 `EventLoop`不是必须使用智能指针，可以使用值对象，当然它也是禁止拷贝的。
 
 # 接口

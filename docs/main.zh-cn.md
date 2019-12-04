@@ -31,7 +31,8 @@
 请查看[example](https://github.com/IronsDu/brynet/tree/master/examples)
 
 # 建议
-- 建议使用[wrapper](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/Wrapper.h)来使用brynet，它会让您使用得更便捷，提高您的开发效率。在[examples](https://github.com/IronsDu/brynet/tree/master/examples)目录里有一些示例就使用了它，您可以参考一下。
+- 建议使用[wrapper](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/wrapper)目录下的包装代码来使用brynet，它会让您使用得更便捷，提高您的开发效率。在[examples](https://github.com/IronsDu/brynet/tree/master/examples)目录里有一些示例就使用了它，您可以参考一下。
+- 你完全可以使用(链接)官方的http_parser，将其路径添加到工程的包含路径即可（则会自动替代brynet自带的http_parser.h)
 
 # 应用项目
 * [ARK - distributed plugin framework](https://github.com/ArkNX/ARK)

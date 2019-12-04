@@ -1,5 +1,5 @@
 # 概述
-`AsyncConnector`是一个异步创建外部连接的类.源代码见:[Connector.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/Connector.h).
+`AsyncConnector`是一个异步创建外部连接的类.源代码见:[AsyncConnector.hpp](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/AsyncConnector.hpp).
 
 # 接口
 
@@ -16,9 +16,9 @@
     
     (线程安全)停止工作线程(当工作线程结束时此函数才返回)
 
-- `AsyncConnector::asyncConnect(const std::vector<ConnectOptions::ConnectOptionFunc>& options)`
+- `AsyncConnector::asyncConnect(const std::vector<ConnectOption::ConnectOptionFunc>& options)`
     
-    (线程安全)请求创建外部链接,options为异步连接的选项,比如`ConnectOptions::WithAddr`为指定服务器地址,`ConnectOptions::WithCompletedCallback`则指定完成回调</br>
+    (线程安全)请求创建外部链接,options为异步连接的选项,比如`ConnectOption::WithAddr`为指定服务器地址,`ConnectOption::WithCompletedCallback`则指定完成回调</br>
     如果没有开启工作线程,那么此函数会产生异常!
 
 ## 示例
@@ -28,13 +28,13 @@ connector->startWorkerThread();
 
 // set timeout is 1s
 connector->asyncConnect({
-        ConnectOptions::WithAddr("127.0.0.1", 9999),
-        ConnectOptions::WithTimeout(std::chrono::seconds(1)),
-        ConnectOptions::WithCompletedCallback([](TcpSocket::PTR socket) {
+        ConnectOption::WithAddr("127.0.0.1", 9999),
+        ConnectOption::WithTimeout(std::chrono::seconds(1)),
+        ConnectOption::WithCompletedCallback([](TcpSocket::PTR socket) {
             std::cout << "connect success" << std::endl;
             // 在此我们就可以将 socket 用于网络库的其他部分,比如用于`TCPService::addTcpConnection`
         }),
-        ConnectOptions::WithFailedCallback([]() {
+        ConnectOption::WithFailedCallback([]() {
             std::cout << "connect failed" << std::endl;
         })
     });

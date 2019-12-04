@@ -1,5 +1,5 @@
 # 概述
-`ListenThread `是一个用于接受外部连接的类.源代码见:[ListenThread.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/ListenThread.h).
+`ListenThread `是一个用于接受外部连接的类.源代码见:[ListenThread.hpp](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/ListenThread.hpp).
 
 # 接口
 

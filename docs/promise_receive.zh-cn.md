@@ -1,5 +1,5 @@
 # 概述
-`PromiseReceive`可以提供更高级更方便的消息解析.源代码见:[PromiseReceive.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/PromiseReceive.h).</br>
+`PromiseReceive`可以提供更高级更方便的消息解析.源代码见:[PromiseReceive.h](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/PromiseReceive.hpp).</br>
 使用此辅助类，可以更方便的解析`HTTP`、`Redis`等文本协议
 
 # 接口
