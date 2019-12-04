@@ -1,10 +1,10 @@
 ﻿#include <iostream>
 #include <string>
 
-#include <brynet/net/SocketLibFunction.h>
-#include <brynet/net/TCPService.h>
-#include <brynet/net/Connector.h>
-#include <brynet/net/Wrapper.h>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/TcpService.hpp>
+#include <brynet/net/AsyncConnector.hpp>
+#include <brynet/net/wrapper/ConnectionBuilder.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -41,8 +41,8 @@ int main(int argc, char **argv)
     connectionBuilder.configureService(service)
         .configureConnector(connector)
         .configureConnectionOptions({
-            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
+            brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
+            brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
         });
 
     const auto num = std::atoi(argv[4]);
@@ -53,10 +53,10 @@ int main(int argc, char **argv)
         try
         {
             connectionBuilder.configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port),
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
-                    AsyncConnector::ConnectOptions::WithFailedCallback(failedCallback),
-                    AsyncConnector::ConnectOptions::AddProcessTcpSocketCallback([](TcpSocket& socket) {
+                    ConnectOption::WithAddr(ip, port),
+                    ConnectOption::WithTimeout(std::chrono::seconds(10)),
+                    ConnectOption::WithFailedCallback(failedCallback),
+                    ConnectOption::AddProcessTcpSocketCallback([](TcpSocket& socket) {
                         socket.setNodelay();
                     })
                 })

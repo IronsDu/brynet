@@ -8,17 +8,17 @@
 #include <vector>
 #include <atomic>
 
-#include <brynet/utils/packet.h>
-#include <brynet/net/SocketLibFunction.h>
+#include <brynet/base/Packet.hpp>
+#include <brynet/net/SocketLibFunction.hpp>
 
-#include <brynet/net/EventLoop.h>
-#include <brynet/net/TcpConnection.h>
-#include <brynet/net/TCPService.h>
-#include <brynet/net/ListenThread.h>
+#include <brynet/net/EventLoop.hpp>
+#include <brynet/net/TcpConnection.hpp>
+#include <brynet/net/TcpService.hpp>
+#include <brynet/net/ListenThread.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
-using namespace brynet::utils;
+using namespace brynet::base;
 
 std::atomic_llong TotalSendLen = ATOMIC_VAR_INIT(0);
 std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
@@ -134,8 +134,8 @@ int main(int argc, char** argv)
                 });
         };
         service->addTcpConnection(std::move(socket),
-            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
+            brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
+            brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
         });
 
     listenThread->startListen();

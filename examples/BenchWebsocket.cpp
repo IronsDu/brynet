@@ -3,18 +3,18 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-
-#include <brynet/net/SocketLibFunction.h>
-#include <brynet/net/http/HttpService.h>
-#include <brynet/net/http/HttpFormat.h>
-#include <brynet/net/http/WebSocketFormat.h>
-#include <brynet/utils/packet.h>
-#include <brynet/net/Wrapper.h>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/http/HttpService.hpp>
+#include <brynet/net/http/HttpFormat.hpp>
+#include <brynet/net/http/WebSocketFormat.hpp>
+#include <brynet/base/Packet.hpp>
+#include <brynet/net/wrapper/ConnectionBuilder.hpp>
+#include <brynet/net/wrapper/HttpConnectionBuilder.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
 using namespace brynet::net::http;
-using namespace brynet::utils;
+using namespace brynet::base;
 
 std::atomic<int32_t> count;
 
@@ -91,15 +91,15 @@ int main(int argc, char **argv)
     connectionBuilder.configureService(service)
         .configureConnector(connector)
         .configureConnectionOptions({
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
+            brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
         });
 
     for (int i = 0; i < connections; i++)
     {
         connectionBuilder.configureConnectOptions({
-                AsyncConnector::ConnectOptions::WithAddr(host, port),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
-                AsyncConnector::ConnectOptions::AddProcessTcpSocketCallback([](TcpSocket& socket) {
+                ConnectOption::WithAddr(host, port),
+                ConnectOption::WithTimeout(std::chrono::seconds(10)),
+                ConnectOption::AddProcessTcpSocketCallback([](TcpSocket& socket) {
                     socket.setNodelay();
                 })
             })

@@ -1,5 +1,5 @@
 # 概述
-`TcpSocket::PTR`和`ListenSocket::PTR`是对socket fd的封装，结合`std::unique_ptr`使得fd资源更安全，避免泄露.源代码见:[Socket.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/Socket.h).
+`TcpSocket::PTR`和`ListenSocket::PTR`是对socket fd的封装，结合`std::unique_ptr`使得fd资源更安全，避免泄露.源代码见:[Socket.h](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/Socket.hpp).
 
 # 接口
 

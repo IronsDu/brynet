@@ -3,13 +3,14 @@
 #include <mutex>
 #include <condition_variable>
 
-#include <brynet/net/SSLHelper.h>
-#include <brynet/net/SocketLibFunction.h>
-#include <brynet/net/http/HttpService.h>
-#include <brynet/net/http/HttpFormat.h>
-#include <brynet/net/http/WebSocketFormat.h>
-#include <brynet/net/Connector.h>
-#include <brynet/net/Wrapper.h>
+#include <brynet/net/SSLHelper.hpp>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/http/HttpService.hpp>
+#include <brynet/net/http/HttpFormat.hpp>
+#include <brynet/net/http/WebSocketFormat.hpp>
+#include <brynet/net/AsyncConnector.hpp>
+#include <brynet/net/wrapper/ConnectionBuilder.hpp>
+#include <brynet/net/wrapper/HttpConnectionBuilder.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -56,15 +57,15 @@ int main(int argc, char **argv)
             .configureConnector(connector)
             .configureService(service)
             .configureConnectOptions({
-                AsyncConnector::ConnectOptions::WithAddr("23.73.140.64", 80),
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(10)),
-                AsyncConnector::ConnectOptions::WithFailedCallback([]() {
+                ConnectOption::WithAddr("23.73.140.64", 80),
+                ConnectOption::WithTimeout(std::chrono::seconds(10)),
+                ConnectOption::WithFailedCallback([]() {
                         std::cout << "connect failed" << std::endl;
                     }),
             })
             .configureConnectionOptions({
-                TcpService::AddSocketOption::WithMaxRecvBufferSize(1024),
-                TcpService::AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
+                AddSocketOption::WithMaxRecvBufferSize(1024),
+                AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
                     // do something for session
                     (void)session;
                 })

@@ -2,9 +2,9 @@
 #include <mutex>
 #include <atomic>
 
-#include <brynet/net/EventLoop.h>
-#include <brynet/net/TCPService.h>
-#include <brynet/net/Wrapper.h>
+#include <brynet/net/EventLoop.hpp>
+#include <brynet/net/TcpService.hpp>
+#include <brynet/net/wrapper/ServiceBuilder.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -47,8 +47,8 @@ int main(int argc, char **argv)
             }
         })
         .configureConnectionOptions({
-            brynet::net::TcpService::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024),
-            brynet::net::TcpService::AddSocketOption::AddEnterCallback(enterCallback)
+            brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024),
+            brynet::net::AddSocketOption::AddEnterCallback(enterCallback)
         })
         .configureListen([=](wrapper::BuildListenConfig config) {
             config.setAddr(false, "0.0.0.0", atoi(argv[1]));

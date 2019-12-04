@@ -1,7 +1,7 @@
 `brynet`不会对每一个消息都进行`send`系统调用.
 
 当上层需要发送消息时，是投递一个`std::function`投递到`EventLoop`中。
-请打开[TcpConnection.h](https://github.com/IronsDu/brynet/blob/master/src/brynet/net/TcpConnection.h)
+请打开[TcpConnection.h](https://github.com/IronsDu/brynet/blob/master/include/brynet/net/TcpConnection.hpp)
 
 在`std::function`执行时会将消息放入`TcpConnection`的待发送队列中，见`TcpConnection::send`函数。
 

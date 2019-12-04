@@ -2,12 +2,12 @@
 #include "catch.hpp"
 #include <memory>
 #include <atomic>
-#include <brynet/utils/WaitGroup.h>
+#include <brynet/base/WaitGroup.hpp>
 #include <chrono>
 #include <thread>
 
 TEST_CASE("WaitGroup are computed", "[waitgroup]") {
-    auto wg = brynet::utils::WaitGroup::Create();
+    auto wg = brynet::base::WaitGroup::Create();
     wg->wait();
 
     wg->add(2);

@@ -1,7 +1,8 @@
 ﻿#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
-#include <brynet/net/Wrapper.h>
-#include <brynet/net/ListenThread.h>
+#include <brynet/net/wrapper/ConnectionBuilder.hpp>
+#include <brynet/net/wrapper/ServiceBuilder.hpp>
+#include <brynet/net/ListenThread.hpp>
 
 TEST_CASE("SyncConnector are computed", "[sync_connect]") {
     
@@ -19,8 +20,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
             auto socket = connectBuilder
                 .configureConnector(connector)
                 .configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                    ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                    ConnectOption::WithAddr(ip, port)
                     })
                 .syncConnect();
 
@@ -38,8 +39,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
                 .configureService(service)
                 .configureConnector(connector)
                 .configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                    ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                    ConnectOption::WithAddr(ip, port)
                 })
                 .syncConnect();
 
@@ -54,7 +55,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
         wrapper::ListenerBuilder listenerBuilder;
         listenerBuilder.configureService(service)
             .configureConnectionOptions({
-                TcpService::AddSocketOption::WithMaxRecvBufferSize(10)
+                AddSocketOption::WithMaxRecvBufferSize(10)
             })
             .configureSocketOptions({})
             .configureListen([=](wrapper::BuildListenConfig config) {
@@ -69,8 +70,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
                 auto socket = connectBuilder
                     .configureConnector(connector)
                     .configureConnectOptions({
-                        AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                        AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                        ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                        ConnectOption::WithAddr(ip, port)
                         })
                     .syncConnect();
 
@@ -85,8 +86,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
         auto socket = connectBuilder
             .configureConnector(connector)
             .configureConnectOptions({
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                ConnectOption::WithAddr(ip, port)
                 })
             .syncConnect();
 
@@ -109,8 +110,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
             auto socket = connectBuilder
                 .configureConnector(connector)
                 .configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                    ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                    ConnectOption::WithAddr(ip, port)
                 })
                 .syncConnect();
 
@@ -129,8 +130,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
                 .configureService(service)
                 .configureConnector(connector)
                 .configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                    ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                    ConnectOption::WithAddr(ip, port)
                 })
                 .syncConnect();
 
@@ -148,8 +149,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
                 .configureService(service)
                 .configureConnector(connector)
                 .configureConnectOptions({
-                    AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                    AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                    ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                    ConnectOption::WithAddr(ip, port)
                 })
                 .syncConnect();
 
@@ -165,8 +166,8 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]") {
         auto socket = connectBuilder
             .configureConnector(connector)
             .configureConnectOptions({
-                AsyncConnector::ConnectOptions::WithTimeout(std::chrono::seconds(2)),
-                AsyncConnector::ConnectOptions::WithAddr(ip, port)
+                ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                ConnectOption::WithAddr(ip, port)
             })
             .syncConnect();
 

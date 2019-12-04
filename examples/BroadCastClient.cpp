@@ -9,18 +9,17 @@
 #include <thread>
 #include <atomic>
 
-#include <brynet/utils/packet.h>
+#include <brynet/base/Timer.hpp>
+#include <brynet/base/Packet.hpp>
 
-#include <brynet/net/SocketLibFunction.h>
-
-#include <brynet/net/EventLoop.h>
-#include <brynet/net/TcpConnection.h>
-#include <brynet/timer/Timer.h>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/EventLoop.hpp>
+#include <brynet/net/TcpConnection.hpp>
 
 using namespace std;
 using namespace brynet;
 using namespace brynet::net;
-using namespace brynet::utils;
+using namespace brynet::base;
 
 atomic_llong  TotalRecvPacketNum = ATOMIC_VAR_INIT(0);
 atomic_llong TotalRecvSize = ATOMIC_VAR_INIT(0);
