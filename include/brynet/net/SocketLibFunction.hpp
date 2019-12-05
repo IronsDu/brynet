@@ -41,7 +41,7 @@ namespace brynet { namespace net { namespace base {
     static int  SocketNodelay(BrynetSocketFD fd)
     {
         const int flag = 1;
-        return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const char*)&flag, sizeof(flag));
+        return ::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const char*)&flag, sizeof(flag));
     }
 
     static bool SocketBlock(BrynetSocketFD fd)
@@ -72,25 +72,25 @@ namespace brynet { namespace net { namespace base {
 
     static int  SocketSetSendSize(BrynetSocketFD fd, int sd_size)
     {
-        return setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (const char*)&sd_size, sizeof(sd_size));
+        return ::setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (const char*)&sd_size, sizeof(sd_size));
     }
 
     static int  SocketSetRecvSize(BrynetSocketFD fd, int rd_size)
     {
-        return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
+        return ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
     }
 
     static BrynetSocketFD SocketCreate(int af, int type, int protocol)
     {
-        return socket(af, type, protocol);
+        return ::socket(af, type, protocol);
     }
 
     static void SocketClose(BrynetSocketFD fd)
     {
 #ifdef BRYNET_PLATFORM_WINDOWS
-        closesocket(fd);
+        ::closesocket(fd);
 #elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
-        close(fd);
+        ::close(fd);
 #endif
     }
 
@@ -138,7 +138,7 @@ namespace brynet { namespace net { namespace base {
             return BRYNET_INVALID_SOCKET;
         }
 
-        while (connect(clientfd, (struct sockaddr*)paddr, addrLen) < 0)
+        while (::connect(clientfd, (struct sockaddr*)paddr, addrLen) < 0)
         {
             if (EINTR == BRYNET_ERRNO)
             {
@@ -188,7 +188,7 @@ namespace brynet { namespace net { namespace base {
 
         const int reuseaddr_value = 1;
         if (!ptonResult ||
-            setsockopt(socketfd,
+            ::setsockopt(socketfd,
                 SOL_SOCKET,
                 SO_REUSEADDR,
                 (const char*)&reuseaddr_value,
@@ -198,7 +198,7 @@ namespace brynet { namespace net { namespace base {
             return BRYNET_INVALID_SOCKET;
         }
 
-        const int bindRet = bind(socketfd, (struct sockaddr*)paddr, addrLen);
+        const int bindRet = ::bind(socketfd, (struct sockaddr*)paddr, addrLen);
         if (bindRet == BRYNET_SOCKET_ERROR ||
             listen(socketfd, back_num) == BRYNET_SOCKET_ERROR)
         {
@@ -239,14 +239,14 @@ namespace brynet { namespace net { namespace base {
 #ifdef BRYNET_PLATFORM_WINDOWS
         struct sockaddr name = sockaddr();
         int namelen = sizeof(name);
-        if (getpeername(fd, (struct sockaddr*) & name, &namelen) == 0)
+        if (::getpeername(fd, (struct sockaddr*) & name, &namelen) == 0)
         {
             return getIPString(&name);
         }
 #elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
         struct sockaddr_in name = sockaddr_in();
         socklen_t namelen = sizeof(name);
-        if (getpeername(fd, (struct sockaddr*) & name, &namelen) == 0)
+        if (::getpeername(fd, (struct sockaddr*) & name, &namelen) == 0)
         {
             return getIPString((const struct sockaddr*) & name);
         }
@@ -257,7 +257,7 @@ namespace brynet { namespace net { namespace base {
 
     static int SocketSend(BrynetSocketFD fd, const char* buffer, int len)
     {
-        int transnum = send(fd, buffer, len, 0);
+        int transnum = ::send(fd, buffer, len, 0);
         if (transnum < 0 && BRYNET_EWOULDBLOCK == BRYNET_ERRNO)
         {
             transnum = 0;
@@ -269,7 +269,7 @@ namespace brynet { namespace net { namespace base {
 
     static BrynetSocketFD Accept(BrynetSocketFD listenSocket, struct sockaddr* addr, socklen_t* addrLen)
     {
-        return accept(listenSocket, addr, addrLen);
+        return ::accept(listenSocket, addr, addrLen);
     }
 
     static struct sockaddr_in6 getPeerAddr(BrynetSocketFD sockfd)
