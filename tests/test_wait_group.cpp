@@ -12,7 +12,7 @@ TEST_CASE("WaitGroup are computed", "[waitgroup]") {
 
     wg->add(2);
 
-    std::atomic<int> upvalue = ATOMIC_VAR_INIT(1);
+    std::atomic<int> upvalue = ATOMIC_VAR_INIT(0);
     auto a = std::thread([&]() {
         upvalue++;
         wg->done();
@@ -23,7 +23,7 @@ TEST_CASE("WaitGroup are computed", "[waitgroup]") {
     });
     wg->wait();
 
-    //REQUIRE(upvalue == 2);
+    REQUIRE(upvalue == 2);
     wg->wait();
     if (a.joinable())
     {

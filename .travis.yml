@@ -88,7 +88,7 @@ before_script:
    - export CC_FOR_BUILD=$CC
    - export CXX_FOR_BUILD=$CXX
 script:
-  - cmake .
+  - cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
   # make
   - bash ./scripts/travis-compiler.sh
   - sonar-scanner -X

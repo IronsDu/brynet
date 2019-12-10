@@ -29,11 +29,16 @@ Linux/MacOS : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=m
 * GCC 4.8+ (32/64-bit)
 * Clang (Supported C++ 11)
 
+## Macro
+* BRYNET_VERSION
+* BRYNET_USE_OPENSSL
+
+
 ## Build Example
-1. `cmake .`
+1. `cmake . -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON`
 2. If you use Windows, please open brynet.sln then build. If on Linux or MacOS, only enter `make`.
 
-## Install
+## Only Install
 1. `cmake .`
 2. `sudo make install`
 
