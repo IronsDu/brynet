@@ -247,9 +247,6 @@ typedef union
 #define S_R3(v,w,x,y,z,i) {z+=(((w|x)&y)|(w&x))+SHABLK(i)+0x8F1BBCDC+ROL32(v,5);w=ROL32(w,30);}
 #define S_R4(v,w,x,y,z,i) {z+=(w^x^y)+SHABLK(i)+0xCA62C1D6+ROL32(v,5);w=ROL32(w,30);}
 
-#pragma warning(push)
-// Disable compiler warning 'Conditional expression is constant'
-#pragma warning(disable: 4127)
 
 class CSHA1
 {
@@ -267,6 +264,8 @@ public:
 	// Constructor and destructor
     CSHA1()
     {
+        (void)m_reserved0;
+        (void)m_reserved1;
         m_block = (SHA1_WORKSPACE_BLOCK*)m_workspace;
 
         Reset();
@@ -493,7 +492,5 @@ private:
 	UINT_8 m_workspace[64];
 	SHA1_WORKSPACE_BLOCK* m_block; // SHA1 pointer to the byte array above
 };
-
-#pragma warning(pop)
 
 #endif // SHA1_H_A545E61D43E9404E8D736869AB3CBFE7
