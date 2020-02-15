@@ -58,8 +58,8 @@ namespace brynet { namespace base {
         {
             Callback callback;
             std::call_once(mExecuteOnceFlag, [&, this]() {
-                callback = std::move(mCallback);
-                mCallback = nullptr;
+                    callback = std::move(mCallback);
+                    mCallback = nullptr;
                 });
 
             if (callback != nullptr)
@@ -72,7 +72,7 @@ namespace brynet { namespace base {
         std::once_flag                                  mExecuteOnceFlag;
         Callback                                        mCallback;
         const std::chrono::steady_clock::time_point     mStartTime;
-        std::chrono::nanoseconds                        mLastTime;
+        const std::chrono::nanoseconds                  mLastTime;
 
         friend class TimerMgr;
     };

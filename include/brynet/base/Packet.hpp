@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdint.h>
-#include <assert.h>
+#include <cstdint>
+#include <cassert>
+#include <cstdbool>
+#include <cstring>
 #include <string>
-#include <stdbool.h>
-#include <string.h>
 
 #include <brynet/base/endian/Endian.hpp>
 
@@ -18,8 +18,8 @@ namespace brynet { namespace base {
             bool useBigEndian = true,
             bool isAutoMalloc = false)
             :
-            mBigEndian(useBigEndian),
-            mIsAutoMalloc(isAutoMalloc)
+            mIsAutoMalloc(isAutoMalloc),
+            mBigEndian(useBigEndian)
         {
             mMaxLen = len;
             mPos = 0;
@@ -234,11 +234,11 @@ namespace brynet { namespace base {
         }
 
     protected:
+        const bool  mIsAutoMalloc;
         bool        mBigEndian;
         size_t      mPos;
         size_t      mMaxLen;
         char*       mBuffer;
-        const bool  mIsAutoMalloc;
         char*       mMallocBuffer;
     };
 
@@ -374,9 +374,9 @@ namespace brynet { namespace base {
 
     protected:
         const bool      mBigEndian;
-        size_t          mPos;
         const size_t    mMaxLen;
         const char*     mBuffer;
+        size_t          mPos;
     };
 
     template<size_t SIZE>

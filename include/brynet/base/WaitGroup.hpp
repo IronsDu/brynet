@@ -13,9 +13,9 @@ namespace brynet { namespace base {
     class WaitGroup : public NonCopyable
     {
     public:
-        typedef std::shared_ptr<WaitGroup> PTR;
+        typedef std::shared_ptr<WaitGroup> Ptr;
 
-        static PTR Create()
+        static Ptr Create()
         {
             struct make_shared_enabler : public WaitGroup {};
             return std::make_shared<make_shared_enabler>();
