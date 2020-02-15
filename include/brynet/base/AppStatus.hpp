@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdbool.h>
-#include <stdio.h>
+#include <cstdbool>
+#include <cstdio>
 #include <signal.h>
 
 #include <brynet/base/Platform.hpp>
@@ -16,23 +16,20 @@
 
 namespace brynet { namespace base {
 
-    static int app_kbhit(void)
+    static bool app_kbhit()
     {
 #ifdef BRYNET_PLATFORM_WINDOWS
         return _kbhit();
 #else
-        struct termios oldt, newt;
-        int ch;
-        int oldf;
-
+        struct termios oldt;
         tcgetattr(STDIN_FILENO, &oldt);
-        newt = oldt;
+        auto newt = oldt;
         newt.c_lflag &= ~(ICANON | ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        const auto oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
         fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
 
-        ch = getchar();
+        const auto ch = getchar();
 
         tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         fcntl(STDIN_FILENO, F_SETFL, oldf);
@@ -40,10 +37,10 @@ namespace brynet { namespace base {
         if (ch != EOF)
         {
             ungetc(ch, stdin);
-            return 1;
+            return true;
         }
 
-        return 0;
+        return false;
 #endif
     }
 

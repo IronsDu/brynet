@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <stdint.h>
+#include <cstdbool>
+#include <cstring>
+#include <cstdlib>
+#include <cassert>
+#include <cstdint>
 
 #include <brynet/base/Array.hpp>
 
@@ -22,46 +22,47 @@ namespace brynet { namespace base {
 
     static void stack_delete(struct stack_s* self)
     {
-        if (self == NULL)
+        if (self == nullptr)
         {
             return;
         }
 
-        if (self->array != NULL)
+        if (self->array != nullptr)
         {
             array_delete(self->array);
-            self->array = NULL;
+            self->array = nullptr;
         }
 
         self->element_num = 0;
         self->front = 0;
         self->num = 0;
         free(self);
-        self = NULL;
+        self = nullptr;
     }
 
     static struct stack_s* stack_new(size_t num, size_t element_size)
     {
         struct stack_s* ret = (struct stack_s*)malloc(sizeof(struct stack_s));
-        if (ret == NULL)
+        if (ret == nullptr)
         {
-            return NULL;
+            return nullptr;
         }
 
-        memset(ret, 0, sizeof(*ret));
-
-        ret->element_size = element_size;
+        ret->element_size = 0;
+        ret->element_num = 0;
+        ret->front = 0;
+        ret->num = 0;
         ret->array = array_new(num, element_size);
 
-        if (ret->array != NULL)
+        if (ret->array != nullptr)
         {
+            ret->element_size = element_size;
             ret->element_num = num;
-            ret->num = 0;
         }
         else
         {
             stack_delete(ret);
-            ret = NULL;
+            ret = nullptr;
         }
 
         return ret;
@@ -82,16 +83,15 @@ namespace brynet { namespace base {
     {
         struct array_s* tmp = array_new(self->element_num + increase_num, 
             self->element_size);
-        if (tmp == NULL)
+        if (tmp == nullptr)
         {
             return false;
         }
 
         {
-            size_t i = 0;
             size_t current_num = self->element_num;
             size_t current_stack_num = stack_num(self);
-            for (; i < current_stack_num; ++i)
+            for (size_t i = 0; i < current_stack_num; ++i)
             {
                 array_set(tmp, i, array_at(self->array, (self->front + i) % current_num));
             }
@@ -114,7 +114,8 @@ namespace brynet { namespace base {
     {
         return (self->num == self->element_num);
     }
-
+    
+    /*  stack的stack_push会在空间不足的时候自动增长(通过stack_increase)  */
     static bool stack_push(struct stack_s* self, const void* data)
     {
         if (stack_isfull(self))
@@ -132,9 +133,9 @@ namespace brynet { namespace base {
         return true;
     }
 
-    static char* stack_front(struct stack_s* self)
+    static void* stack_front(struct stack_s* self)
     {
-        char* ret = NULL;
+        void* ret = nullptr;
 
         if (stack_num(self) > 0)
         {
@@ -144,11 +145,11 @@ namespace brynet { namespace base {
         return ret;
     }
 
-    static char* stack_popfront(struct stack_s* self)
+    static void* stack_popfront(struct stack_s* self)
     {
-        char* ret = stack_front(self);
+        void* ret = stack_front(self);
 
-        if (ret != NULL)
+        if (ret != nullptr)
         {
             self->num--;
             self->front++;
@@ -158,9 +159,9 @@ namespace brynet { namespace base {
         return ret;
     }
 
-    static char* stack_popback(struct stack_s* self)
+    static void* stack_popback(struct stack_s* self)
     {
-        char* ret = NULL;
+        void* ret = nullptr;
 
         if (stack_num(self) > 0)
         {

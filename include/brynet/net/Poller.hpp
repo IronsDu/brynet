@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <stdbool.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cassert>
+#include <cstdbool>
+#include <string>
 
 #include <brynet/net/SocketLibTypes.hpp>
 #include <brynet/base/Stack.hpp>
@@ -20,7 +20,6 @@ namespace brynet { namespace base {
     const static int CHECK_WRITE_FLAG = (POLLOUT | POLLWRNORM);
     const static int CHECK_ERROR_FLAG = (POLLERR | POLLHUP);
     #elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
-    #include <poll.h>
     const static int CHECK_READ_FLAG = (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI);
     const static int CHECK_WRITE_FLAG = (POLLOUT | POLLWRNORM | POLLWRBAND);
     const static int CHECK_ERROR_FLAG = (POLLERR | POLLHUP);
@@ -49,16 +48,16 @@ namespace brynet { namespace base {
 
         struct pollfd* newPollfds = (struct pollfd*)malloc(
             sizeof(struct pollfd) * (self->limitSize + upSize));
-        if (newPollfds == NULL)
+        if (newPollfds == nullptr)
         {
             return;
         }
 
-        if (self->pollFds != NULL)
+        if (self->pollFds != nullptr)
         {
             memcpy(newPollfds, self->pollFds, sizeof(struct pollfd) * self->nfds);
             free(self->pollFds);
-            self->pollFds = NULL;
+            self->pollFds = nullptr;
         }
         self->pollFds = newPollfds;
         self->limitSize += upSize;
@@ -66,8 +65,7 @@ namespace brynet { namespace base {
 
     static struct pollfd* find_pollfd(struct poller_s* self, BrynetSocketFD fd)
     {
-        int i = 0;
-        for (; i < self->nfds; i++)
+        for (int i = 0; i < self->nfds; i++)
         {
             if (self->pollFds[i].fd == fd)
             {
@@ -75,14 +73,13 @@ namespace brynet { namespace base {
             }
         }
 
-        return NULL;
+        return nullptr;
     }
 
     static void try_remove_pollfd(struct poller_s* self, BrynetSocketFD fd)
     {
         int pos = -1;
-        int i = 0;
-        for (; i < self->nfds; i++)
+        for (int i = 0; i < self->nfds; i++)
         {
             if (self->pollFds[i].fd == fd)
             {
@@ -104,7 +101,7 @@ namespace brynet { namespace base {
     static struct poller_s* poller_new(void)
     {
         struct poller_s* ret = (struct poller_s*)malloc(sizeof(struct poller_s));
-        if (ret != NULL)
+        if (ret != nullptr)
         {
             ret->pollFds = NULL;
             ret->limitSize = 0;
@@ -118,12 +115,12 @@ namespace brynet { namespace base {
     static void poller_delete(struct poller_s* self)
     {
         free(self->pollFds);
-        self->pollFds = NULL;
+        self->pollFds = nullptr;
         self->nfds = 0;
         self->limitSize = 0;
 
         free(self);
-        self = NULL;
+        self = nullptr;
     }
 
     static void poller_add(struct poller_s* self, BrynetSocketFD fd, int type)
@@ -139,7 +136,7 @@ namespace brynet { namespace base {
         }
 
         struct pollfd* pf = find_pollfd(self, fd);
-        if (pf == NULL)
+        if (pf == nullptr)
         {
             /*real add*/
             pf = self->pollFds + self->nfds;
@@ -168,7 +165,7 @@ namespace brynet { namespace base {
     static void poller_del(struct poller_s* self, BrynetSocketFD fd, int type)
     {
         struct pollfd* pf = find_pollfd(self, fd);
-        if (pf == NULL)
+        if (pf == nullptr)
         {
             return;
         }
@@ -201,7 +198,7 @@ namespace brynet { namespace base {
 
     static bool check_event(const struct pollfd* pf, enum CheckType type)
     {
-        if (pf == NULL)
+        if (pf == nullptr)
         {
             return false;
         }
@@ -231,8 +228,7 @@ namespace brynet { namespace base {
         enum CheckType type, 
         struct stack_s* result)
     {
-        int i = 0;
-        for (; i < self->nfds; i++)
+        for (int i = 0; i < self->nfds; i++)
         {
             if (check_event(self->pollFds + i, type))
             {
@@ -252,10 +248,10 @@ namespace brynet { namespace base {
         if (ret == BRYNET_SOCKET_ERROR)
         {
             ret = (BRYNET_ERRNO != BRYNET_EINTR) ? -1 : 0;
-    }
+        }
 
         return ret;
-}
+    }
 
     static bool poller_check(struct poller_s* self, BrynetSocketFD fd, enum CheckType type)
     {

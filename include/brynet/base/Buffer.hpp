@@ -1,9 +1,9 @@
 #pragma once
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdbool>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 
 namespace brynet { namespace base {
 
@@ -18,39 +18,42 @@ namespace brynet { namespace base {
 
     static void buffer_delete(struct buffer_s* self)
     {
-        if (self == NULL)
+        if (self == nullptr)
         {
             return;
         }
 
-        if (self->data != NULL)
+        if (self->data != nullptr)
         {
             free(self->data);
-            self->data = NULL;
+            self->data = nullptr;
         }
 
         free(self);
-        self = NULL;
+        self = nullptr;
     }
 
     static struct buffer_s* buffer_new(size_t buffer_size)
     {
         struct buffer_s* ret = (struct buffer_s*)malloc(sizeof(struct buffer_s));
-        if (ret == NULL)
+        if (ret == nullptr)
         {
-            return NULL;
+            return nullptr;
         }
 
-        if ((ret->data = (char*)malloc(sizeof(char) * buffer_size)) != NULL)
+        ret->data_len = 0;
+        ret->read_pos = 0;
+        ret->write_pos = 0;
+        ret->data = (char*)malloc(sizeof(char) * buffer_size);
+
+        if (ret->data != nullptr)
         {
             ret->data_len = buffer_size;
-            ret->read_pos = 0;
-            ret->write_pos = 0;
         }
         else
         {
             buffer_delete(ret);
-            ret = NULL;
+            ret = nullptr;
         }
 
         return ret;
@@ -63,14 +66,12 @@ namespace brynet { namespace base {
 
     static void buffer_adjustto_head(struct buffer_s* self)
     {
-        size_t len = 0;
-
-        if (self->read_pos <= 0)
+        if (self->read_pos == 0)
         {
             return;
         }
 
-        len = buffer_getreadvalidcount(self);
+        const auto len = buffer_getreadvalidcount(self);
         if (len > 0)
         {
             memmove(self->data, self->data + self->read_pos, len);
@@ -96,21 +97,31 @@ namespace brynet { namespace base {
         return self->read_pos;
     }
 
-    static void buffer_addwritepos(struct buffer_s* self, size_t value)
+    static bool buffer_addwritepos(struct buffer_s* self, size_t value)
     {
-        size_t temp = self->write_pos + value;
+        const size_t temp = self->write_pos + value;
         if (temp <= self->data_len)
         {
             self->write_pos = temp;
+            return true;
+        }
+        else
+        {
+            return false;
         }
     }
 
-    static void buffer_addreadpos(struct buffer_s* self, size_t value)
+    static bool buffer_addreadpos(struct buffer_s* self, size_t value)
     {
-        size_t temp = self->read_pos + value;
+        const size_t temp = self->read_pos + value;
         if (temp <= self->data_len)
         {
             self->read_pos = temp;
+            return true;
+        }
+        else
+        {
+            return false;
         }
     }
 
@@ -132,7 +143,7 @@ namespace brynet { namespace base {
         }
         else
         {
-            return NULL;
+            return nullptr;
         }
     }
 
@@ -144,10 +155,9 @@ namespace brynet { namespace base {
         }
         else
         {
-            return NULL;
+            return nullptr;
         }
     }
-
 
     static bool buffer_write(struct buffer_s* self, const char* data, size_t len)
     {

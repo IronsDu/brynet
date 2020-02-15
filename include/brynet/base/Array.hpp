@@ -1,15 +1,15 @@
 #pragma once
 
-#include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
+#include <cstdbool>
+#include <cstring>
+#include <cstdlib>
+#include <cassert>
 
 namespace brynet { namespace base {
 
     struct array_s
     {
-        char*   buffer;
+        void*   buffer;
         size_t  buffer_size;
         size_t  element_size;
         size_t  element_num;
@@ -17,36 +17,39 @@ namespace brynet { namespace base {
 
     static void array_delete(struct array_s* self)
     {
-        if (self == NULL)
+        if (self == nullptr)
         {
             return;
         }
 
-        if (self->buffer != NULL)
+        if (self->buffer != nullptr)
         {
             free(self->buffer);
-            self->buffer = NULL;
+            self->buffer = nullptr;
         }
 
         self->element_num = 0;
         free(self);
-        self = NULL;
+        self = nullptr;
     }
 
     static struct array_s* array_new(size_t num, size_t element_size)
     {
-        size_t buffer_size = num * element_size;
-        struct array_s* ret = (struct array_s*)malloc(sizeof(struct array_s));
-        if (ret == NULL)
+        auto ret = (struct array_s*)malloc(sizeof(struct array_s));
+        if (ret == nullptr)
         {
-            return NULL;
+            return nullptr;
         }
 
-        memset(ret, 0, sizeof(*ret));
-        ret->buffer = (char*)malloc(buffer_size);
-        if (ret->buffer != NULL)
+        const auto buffer_size = num * element_size;
+
+        ret->buffer_size = 0;
+        ret->element_size = 0;
+        ret->element_num = 0;
+        ret->buffer = malloc(buffer_size);
+
+        if (ret->buffer != nullptr)
         {
-            memset(ret->buffer, 0, buffer_size);
             ret->element_size = element_size;
             ret->element_num = num;
             ret->buffer_size = buffer_size;
@@ -54,19 +57,19 @@ namespace brynet { namespace base {
         else
         {
             array_delete(ret);
-            ret = NULL;
+            ret = nullptr;
         }
 
         return ret;
     }
 
-    static char* array_at(struct array_s* self, size_t index)
+    static void* array_at(struct array_s* self, size_t index)
     {
-        char* ret = NULL;
+        void* ret = nullptr;
 
         if (index < self->element_num)
         {
-            ret = self->buffer + (index * self->element_size);
+            ret = (char*)(self->buffer) + (index * self->element_size);
         }
         else
         {
@@ -78,9 +81,9 @@ namespace brynet { namespace base {
 
     static bool array_set(struct array_s* self, size_t index, const void* data)
     {
-        char* old_data = array_at(self, index);
+        void* old_data = array_at(self, index);
 
-        if (old_data != NULL)
+        if (old_data != nullptr)
         {
             memcpy(old_data, data, self->element_size);
             return true;
@@ -93,20 +96,16 @@ namespace brynet { namespace base {
 
     static bool array_increase(struct array_s* self, size_t increase_num)
     {
-        size_t new_buffer_size = 0;
-        char* new_buffer = NULL;
-
         if (increase_num == 0)
         {
             return false;
         }
 
-        new_buffer_size = self->buffer_size + increase_num * self->element_size;
-        new_buffer = (char*)malloc(new_buffer_size);
+        const auto new_buffer_size = self->buffer_size + increase_num * self->element_size;
+        auto new_buffer = malloc(new_buffer_size);
 
-        if (new_buffer != NULL)
+        if (new_buffer != nullptr)
         {
-            memset(new_buffer, 0, new_buffer_size);
             memcpy(new_buffer, self->buffer, self->buffer_size);
             free(self->buffer);
             self->buffer = new_buffer;

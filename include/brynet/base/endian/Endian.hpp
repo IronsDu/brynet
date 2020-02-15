@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdint.h>
-#include <assert.h>
-#include <string>
-#include <stdbool.h>
-#include <string.h>
+#include <cstdint>
+#include <cassert>
+#include <cstring>
+#include <cstdbool>
+#include <cstring>
 
 #include <brynet/net/SocketLibTypes.hpp>
 
@@ -16,13 +16,13 @@
 
 namespace brynet { namespace base { namespace endian {
 
-    inline uint64_t  hl64ton(uint64_t   host)
+    inline uint64_t  hl64ton(uint64_t   hostValue)
     {
         uint64_t   ret = 0;
         uint32_t   high, low;
 
-        low = host & 0xFFFFFFFF;
-        high = (host >> 32) & 0xFFFFFFFF;
+        low = hostValue & 0xFFFFFFFF;
+        high = (hostValue >> 32) & 0xFFFFFFFF;
         low = htonl(low);
         high = htonl(high);
         ret = low;
@@ -32,13 +32,13 @@ namespace brynet { namespace base { namespace endian {
         return   ret;
     }
 
-    inline uint64_t  ntohl64(uint64_t   host)
+    inline uint64_t  ntohl64(uint64_t   netValue)
     {
         uint64_t   ret = 0;
         uint32_t   high, low;
 
-        low = host & 0xFFFFFFFF;
-        high = (host >> 32) & 0xFFFFFFFF;
+        low = netValue & 0xFFFFFFFF;
+        high = (netValue >> 32) & 0xFFFFFFFF;
         low = ntohl(low);
         high = ntohl(high);
         ret = low;
