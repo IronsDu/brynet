@@ -929,14 +929,14 @@ namespace brynet { namespace net {
             ev.data.ptr = (Channel*)(this);
             epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
 #elif defined BRYNET_PLATFORM_DARWIN
-            struct kevent ev[2];
-            memset(&ev, 0, sizeof(ev));
-            int n = 0;
-            EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_ENABLE, 0, 0, (Channel*)(this));
-            EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_ENABLE, 0, 0, (Channel*)(this));
+//             struct kevent ev[2];
+//             memset(&ev, 0, sizeof(ev));
+//             int n = 0;
+//             EV_SET(&ev[n++], mSocket->getFD(), EVFILT_READ, EV_ENABLE, 0, 0, (Channel*)(this));
+//             EV_SET(&ev[n++], mSocket->getFD(), EVFILT_WRITE, EV_ENABLE, 0, 0, (Channel*)(this));
 
-            struct timespec now = { 0, 0 };
-            kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
+//             struct timespec now = { 0, 0 };
+//             kevent(mEventLoop->getKqueueHandle(), ev, n, NULL, 0, &now);
 #endif
         }
         void                            unregisterPollerEvent()
