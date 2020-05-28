@@ -140,8 +140,7 @@ namespace brynet { namespace net { namespace detail {
         {
             try
             {
-                auto clientSocket = listenSocket->accept();
-                return clientSocket;
+                return listenSocket->accept();
             }
             catch (const EintrError & e)
             {

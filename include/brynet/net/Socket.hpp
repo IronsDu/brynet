@@ -164,7 +164,19 @@ namespace brynet { namespace net {
             const auto clientFD = brynet::net::base::Accept(mFD, nullptr, nullptr);
             if (clientFD == BRYNET_INVALID_SOCKET)
             {
-                if (EINTR == BRYNET_ERRNO)
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+                if (BRYNET_ERRNO == EMFILE)
+                {
+                    // Thanks libev and muduo.
+                    // Read the section named "The special problem of
+                    // accept()ing when you can't" in libev's doc.
+                    // By Marc Lehmann, author of libev.
+                    mIdle.reset();
+                    TcpSocket::Create(brynet::net::base::Accept(mFD, nullptr, nullptr), true);
+                    mIdle = brynet::net::TcpSocket::Create(::open("/dev/null", O_RDONLY | O_CLOEXEC), true);
+                }
+#endif
+                if (BRYNET_ERRNO == EINTR)
                 {
                     throw EintrError();
                 }
@@ -196,6 +208,9 @@ namespace brynet { namespace net {
             :
             mFD(fd)
         {
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+            mIdle = brynet::net::TcpSocket::Create(::open("/dev/null", O_RDONLY | O_CLOEXEC), true);
+#endif
         }
 
         virtual ~ListenSocket()
@@ -205,6 +220,9 @@ namespace brynet { namespace net {
 
     private:
         const BrynetSocketFD  mFD;
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+        brynet::net::TcpSocket::Ptr mIdle;
+#endif
 
         friend class TcpConnection;
     };
