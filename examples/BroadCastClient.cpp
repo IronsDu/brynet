@@ -51,7 +51,7 @@ int main(int argc, char** argv)
         auto enterCallback = [packetLen](TcpConnection::Ptr datasSocket) {
             static_assert(sizeof(datasSocket.get()) <= sizeof(int64_t), "");
 
-            auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
+            uint32_t HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
 
             std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
             sp->writeUINT32(HEAD_LEN + sizeof(int64_t) + packetLen);

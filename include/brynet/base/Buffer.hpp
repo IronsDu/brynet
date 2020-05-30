@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdbool>
+#include <brynet/base/Bool.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>

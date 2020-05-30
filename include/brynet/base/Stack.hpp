@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cstdbool>
 #include <cstring>
 #include <cstdlib>
 #include <cassert>
 #include <cstdint>
 
 #include <brynet/base/Array.hpp>
+#include <brynet/base/Bool.hpp>
 
 namespace brynet { namespace base {
 
@@ -16,8 +16,8 @@ namespace brynet { namespace base {
         size_t          element_size;
 
         size_t          element_num;
-        size_t          front;              /*  栈底  */
-        size_t          num;                /*  栈有效元素大小 */
+        size_t          front;              /*  TODO: add comment  */
+        size_t          num;                /*  TODO: add comment */
     };
 
     static void stack_delete(struct stack_s* self)
@@ -115,7 +115,7 @@ namespace brynet { namespace base {
         return (self->num == self->element_num);
     }
     
-    /*  stack的stack_push会在空间不足的时候自动增长(通过stack_increase)  */
+    /*  TODO: fix comment  */
     static bool stack_push(struct stack_s* self, const void* data)
     {
         if (stack_isfull(self))
