@@ -209,8 +209,8 @@ namespace brynet { namespace net { namespace http {
             if (isMasking)
             {
                 payload.reserve(payloadlen);
-                for (size_t i = pos, j = 0; j < payloadlen; i++, j++)
-                    payload.push_back(buffer[i] ^ mask[j % 4]);
+                for (size_t j = 0; j < payloadlen; j++)
+                    payload.push_back(buffer[pos+j] ^ mask[j % 4]);
             }
             else
             {

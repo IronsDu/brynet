@@ -2,12 +2,11 @@
 #include <string>
 #include <thread>
 
-#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/http/HttpService.hpp>
-#include <brynet/net/http/HttpFormat.hpp>
 #include <brynet/net/http/WebSocketFormat.hpp>
 #include <brynet/net/AsyncConnector.hpp>
 #include <brynet/net/ListenThread.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace std;
 using namespace brynet;
@@ -58,6 +57,7 @@ int main(int argc, char **argv)
                         cachePacket->clear();
 
                         backendSession->setDisConnectCallback([=](const TcpConnection::Ptr& backendSession) {
+                            (void)backendSession;
                             *shareBackendSession = nullptr;
                             auto ud = brynet::base::cast<int64_t>(session->getUD());
                             if (*ud != -1)
@@ -121,6 +121,14 @@ int main(int argc, char **argv)
 
     // listen for front http client
     listenThread->startListen();
-    
-    std::cin.get();
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (brynet::base::app_kbhit())
+        {
+            break;
+        }
+    }
+
+    return 0;
 }

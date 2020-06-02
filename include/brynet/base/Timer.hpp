@@ -24,7 +24,7 @@ namespace brynet { namespace base {
             std::chrono::nanoseconds lastTime,
             Callback&& callback) BRYNET_NOEXCEPT
             :
-            mCallback(std::forward<Callback>(callback)),
+            mCallback(std::move(callback)),
             mStartTime(startTime),
             mLastTime(lastTime)
         {
@@ -57,7 +57,7 @@ namespace brynet { namespace base {
         void            operator() ()
         {
             Callback callback;
-            std::call_once(mExecuteOnceFlag, [&, this]() {
+            std::call_once(mExecuteOnceFlag, [&callback, this]() {
                     callback = std::move(mCallback);
                     mCallback = nullptr;
                 });

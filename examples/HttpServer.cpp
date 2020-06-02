@@ -1,15 +1,13 @@
 ﻿#include <iostream>
 #include <string>
-#include <mutex>
 #include <condition_variable>
 
-#include <brynet/net/SSLHelper.hpp>
-#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/http/HttpService.hpp>
 #include <brynet/net/http/HttpFormat.hpp>
 #include <brynet/net/http/WebSocketFormat.hpp>
 #include <brynet/net/wrapper/ServiceBuilder.hpp>
 #include <brynet/net/wrapper/HttpServiceBuilder.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -74,6 +72,14 @@ int main(int argc, char **argv)
         })
         .asyncRun();
 
-    std::cin.get();
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (brynet::base::app_kbhit())
+        {
+            break;
+        }
+    }
+
     return 0;
 }

@@ -5,6 +5,7 @@
 #include <brynet/net/EventLoop.hpp>
 #include <brynet/net/TcpService.hpp>
 #include <brynet/net/wrapper/ServiceBuilder.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -35,6 +36,7 @@ int main(int argc, char **argv)
             });
 
         session->setDisConnectCallback([](const TcpConnection::Ptr& session) {
+                (void)session;
                 total_client_num--;
             });
     };
@@ -75,5 +77,12 @@ int main(int argc, char **argv)
         std::cout << "packet num:" << total_packet_num << std::endl;
         total_packet_num = 0;
         TotalRecvSize = 0;
+
+        if (brynet::base::app_kbhit())
+        {
+            break;
+        }
     }
+
+    return 0;
 }

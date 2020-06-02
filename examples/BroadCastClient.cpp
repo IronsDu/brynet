@@ -1,20 +1,15 @@
-﻿#include <functional>
-#include <time.h>
-#include <stdio.h>
-#include <thread>
+﻿#include <stdio.h>
 #include <iostream>
-#include <assert.h>
 #include <chrono>
 #include <memory>
-#include <thread>
 #include <atomic>
 
-#include <brynet/base/Timer.hpp>
 #include <brynet/base/Packet.hpp>
 
 #include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/EventLoop.hpp>
 #include <brynet/net/TcpConnection.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace std;
 using namespace brynet;
@@ -34,37 +29,37 @@ int main(int argc, char** argv)
 
     std::string ip = argv[1];
     int port = atoi(argv[2]);
-    int clietNum = atoi(argv[3]);
+    int clientNum = atoi(argv[3]);
     int packetLen = atoi(argv[4]);
 
     brynet::net::base::InitSocket();
 
     auto clientEventLoop = std::make_shared<EventLoop>();
 
-    for (int i = 0; i < clietNum; i++)
+    for (int i = 0; i < clientNum; i++)
     {
-        auto fd = brynet::net::base::Connect(false, ip.c_str(), port);
+        auto fd = brynet::net::base::Connect(false, ip, port);
         brynet::net::base::SocketSetSendSize(fd, 32 * 1024);
         brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
         brynet::net::base::SocketNodelay(fd);
 
-        auto enterCallback = [packetLen](TcpConnection::Ptr datasSocket) {
-            static_assert(sizeof(datasSocket.get()) <= sizeof(int64_t), "");
+        auto enterCallback = [packetLen](const TcpConnection::Ptr& dataSocket) {
+            static_assert(sizeof(dataSocket.get()) <= sizeof(int64_t), "ud's size must less int64");
 
             auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
 
             std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
             sp->writeUINT32(HEAD_LEN + sizeof(int64_t) + packetLen);
             sp->writeUINT16(1);
-            sp->writeINT64((int64_t)datasSocket.get());
+            sp->writeINT64((int64_t)dataSocket.get());
             sp->writeBinary(std::string(packetLen, '_'));
 
             for (int i = 0; i < 1; ++i)
             {
-                datasSocket->send(sp->getData(), sp->getPos());
+                dataSocket->send(sp->getData(), sp->getPos());
             }
 
-            datasSocket->setDataCallback([datasSocket](const char* buffer, size_t len) {
+            dataSocket->setDataCallback([dataSocket](const char* buffer, size_t len) {
                 const char* parseStr = buffer;
                 int totalProcLen = 0;
                 size_t leftLen = len;
@@ -87,9 +82,9 @@ int main(int argc, char** argv)
                             rp.readUINT16();
                             int64_t addr = rp.readINT64();
 
-                            if (addr == (int64_t)(datasSocket.get()))
+                            if (addr == (int64_t)(dataSocket.get()))
                             {
-                                datasSocket->send(parseStr, packet_len);
+                                dataSocket->send(parseStr, packet_len);
                             }
 
                             totalProcLen += packet_len;
@@ -110,7 +105,8 @@ int main(int argc, char** argv)
                 return totalProcLen;
             });
 
-            datasSocket->setDisConnectCallback([](TcpConnection::Ptr datasSocket) {
+            dataSocket->setDisConnectCallback([](const TcpConnection::Ptr& dataSocket) {
+                (void)dataSocket;
             });
         };
         auto tcpConnection = TcpConnection::Create(TcpSocket::Create(fd, false),
@@ -145,5 +141,11 @@ int main(int argc, char** argv)
             TotalRecvSize = 0;
             TotalRecvPacketNum = 0;
         }
+        if (app_kbhit())
+        {
+            break;
+        }
     }
+
+    return 0;
 }
