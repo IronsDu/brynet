@@ -1,15 +1,11 @@
 ﻿#include <iostream>
 #include <mutex>
-#include <atomic>
-
-#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/EventLoop.hpp>
 #include <brynet/net/TcpService.hpp>
 #include <brynet/net/PromiseReceive.hpp>
 #include <brynet/net/http/HttpFormat.hpp>
-#include <brynet/net/ListenThread.hpp>
 #include <brynet/net/wrapper/ServiceBuilder.hpp>
-#include <brynet/net/wrapper/ConnectionBuilder.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -52,6 +48,8 @@ int main(int argc, char **argv)
                 }
                 return false;
             })->receive(contentLength, [session](const char* buffer, size_t len) {
+                (void)buffer;
+                (void)len;
                 HttpResponse response;
                 response.setStatus(HttpResponse::HTTP_RESPONSE_STATUS::OK);
                 response.setContentType("text/html; charset=utf-8");
@@ -81,9 +79,14 @@ int main(int argc, char **argv)
         })
         .asyncRun();
 
-    EventLoop mainLoop;
-    while (true)
+    while(true)
     {
-        mainLoop.loop(1000);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (brynet::base::app_kbhit())
+        {
+            break;
+        }
     }
+
+    return 0;
 }

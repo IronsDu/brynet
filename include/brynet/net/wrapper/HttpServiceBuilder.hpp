@@ -10,7 +10,7 @@ namespace brynet { namespace net { namespace wrapper {
     public:
         HttpListenerBuilder& configureEnterCallback(http::HttpSession::EnterCallback&& callback)
         {
-            mHttpEnterCallback = std::forward<http::HttpSession::EnterCallback>(callback);
+            mHttpEnterCallback = std::move(callback);
             return *this;
         }
 

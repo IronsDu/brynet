@@ -35,13 +35,12 @@ namespace brynet { namespace net { namespace detail {
             FailedCallback&& failedCB,
             std::vector<ProcessTcpSocketCallback>&& processCallbacks)
             :
-            mIP(std::forward<std::string>(ip)),
+            mIP(std::move(ip)),
             mPort(port),
             mTimeout(timeout),
-            mSuccessCB(std::forward<CompletedCallback>(successCB)),
-            mFailedCB(std::forward<FailedCallback>(failedCB)),
-            mProcessCallbacks(std::forward<std::vector<ProcessTcpSocketCallback>>(
-                processCallbacks))
+            mSuccessCB(std::move(successCB)),
+            mFailedCB(std::move(failedCB)),
+            mProcessCallbacks(std::move(processCallbacks))
         {
         }
 

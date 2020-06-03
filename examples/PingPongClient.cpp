@@ -1,10 +1,10 @@
 ﻿#include <iostream>
 #include <string>
 
-#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/TcpService.hpp>
 #include <brynet/net/AsyncConnector.hpp>
 #include <brynet/net/wrapper/ConnectionBuilder.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -68,5 +68,14 @@ int main(int argc, char **argv)
         }
     }
 
-    std::cin.get();
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (brynet::base::app_kbhit())
+        {
+            break;
+        }
+    }
+
+    return 0;
 }

@@ -275,7 +275,7 @@ namespace brynet { namespace net { namespace base {
     static struct sockaddr_in6 getPeerAddr(BrynetSocketFD sockfd)
     {
         struct sockaddr_in6 peeraddr = sockaddr_in6();
-        socklen_t addrlen = static_cast<socklen_t>(sizeof peeraddr);
+        auto addrlen = static_cast<socklen_t>(sizeof peeraddr);
         if (::getpeername(sockfd, (struct sockaddr*)(&peeraddr), &addrlen) < 0)
         {
             return peeraddr;
@@ -286,7 +286,7 @@ namespace brynet { namespace net { namespace base {
     static struct sockaddr_in6 getLocalAddr(BrynetSocketFD sockfd)
     {
         struct sockaddr_in6 localaddr = sockaddr_in6();
-        socklen_t addrlen = static_cast<socklen_t>(sizeof localaddr);
+        auto addrlen = static_cast<socklen_t>(sizeof localaddr);
         if (::getsockname(sockfd, (struct sockaddr*)(&localaddr), &addrlen) < 0)
         {
             return localaddr;

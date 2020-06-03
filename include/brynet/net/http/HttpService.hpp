@@ -27,24 +27,25 @@ namespace brynet { namespace net { namespace http {
         using WsConnectedCallback = std::function <void(const HttpSession::Ptr&, const HTTPParser&)>;
 
     public:
+        // TODO::thread-safe
         void                        setHttpCallback(HttpParserCallback&& callback)
         {
-            mHttpRequestCallback = std::forward<HttpParserCallback>(callback);
+            mHttpRequestCallback = std::move(callback);
         }
 
         void                        setClosedCallback(ClosedCallback&& callback)
         {
-            mCloseCallback = std::forward<ClosedCallback>(callback);
+            mCloseCallback = std::move(callback);
         }
 
         void                        setWSCallback(WsCallback&& callback)
         {
-            mWSCallback = std::forward<WsCallback>(callback);
+            mWSCallback = std::move(callback);
         }
 
         void                        setWSConnected(WsConnectedCallback&& callback)
         {
-            mWSConnectedCallback = std::forward<WsConnectedCallback>(callback);
+            mWSConnectedCallback = std::move(callback);
         }
 
         template<typename PacketType>
@@ -52,15 +53,13 @@ namespace brynet { namespace net { namespace http {
             TcpConnection::PacketSendedCallback&& callback = nullptr)
         {
             mSession->send(std::forward<TcpConnection::PacketPtr>(packet),
-                std::forward<TcpConnection::PacketSendedCallback>(callback));
+                std::move(callback));
         }
         void                        send(const char* packet,
             size_t len,
             TcpConnection::PacketSendedCallback&& callback = nullptr)
         {
-            mSession->send(packet, 
-                len, 
-                std::forward<TcpConnection::PacketSendedCallback>(callback));
+            mSession->send(packet, len, std::move(callback));
         }
 
         void                        postShutdown() const

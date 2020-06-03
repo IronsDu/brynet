@@ -272,7 +272,7 @@ namespace brynet { namespace net {
             }
             else
             {
-                pushAsyncFunctor(std::forward<UserFunctor>(f));
+                pushAsyncFunctor(std::move(f));
                 wakeup();
             }
         }
@@ -284,14 +284,14 @@ namespace brynet { namespace net {
                 throw BrynetCommonException("only push after functor in io thread");
             }
 
-            mAfterLoopFunctors.emplace_back(std::forward<UserFunctor>(f));
+            mAfterLoopFunctors.emplace_back(std::move(f));
         }
         brynet::base::Timer::WeakPtr   runAfter(std::chrono::nanoseconds timeout, UserFunctor&& callback)
         {
             auto timer = std::make_shared<brynet::base::Timer>(
                 std::chrono::steady_clock::now(),
                 std::chrono::nanoseconds(timeout),
-                std::forward<UserFunctor>(callback));
+                std::move(callback));
 
             if (isInLoopThread())
             {
@@ -347,7 +347,7 @@ namespace brynet { namespace net {
         void                            pushAsyncFunctor(UserFunctor&& f)
         {
             std::lock_guard<std::mutex> lck(mAsyncFunctorsMutex);
-            mAsyncFunctors.emplace_back(std::forward<UserFunctor>(f));
+            mAsyncFunctors.emplace_back(std::move(f));
         }
 
 #ifdef BRYNET_PLATFORM_LINUX

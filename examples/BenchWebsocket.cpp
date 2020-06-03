@@ -3,13 +3,13 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/http/HttpService.hpp>
 #include <brynet/net/http/HttpFormat.hpp>
 #include <brynet/net/http/WebSocketFormat.hpp>
 #include <brynet/base/Packet.hpp>
 #include <brynet/net/wrapper/ConnectionBuilder.hpp>
 #include <brynet/net/wrapper/HttpConnectionBuilder.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -18,7 +18,7 @@ using namespace brynet::base;
 
 std::atomic<int32_t> count;
 
-static void sendPacket(HttpSession::Ptr session, const char* data, size_t len)
+static void sendPacket(const HttpSession::Ptr& session, const char* data, size_t len)
 {
     char buff[1024];
     BasePacketWriter bw(buff, sizeof(buff), true, true);
@@ -113,6 +113,11 @@ int main(int argc, char **argv)
         mainLoop.loop(5000);
         std::cout << (count / 5) << std::endl;
         count = 0;
+        if (app_kbhit())
+        {
+            break;
+        }
     }
-    std::cin.get();
+
+    return 0;
 }

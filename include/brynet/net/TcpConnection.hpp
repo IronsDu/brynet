@@ -62,14 +62,14 @@ namespace brynet { namespace net {
                     :
                     TcpConnection(std::move(socket), 
                         maxRecvBufferSize, 
-                        std::forward<EnterCallback>(enterCallback), 
+                        std::move(enterCallback),
                         std::move(eventLoop))
                 {}
             };
             return std::make_shared<make_shared_enabler>(
                 std::move(socket),
                 maxRecvBufferSize,
-                std::forward<EnterCallback>(enterCallback),
+                std::move(enterCallback),
                 std::move(eventLoop));
         }
 
@@ -124,7 +124,7 @@ namespace brynet { namespace net {
             size_t len, 
             PacketSendedCallback&& callback = nullptr)
         {
-            send(makePacket(buffer, len), std::forward<PacketSendedCallback>(callback));
+            send(makePacket(buffer, len), std::move(callback));
         }
 
         template<typename PacketType>
@@ -134,7 +134,7 @@ namespace brynet { namespace net {
             callback = nullptr)
         {
             auto packetCapture = std::forward<PacketType>(packet);
-            auto callbackCapture = std::forward<PacketSendedCallback>(callback);
+            auto callbackCapture = std::move(callback);
             auto sharedThis = shared_from_this();
             mEventLoop->runAsyncFunctor(
                 [sharedThis, packetCapture, callbackCapture]() mutable {
@@ -272,7 +272,7 @@ namespace brynet { namespace net {
             mEventLoop(std::move(eventLoop)),
             mAlreadyClose(false),
             mMaxRecvBufferSize(maxRecvBufferSize),
-            mEnterCallback(std::forward<EnterCallback>(enterCallback))
+            mEnterCallback(std::move(enterCallback))
         {
             mRecvData = false;
             mCheckTime = std::chrono::steady_clock::duration::zero();

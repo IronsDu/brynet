@@ -1,9 +1,6 @@
-﻿#include <functional>
-#include <time.h>
-#include <stdio.h>
+﻿#include <cstdio>
 #include <thread>
 #include <iostream>
-#include <assert.h>
 #include <chrono>
 #include <vector>
 #include <atomic>
@@ -15,6 +12,7 @@
 #include <brynet/net/TcpConnection.hpp>
 #include <brynet/net/TcpService.hpp>
 #include <brynet/net/ListenThread.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -75,7 +73,7 @@ int main(int argc, char** argv)
     }
 
     int port = atoi(argv[1]);
-    int threadnum = atoi(argv[2]);
+    int threadNum = atoi(argv[2]);
     brynet::net::base::InitSocket();
 
     service = TcpService::Create();
@@ -139,7 +137,7 @@ int main(int argc, char** argv)
         });
 
     listenThread->startListen();
-    service->startWorkerThread(threadnum);
+    service->startWorkerThread(threadNum);
 
     auto now = std::chrono::steady_clock::now();
     while (true)
@@ -163,6 +161,11 @@ int main(int argc, char** argv)
             RecvPacketNum = 0;
             SendPacketNum = 0;
             now = std::chrono::steady_clock::now();
+        }
+
+        if (app_kbhit())
+        {
+            break;
         }
     }
 

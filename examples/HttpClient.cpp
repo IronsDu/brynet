@@ -1,16 +1,11 @@
 #include <iostream>
 #include <string>
 #include <mutex>
-#include <condition_variable>
-
-#include <brynet/net/SSLHelper.hpp>
-#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/http/HttpService.hpp>
 #include <brynet/net/http/HttpFormat.hpp>
-#include <brynet/net/http/WebSocketFormat.hpp>
 #include <brynet/net/AsyncConnector.hpp>
-#include <brynet/net/wrapper/ConnectionBuilder.hpp>
 #include <brynet/net/wrapper/HttpConnectionBuilder.hpp>
+#include <brynet/base/AppStatus.hpp>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -70,7 +65,7 @@ int main(int argc, char **argv)
                     (void)session;
                 })
             })
-            .configureEnterCallback([requestStr](HttpSession::Ptr session) {
+            .configureEnterCallback([requestStr](const HttpSession::Ptr& session) {
                 (void)session;
                 std::cout << "connect success" << std::endl;
                 session->send(requestStr.c_str(), requestStr.size());
@@ -83,6 +78,14 @@ int main(int argc, char **argv)
             .asyncConnect();
     }
 
-    std::cin.get();
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (brynet::base::app_kbhit())
+        {
+            break;
+        }
+    }
+
     return 0;
 }
