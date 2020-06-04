@@ -34,15 +34,14 @@ int main(int argc, char **argv)
         "0.0.0.0",
         bindPort,
         [tcpService, asyncConnector, backendIP, backendPort](TcpSocket::Ptr socket) {
-            auto enterCallback = [tcpService, asyncConnector, backendIP, backendPort](const TcpConnection::Ptr& session) {
-                session->setUD(static_cast<int64_t>(1));
+            auto status = std::make_shared<bool>(true);
+            auto enterCallback = [tcpService, asyncConnector, backendIP, backendPort, status](const TcpConnection::Ptr& session) {
                 std::shared_ptr<TcpConnection::Ptr> shareBackendSession = std::make_shared<TcpConnection::Ptr>(nullptr);
                 std::shared_ptr<std::vector<string>> cachePacket = std::make_shared<std::vector<std::string>>();
 
-                auto enterCallback = [tcpService, session, shareBackendSession, cachePacket](TcpSocket::Ptr socket) {
+                auto enterCallback = [tcpService, session, shareBackendSession, cachePacket, status](TcpSocket::Ptr socket) {
                     auto enterCallback = [=](const TcpConnection::Ptr& backendSession) {
-                        auto ud = brynet::base::cast<int64_t>(session->getUD());
-                        if (*ud == -1)   /*if http client already close*/
+                        if (!*status)   /*if http client already close*/
                         {
                             backendSession->postDisConnect();
                             return;
@@ -59,8 +58,7 @@ int main(int argc, char **argv)
                         backendSession->setDisConnectCallback([=](const TcpConnection::Ptr& backendSession) {
                             (void)backendSession;
                             *shareBackendSession = nullptr;
-                            auto ud = brynet::base::cast<int64_t>(session->getUD());
-                            if (*ud != -1)
+                            if (*status)
                             {
                                 session->postDisConnect();
                             }
@@ -109,8 +107,7 @@ int main(int argc, char **argv)
                     {
                         backendSession->postDisConnect();
                     }
-
-                    session->setUD(-1);
+                    *status = false;
                     });
             };
 

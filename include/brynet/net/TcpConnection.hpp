@@ -197,16 +197,6 @@ namespace brynet { namespace net {
                 });
         }
 
-        void                            setUD(brynet::base::BrynetAny value)
-        {
-            mUD = std::move(value);
-        }
-
-        const brynet::base::BrynetAny& getUD() const
-        {
-            return mUD;
-        }
-
         const std::string& getIP() const
         {
             return mIP;
@@ -1084,8 +1074,6 @@ namespace brynet { namespace net {
         DisconnectedCallback            mDisConnectCallback;
 
         bool                            mIsPostFlush;
-
-        brynet::base::BrynetAny         mUD;
 
 #ifdef BRYNET_USE_OPENSSL
         SSL_CTX*                        mSSLCtx;

@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     
     std::cout << "host: " << host << ':' << port << " | connections: " << connections << " | workers: " << workers << std::endl;
 
-    auto enterCallback = [host](const HttpSession::Ptr& httpSession) {
+    auto enterCallback = [host](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
         HttpRequest request;
         request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
         request.setUrl("/ws");
@@ -66,14 +66,14 @@ int main(int argc, char **argv)
         std::string requestStr = request.getResult();
         httpSession->send(requestStr.c_str(), requestStr.size());
 
-        httpSession->setWSConnected([](const HttpSession::Ptr& session, const HTTPParser&) {
+        handlers.setWSConnected([](const HttpSession::Ptr& session, const HTTPParser&) {
                 for (int i = 0; i < 200; i++)
                 {
                     sendPacket(session, "hello, world!", 13);
                 }
             });
 
-        httpSession->setWSCallback([](const HttpSession::Ptr& session,
+        handlers.setWSCallback([](const HttpSession::Ptr& session,
             WebSocketFormat::WebSocketFrameType, const std::string& payload) {
                 std::cout << payload << std::endl;
                 sendPacket(session, "hello, world!", 13);

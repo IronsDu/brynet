@@ -11,13 +11,14 @@
 namespace brynet { namespace net { namespace http {
 
     class HttpService;
+    class HttpSessionHandlers;
 
     class HttpSession : public brynet::base::NonCopyable
     {
     public:
         using Ptr = std::shared_ptr<HttpSession>;
 
-        using EnterCallback = std::function <void(const HttpSession::Ptr&)>;
+        using EnterCallback = std::function <void(const HttpSession::Ptr&, HttpSessionHandlers&)>;
         using HttpParserCallback = std::function <void(const HTTPParser&, const HttpSession::Ptr&)>;
         using WsCallback =  std::function < void(   const HttpSession::Ptr&,
                                                     WebSocketFormat::WebSocketFrameType opcode,
@@ -27,27 +28,6 @@ namespace brynet { namespace net { namespace http {
         using WsConnectedCallback = std::function <void(const HttpSession::Ptr&, const HTTPParser&)>;
 
     public:
-        // TODO::thread-safe
-        void                        setHttpCallback(HttpParserCallback&& callback)
-        {
-            mHttpRequestCallback = std::move(callback);
-        }
-
-        void                        setClosedCallback(ClosedCallback&& callback)
-        {
-            mCloseCallback = std::move(callback);
-        }
-
-        void                        setWSCallback(WsCallback&& callback)
-        {
-            mWSCallback = std::move(callback);
-        }
-
-        void                        setWSConnected(WsConnectedCallback&& callback)
-        {
-            mWSConnectedCallback = std::move(callback);
-        }
-
         template<typename PacketType>
         void                        send(PacketType&& packet,
             TcpConnection::PacketSendedCallback&& callback = nullptr)
@@ -70,16 +50,6 @@ namespace brynet { namespace net { namespace http {
         void                        postClose() const
         {
             mSession->postDisConnect();
-        }
-
-        const brynet::base::BrynetAny& getUD() const
-        {
-            return mUD;
-        }
-
-        void                        setUD(brynet::base::BrynetAny ud)
-        {
-            mUD = std::move(ud);
         }
 
     protected:
@@ -129,12 +99,64 @@ namespace brynet { namespace net { namespace http {
         }
 
     private:
+        void                        setHttpCallback(HttpParserCallback&& callback)
+        {
+            mHttpRequestCallback = std::move(callback);
+        }
+
+        void                        setClosedCallback(ClosedCallback&& callback)
+        {
+            mCloseCallback = std::move(callback);
+        }
+
+        void                        setWSCallback(WsCallback&& callback)
+        {
+            mWSCallback = std::move(callback);
+        }
+
+        void                        setWSConnected(WsConnectedCallback&& callback)
+        {
+            mWSConnectedCallback = std::move(callback);
+        }
+
+    private:
         TcpConnection::Ptr          mSession;
-        brynet::base::BrynetAny     mUD;
         HttpParserCallback          mHttpRequestCallback;
         WsCallback                  mWSCallback;
         ClosedCallback              mCloseCallback;
         WsConnectedCallback         mWSConnectedCallback;
+
+        friend class HttpService;
+    };
+
+    class HttpSessionHandlers
+    {
+    public:
+        void                        setHttpCallback(HttpSession::HttpParserCallback&& callback)
+        {
+            mHttpRequestCallback = std::move(callback);
+        }
+
+        void                        setClosedCallback(HttpSession::ClosedCallback&& callback)
+        {
+            mCloseCallback = std::move(callback);
+        }
+
+        void                        setWSCallback(HttpSession::WsCallback&& callback)
+        {
+            mWSCallback = std::move(callback);
+        }
+
+        void                        setWSConnected(HttpSession::WsConnectedCallback&& callback)
+        {
+            mWSConnectedCallback = std::move(callback);
+        }
+
+    private:
+        HttpSession::HttpParserCallback          mHttpRequestCallback;
+        HttpSession::WsCallback                  mWSCallback;
+        HttpSession::ClosedCallback              mCloseCallback;
+        HttpSession::WsConnectedCallback         mWSConnectedCallback;
 
         friend class HttpService;
     };
@@ -148,7 +170,12 @@ namespace brynet { namespace net { namespace http {
             auto httpSession = HttpSession::Create(session);
             if (enterCallback != nullptr)
             {
-                enterCallback(httpSession);
+                HttpSessionHandlers handlers;
+                enterCallback(httpSession, handlers);
+                httpSession->setHttpCallback(std::move(handlers.mHttpRequestCallback));
+                httpSession->setClosedCallback(std::move(handlers.mCloseCallback));
+                httpSession->setWSCallback(std::move(handlers.mWSCallback));
+                httpSession->setWSConnected(std::move(handlers.mWSConnectedCallback));
             }
             HttpService::handle(httpSession);
         }
