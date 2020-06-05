@@ -66,9 +66,9 @@ int main(int argc, char **argv)
         .configureListen([port](wrapper::BuildListenConfig builder) {
             builder.setAddr(false, "0.0.0.0", port);
         })
-        .configureEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession) {
-            httpSession->setHttpCallback(httpEnterCallback);
-            httpSession->setWSCallback(wsEnterCallback);
+        .configureEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
+            handlers.setHttpCallback(httpEnterCallback);
+            handlers.setWSCallback(wsEnterCallback);
         })
         .asyncRun();
 

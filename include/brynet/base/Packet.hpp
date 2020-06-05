@@ -6,11 +6,12 @@
 #include <cstring>
 #include <string>
 
+#include <brynet/base/NonCopyable.hpp>
 #include <brynet/base/endian/Endian.hpp>
 
 namespace brynet { namespace base {
 
-    class BasePacketWriter
+    class BasePacketWriter : public NonCopyable
     {
     public:
         BasePacketWriter(char* buffer,

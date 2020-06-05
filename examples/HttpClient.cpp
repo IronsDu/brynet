@@ -65,11 +65,11 @@ int main(int argc, char **argv)
                     (void)session;
                 })
             })
-            .configureEnterCallback([requestStr](const HttpSession::Ptr& session) {
+            .configureEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
                 (void)session;
                 std::cout << "connect success" << std::endl;
                 session->send(requestStr.c_str(), requestStr.size());
-                session->setHttpCallback([requestStr](const HTTPParser& httpParser,
+                handlers.setHttpCallback([requestStr](const HTTPParser& httpParser,
                                          const HttpSession::Ptr& session) {
                     (void)session;
                     std::cout << httpParser.getBody() << std::endl;
