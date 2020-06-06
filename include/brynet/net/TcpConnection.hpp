@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cassert>
 #include <cstring>
+#include <cmath>
 
 #include <brynet/base/Buffer.hpp>
 #include <brynet/base/Timer.hpp>
@@ -268,6 +269,7 @@ namespace brynet { namespace net {
             if (mRecvBuffer == nullptr)
             {
                 mRecvBuffer.reset(brynet::base::buffer_new(std::min<size_t>(16 * 1024, mMaxRecvBufferSize)));
+                mRecvBuffOriginSize = buffer_getsize(mRecvBuffer.get());
             }
             else
             {
@@ -276,8 +278,12 @@ namespace brynet { namespace net {
                     return;
                 }
 
-                const auto NewSize = std::min<size_t>(buffer_getsize(mRecvBuffer.get()) * 2,
-                    mMaxRecvBufferSize);
+                mCurrentTanhXDiff += 0.2;
+                const auto newTanh = std::tanh(mCurrentTanhXDiff);
+                const auto maxSizeDiff = mMaxRecvBufferSize - mRecvBuffOriginSize;
+                const auto NewSize = mRecvBuffOriginSize + (maxSizeDiff * newTanh);
+
+                assert(NewSize <= mMaxRecvBufferSize);
                 std::unique_ptr<struct brynet::base::buffer_s, BufferDeleter> newBuffer(brynet::base::buffer_new(NewSize));
                 buffer_write(newBuffer.get(),
                     buffer_getreadptr(mRecvBuffer.get()),
@@ -1093,6 +1099,8 @@ namespace brynet { namespace net {
             }
         };
         std::unique_ptr<struct brynet::base::buffer_s, BufferDeleter> mRecvBuffer;
+        double                          mCurrentTanhXDiff = 0;
+        size_t                          mRecvBuffOriginSize = 0;
         const size_t                    mMaxRecvBufferSize;
 
         struct PendingPacket
