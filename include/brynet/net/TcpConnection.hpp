@@ -82,7 +82,7 @@ namespace brynet { namespace net {
             {
                 if (isServerSide)
                 {
-                    if (slHelper->getOpenSSLCTX() == nullptr ||
+                    if (sslHelper->getOpenSSLCTX() == nullptr ||
                         !session->initAcceptSSL(sslHelper->getOpenSSLCTX()))
                     {
                         throw std::runtime_error("init ssl failed");
