@@ -16,6 +16,7 @@
 #include <brynet/net/Channel.hpp>
 #include <brynet/net/EventLoop.hpp>
 #include <brynet/net/Socket.hpp>
+#include <brynet/net/SSLHelper.hpp>
 
 #ifdef BRYNET_USE_OPENSSL
 
@@ -50,7 +51,8 @@ namespace brynet { namespace net {
         Ptr static Create(TcpSocket::Ptr socket, 
             size_t maxRecvBufferSize, 
             EnterCallback&& enterCallback, 
-            EventLoop::Ptr eventLoop)
+            const EventLoop::Ptr& eventLoop,
+            const SSLHelper::Ptr& sslHelper = nullptr)
         {
             class make_shared_enabler : public TcpConnection
             {
@@ -66,50 +68,45 @@ namespace brynet { namespace net {
                         std::move(eventLoop))
                 {}
             };
-            return std::make_shared<make_shared_enabler>(
-                std::move(socket),
-                maxRecvBufferSize,
-                std::move(enterCallback),
-                std::move(eventLoop));
-        }
 
-        /* must called in network thread */
-        bool                            onEnterEventLoop()
-        {
-            assert(mEventLoop->isInLoopThread());
-            if (!mEventLoop->isInLoopThread())
-            {
-                return false;
-            }
-
-            if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
-                !mEventLoop->linkChannel(mSocket->getFD(), this))
-            {
-                return false;
-            }
-
-            const auto findRet = mEventLoop->getTcpConnection(mSocket->getFD());
-            (void)findRet;
-            assert(findRet == nullptr);
-
+            const auto isServerSide = socket->isServerSide();
+            auto session = std::make_shared<make_shared_enabler>(
+                    std::move(socket),
+                    maxRecvBufferSize,
+                    std::move(enterCallback),
+                    eventLoop);
+            (void)isServerSide;
 #ifdef BRYNET_USE_OPENSSL
-            if (mSSL != nullptr)
+            if(sslHelper != nullptr)
             {
-                mEventLoop->addTcpConnection(mSocket->getFD(), shared_from_this());
-                processSSLHandshake();
-                return true;
+                if (isServerSide)
+                {
+                    if (slHelper->getOpenSSLCTX() == nullptr ||
+                        !session->initAcceptSSL(sslHelper->getOpenSSLCTX()))
+                    {
+                        throw std::runtime_error("init ssl failed");
+                    }
+                }
+                else
+                {
+                    if (!session->initConnectSSL())
+                    {
+                        throw std::runtime_error("init ssl failed");
+                    }
+                }
+            }
+#else
+            if (sslHelper != nullptr)
+            {
+                throw std::runtime_error("not enable ssl");
             }
 #endif
 
-            if (!checkRead())
-            {
-                return false;
-            }
-
-            mEventLoop->addTcpConnection(mSocket->getFD(), shared_from_this());
-            causeEnterCallback();
-
-            return true;
+            eventLoop->runAsyncFunctor([session]()
+                                       {
+                                           session->onEnterEventLoop();
+                                       });
+            return session;
         }
 
         const EventLoop::Ptr& getEventLoop() const
@@ -202,45 +199,6 @@ namespace brynet { namespace net {
             return mIP;
         }
 
-#ifdef BRYNET_USE_OPENSSL
-        bool                            initAcceptSSL(SSL_CTX* ctx)
-        {
-            if (mSSL != nullptr)
-            {
-                return false;
-            }
-
-            mSSL = SSL_new(ctx);
-            if (SSL_set_fd(mSSL, mSocket->getFD()) != 1)
-            {
-                ERR_print_errors_fp(stdout);
-                ::fflush(stdout);
-                return false;
-            }
-
-            return true;
-        }
-        bool                            initConnectSSL()
-        {
-            if (mSSLCtx != nullptr)
-            {
-                return false;
-            }
-
-            mSSLCtx = SSL_CTX_new(SSLv23_client_method());
-            mSSL = SSL_new(mSSLCtx);
-
-            if (SSL_set_fd(mSSL, mSocket->getFD()) != 1)
-            {
-                ERR_print_errors_fp(stdout);
-                ::fflush(stdout);
-                return false;
-            }
-
-            return true;
-        }
-#endif
-
         static  TcpConnection::PacketPtr  makePacket(const char* buffer, size_t len)
         {
             return std::make_shared<std::string>(buffer, len);
@@ -327,6 +285,84 @@ namespace brynet { namespace net {
                 mRecvBuffer = std::move(newBuffer);
             }
         }
+
+        /* must called in network thread */
+        bool                            onEnterEventLoop()
+        {
+            assert(mEventLoop->isInLoopThread());
+            if (!mEventLoop->isInLoopThread())
+            {
+                return false;
+            }
+
+            if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
+                !mEventLoop->linkChannel(mSocket->getFD(), this))
+            {
+                return false;
+            }
+
+            const auto findRet = mEventLoop->getTcpConnection(mSocket->getFD());
+            (void)findRet;
+            assert(findRet == nullptr);
+
+#ifdef BRYNET_USE_OPENSSL
+            if (mSSL != nullptr)
+            {
+                mEventLoop->addTcpConnection(mSocket->getFD(), shared_from_this());
+                processSSLHandshake();
+                return true;
+            }
+#endif
+
+            if (!checkRead())
+            {
+                return false;
+            }
+
+            mEventLoop->addTcpConnection(mSocket->getFD(), shared_from_this());
+            causeEnterCallback();
+
+            return true;
+        }
+
+#ifdef BRYNET_USE_OPENSSL
+            bool                            initAcceptSSL(SSL_CTX* ctx)
+        {
+            if (mSSL != nullptr)
+            {
+                return false;
+            }
+
+            mSSL = SSL_new(ctx);
+            if (SSL_set_fd(mSSL, mSocket->getFD()) != 1)
+            {
+                ERR_print_errors_fp(stdout);
+                ::fflush(stdout);
+                return false;
+            }
+
+            return true;
+        }
+        bool                            initConnectSSL()
+        {
+            if (mSSLCtx != nullptr)
+            {
+                return false;
+            }
+
+            mSSLCtx = SSL_CTX_new(SSLv23_client_method());
+            mSSL = SSL_new(mSSLCtx);
+
+            if (SSL_set_fd(mSSL, mSocket->getFD()) != 1)
+            {
+                ERR_print_errors_fp(stdout);
+                ::fflush(stdout);
+                return false;
+            }
+
+            return true;
+        }
+#endif
 
         void                            pingCheck()
         {
@@ -1081,7 +1117,7 @@ namespace brynet { namespace net {
         bool                            mIsHandsharked;
 #endif
         bool                            mRecvData;
-        std::chrono::nanoseconds        mCheckTime;
+        std::chrono::nanoseconds        mCheckTime{};
         brynet::base::Timer::WeakPtr    mTimer;
     };
 

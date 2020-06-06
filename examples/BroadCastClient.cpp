@@ -113,9 +113,6 @@ int main(int argc, char** argv)
             1024 * 1024, 
             enterCallback, 
             clientEventLoop);
-        clientEventLoop->runAsyncFunctor([clientEventLoop, tcpConnection]() {
-            tcpConnection->onEnterEventLoop();
-        });
     }
 
     auto now = std::chrono::steady_clock::now();
