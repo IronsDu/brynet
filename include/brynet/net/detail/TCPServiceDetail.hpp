@@ -159,41 +159,16 @@ namespace brynet { namespace net { namespace detail {
                 }
             };
 
-            const auto isServerSide = socket->isServerSide();
-            auto tcpConnection = TcpConnection::Create(std::move(socket),
+            if (options.useSSL && options.sslHelper == nullptr)
+            {
+                options.sslHelper = SSLHelper::Create();
+            }
+
+            TcpConnection::Create(std::move(socket),
                 options.maxRecvBufferSize,
                 wrapperEnterCallback,
-                eventLoop);
-            (void)isServerSide;
-#ifdef BRYNET_USE_OPENSSL
-            if (options.useSSL)
-            {
-                if (isServerSide)
-                {
-                    if (options.sslHelper == nullptr ||
-                        options.sslHelper->getOpenSSLCTX() == nullptr ||
-                        !tcpConnection->initAcceptSSL(options.sslHelper->getOpenSSLCTX()))
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    if (!tcpConnection->initConnectSSL())
-                    {
-                        return false;
-                    }
-                }
-            }
-#else
-            if (options.useSSL)
-            {
-                return false;
-            }
-#endif
-            eventLoop->runAsyncFunctor([tcpConnection]() {
-                tcpConnection->onEnterEventLoop();
-                });
+                eventLoop,
+                options.sslHelper);
 
             return true;
         }
