@@ -6,6 +6,7 @@
 #include <brynet/net/TcpService.hpp>
 #include <brynet/net/wrapper/ServiceBuilder.hpp>
 #include <brynet/base/AppStatus.hpp>
+//#define USE_SSL
 
 using namespace brynet;
 using namespace brynet::net;
@@ -40,7 +41,10 @@ int main(int argc, char **argv)
                 total_client_num--;
             });
     };
-
+#ifdef USE_SSL
+    SSLHelper::Ptr sslHelper = SSLHelper::Create();
+    sslHelper->initSSL("server.crt", "server.key");
+#endif // USE_SSL
     wrapper::ListenerBuilder listener;
     listener.configureService(service)
         .configureSocketOptions({
@@ -49,6 +53,9 @@ int main(int argc, char **argv)
             }
         })
         .configureConnectionOptions({
+#ifdef USE_SSL
+            brynet::net::AddSocketOption::WithServerSideSSL(sslHelper),
+#endif // USE_SSL
             brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024),
             brynet::net::AddSocketOption::AddEnterCallback(enterCallback)
         })

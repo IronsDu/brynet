@@ -83,8 +83,8 @@ namespace brynet { namespace net {
         using Ptr = std::shared_ptr<SSLHelper>;
 
 #ifdef BRYNET_USE_OPENSSL
-        bool        initSSL(const std::string& certificate,
-            const std::string& privatekey)
+        bool        initSSL(const std::string& certificate = "",
+            const std::string& privatekey = "")
         {
             std::call_once(initCryptoThreadSafeSupportOnceFlag, 
                 InitCryptoThreadSafeSupport);
@@ -93,6 +93,10 @@ namespace brynet { namespace net {
             {
                 return false;
             }
+            SSL_library_init();
+            OpenSSL_add_all_algorithms();
+            SSL_load_error_strings();
+
             if (certificate.empty() || privatekey.empty())
             {
                 return false;
