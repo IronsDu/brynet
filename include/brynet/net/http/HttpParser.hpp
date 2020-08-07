@@ -56,6 +56,13 @@ namespace brynet { namespace net { namespace http {
             return mIsKeepAlive;
         }
 
+        int     method() const
+        {
+            // mMethod's value defined in http_method, such as  HTTP_GET、HTTP_POST.
+            // if mMethod is -1, it's invalid.
+            return mMethod;
+        }
+
         const std::string& getPath() const
         {
             return mPath;
@@ -144,6 +151,7 @@ namespace brynet { namespace net { namespace http {
             {
                 mIsWebSocket = mParser.upgrade;
                 mIsKeepAlive = !hasEntry("Connection", "close");
+                mMethod = mParser.method;
                 http_parser_init(&mParser, mParserType);
             }
 
@@ -285,6 +293,7 @@ namespace brynet { namespace net { namespace http {
         http_parser                             mParser;
         http_parser_settings                    mSettings;
 
+        int                                     mMethod = -1;
         bool                                    mIsWebSocket;
         bool                                    mIsKeepAlive;
         bool                                    mISCompleted;

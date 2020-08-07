@@ -29,6 +29,7 @@ int main(int argc, char **argv)
             const HttpSession::Ptr& session) {
                 (void)httpParser;
                 HttpResponse response;
+                std::cout << "method:" << http_method_str(static_cast<http_method>(httpParser.method())) << std::endl;
                 std::string body = "<html>hello world </html>";
                 response.setBody(body);
                 std::string result = response.getResult();
