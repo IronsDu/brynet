@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <cassert>
 #include <cstring>
-#include <cstdbool>
 #include <cstring>
 
+#include <brynet/base/Bool.hpp>
 #include <brynet/net/SocketLibTypes.hpp>
 
 #ifdef BRYNET_PLATFORM_LINUX

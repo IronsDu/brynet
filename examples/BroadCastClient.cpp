@@ -46,7 +46,7 @@ int main(int argc, char** argv)
         auto enterCallback = [packetLen](const TcpConnection::Ptr& dataSocket) {
             static_assert(sizeof(dataSocket.get()) <= sizeof(int64_t), "ud's size must less int64");
 
-            auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
+            uint32_t HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
 
             std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
             sp->writeUINT32(HEAD_LEN + sizeof(int64_t) + packetLen);

@@ -3,11 +3,11 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cassert>
-#include <cstdbool>
 #include <string>
 
 #include <brynet/net/SocketLibTypes.hpp>
 #include <brynet/base/Stack.hpp>
+#include <brynet/base/Bool.hpp>
 
 #if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
 #include <poll.h>

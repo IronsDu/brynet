@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cstdbool>
 #include <cstdio>
 #include <signal.h>
 
 #include <brynet/base/Platform.hpp>
+#include <brynet/base/Bool.hpp>
 
 #ifdef BRYNET_PLATFORM_WINDOWS
 #include <conio.h>

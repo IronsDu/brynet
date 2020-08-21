@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <cassert>
-#include <cstdbool>
+#include <brynet/base/Bool.hpp>
 #include <cstring>
 #include <string>
 
@@ -360,9 +360,17 @@ namespace brynet { namespace base {
         void            read(T& value)
         {
             static_assert(std::is_same<T, typename std::remove_pointer<T>::type>::value,
-                "T must a nomal type");
+                "T must be a nomal type");
+#ifdef BRYNET_HAVE_LANG_CXX17
+            static_assert(std::is_trivially_copyable_v<T>,
+                "T must be trivially copyable");
+
+            static_assert(std::is_standard_layout_v<T>,
+                "T must have a standard layout");
+#else
             static_assert(std::is_pod<T>::value,
                 "T must a pod type");
+#endif
 
             if ((mPos + sizeof(value)) > mMaxLen)
             {
