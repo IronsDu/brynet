@@ -150,7 +150,7 @@ namespace brynet { namespace net { namespace http {
             if (mISCompleted)
             {
                 mIsWebSocket = mParser.upgrade;
-                mIsKeepAlive = !hasEntry("Connection", "close");
+                mIsKeepAlive = hasEntry("Connection", "Keep-Alive");
                 mMethod = mParser.method;
                 http_parser_init(&mParser, mParserType);
             }

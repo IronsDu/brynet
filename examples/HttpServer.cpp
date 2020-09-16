@@ -33,9 +33,18 @@ int main(int argc, char **argv)
                 std::string body = "<html>hello world </html>";
                 response.setBody(body);
                 std::string result = response.getResult();
-                session->send(result.c_str(), result.size(), [session]() {
+                if(httpParser.isKeepAlive())
+                {
+                    response.addHeadValue("Connection", "Keep-Alive");
+                    session->send(result.c_str(), result.size());
+                }
+                else
+                {
+                    response.addHeadValue("Connection", "Close");
+                    session->send(result.c_str(), result.size(), [session]() {
                         session->postShutdown();
                     });
+                }
             };
 
     auto wsEnterCallback = [](const HttpSession::Ptr& httpSession,
