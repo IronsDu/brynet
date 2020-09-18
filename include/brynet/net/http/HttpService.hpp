@@ -332,10 +332,6 @@ namespace brynet { namespace net { namespace http {
                 {
                     httpCallback(*httpParser, httpSession);
                 }
-                if (httpParser->isKeepAlive())
-                {
-                    httpParser->clearParse();
-                }
             }
 
             return retlen;

@@ -138,10 +138,17 @@ namespace brynet { namespace net { namespace http {
     private:
         void    clearParse()
         {
+            mMethod = -1;
             mISCompleted = false;
+            mLastWasValue = true;
+            mUrl.clear();
+            mQuery.clear();
+            mBody.clear();
+            mStatus.clear();
+            mCurrentField.clear();
+            mCurrentValue.clear();
             mHeadValues.clear();
             mPath.clear();
-            mQuery.clear();
         }
 
         size_t  tryParse(const char* buffer, size_t len)
@@ -179,9 +186,7 @@ namespace brynet { namespace net { namespace http {
         static int  sMessageBegin(http_parser* hp)
         {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
-            httpParser->mLastWasValue = true;
-            httpParser->mCurrentField.clear();
-            httpParser->mCurrentValue.clear();
+            httpParser->clearParse();
 
             return 0;
         }
@@ -196,10 +201,6 @@ namespace brynet { namespace net { namespace http {
         static int  sHeadComplete(http_parser* hp)
         {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
-            if (!httpParser->mCurrentField.empty())
-            {
-                httpParser->mHeadValues[httpParser->mCurrentField] = httpParser->mCurrentValue;
-            }
 
             if (httpParser->mUrl.empty())
             {
@@ -249,7 +250,8 @@ namespace brynet { namespace net { namespace http {
         static int  sHeadValue(http_parser* hp, const char* at, size_t length)
         {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
-            httpParser->mCurrentValue.append(at, length);
+            auto& value = httpParser->mHeadValues[httpParser->mCurrentField];
+            value.append(at, length);
             httpParser->mLastWasValue = true;
             return 0;
         }
@@ -259,14 +261,8 @@ namespace brynet { namespace net { namespace http {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
             if (httpParser->mLastWasValue)
             {
-                if (!httpParser->mCurrentField.empty())
-                {
-                    sHeadComplete(hp);
-                }
                 httpParser->mCurrentField.clear();
-                httpParser->mCurrentValue.clear();
             }
-
             httpParser->mCurrentField.append(at, length);
             httpParser->mLastWasValue = false;
 
