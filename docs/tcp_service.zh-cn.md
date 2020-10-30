@@ -5,7 +5,7 @@
 # 接口
 
 - `TcpService::Create(void)`
-    
+  
 
     此静态函数用于创建网络服务对象，且只能使用此接口创建`TcpService`对象。</br>
     用户通过服务对象操作网络会话。
@@ -15,7 +15,7 @@
     (线程安全)开启工作线程，每一个工作线程有一个`EventLoop`负责事件检测。
 
 
-- `TcpService::addTcpConnection(TcpSocket::PTR socket, Options...)`
+- `TcpService::addTcpConnection(TcpSocket::Ptr socket, Options...)`
 
     (线程安全),将一个TcpConnection交给TcpService管理,其中Options请查阅`AddSocketOption的WithXXX系列函数`。
 

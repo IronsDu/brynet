@@ -5,7 +5,7 @@
 
 - `ListenThread::Create(bool isIPV6, const std::string& ip, int port, const AccepCallback& callback, const std::vector<TcpSocketProcessCallback>& process = {})`
 	
-	创建`ListenThread::PTR`智能指针对象，此对象用于后续工作. `callback`是连接进入的回调，在其中使用传进的`TcpSocket::PTR`，当`callback`为nullptr时会产生异常。</br>
+	创建`ListenThread::Ptr`智能指针对象，此对象用于后续工作. `callback`是连接进入的回调，在其中使用传进的`TcpSocket::Ptr`，当`callback`为nullptr时会产生异常。</br>
 	`process `也是连接进入时的回调，但它的参数类型是`TcpSocket&`，主要用于一些socket选项设置。
 
 - `ListenThread::startThread()`
@@ -21,7 +21,7 @@
 auto listenThread = ListenThread::Create(false,
 	"0.0.0.0",
 	9999,
-	[](TcpSocket::PTR socket) {
+	[](TcpSocket::Ptr socket) {
 		std::cout << "accepted connection" << std::endl;
 		// 在此我们就可以将 socket 用于网络库的其他部分,比如用于`TCPService`
 	},
