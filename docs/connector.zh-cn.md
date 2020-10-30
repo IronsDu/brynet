@@ -4,20 +4,20 @@
 # 接口
 
 - `AsyncConnector::Create`
-    
+  
 
-    必须(只能)使用此静态方法创建`AsyncConnector::PTR`智能指针对象,以用于后续使用.
+    必须(只能)使用此静态方法创建`AsyncConnector::Ptr`智能指针对象,以用于后续使用.
 
 - `AsyncConnector::startWorkerThread(void)`
-    
+  
     (线程安全)使用此成员函数即可开启工作线程(在开启的工作线程里负责异步链接)
 
 - `AsyncConnector::stopWorkerThread(void)`
-    
+  
     (线程安全)停止工作线程(当工作线程结束时此函数才返回)
 
 - `AsyncConnector::asyncConnect(const std::vector<ConnectOption::ConnectOptionFunc>& options)`
-    
+  
     (线程安全)请求创建外部链接,options为异步连接的选项,比如`ConnectOption::WithAddr`为指定服务器地址,`ConnectOption::WithCompletedCallback`则指定完成回调</br>
     如果没有开启工作线程,那么此函数会产生异常!
 

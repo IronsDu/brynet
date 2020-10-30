@@ -4,23 +4,22 @@
 
 # 接口
 
-- `brynet::net::setupPromiseReceive(const TCPSession::PTR& session)`
+- `brynet::net::setupPromiseReceive(const TCPSession::Ptr& session)`
+  
+首先使用此静态方法创建`PromiseReceive::Ptr`智能指针对象,接管 `session`的数据解析.</br>
+    因此使用者一定不要再为`TCPSession::Ptr`调用`setDataCallback`接口设置数据回调！
     
-
-    首先使用此静态方法创建`PromiseReceive::PTR`智能指针对象,接管 `session`的数据解析.</br>
-    因此使用者一定不要再为`TCPSession::PTR`调用`setDataCallback`接口设置数据回调！
-
 - `PromiseReceive::receive(size_t len, Handle handle)`
-    
+  
     (非线程安全)投递一个异步读取，当满足长度>=len时，调用`handle`</br>
     `Handle`类型为：`std::function<bool(const char* buffer, size_t len)>`，当`handle`返回值为`true`表示重复投递此`receive`请求（待下次满足条件时会继续调用`handle`)
 
 - `PromiseReceive::receive(std::shared_ptr<size_t> len, Handle handle)`
-    
+  
     (非线程安全)重载版本，提供智能指针作为参数，此值delay决议，用于调用`receive`时不确定长度的情况。
 
 - `PromiseReceive::receiveUntil(std::string str, Handle handle)`
-    
+  
     (非线程安全)当收到的数据中包含`str`时，回调`handle`。
 
 ## 示例
