@@ -11,6 +11,6 @@
 #endif
 
 #if (__cplusplus >= 201703L || \
-     (defined(_MSC_VER) && _MSC_VER >= 1910))
+     (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L))
 #define BRYNET_HAVE_LANG_CXX17 1
 #endif
