@@ -30,5 +30,5 @@ TEST_CASE("Packet are computed", "[Packet]") {
     REQUIRE(reader.readUINT64() == 8);
 
     REQUIRE(reader.getLeft() == 0);
-    REQUIRE(reader.getPos() == 31);
+    REQUIRE(reader.currentPos() == 31);
 }

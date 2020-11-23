@@ -16,7 +16,7 @@ namespace brynet { namespace base {
     public:
         BasePacketWriter(char* buffer,
             size_t len,
-            bool useBigEndian = true,
+            bool useBigEndian = false,
             bool isAutoMalloc = false)
             :
             mIsAutoMalloc(isAutoMalloc),
@@ -248,49 +248,85 @@ namespace brynet { namespace base {
     public:
         BasePacketReader(const char* buffer,
             size_t len,
-            bool useBigEndian = true) :
-            mBigEndian(useBigEndian),
-            mMaxLen(len)
+            bool useBigEndian = false) :
+                mBigEndian(useBigEndian),
+                mSize(len)
         {
             mPos = 0;
+            mSavedPos = 0;
             mBuffer = buffer;
         }
 
         virtual ~BasePacketReader() = default;
 
+        void    useBigEndian()
+        {
+            mBigEndian = true;
+        }
+
+        void    useLittleEndian()
+        {
+            mBigEndian = false;
+        }
+
+        void    savePos()
+        {
+            mSavedPos = mPos;
+        }
+
+        size_t  savedPos() const
+        {
+            return mSavedPos;
+        }
+
         size_t          getLeft() const
         {
-            if (mPos > mMaxLen)
+            if (mPos > mSize)
             {
                 throw std::out_of_range("current pos is greater than max len");
             }
-            return mMaxLen - mPos;
+            return mSize - mPos;
         }
 
-        const char*     getBuffer() const
+        bool    enough(size_t len) const
+        {
+            if (mPos > mSize)
+            {
+                return false;
+            }
+            return (mSize - mPos) >= len;
+        }
+
+        const char*     begin() const
         {
             return mBuffer;
         }
 
-        void            skipAll()
+        const char*     currentBuffer() const
         {
-            mPos = mMaxLen;
+            return mBuffer+mPos;
         }
 
-        size_t          getPos() const
+        void            consumeAll()
+        {
+            mPos = mSize;
+            savePos();
+        }
+
+        size_t          currentPos() const
         {
             return mPos;
         }
 
-        size_t          getMaxPos() const
+        size_t          size() const
         {
-            return mMaxLen;
+            return mSize;
         }
 
         void            addPos(size_t diff)
         {
             const auto tmpPos = mPos + diff;
-            if (tmpPos > mMaxLen)
+            if (tmpPos > mSize)
             {
                 throw std::out_of_range("diff is to big");
             }
@@ -360,11 +396,11 @@ namespace brynet { namespace base {
         void            read(T& value)
         {
             static_assert(std::is_same<T, typename std::remove_pointer<T>::type>::value,
-                "T must a nomal type");
+                "T must a normal type");
             static_assert(std::is_pod<T>::value,
                 "T must a pod type");
 
-            if ((mPos + sizeof(value)) > mMaxLen)
+            if ((mPos + sizeof(value)) > mSize)
             {
                 throw std::out_of_range("T size is to big");
             }
@@ -374,17 +410,18 @@ namespace brynet { namespace base {
         }
 
     protected:
-        const bool      mBigEndian;
-        const size_t    mMaxLen;
+        bool            mBigEndian;
+        const size_t    mSize;
         const char*     mBuffer;
         size_t          mPos;
+        size_t          mSavedPos;
     };
 
     template<size_t SIZE>
     class AutoMallocPacket : public BasePacketWriter
     {
     public:
-        explicit AutoMallocPacket(bool useBigEndian = true,
+        explicit AutoMallocPacket(bool useBigEndian = false,
             bool isAutoMalloc = false)
             :
             BasePacketWriter(mData, SIZE, useBigEndian, isAutoMalloc)

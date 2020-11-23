@@ -7,12 +7,14 @@
 #include <cassert>
 #include <cstring>
 #include <cmath>
+#include <type_traits>
 
 #include <brynet/base/Buffer.hpp>
 #include <brynet/base/Timer.hpp>
 #include <brynet/base/NonCopyable.hpp>
 #include <brynet/base/Any.hpp>
 #include <brynet/base/Noexcept.hpp>
+#include <brynet/base/Packet.hpp>
 #include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/Channel.hpp>
 #include <brynet/net/EventLoop.hpp>
@@ -34,6 +36,17 @@ extern "C" {
 
 namespace brynet { namespace net {
 
+    class SendableMsg
+    {
+    public:
+        using Ptr = std::shared_ptr<SendableMsg>;
+
+        virtual ~SendableMsg() = default;
+
+        virtual const void *    data() = 0;
+        virtual size_t          size() = 0;
+    };
+
     class TcpConnection :   public Channel, 
                             public brynet::base::NonCopyable, 
                             public std::enable_shared_from_this<TcpConnection>
@@ -42,11 +55,9 @@ namespace brynet { namespace net {
         using Ptr = std::shared_ptr<TcpConnection>;
 
         using EnterCallback = std::function<void(Ptr)>;
-        using DataCallback = std::function<size_t(const char* buffer, size_t len)>;
+        using DataCallback = std::function<void(brynet::base::BasePacketReader&)>;
         using DisconnectedCallback = std::function<void(Ptr)>;
         using PacketSendedCallback = std::function<void(void)>;
-
-        using PacketPtr = std::shared_ptr<std::string>;
 
     public:
         Ptr static Create(TcpSocket::Ptr socket, 
@@ -104,9 +115,9 @@ namespace brynet { namespace net {
 #endif
 
             eventLoop->runAsyncFunctor([session]()
-                                       {
-                                           session->onEnterEventLoop();
-                                       });
+            {
+                session->onEnterEventLoop();
+            });
             return session;
         }
 
@@ -116,56 +127,102 @@ namespace brynet { namespace net {
         }
 
         //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
+        void                            send(
+            const SendableMsg::Ptr& msg,
+            PacketSendedCallback&& callback = nullptr
+        )
+        {
+            auto sharedThis = shared_from_this();
+            mEventLoop->runAsyncFunctor([sharedThis, msg, callback]() mutable
+            {
+                const auto len = msg->size();
+                sharedThis->mSendList.emplace_back(PendingPacket{
+                        std::move(msg),
+                        len,
+                        std::move(callback) });
+                sharedThis->runAfterFlush();
+            });
+        }
 
         void                            send(
             const char* buffer, 
             size_t len, 
             PacketSendedCallback&& callback = nullptr)
         {
-            send(makePacket(buffer, len), std::move(callback));
+            send(std::make_shared<std::string>(buffer, len), std::move(callback));
         }
 
-        template<typename PacketType>
         void                            send(
-            PacketType&& packet, 
-            PacketSendedCallback&& 
-            callback = nullptr)
+            const std::shared_ptr<std::string>& packet,
+            PacketSendedCallback&& callback = nullptr)
         {
-            auto packetCapture = std::forward<PacketType>(packet);
-            auto callbackCapture = std::move(callback);
+            class StringSendMsg : public SendableMsg
+            {
+            public:
+                explicit StringSendMsg(std::shared_ptr<std::string>&&  msg)
+                    :
+                    mMsg(std::move(msg))
+                {}
+                explicit StringSendMsg(const std::shared_ptr<std::string>&  msg)
+                    :
+                    mMsg(msg)
+                {}
+
+                const void* data() override
+                {
+                    return static_cast<const void*>(mMsg->data());
+                }
+
+                size_t  size() override
+                {
+                    return mMsg->size();
+                }
+
+            private:
+                std::shared_ptr<std::string>    mMsg;
+            };
+
             auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor(
-                [sharedThis, packetCapture, callbackCapture]() mutable {
-                const auto len = packetCapture->size();
+            mEventLoop->runAsyncFunctor([sharedThis, packet, callback]() mutable
+            {
+                const auto len = packet->size();
                 sharedThis->mSendList.emplace_back(PendingPacket{
-                    std::move(packetCapture), 
+                    std::make_shared<StringSendMsg>(std::move(packet)),
                     len, 
-                    std::move(callbackCapture) });
+                    std::move(callback) });
                 sharedThis->runAfterFlush();
-                });
+            });
         }
 
-        void                            setDataCallback(DataCallback&& cb)
+      // setDataCallback(std::function<void(brynet::base::BasePacketReader&)>）
+        template<typename Callback>
+        void                            setDataCallback(Callback&& cb)
         {
+            verifyArgType(cb, &Callback::operator());
+
             auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
-                sharedThis->mDataCallback = std::move(cb);
+            mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable
+            {
+                sharedThis->mDataCallback = cb;
                 sharedThis->processRecvMessage();
-                });
+            });
         }
+
         void                            setDisConnectCallback(DisconnectedCallback&& cb)
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
+            mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable
+            {
                 sharedThis->mDisConnectCallback = std::move(cb);
-                });
+            });
         }
 
         /* if checkTime is zero, will cancel check heartbeat */
         void                            setHeartBeat(std::chrono::nanoseconds checkTime)
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis, checkTime]() {
+            mEventLoop->runAsyncFunctor([sharedThis, checkTime]()
+            {
                 if (sharedThis->mTimer.lock() != nullptr)
                 {
                     sharedThis->mTimer.lock()->cancel();
@@ -174,35 +231,33 @@ namespace brynet { namespace net {
 
                 sharedThis->mCheckTime = checkTime;
                 sharedThis->startPingCheckTimer();
-                });
+            });
         }
 
         void                            postDisConnect()
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis]() {
+            mEventLoop->runAsyncFunctor([sharedThis]()
+            {
                 sharedThis->procCloseInLoop();
-                });
+            });
         }
 
         void                            postShutdown()
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis]() {
-                sharedThis->mEventLoop->runFunctorAfterLoop([sharedThis]() {
+            mEventLoop->runAsyncFunctor([sharedThis]()
+            {
+                sharedThis->mEventLoop->runFunctorAfterLoop([sharedThis]()
+                {
                     sharedThis->procShutdownInLoop();
-                    });
                 });
+            });
         }
 
         const std::string& getIP() const
         {
             return mIP;
-        }
-
-        static  TcpConnection::PacketPtr  makePacket(const char* buffer, size_t len)
-        {
-            return std::make_shared<std::string>(buffer, len);
         }
 
     protected:
@@ -662,7 +717,7 @@ namespace brynet { namespace net {
             static  const   int SENDBUF_SIZE = 1024 * 32;
             if (threadLocalSendBuf == nullptr)
             {
-                threadLocalSendBuf = (char*)malloc(SENDBUF_SIZE);
+                threadLocalSendBuf = static_cast<char*>(malloc(SENDBUF_SIZE));
             }
 
 #ifdef BRYNET_USE_OPENSSL
@@ -675,13 +730,13 @@ namespace brynet { namespace net {
 
             while (!mSendList.empty() && mCanWrite)
             {
-                char* sendptr = threadLocalSendBuf;
+                auto sendptr = threadLocalSendBuf;
                 size_t     wait_send_size = 0;
 
                 for (auto it = mSendList.begin(); it != mSendList.end(); ++it)
                 {
                     auto& packet = *it;
-                    auto packetLeftBuf = (char*)(packet.data->c_str() + (packet.data->size() - packet.left));
+                    auto packetLeftBuf = (char*)(packet.data->data()) + packet.data->size() - packet.left;
                     const auto packetLeftLen = packet.left;
 
                     if ((wait_send_size + packetLeftLen) > SENDBUF_SIZE)
@@ -694,7 +749,7 @@ namespace brynet { namespace net {
                         break;
                     }
 
-                    memcpy(sendptr + wait_send_size, packetLeftBuf, packetLeftLen);
+                    memcpy(static_cast<void*>(sendptr + wait_send_size), static_cast<void*>(packetLeftBuf), packetLeftLen);
                     wait_send_size += packetLeftLen;
                 }
 
@@ -791,7 +846,7 @@ namespace brynet { namespace net {
                 size_t ready_send_len = 0;
                 for (const auto& p : mSendList)
                 {
-                    iov[num].iov_base = (void*)(p.data->c_str() + (p.data->size() - p.left));
+                    iov[num].iov_base = (void*)(static_cast<const char*>(p.data->data()) + p.data->size() - p.left);
                     iov[num].iov_len = p.left;
                     ready_send_len += p.left;
 
@@ -1064,14 +1119,23 @@ namespace brynet { namespace net {
         {
             if (mDataCallback != nullptr && buffer_getreadvalidcount(mRecvBuffer.get()) > 0)
             {
-                const auto proclen = mDataCallback(buffer_getreadptr(mRecvBuffer.get()),
-                    buffer_getreadvalidcount(mRecvBuffer.get()));
-                assert(proclen <= buffer_getreadvalidcount(mRecvBuffer.get()));
-                if (proclen <= buffer_getreadvalidcount(mRecvBuffer.get()))
+                auto reader = brynet::base::BasePacketReader(buffer_getreadptr(mRecvBuffer.get()),
+                                                             buffer_getreadvalidcount(mRecvBuffer.get()), false);
+                mDataCallback(reader);
+                const auto consumedLen = reader.savedPos();
+                assert(consumedLen <= reader.size());
+                if (consumedLen <= reader.size())
                 {
-                    buffer_addreadpos(mRecvBuffer.get(), proclen);
+                    buffer_addreadpos(mRecvBuffer.get(), consumedLen);
                 }
             }
+        }
+
+        template<typename CallbackType, typename Arg>
+        static void verifyArgType(const CallbackType&, void(CallbackType::*)(Arg&) const)
+        {
+            static_assert(std::is_reference<Arg&>::value, "arg must be reference type");
+            static_assert(!std::is_const<typename std::remove_const<Arg>::type>::value, "arg can't be const type");
         }
 
     private:
@@ -1105,7 +1169,7 @@ namespace brynet { namespace net {
 
         struct PendingPacket
         {
-            PacketPtr  data;
+            SendableMsg::Ptr data;
             size_t      left;
             PacketSendedCallback  mCompleteCallback;
         };

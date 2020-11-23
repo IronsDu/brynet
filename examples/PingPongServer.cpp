@@ -28,11 +28,11 @@ int main(int argc, char **argv)
     auto enterCallback = [](const TcpConnection::Ptr& session) {
         total_client_num++;
 
-        session->setDataCallback([session](const char* buffer, size_t len) {
-                session->send(buffer, len);
-                TotalRecvSize += len;
+        session->setDataCallback([session](brynet::base::BasePacketReader& reader) {
+                session->send(reader.begin(), reader.size());
+                TotalRecvSize += reader.size();
                 total_packet_num++;
-                return len;
+                reader.consumeAll();
             });
 
         session->setDisConnectCallback([](const TcpConnection::Ptr& session) {
