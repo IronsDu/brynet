@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 
             auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
 
-            std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(1);
+            std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(false);
             sp->writeUINT32(HEAD_LEN + sizeof(int64_t) + packetLen);
             sp->writeUINT16(1);
             sp->writeINT64((int64_t)dataSocket.get());
@@ -59,50 +59,35 @@ int main(int argc, char** argv)
                 dataSocket->send(sp->getData(), sp->getPos());
             }
 
-            dataSocket->setDataCallback([dataSocket](const char* buffer, size_t len) {
-                const char* parseStr = buffer;
-                int totalProcLen = 0;
-                size_t leftLen = len;
-
+            dataSocket->setDataCallback([dataSocket](brynet::base::BasePacketReader& reader) {
                 while (true)
                 {
-                    bool flag = false;
-                    auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
-                    if (leftLen >= HEAD_LEN)
-                    {
-                        BasePacketReader rp(parseStr, leftLen);
-                        auto packet_len = rp.readUINT32();
-                        if (leftLen >= packet_len && packet_len >= HEAD_LEN)
-                        {
-                            TotalRecvSize += packet_len;
-                            TotalRecvPacketNum++;
-
-                            BasePacketReader rp(parseStr, packet_len);
-                            rp.readUINT32();
-                            rp.readUINT16();
-                            int64_t addr = rp.readINT64();
-
-                            if (addr == (int64_t)(dataSocket.get()))
-                            {
-                                dataSocket->send(parseStr, packet_len);
-                            }
-
-                            totalProcLen += packet_len;
-                            parseStr += packet_len;
-                            leftLen -= packet_len;
-                            flag = true;
-                            rp.skipAll();
-                        }
-                        rp.skipAll();
-                    }
-
-                    if (!flag)
+                    if (!reader.enough(sizeof(uint32_t)))
                     {
                         break;
                     }
-                }
 
-                return totalProcLen;
+                    auto buffer = reader.currentBuffer();
+                    auto packetLen = reader.readUINT32();
+                    if (!reader.enough(packetLen-sizeof(uint32_t)))
+                    {
+                        break;
+                    }
+
+                    TotalRecvSize += packetLen;
+                    TotalRecvPacketNum++;
+
+                    reader.readUINT16();
+                    int64_t addr = reader.readINT64();
+
+                    if (addr == (int64_t)(dataSocket.get()))
+                    {
+                        dataSocket->send(buffer, packetLen);
+                    }
+
+                    reader.addPos(packetLen-sizeof(uint32_t)-sizeof(uint16_t)-sizeof(int64_t));
+                    reader.savePos();
+                }
             });
 
             dataSocket->setDisConnectCallback([](const TcpConnection::Ptr& dataSocket) {

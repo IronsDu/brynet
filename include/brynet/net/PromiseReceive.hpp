@@ -144,9 +144,10 @@ namespace brynet { namespace net {
     std::shared_ptr<PromiseReceive> setupPromiseReceive(const TcpConnection::Ptr& session)
     {
         auto promiseReceive = std::make_shared<PromiseReceive>();
-        session->setDataCallback([promiseReceive](const char* buffer,
-            size_t len) {
-            return promiseReceive->process(buffer, len);
+        session->setDataCallback([promiseReceive](brynet::base::BasePacketReader& reader) {
+            auto procLen = promiseReceive->process(reader.begin(), reader.size());
+            reader.addPos(procLen);
+            reader.savePos();
         });
 
         return promiseReceive;

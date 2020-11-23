@@ -12,7 +12,10 @@
     
     发送消息.如果`callback`不为nullptr，那么当io线程将此消息全部"发送完成"(投递到内核TCP缓冲区)时会调用callback。
 
-- `TcpConnection::setDataCallback(std::function<size_t(const char* buffer, size_t len)> callback)`
+- `TcpConnection::send(const SendableMsg::Ptr& msg, PacketSendedCallback&& callback)`
+    
+	发送消息，用户可以继承SendableMsg，重写`data`和`size`函数，且最重要的是：能实现自己的消息内存管理器。
+		
+- `Connection::setDataCallback(std::function<void(brynet::base::BasePacketReader&)> callback)`
 
-    设置处理接受消息的回调函数。此函数的返回值表示业务层此次回调里消耗了多少字节的数据，此返回值<= len，如果返回值小于len,那么网络层会把buffer里剩余部分缓存起来，
-    等下次接收到对端发送的数据时，会再一并传递给此回调函数。
+    设置处理接受消息的回调函数。等下次接收到对端发送的数据时，会再传递给此回调函数。

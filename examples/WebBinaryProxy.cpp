@@ -64,11 +64,10 @@ int main(int argc, char **argv)
                             }
                             });
 
-                        backendSession->setDataCallback([=](const char* buffer,
-                            size_t size) {
-                                /* recieve data from backend server, then send to http client */
-                                session->send(buffer, size);
-                                return size;
+                        backendSession->setDataCallback([=](brynet::base::BasePacketReader& reader) {
+                                /* receive data from backend server, then send to http client */
+                                session->send(reader.begin(), reader.size());
+                                reader.consumeAll();
                             });
                     };
 
@@ -84,21 +83,21 @@ int main(int argc, char **argv)
                     ConnectOption::WithTimeout(std::chrono::seconds(10)),
                     ConnectOption::WithCompletedCallback(enterCallback) });
 
-                session->setDataCallback([=](const char* buffer, size_t size) {
+                session->setDataCallback([=](brynet::base::BasePacketReader& reader) {
                     TcpConnection::Ptr backendSession = *shareBackendSession;
                     if (backendSession == nullptr)
                     {
                         /*cache it*/
-                        cachePacket->push_back(std::string(buffer, size));
+                        cachePacket->push_back(std::string(reader.begin(), reader.size()));
                     }
                     else
                     {
                         /* receive data from http client, then send to backend server */
-                        backendSession->send(buffer, size);
+                        backendSession->send(reader.begin(), reader.size());
                     }
 
-                    return size;
-                    });
+                    reader.consumeAll();
+                });
 
                 session->setDisConnectCallback([=](const TcpConnection::Ptr& session) {
                     /*if http client close, then close it's backend server */

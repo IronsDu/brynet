@@ -32,7 +32,7 @@ namespace brynet { namespace net { namespace http {
         void                        send(PacketType&& packet,
             TcpConnection::PacketSendedCallback&& callback = nullptr)
         {
-            mSession->send(std::forward<TcpConnection::PacketPtr>(packet),
+            mSession->send(std::forward<std::shared_ptr<std::string>>(packet),
                 std::move(callback));
         }
         void                        send(const char* packet,
@@ -196,25 +196,26 @@ namespace brynet { namespace net { namespace http {
 
             auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
             session->setDataCallback([httpSession, httpParser](
-                const char* buffer, size_t len) {
-                    size_t retlen = 0;
+                brynet::base::BasePacketReader& reader) {
+                    size_t retLen = 0;
 
                     if (httpParser->isWebSocket())
                     {
-                        retlen = HttpService::ProcessWebSocket(buffer, 
-                            len, 
-                            httpParser, 
-                            httpSession);
+                        retLen = HttpService::ProcessWebSocket( reader.begin(),
+                                                                reader.size(),
+                                                                httpParser,
+                                                                httpSession);
                     }
                     else
                     {
-                        retlen = HttpService::ProcessHttp(buffer, 
-                            len, 
-                            httpParser, 
-                            httpSession);
+                        retLen = HttpService::ProcessHttp(  reader.begin(),
+                                                            reader.size(),
+                                                            httpParser,
+                                                            httpSession);
                     }
 
-                    return retlen;
+                    reader.addPos(retLen);
+                    reader.savePos();
                 });
         }
 
