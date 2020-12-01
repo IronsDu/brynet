@@ -47,6 +47,42 @@ namespace brynet { namespace net {
         virtual size_t          size() = 0;
     };
 
+    class StringSendMsg : public SendableMsg
+    {
+    public:
+        explicit StringSendMsg(const char* buffer, size_t len)
+        :
+        mMsg(buffer, len)
+        {}
+
+        explicit StringSendMsg(std::string buffer)
+        :
+        mMsg(std::move(buffer))
+        {}
+
+        const void* data() override
+        {
+            return static_cast<const void*>(mMsg.data());
+        }
+        size_t  size() override
+        {
+            return mMsg.size();
+        }
+
+    private:
+        std::string    mMsg;
+    };
+
+    static  SendableMsg::Ptr MakeStringMsg(const char* buffer, size_t len)
+    {
+        return std::make_shared<StringSendMsg>(buffer, len);
+    }
+
+    static  SendableMsg::Ptr MakeStringMsg(std::string buffer)
+    {
+        return std::make_shared<StringSendMsg>(std::move(buffer));
+    }
+
     class TcpConnection :   public Channel, 
                             public brynet::base::NonCopyable, 
                             public std::enable_shared_from_this<TcpConnection>
@@ -162,40 +198,14 @@ namespace brynet { namespace net {
             size_t len, 
             PacketSendedCallback&& callback = nullptr)
         {
-            send(std::make_shared<std::string>(buffer, len), std::move(callback));
+            send(MakeStringMsg(buffer, len), std::move(callback));
         }
 
         void                            send(
-            const std::shared_ptr<std::string>& packet,
+            std::string buffer,
             PacketSendedCallback&& callback = nullptr)
         {
-            class StringSendMsg : public SendableMsg
-            {
-            public:
-                explicit StringSendMsg(std::shared_ptr<std::string>&&  msg)
-                    :
-                    mMsg(std::move(msg))
-                {}
-                explicit StringSendMsg(const std::shared_ptr<std::string>&  msg)
-                    :
-                    mMsg(msg)
-                {}
-
-                const void* data() override
-                {
-                    return static_cast<const void*>(mMsg->data());
-                }
-
-                size_t  size() override
-                {
-                    return mMsg->size();
-                }
-
-            private:
-                std::shared_ptr<std::string>    mMsg;
-            };
-
-            send(std::make_shared<StringSendMsg>(packet), std::move(callback));
+            send(MakeStringMsg(std::move(buffer)), std::move(callback));
         }
 
         // setDataCallback(std::function<void(brynet::base::BasePacketReader&)>）

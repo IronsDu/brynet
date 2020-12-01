@@ -49,7 +49,7 @@ static size_t getClientNum()
     return clients.size();
 }
 
-static void broadCastPacket(const std::shared_ptr<std::string>& packet)
+static void broadCastPacket(const brynet::net::SendableMsg::Ptr & packet)
 {
     auto packetLen = packet->size();
     RecvPacketNum++;
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
                         break;
                     }
 
-                    auto packet = std::make_shared<std::string>(buffer, packetLen);
+                    auto packet = brynet::net::MakeStringMsg(buffer, packetLen);
                     mainLoop->runAsyncFunctor([packet]()
                     {
                         broadCastPacket(packet);
