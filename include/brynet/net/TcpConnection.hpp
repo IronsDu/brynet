@@ -58,6 +58,7 @@ namespace brynet { namespace net {
         using DataCallback = std::function<void(brynet::base::BasePacketReader&)>;
         using DisconnectedCallback = std::function<void(Ptr)>;
         using PacketSendedCallback = std::function<void(void)>;
+        using HighWaterCallback = std::function<void(void)>;
 
     public:
         Ptr static Create(TcpSocket::Ptr socket, 
@@ -135,12 +136,24 @@ namespace brynet { namespace net {
             auto sharedThis = shared_from_this();
             mEventLoop->runAsyncFunctor([sharedThis, msg, callback]() mutable
             {
+                if(sharedThis->mAlreadyClose)
+                {
+                    return;
+                }
+
                 const auto len = msg->size();
+                sharedThis->mSendingMsgSize += len;
                 sharedThis->mSendList.emplace_back(PendingPacket{
                         std::move(msg),
                         len,
                         std::move(callback) });
                 sharedThis->runAfterFlush();
+
+                if(sharedThis->mSendingMsgSize > sharedThis->mHighWaterSize &&
+                    sharedThis->mHighWaterCallback != nullptr)
+                {
+                    sharedThis->mHighWaterCallback();
+                }
             });
         }
 
@@ -182,16 +195,7 @@ namespace brynet { namespace net {
                 std::shared_ptr<std::string>    mMsg;
             };
 
-            auto sharedThis = shared_from_this();
-            mEventLoop->runAsyncFunctor([sharedThis, packet, callback]() mutable
-            {
-                const auto len = packet->size();
-                sharedThis->mSendList.emplace_back(PendingPacket{
-                    std::make_shared<StringSendMsg>(std::move(packet)),
-                    len, 
-                    std::move(callback) });
-                sharedThis->runAfterFlush();
-            });
+            send(std::make_shared<StringSendMsg>(packet), std::move(callback));
         }
 
         // setDataCallback(std::function<void(brynet::base::BasePacketReader&)>）
@@ -231,6 +235,16 @@ namespace brynet { namespace net {
 
                 sharedThis->mCheckTime = checkTime;
                 sharedThis->startPingCheckTimer();
+            });
+        }
+
+        void                            setHighWaterCallback(HighWaterCallback cb, size_t size)
+        {
+            auto sharedThis = shared_from_this();
+            mEventLoop->runAsyncFunctor([=]() mutable
+            {
+                sharedThis->mHighWaterCallback = std::move(cb);
+                sharedThis->mHighWaterSize = size;
             });
         }
 
@@ -288,7 +302,9 @@ namespace brynet { namespace net {
             mEventLoop(std::move(eventLoop)),
             mAlreadyClose(false),
             mMaxRecvBufferSize(maxRecvBufferSize),
-            mEnterCallback(std::move(enterCallback))
+            mSendingMsgSize(0),
+            mEnterCallback(std::move(enterCallback)),
+            mHighWaterSize(0)
         {
             mRecvData = false;
             mCheckTime = std::chrono::steady_clock::duration::zero();
@@ -850,6 +866,7 @@ namespace brynet { namespace net {
                     {
                         (packet.mCompleteCallback)();
                     }
+                    mSendingMsgSize -= packet.data->size();
                     it = mSendList.erase(it);
                 }
 
@@ -928,6 +945,7 @@ namespace brynet { namespace net {
                     {
                         b.mCompleteCallback();
                     }
+                    mSendingMsgSize -= b.data->size();
                     it = mSendList.erase(it);
                 }
 
@@ -980,9 +998,11 @@ namespace brynet { namespace net {
                 });
 
             mCanWrite = false;
-            mDisConnectCallback = nullptr;
             mDataCallback = nullptr;
+            mDisConnectCallback = nullptr;
+            mHighWaterCallback = nullptr;
             mRecvBuffer = nullptr;
+            mSendList.clear();
         }
 
         void                            procCloseInLoop()
@@ -1212,10 +1232,13 @@ namespace brynet { namespace net {
 
         using PacketListType = std::deque<PendingPacket>;
         PacketListType                  mSendList;
+        size_t                          mSendingMsgSize;
 
         EnterCallback                   mEnterCallback;
         DataCallback                    mDataCallback;
         DisconnectedCallback            mDisConnectCallback;
+        HighWaterCallback               mHighWaterCallback;
+        size_t                          mHighWaterSize;
 
         bool                            mIsPostFlush;
 

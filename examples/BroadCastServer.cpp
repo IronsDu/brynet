@@ -94,6 +94,12 @@ int main(int argc, char** argv)
                     });
                 });
 
+            session->setHighWaterCallback([]()
+                {
+                    std::cout << "high water" << std::endl;
+                },
+                1024*1024*100);
+
             session->setDataCallback([mainLoop](brynet::base::BasePacketReader& reader) {
                 while (true)
                 {
