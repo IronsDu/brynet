@@ -194,7 +194,7 @@ namespace brynet { namespace net {
             });
         }
 
-      // setDataCallback(std::function<void(brynet::base::BasePacketReader&)>）
+        // setDataCallback(std::function<void(brynet::base::BasePacketReader&)>）
         template<typename Callback>
         void                            setDataCallback(Callback&& cb)
         {
@@ -231,6 +231,18 @@ namespace brynet { namespace net {
 
                 sharedThis->mCheckTime = checkTime;
                 sharedThis->startPingCheckTimer();
+            });
+        }
+
+        void                            postShrinkReceiveBuffer()
+        {
+            auto sharedThis = shared_from_this();
+            mEventLoop->runAsyncFunctor([=]()
+            {
+                mEventLoop->runFunctorAfterLoop([=]()
+                {
+                    sharedThis->shrinkReceiveBuffer();
+                });
             });
         }
 
@@ -345,6 +357,29 @@ namespace brynet { namespace net {
                     buffer_getreadvalidcount(mRecvBuffer.get()));
                 mRecvBuffer = std::move(newBuffer);
             }
+        }
+
+        void                            shrinkReceiveBuffer()
+        {
+            auto newSize = buffer_getreadvalidcount(mRecvBuffer.get());
+            if (newSize == 0)
+            {
+                newSize = std::min<size_t>(16 * 1024, mMaxRecvBufferSize);
+            }
+            if(newSize == buffer_getsize(mRecvBuffer.get()))
+            {
+                return;
+            }
+
+            std::unique_ptr<struct brynet::base::buffer_s, BufferDeleter>
+                    newBuffer(brynet::base::buffer_new(newSize));
+            buffer_write(newBuffer.get(),
+                         buffer_getreadptr(mRecvBuffer.get()),
+                         buffer_getreadvalidcount(mRecvBuffer.get()));
+
+            mRecvBuffer = std::move(newBuffer);
+            mCurrentTanhXDiff = 0;
+            mRecvBuffOriginSize = newSize;
         }
 
         /* must called in network thread */
@@ -603,6 +638,12 @@ namespace brynet { namespace net {
                     buffer_adjustto_head(mRecvBuffer.get());
                 }
 
+                if (buffer_getreadvalidcount(mRecvBuffer.get())
+                    == buffer_getsize(mRecvBuffer.get()))
+                {
+                    growRecvBuffer();
+                }
+
                 const auto tryRecvLen = buffer_getwritevalidcount(mRecvBuffer.get());
                 if (tryRecvLen == 0)
                 {
@@ -667,11 +708,6 @@ namespace brynet { namespace net {
 
                 mRecvData = true;
                 buffer_addwritepos(mRecvBuffer.get(), static_cast<size_t>(retlen));
-                if (buffer_getreadvalidcount(mRecvBuffer.get())
-                    == buffer_getsize(mRecvBuffer.get()))
-                {
-                    growRecvBuffer();
-                }
 
                 if (notInSSL && retlen < static_cast<int>(tryRecvLen))
                 {
