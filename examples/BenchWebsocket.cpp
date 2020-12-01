@@ -28,14 +28,14 @@ static void sendPacket(const HttpSession::Ptr& session, const char* data, size_t
     bw.writeINT8('"');
     bw.writeINT8('}');
 
-    auto frame = std::make_shared<std::string>();
+    std::string frame;
     WebSocketFormat::wsFrameBuild(bw.getData(),
         bw.getPos(), 
-        *frame, 
+        frame,
         WebSocketFormat::WebSocketFrameType::TEXT_FRAME, 
         true, 
         true);
-    session->send(frame);
+    session->send(std::move(frame));
 }
 
 int main(int argc, char **argv)

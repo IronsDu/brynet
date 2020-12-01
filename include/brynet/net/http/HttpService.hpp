@@ -32,7 +32,7 @@ namespace brynet { namespace net { namespace http {
         void                        send(PacketType&& packet,
             TcpConnection::PacketSendedCallback&& callback = nullptr)
         {
-            mSession->send(std::forward<std::shared_ptr<std::string>>(packet),
+            mSession->send(std::forward<PacketType&&>(packet),
                 std::move(callback));
         }
         void                        send(const char* packet,

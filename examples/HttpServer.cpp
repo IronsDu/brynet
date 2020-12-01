@@ -53,14 +53,14 @@ int main(int argc, char **argv)
                 std::cout << "frame enter of type:" << int(opcode) << std::endl;
                 std::cout << "payload is:" << payload << std::endl;
                 // echo frame
-                auto frame = std::make_shared<std::string>();
+                std::string frame;
                 WebSocketFormat::wsFrameBuild(payload.c_str(),
                     payload.size(),
-                    *frame,
+                    frame,
                     WebSocketFormat::WebSocketFrameType::TEXT_FRAME,
                     true,
                     false);
-                httpSession->send(frame);
+                httpSession->send(std::move(frame));
             };
 
     wrapper::HttpListenerBuilder listenBuilder;
