@@ -31,6 +31,10 @@ int main(int argc, char **argv)
                 HttpResponse response;
                 std::cout << "method:" << http_method_str(static_cast<http_method>(httpParser.method())) << std::endl;
                 std::string body = "<html>hello world </html>";
+                for(size_t i = 0; i < 10; i++)
+                {
+                    body += body;
+                }
                 response.setBody(body);
                 std::string result = response.getResult();
                 if(httpParser.isKeepAlive())

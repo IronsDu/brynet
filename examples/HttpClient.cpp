@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <mutex>
+#include <atomic>
 #include <brynet/net/http/HttpService.hpp>
 #include <brynet/net/http/HttpFormat.hpp>
 #include <brynet/net/AsyncConnector.hpp>
@@ -10,6 +11,8 @@
 using namespace brynet;
 using namespace brynet::net;
 using namespace brynet::net::http;
+
+static std::atomic_llong counter = ATOMIC_VAR_INIT(0);
 
 int main(int argc, char **argv)
 {
@@ -48,18 +51,19 @@ int main(int argc, char **argv)
 
     for (size_t i = 0; i < 10; i++)
     {
+        // ConnectOption::WithAddr("23.73.140.64", 80),
         wrapper::HttpConnectionBuilder()
             .configureConnector(connector)
             .configureService(service)
             .configureConnectOptions({
-                ConnectOption::WithAddr("23.73.140.64", 80),
+                ConnectOption::WithAddr("127.0.0.1", 80),
                 ConnectOption::WithTimeout(std::chrono::seconds(10)),
                 ConnectOption::WithFailedCallback([]() {
                         std::cout << "connect failed" << std::endl;
                     }),
             })
             .configureConnectionOptions({
-                AddSocketOption::WithMaxRecvBufferSize(1024),
+                AddSocketOption::WithMaxRecvBufferSize(10),
                 AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
                     // do something for session
                     (void)session;
@@ -73,6 +77,8 @@ int main(int argc, char **argv)
                                          const HttpSession::Ptr& session) {
                     (void)session;
                     std::cout << httpParser.getBody() << std::endl;
+                    counter.fetch_add(1);
+                    std::cout << "counter:" << counter.load() << std::endl;
                 });
             })
             .asyncConnect();
