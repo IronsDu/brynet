@@ -4,7 +4,7 @@
 #include <chrono>
 #include <vector>
 #include <atomic>
-
+#include <malloc.h>
 #include <brynet/base/Packet.hpp>
 #include <brynet/net/SocketLibFunction.hpp>
 
@@ -164,7 +164,36 @@ int main(int argc, char** argv)
         }
     }
 
-    service->stopWorkerThread();
+    std::cout << "ready exit" << std::endl;
+
+    //mainLoop = nullptr;
+    //service->stopWorkerThread();
+    //service = nullptr;
+    //malloc_trim(0);
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    //std::cout << "ready malloc_trim" << std::endl;
+    //std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::cout << "ready malloc" << std::endl;
+    std::vector<char*> vs;
+    for(size_t i = 0; i < 30*1000*1000; i++)
+    {
+        vs.push_back(new char[30]);
+    }
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    std::cout << "ready delete" << std::endl;
+    for(auto v : vs)
+    {
+        delete v;
+    }
+    vs.clear();
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::cout << "ready malloc_trim" << std::endl;
+    malloc_trim(0);
+    std::this_thread::sleep_for(std::chrono::seconds(60));
+
 
     return 0;
 }

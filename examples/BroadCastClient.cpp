@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         brynet::net::base::SocketSetRecvSize(fd, 32 * 1024);
         brynet::net::base::SocketNodelay(fd);
 
-        auto enterCallback = [packetLen](const TcpConnection::Ptr& dataSocket) {
+        auto enterCallback = [packetLen, i](const TcpConnection::Ptr& dataSocket) {
             static_assert(sizeof(dataSocket.get()) <= sizeof(int64_t), "ud's size must less int64");
 
             auto HEAD_LEN = sizeof(uint32_t) + sizeof(uint16_t);
@@ -59,7 +59,11 @@ int main(int argc, char** argv)
                 dataSocket->send(sp->getData(), sp->getPos());
             }
 
-            dataSocket->setDataCallback([dataSocket](brynet::base::BasePacketReader& reader) {
+            dataSocket->setDataCallback([dataSocket, i](brynet::base::BasePacketReader& reader) {
+                if (i%2 == 0)
+                {
+                    return;
+                }
                 while (true)
                 {
                     if (!reader.enough(sizeof(uint32_t)))
