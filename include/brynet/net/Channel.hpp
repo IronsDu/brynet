@@ -11,7 +11,7 @@ namespace brynet { namespace net {
 
     private:
         virtual void    canSend() = 0;
-        virtual void    canRecv() = 0;
+        virtual void    canRecv(bool willClose) = 0;
         virtual void    onClose() = 0;
 
         friend class EventLoop;

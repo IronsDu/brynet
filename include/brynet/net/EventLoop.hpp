@@ -151,7 +151,7 @@ namespace brynet { namespace net {
                 const auto ovl = reinterpret_cast<const port::Win::OverlappedExt*>(mEventEntries[i].lpOverlapped);
                 if (ovl->OP == port::Win::OverlappedType::OverlappedRecv)
                 {
-                    channel->canRecv();
+                    channel->canRecv(false);
                 }
                 else if (ovl->OP == port::Win::OverlappedType::OverlappedSend)
                 {
@@ -174,14 +174,14 @@ namespace brynet { namespace net {
 
                 if (event_data & EPOLLRDHUP)
                 {
-                    channel->canRecv();
+                    channel->canRecv(true);
                     channel->onClose();
                     continue;
                 }
 
                 if (event_data & EPOLLIN)
                 {
-                    channel->canRecv();
+                    channel->canRecv(false);
                 }
 
                 if (event_data & EPOLLOUT)
@@ -207,7 +207,7 @@ namespace brynet { namespace net {
 
                 if (event.filter == EVFILT_READ)
                 {
-                    channel->canRecv();
+                    channel->canRecv(false);
                 }
 
                 if (event.filter == EVFILT_WRITE)

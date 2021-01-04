@@ -516,7 +516,7 @@ namespace brynet { namespace net {
             }
         }
 
-        void                            canRecv() override
+        void                            canRecv(const bool willClose) override
         {
 #ifdef BRYNET_PLATFORM_WINDOWS
             mPostRecvCheck = false;
@@ -544,7 +544,11 @@ namespace brynet { namespace net {
             }
 #endif
 
-            recv();
+            do
+            {
+                recv();
+                adjustReceiveBuffer();
+            } while(willClose && !mAlreadyClose && mRecvBuffer != nullptr && buffer_getwritevalidcount(mRecvBuffer.get()) > 0);
         }
 
         void                            canSend() override
@@ -646,6 +650,25 @@ namespace brynet { namespace net {
             return check_ret;
         }
 
+        void                            adjustReceiveBuffer()
+        {
+            if(!mRecvBuffer)
+            {
+                return;
+            }
+
+            if (buffer_getwritevalidcount(mRecvBuffer.get()) == 0
+                || buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
+            {
+                buffer_adjustto_head(mRecvBuffer.get());
+            }
+
+            if (buffer_getreadvalidcount(mRecvBuffer.get())
+                == buffer_getsize(mRecvBuffer.get()))
+            {
+                growRecvBuffer();
+            }
+        }
 
         void                            recv()
         {
@@ -658,17 +681,7 @@ namespace brynet { namespace net {
 
             while (true)
             {
-                if (buffer_getwritevalidcount(mRecvBuffer.get()) == 0
-                    || buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
-                {
-                    buffer_adjustto_head(mRecvBuffer.get());
-                }
-
-                if (buffer_getreadvalidcount(mRecvBuffer.get())
-                    == buffer_getsize(mRecvBuffer.get()))
-                {
-                    growRecvBuffer();
-                }
+                adjustReceiveBuffer();
 
                 const auto tryRecvLen = buffer_getwritevalidcount(mRecvBuffer.get());
                 if (tryRecvLen == 0)

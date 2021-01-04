@@ -39,7 +39,7 @@ namespace brynet { namespace net { namespace detail {
         }
 
     private:
-        void    canRecv() BRYNET_NOEXCEPT override
+        void    canRecv(bool) BRYNET_NOEXCEPT override
         {
             ;
         }
@@ -72,7 +72,7 @@ namespace brynet { namespace net { namespace detail {
         }
 
     private:
-        void    canRecv() override
+        void    canRecv(bool) override
         {
             char temp[1024 * 10];
             while (true)
@@ -118,7 +118,7 @@ namespace brynet { namespace net { namespace detail {
         }
 
     private:
-        void canRecv() override
+        void canRecv(bool) override
         {
         }
 
