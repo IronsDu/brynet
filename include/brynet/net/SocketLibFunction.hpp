@@ -80,6 +80,12 @@ namespace brynet { namespace net { namespace base {
         return ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&rd_size, sizeof(rd_size));
     }
 
+    static int  SocketSetReusePort(BrynetSocketFD fd)
+    {
+        int enable = 1;
+        return ::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
+    }
+
     static BrynetSocketFD SocketCreate(int af, int type, int protocol)
     {
         return ::socket(af, type, protocol);
@@ -152,7 +158,7 @@ namespace brynet { namespace net { namespace base {
         return clientfd;
     }
 
-    static BrynetSocketFD Listen(bool isIPV6, const char* ip, int port, int back_num)
+    static BrynetSocketFD Listen(bool isIPV6, const char* ip, int port, int back_num, bool enabledReusePort)
     {
         InitSocket();
 
@@ -193,6 +199,12 @@ namespace brynet { namespace net { namespace base {
                 SO_REUSEADDR,
                 (const char*)&reuseaddr_value,
                 sizeof(int)) < 0)
+        {
+            SocketClose(socketfd);
+            return BRYNET_INVALID_SOCKET;
+        }
+
+        if(enabledReusePort && SocketSetReusePort(socketfd) < 0)
         {
             SocketClose(socketfd);
             return BRYNET_INVALID_SOCKET;
