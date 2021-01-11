@@ -14,6 +14,7 @@ namespace brynet { namespace net { namespace wrapper {
             mSetting = false;
             mIsIpV6 = false;
             mPort = 0;
+            mEnabledReusePort = false;
         }
 
         void        setAddr(bool ipV6, std::string ip, int port)
@@ -44,11 +45,22 @@ namespace brynet { namespace net { namespace wrapper {
             return mSetting;
         }
 
+        void        enableReusePort()
+        {
+            mEnabledReusePort = true;
+        }
+
+        bool        enabledReusePort()
+        {
+            return mEnabledReusePort;
+        }
+
     private:
         std::string mListenAddr;
         int         mPort;
         bool        mIsIpV6;
         bool        mSetting;
+        bool        mEnabledReusePort;
     };
 
     class BuildListenConfig
@@ -63,6 +75,11 @@ namespace brynet { namespace net { namespace wrapper {
         void        setAddr(bool ipV6, std::string ip, int port)
         {
             mConfig->setAddr(ipV6, ip, port);
+        }
+
+        void        enableReusePort()
+        {
+            mConfig->enableReusePort();
         }
 
     private:
@@ -146,7 +163,8 @@ namespace brynet { namespace net { namespace wrapper {
                 [service, connectionOptions](brynet::net::TcpSocket::Ptr socket) {
                     service->addTcpConnection(std::move(socket), connectionOptions);
                 },
-                mSocketOptions);
+                mSocketOptions,
+                mListenConfig.enabledReusePort());
             mListenThread->startListen();
         }
 

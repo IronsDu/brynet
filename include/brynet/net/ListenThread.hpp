@@ -27,7 +27,8 @@ namespace brynet { namespace net {
             const std::string& ip,
             int port,
             const AccepCallback& callback,
-            const std::vector<TcpSocketProcessCallback> & processCallbacks = {})
+            const std::vector<TcpSocketProcessCallback> & processCallbacks = {},
+            bool enabledReusePort = false)
         {
             class make_shared_enabler : public ListenThread
             {
@@ -36,12 +37,13 @@ namespace brynet { namespace net {
                     const std::string& ip,
                     int port,
                     const AccepCallback& callback,
-                    const std::vector<TcpSocketProcessCallback>& processCallbacks)
+                    const std::vector<TcpSocketProcessCallback>& processCallbacks,
+                    bool enabledReusePort)
                     :
-                    ListenThread(isIPV6, ip, port, callback, processCallbacks)
+                    ListenThread(isIPV6, ip, port, callback, processCallbacks, enabledReusePort)
                 {}
             };
-            return std::make_shared<make_shared_enabler>(isIPV6, ip, port, callback, processCallbacks);
+            return std::make_shared<make_shared_enabler>(isIPV6, ip, port, callback, processCallbacks, enabledReusePort);
         }
 
     protected:
@@ -49,9 +51,10 @@ namespace brynet { namespace net {
             const std::string& ip,
             int port,
             const AccepCallback& callback,
-            const std::vector<TcpSocketProcessCallback>& processCallbacks)
+            const std::vector<TcpSocketProcessCallback>& processCallbacks,
+            bool enabledReusePort)
             :
-            detail::ListenThreadDetail(isIPV6, ip, port, callback, processCallbacks)
+            detail::ListenThreadDetail(isIPV6, ip, port, callback, processCallbacks, enabledReusePort)
         {}
     };
 

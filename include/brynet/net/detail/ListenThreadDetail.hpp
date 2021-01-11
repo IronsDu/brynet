@@ -33,7 +33,7 @@ namespace brynet { namespace net { namespace detail {
                 return;
             }
 
-            const auto fd = brynet::net::base::Listen(mIsIPV6, mIP.c_str(), mPort, 512);
+            const auto fd = brynet::net::base::Listen(mIsIPV6, mIP.c_str(), mPort, 512, mEnabledReusePort);
             if (fd == BRYNET_INVALID_SOCKET)
             {
                 throw BrynetCommonException(
@@ -87,6 +87,7 @@ namespace brynet { namespace net { namespace detail {
             auto connector = AsyncConnector::Create();
             connector->startWorkerThread();
 
+            //TODO:: if the listen enable reuse_port, one time connect may be can't wakeup listen.
             wrapper::SocketConnectBuilder connectBuilder;
             connectBuilder
                 .configureConnector(connector)
@@ -115,13 +116,15 @@ namespace brynet { namespace net { namespace detail {
             const std::string& ip,
             int port,
             const AccepCallback& callback,
-            const std::vector<TcpSocketProcessCallback>& processCallbacks)
+            const std::vector<TcpSocketProcessCallback>& processCallbacks,
+            bool enabledReusePort)
             :
             mIsIPV6(isIPV6),
             mIP(ip),
             mPort(port),
             mCallback(callback),
-            mProcessCallbacks(processCallbacks)
+            mProcessCallbacks(processCallbacks),
+            mEnabledReusePort(enabledReusePort)
         {
             if (mCallback == nullptr)
             {
@@ -160,6 +163,7 @@ namespace brynet { namespace net { namespace detail {
         const int                           mPort;
         const AccepCallback                 mCallback;
         const std::vector<TcpSocketProcessCallback>    mProcessCallbacks;
+        const bool                          mEnabledReusePort;
 
         std::shared_ptr<bool>               mRunListen;
         std::shared_ptr<std::thread>        mListenThread;
