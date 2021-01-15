@@ -82,8 +82,12 @@ namespace brynet { namespace net { namespace base {
 
     static int  SocketSetReusePort(BrynetSocketFD fd)
     {
+#ifdef BRYNET_PLATFORM_WINDOWS
+        return 0;
+#else
         int enable = 1;
         return ::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
+#endif
     }
 
     static BrynetSocketFD SocketCreate(int af, int type, int protocol)
