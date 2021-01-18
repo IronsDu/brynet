@@ -5,6 +5,7 @@
 #include <brynet/net/AsyncConnector.hpp>
 #include <brynet/net/wrapper/ConnectionBuilder.hpp>
 #include <brynet/base/AppStatus.hpp>
+//#define USE_SSL 0
 
 using namespace brynet;
 using namespace brynet::net;
@@ -37,10 +38,18 @@ int main(int argc, char **argv)
         std::cout << "connect failed" << std::endl;
     };
 
+#ifdef USE_SSL
+    SSLHelper::Ptr sslHelper = SSLHelper::Create();
+    sslHelper->initSSL();
+#endif // USE_SSL
+
     wrapper::ConnectionBuilder connectionBuilder;
     connectionBuilder.configureService(service)
         .configureConnector(connector)
         .configureConnectionOptions({
+#ifdef USE_SSL
+            brynet::net::AddSocketOption::WithClientSideSSL(),
+#endif // USE_SSL
             brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
             brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
         });
@@ -48,6 +57,8 @@ int main(int argc, char **argv)
     const auto num = std::atoi(argv[4]);
     const auto ip = argv[1];
     const auto port = std::atoi(argv[2]);
+
+
     for (auto i = 0; i < num; i++)
     {
         try
