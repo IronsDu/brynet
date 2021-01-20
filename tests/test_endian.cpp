@@ -1,14 +1,16 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-#include "catch.hpp"
+#define CATCH_CONFIG_MAIN// This tells Catch to provide a main() - only do this in one cpp file
 #include <brynet/base/endian/Endian.hpp>
 
-TEST_CASE("Endian are computed", "[Endian]") {
+#include "catch.hpp"
+
+TEST_CASE("Endian are computed", "[Endian]")
+{
     using namespace brynet::base::endian;
 
     auto littleEndian = false;
     {
         int a = 0x12345678;
-        littleEndian = (*(char*)&a == 0x78);
+        littleEndian = (*(char*) &a == 0x78);
     }
 
     REQUIRE(hostToNetwork64(0x1234567812345678, littleEndian) == 0x7856341278563412);

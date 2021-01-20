@@ -1,8 +1,10 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-#include "catch.hpp"
+#define CATCH_CONFIG_MAIN// This tells Catch to provide a main() - only do this in one cpp file
 #include <brynet/base/Stack.hpp>
 
-TEST_CASE("Stack are computed", "[Stack]") {
+#include "catch.hpp"
+
+TEST_CASE("Stack are computed", "[Stack]")
+{
     using namespace brynet::base;
 
     const size_t StackNum = 10;
@@ -23,7 +25,7 @@ TEST_CASE("Stack are computed", "[Stack]") {
 
     for (size_t i = 0; i < StackNum; i++)
     {
-        REQUIRE(*(size_t*)stack_popfront(stack) == i);
+        REQUIRE(*(size_t*) stack_popfront(stack) == i);
     }
     REQUIRE(stack_popback(stack) == nullptr);
     REQUIRE(stack_popfront(stack) == nullptr);
@@ -37,9 +39,9 @@ TEST_CASE("Stack are computed", "[Stack]") {
     {
         REQUIRE(stack_push(stack, &i));
     }
-    for (int i = StackNum-1; i >= 0; i--)
+    for (int i = StackNum - 1; i >= 0; i--)
     {
-        REQUIRE(*(size_t*)stack_popback(stack) == (size_t)i);
+        REQUIRE(*(size_t*) stack_popback(stack) == (size_t) i);
     }
     REQUIRE(stack_popback(stack) == nullptr);
     REQUIRE(stack_popfront(stack) == nullptr);

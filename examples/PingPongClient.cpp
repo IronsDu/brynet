@@ -1,15 +1,14 @@
-﻿#include <iostream>
-#include <string>
-
-#include <brynet/net/TcpService.hpp>
+﻿#include <brynet/base/AppStatus.hpp>
 #include <brynet/net/AsyncConnector.hpp>
+#include <brynet/net/TcpService.hpp>
 #include <brynet/net/wrapper/ConnectionBuilder.hpp>
-#include <brynet/base/AppStatus.hpp>
+#include <iostream>
+#include <string>
 
 using namespace brynet;
 using namespace brynet::net;
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc != 6)
     {
@@ -27,9 +26,9 @@ int main(int argc, char **argv)
 
     auto enterCallback = [tmp](const TcpConnection::Ptr& session) {
         session->setDataCallback([session](brynet::base::BasePacketReader& reader) {
-                session->send(reader.begin(), reader.size());
-                reader.consumeAll();
-            });
+            session->send(reader.begin(), reader.size());
+            reader.consumeAll();
+        });
         session->send(tmp.c_str(), tmp.size());
     };
 
@@ -39,11 +38,9 @@ int main(int argc, char **argv)
 
     wrapper::ConnectionBuilder connectionBuilder;
     connectionBuilder.configureService(service)
-        .configureConnector(connector)
-        .configureConnectionOptions({
-            brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)
-        });
+            .configureConnector(connector)
+            .configureConnectionOptions({brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
+                                         brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)});
 
     const auto num = std::atoi(argv[4]);
     const auto ip = argv[1];
@@ -52,15 +49,13 @@ int main(int argc, char **argv)
     {
         try
         {
-            connectionBuilder.configureConnectOptions({
-                    ConnectOption::WithAddr(ip, port),
-                    ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                    ConnectOption::WithFailedCallback(failedCallback),
-                    ConnectOption::AddProcessTcpSocketCallback([](TcpSocket& socket) {
-                        socket.setNodelay();
-                    })
-                })
-                .asyncConnect();
+            connectionBuilder.configureConnectOptions({ConnectOption::WithAddr(ip, port),
+                                                       ConnectOption::WithTimeout(std::chrono::seconds(10)),
+                                                       ConnectOption::WithFailedCallback(failedCallback),
+                                                       ConnectOption::AddProcessTcpSocketCallback([](TcpSocket& socket) {
+                                                           socket.setNodelay();
+                                                       })})
+                    .asyncConnect();
         }
         catch (std::runtime_error& e)
         {
@@ -68,7 +63,7 @@ int main(int argc, char **argv)
         }
     }
 
-    while(true)
+    while (true)
     {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if (brynet::base::app_kbhit())

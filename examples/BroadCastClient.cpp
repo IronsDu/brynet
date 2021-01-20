@@ -1,22 +1,21 @@
 ﻿#include <stdio.h>
-#include <iostream>
-#include <chrono>
-#include <memory>
+
 #include <atomic>
-
-#include <brynet/base/Packet.hpp>
-
-#include <brynet/net/SocketLibFunction.hpp>
-#include <brynet/net/EventLoop.hpp>
-#include <brynet/net/TcpConnection.hpp>
 #include <brynet/base/AppStatus.hpp>
+#include <brynet/base/Packet.hpp>
+#include <brynet/net/EventLoop.hpp>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/TcpConnection.hpp>
+#include <chrono>
+#include <iostream>
+#include <memory>
 
 using namespace std;
 using namespace brynet;
 using namespace brynet::net;
 using namespace brynet::base;
 
-atomic_llong  TotalRecvPacketNum = ATOMIC_VAR_INIT(0);
+atomic_llong TotalRecvPacketNum = ATOMIC_VAR_INIT(0);
 atomic_llong TotalRecvSize = ATOMIC_VAR_INIT(0);
 
 int main(int argc, char** argv)
@@ -51,7 +50,7 @@ int main(int argc, char** argv)
             std::shared_ptr<BigPacket> sp = std::make_shared<BigPacket>(false);
             sp->writeUINT32(HEAD_LEN + sizeof(int64_t) + packetLen);
             sp->writeUINT16(1);
-            sp->writeINT64((int64_t)dataSocket.get());
+            sp->writeINT64((int64_t) dataSocket.get());
             sp->writeBinary(std::string(packetLen, '_'));
 
             for (int i = 0; i < 1; ++i)
@@ -69,7 +68,7 @@ int main(int argc, char** argv)
 
                     auto buffer = reader.currentBuffer();
                     auto packetLen = reader.readUINT32();
-                    if (!reader.enough(packetLen-sizeof(uint32_t)))
+                    if (!reader.enough(packetLen - sizeof(uint32_t)))
                     {
                         break;
                     }
@@ -85,19 +84,19 @@ int main(int argc, char** argv)
                         dataSocket->send(buffer, packetLen);
                     }
 
-                    reader.addPos(packetLen-sizeof(uint32_t)-sizeof(uint16_t)-sizeof(int64_t));
+                    reader.addPos(packetLen - sizeof(uint32_t) - sizeof(uint16_t) - sizeof(int64_t));
                     reader.savePos();
                 }
             });
 
             dataSocket->setDisConnectCallback([](const TcpConnection::Ptr& dataSocket) {
-                (void)dataSocket;
+                (void) dataSocket;
             });
         };
         auto tcpConnection = TcpConnection::Create(TcpSocket::Create(fd, false),
-            1024 * 1024, 
-            enterCallback, 
-            clientEventLoop);
+                                                   1024 * 1024,
+                                                   enterCallback,
+                                                   clientEventLoop);
     }
 
     auto now = std::chrono::steady_clock::now();
@@ -108,15 +107,18 @@ int main(int argc, char** argv)
         {
             if (TotalRecvSize / 1024 == 0)
             {
-                std::cout << "total recv : " << TotalRecvSize << " bytes/s" << ", num " << TotalRecvPacketNum << endl;
+                std::cout << "total recv : " << TotalRecvSize << " bytes/s"
+                          << ", num " << TotalRecvPacketNum << endl;
             }
             else if ((TotalRecvSize / 1024) / 1024 == 0)
             {
-                std::cout << "total recv : " << TotalRecvSize / 1024 << " K/s" << ", num " << TotalRecvPacketNum << endl;
+                std::cout << "total recv : " << TotalRecvSize / 1024 << " K/s"
+                          << ", num " << TotalRecvPacketNum << endl;
             }
             else
             {
-                std::cout << "total recv : " << (TotalRecvSize / 1024) / 1024 << " M/s" << ", num " << TotalRecvPacketNum << endl;
+                std::cout << "total recv : " << (TotalRecvSize / 1024) / 1024 << " M/s"
+                          << ", num " << TotalRecvPacketNum << endl;
             }
 
             now = std::chrono::steady_clock::now();

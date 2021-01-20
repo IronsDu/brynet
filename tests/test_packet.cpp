@@ -1,8 +1,10 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-#include "catch.hpp"
+#define CATCH_CONFIG_MAIN// This tells Catch to provide a main() - only do this in one cpp file
 #include <brynet/base/Packet.hpp>
 
-TEST_CASE("Packet are computed", "[Packet]") {
+#include "catch.hpp"
+
+TEST_CASE("Packet are computed", "[Packet]")
+{
     using namespace brynet::base;
     BigPacket packet;
     packet.writeBool(true);
