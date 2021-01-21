@@ -1,173 +1,168 @@
 #pragma once
 
-#include <string>
+#include <brynet/base/Noexcept.hpp>
+#include <brynet/base/NonCopyable.hpp>
+#include <brynet/net/AsyncConnector.hpp>
+#include <brynet/net/Socket.hpp>
+#include <brynet/net/SocketLibFunction.hpp>
+#include <brynet/net/wrapper/ConnectionBuilder.hpp>
 #include <functional>
-#include <thread>
+#include <iostream>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <thread>
 #include <vector>
-#include <cstdlib>
-#include <iostream>
-
-#include <brynet/base/NonCopyable.hpp>
-#include <brynet/base/Noexcept.hpp>
-#include <brynet/net/SocketLibFunction.hpp>
-#include <brynet/net/AsyncConnector.hpp>
-#include <brynet/net/wrapper/ConnectionBuilder.hpp>
-#include <brynet/net/Socket.hpp>
 
 namespace brynet { namespace net { namespace detail {
 
-    class ListenThreadDetail :  public brynet::base::NonCopyable
+class ListenThreadDetail : public brynet::base::NonCopyable
+{
+protected:
+    using AccepCallback = std::function<void(TcpSocket::Ptr)>;
+    using TcpSocketProcessCallback = std::function<void(TcpSocket&)>;
+
+    void startListen()
     {
-    protected:
-        using AccepCallback = std::function<void(TcpSocket::Ptr)>;
-        using TcpSocketProcessCallback = std::function<void(TcpSocket&)>;
+        std::lock_guard<std::mutex> lck(mListenThreadGuard);
 
-        void    startListen()
+        if (mListenThread != nullptr)
         {
-            std::lock_guard<std::mutex> lck(mListenThreadGuard);
-
-            if (mListenThread != nullptr)
-            {
-                return;
-            }
-
-            const auto fd = brynet::net::base::Listen(mIsIPV6, mIP.c_str(), mPort, 512, mEnabledReusePort);
-            if (fd == BRYNET_INVALID_SOCKET)
-            {
-                throw BrynetCommonException(
-                    std::string("listen error of:") + std::to_string(BRYNET_ERRNO));
-            }
-
-            mRunListen = std::make_shared<bool>(true);
-
-            auto listenSocket = std::shared_ptr<ListenSocket>(ListenSocket::Create(fd));
-            auto isRunListen = mRunListen;
-            auto callback = mCallback;
-            auto processCallbacks = mProcessCallbacks;
-            mListenThread = std::make_shared<std::thread>(
-                [isRunListen, listenSocket, callback, processCallbacks]() mutable {
-                while (*isRunListen)
-                {
-                    auto clientSocket = runOnceListen(listenSocket);
-                    if (clientSocket == nullptr)
-                    {
-                        continue;
-                    }
-
-                    if (*isRunListen)
-                    {
-                        for (const auto& process : processCallbacks)
-                        {
-                            process(*clientSocket);
-                        }
-                        callback(std::move(clientSocket));
-                    }
-                }
-                });
+            return;
         }
 
-        void    stopListen()
+        const auto fd = brynet::net::base::Listen(mIsIPV6, mIP.c_str(), mPort, 512, mEnabledReusePort);
+        if (fd == BRYNET_INVALID_SOCKET)
         {
-            std::lock_guard<std::mutex> lck(mListenThreadGuard);
+            throw BrynetCommonException(
+                    std::string("listen error of:") + std::to_string(BRYNET_ERRNO));
+        }
 
-            if (mListenThread == nullptr)
-            {
-                return;
-            }
+        mRunListen = std::make_shared<bool>(true);
 
-            *mRunListen = false;
-            auto selfIP = mIP;
-            if (selfIP == "0.0.0.0")
-            {
-                selfIP = "127.0.0.1";
-            }
+        auto listenSocket = std::shared_ptr<ListenSocket>(ListenSocket::Create(fd));
+        auto isRunListen = mRunListen;
+        auto callback = mCallback;
+        auto processCallbacks = mProcessCallbacks;
+        mListenThread = std::make_shared<std::thread>(
+                [isRunListen, listenSocket, callback, processCallbacks]() mutable {
+                    while (*isRunListen)
+                    {
+                        auto clientSocket = runOnceListen(listenSocket);
+                        if (clientSocket == nullptr)
+                        {
+                            continue;
+                        }
 
-            auto connector = AsyncConnector::Create();
-            connector->startWorkerThread();
+                        if (*isRunListen)
+                        {
+                            for (const auto& process : processCallbacks)
+                            {
+                                process(*clientSocket);
+                            }
+                            callback(std::move(clientSocket));
+                        }
+                    }
+                });
+    }
 
-            //TODO:: if the listen enable reuse_port, one time connect may be can't wakeup listen.
-            wrapper::SocketConnectBuilder connectBuilder;
-            connectBuilder
+    void stopListen()
+    {
+        std::lock_guard<std::mutex> lck(mListenThreadGuard);
+
+        if (mListenThread == nullptr)
+        {
+            return;
+        }
+
+        *mRunListen = false;
+        auto selfIP = mIP;
+        if (selfIP == "0.0.0.0")
+        {
+            selfIP = "127.0.0.1";
+        }
+
+        auto connector = AsyncConnector::Create();
+        connector->startWorkerThread();
+
+        //TODO:: if the listen enable reuse_port, one time connect may be can't wakeup listen.
+        wrapper::SocketConnectBuilder connectBuilder;
+        (void)connectBuilder
                 .configureConnector(connector)
-                .configureConnectOptions({
-                    ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                    ConnectOption::WithAddr(selfIP, mPort)
-                    })
+                .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
+                                          ConnectOption::WithAddr(selfIP, mPort)})
                 .syncConnect();
 
-            try
-            {
-                if (mListenThread->joinable())
-                {
-                    mListenThread->join();
-                }
-            }
-            catch (std::system_error & e)
-            {
-                (void)e;
-            }
-            mListenThread = nullptr;
-        }
-
-    protected:
-        ListenThreadDetail(bool isIPV6,
-            const std::string& ip,
-            int port,
-            const AccepCallback& callback,
-            const std::vector<TcpSocketProcessCallback>& processCallbacks,
-            bool enabledReusePort)
-            :
-            mIsIPV6(isIPV6),
-            mIP(ip),
-            mPort(port),
-            mCallback(callback),
-            mProcessCallbacks(processCallbacks),
-            mEnabledReusePort(enabledReusePort)
+        try
         {
-            if (mCallback == nullptr)
+            if (mListenThread->joinable())
             {
-                throw BrynetCommonException("accept callback is nullptr");
+                mListenThread->join();
             }
-            mRunListen = std::make_shared<bool>(false);
         }
-
-        virtual ~ListenThreadDetail() BRYNET_NOEXCEPT
+        catch (std::system_error& e)
         {
-            stopListen();
+            (void) e;
         }
+        mListenThread = nullptr;
+    }
 
-    private:
-        static brynet::net::TcpSocket::Ptr runOnceListen(const std::shared_ptr<ListenSocket>& listenSocket)
+protected:
+    ListenThreadDetail(bool isIPV6,
+                       const std::string& ip,
+                       int port,
+                       const AccepCallback& callback,
+                       const std::vector<TcpSocketProcessCallback>& processCallbacks,
+                       bool enabledReusePort)
+        : mIsIPV6(isIPV6),
+          mIP(ip),
+          mPort(port),
+          mCallback(callback),
+          mProcessCallbacks(processCallbacks),
+          mEnabledReusePort(enabledReusePort)
+    {
+        if (mCallback == nullptr)
         {
-            try
-            {
-                return listenSocket->accept();
-            }
-            catch (const EintrError & e)
-            {
-                std::cerr << "accept eintr execption:" << e.what() << std::endl;
-            }
-            catch (const AcceptError & e)
-            {
-                std::cerr << "accept execption:" << e.what() << std::endl;
-            }
+            throw BrynetCommonException("accept callback is nullptr");
+        }
+        mRunListen = std::make_shared<bool>(false);
+    }
 
-            return nullptr;
+    virtual ~ListenThreadDetail() BRYNET_NOEXCEPT
+    {
+        stopListen();
+    }
+
+private:
+    static brynet::net::TcpSocket::Ptr runOnceListen(const std::shared_ptr<ListenSocket>& listenSocket)
+    {
+        try
+        {
+            return listenSocket->accept();
+        }
+        catch (const EintrError& e)
+        {
+            std::cerr << "accept eintr execption:" << e.what() << std::endl;
+        }
+        catch (const AcceptError& e)
+        {
+            std::cerr << "accept execption:" << e.what() << std::endl;
         }
 
-    private:
-        const bool                          mIsIPV6;
-        const std::string                   mIP;
-        const int                           mPort;
-        const AccepCallback                 mCallback;
-        const std::vector<TcpSocketProcessCallback>    mProcessCallbacks;
-        const bool                          mEnabledReusePort;
+        return nullptr;
+    }
 
-        std::shared_ptr<bool>               mRunListen;
-        std::shared_ptr<std::thread>        mListenThread;
-        std::mutex                          mListenThreadGuard;
-    };
+private:
+    const bool mIsIPV6;
+    const std::string mIP;
+    const int mPort;
+    const AccepCallback mCallback;
+    const std::vector<TcpSocketProcessCallback> mProcessCallbacks;
+    const bool mEnabledReusePort;
 
-} } }
+    std::shared_ptr<bool> mRunListen;
+    std::shared_ptr<std::thread> mListenThread;
+    std::mutex mListenThreadGuard;
+};
+
+}}}// namespace brynet::net::detail

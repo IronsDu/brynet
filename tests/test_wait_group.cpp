@@ -1,12 +1,14 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-#include "catch.hpp"
-#include <memory>
+#define CATCH_CONFIG_MAIN// This tells Catch to provide a main() - only do this in one cpp file
 #include <atomic>
 #include <brynet/base/WaitGroup.hpp>
 #include <chrono>
+#include <memory>
 #include <thread>
 
-TEST_CASE("WaitGroup are computed", "[waitgroup]") {
+#include "catch.hpp"
+
+TEST_CASE("WaitGroup are computed", "[waitgroup]")
+{
     auto wg = brynet::base::WaitGroup::Create();
     wg->wait();
 

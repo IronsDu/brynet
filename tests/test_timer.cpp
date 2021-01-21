@@ -1,10 +1,12 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-#include "catch.hpp"
-#include <memory>
+#define CATCH_CONFIG_MAIN// This tells Catch to provide a main() - only do this in one cpp file
 #include <brynet/base/Timer.hpp>
 #include <chrono>
+#include <memory>
 
-TEST_CASE("Timer are computed", "[timer]") {
+#include "catch.hpp"
+
+TEST_CASE("Timer are computed", "[timer]")
+{
     auto timerMgr = std::make_shared<brynet::base::TimerMgr>();
 
     int upvalue = 0;

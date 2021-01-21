@@ -11,20 +11,20 @@
 namespace brynet { namespace base {
 
 #ifdef BRYNET_HAVE_LANG_CXX17
-    using BrynetAny = std::any;
+using BrynetAny = std::any;
 
-    template<typename T>
-    auto cast(const BrynetAny& ud)
-    {
-        return std::any_cast<T>(&ud);
-    }
+template<typename T>
+auto cast(const BrynetAny& ud)
+{
+    return std::any_cast<T>(&ud);
+}
 #else
-    using BrynetAny = int64_t;
-    template<typename T>
-    const T* cast(const BrynetAny& ud)
-    {
-        return static_cast<const T*>(&ud);
-    }
+using BrynetAny = int64_t;
+template<typename T>
+const T* cast(const BrynetAny& ud)
+{
+    return static_cast<const T*>(&ud);
+}
 #endif
 
-} }
+}}// namespace brynet::base

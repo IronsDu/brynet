@@ -1,18 +1,16 @@
-﻿#include <cstdio>
-#include <thread>
-#include <iostream>
-#include <chrono>
-#include <vector>
-#include <atomic>
-
+﻿#include <atomic>
+#include <brynet/base/AppStatus.hpp>
 #include <brynet/base/Packet.hpp>
-#include <brynet/net/SocketLibFunction.hpp>
-
 #include <brynet/net/EventLoop.hpp>
+#include <brynet/net/ListenThread.hpp>
+#include <brynet/net/SocketLibFunction.hpp>
 #include <brynet/net/TcpConnection.hpp>
 #include <brynet/net/TcpService.hpp>
-#include <brynet/net/ListenThread.hpp>
-#include <brynet/base/AppStatus.hpp>
+#include <chrono>
+#include <cstdio>
+#include <iostream>
+#include <thread>
+#include <vector>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -21,8 +19,8 @@ using namespace brynet::base;
 std::atomic_llong TotalSendLen = ATOMIC_VAR_INIT(0);
 std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
 
-std::atomic_llong  SendPacketNum = ATOMIC_VAR_INIT(0);
-std::atomic_llong  RecvPacketNum = ATOMIC_VAR_INIT(0);
+std::atomic_llong SendPacketNum = ATOMIC_VAR_INIT(0);
+std::atomic_llong RecvPacketNum = ATOMIC_VAR_INIT(0);
 
 std::vector<TcpConnection::Ptr> clients;
 TcpService::Ptr service;
@@ -49,7 +47,7 @@ static size_t getClientNum()
     return clients.size();
 }
 
-static void broadCastPacket(const brynet::net::SendableMsg::Ptr & packet)
+static void broadCastPacket(const brynet::net::SendableMsg::Ptr& packet)
 {
     auto packetLen = packet->size();
     RecvPacketNum++;
@@ -86,19 +84,18 @@ int main(int argc, char** argv)
         auto enterCallback = [mainLoop](const TcpConnection::Ptr& session) {
             mainLoop->runAsyncFunctor([session]() {
                 addClientID(session);
-                });
+            });
 
             session->setDisConnectCallback([mainLoop](const TcpConnection::Ptr& session) {
                 mainLoop->runAsyncFunctor([session]() {
                     removeClientID(session);
-                    });
                 });
+            });
 
-            session->setHighWaterCallback([]()
-                {
-                    std::cout << "high water" << std::endl;
-                },
-                1024*1024*100);
+            session->setHighWaterCallback([]() {
+                std::cout << "high water" << std::endl;
+            },
+                                          1024 * 1024 * 100);
 
             session->setDataCallback([mainLoop](brynet::base::BasePacketReader& reader) {
                 while (true)
@@ -110,26 +107,25 @@ int main(int argc, char** argv)
                     }
 
                     auto packetLen = reader.readUINT32();
-                    if (!reader.enough(packetLen-sizeof(uint32_t)))
+                    if (!reader.enough(packetLen - sizeof(uint32_t)))
                     {
                         break;
                     }
 
                     auto packet = brynet::net::MakeStringMsg(buffer, packetLen);
-                    mainLoop->runAsyncFunctor([packet]()
-                    {
+                    mainLoop->runAsyncFunctor([packet]() {
                         broadCastPacket(packet);
                     });
 
-                    reader.addPos(packetLen-sizeof(uint32_t));
+                    reader.addPos(packetLen - sizeof(uint32_t));
                     reader.savePos();
                 }
             });
         };
         service->addTcpConnection(std::move(socket),
-            brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
-            brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
-        });
+                                  brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
+                                  brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
+    });
 
     listenThread->startListen();
     service->startWorkerThread(threadNum);
@@ -142,15 +138,9 @@ int main(int argc, char** argv)
         if (diff >= std::chrono::seconds(1))
         {
             auto msDiff = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-            std::cout << "cost " << 
-                msDiff << " ms, clientnum:" << 
-                getClientNum() << ", recv " <<
-                (TotalRecvLen / 1024) * 1000 / msDiff  << 
-                " K/s, " << "num : " << 
-                RecvPacketNum * 1000 / msDiff << ", send " <<
-                (TotalSendLen / 1024) / 1024 * 1000 / msDiff <<
-                " M/s, " << " num: " << 
-                SendPacketNum * 1000 / msDiff << std::endl;
+            std::cout << "cost " << msDiff << " ms, clientnum:" << getClientNum() << ", recv " << (TotalRecvLen / 1024) * 1000 / msDiff << " K/s, "
+                      << "num : " << RecvPacketNum * 1000 / msDiff << ", send " << (TotalSendLen / 1024) / 1024 * 1000 / msDiff << " M/s, "
+                      << " num: " << SendPacketNum * 1000 / msDiff << std::endl;
             TotalRecvLen = 0;
             TotalSendLen = 0;
             RecvPacketNum = 0;

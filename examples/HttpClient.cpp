@@ -1,12 +1,12 @@
-#include <iostream>
-#include <string>
-#include <mutex>
 #include <atomic>
-#include <brynet/net/http/HttpService.hpp>
-#include <brynet/net/http/HttpFormat.hpp>
-#include <brynet/net/AsyncConnector.hpp>
-#include <brynet/net/wrapper/HttpConnectionBuilder.hpp>
 #include <brynet/base/AppStatus.hpp>
+#include <brynet/net/AsyncConnector.hpp>
+#include <brynet/net/http/HttpFormat.hpp>
+#include <brynet/net/http/HttpService.hpp>
+#include <brynet/net/wrapper/HttpConnectionBuilder.hpp>
+#include <iostream>
+#include <mutex>
+#include <string>
 
 using namespace brynet;
 using namespace brynet::net;
@@ -14,10 +14,10 @@ using namespace brynet::net::http;
 
 static std::atomic_llong counter = ATOMIC_VAR_INIT(0);
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    (void)argc;
-    (void)argv;
+    (void) argc;
+    (void) argv;
 
     auto service = TcpService::Create();
     service->startWorkerThread(2);
@@ -33,7 +33,8 @@ int main(int argc, char **argv)
     HttpQueryParameter p;
     p.add("key", "DCD9C36F1F54A96F707DFBE833600167");
     p.add("appid", "929390");
-    p.add("ticket", "140000006FC57764C95D45085373F104"
+    p.add("ticket",
+          "140000006FC57764C95D45085373F104"
           "01001001359F745C1800000001000000020000009"
           "DACD3DE1202A8C0431E100003000000B200000032"
           "000000040000005373F104010010016E2E0E009D"
@@ -53,38 +54,36 @@ int main(int argc, char **argv)
     {
         // ConnectOption::WithAddr("23.73.140.64", 80),
         wrapper::HttpConnectionBuilder()
-            .configureConnector(connector)
-            .configureService(service)
-            .configureConnectOptions({
-                ConnectOption::WithAddr("127.0.0.1", 80),
-                ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                ConnectOption::WithFailedCallback([]() {
-                        std::cout << "connect failed" << std::endl;
-                    }),
-            })
-            .configureConnectionOptions({
-                AddSocketOption::WithMaxRecvBufferSize(10),
-                AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
-                    // do something for session
-                    (void)session;
+                .configureConnector(connector)
+                .configureService(service)
+                .configureConnectOptions({
+                        ConnectOption::WithAddr("127.0.0.1", 80),
+                        ConnectOption::WithTimeout(std::chrono::seconds(10)),
+                        ConnectOption::WithFailedCallback([]() {
+                            std::cout << "connect failed" << std::endl;
+                        }),
                 })
-            })
-            .configureEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
-                (void)session;
-                std::cout << "connect success" << std::endl;
-                session->send(requestStr.c_str(), requestStr.size());
-                handlers.setHttpCallback([requestStr](const HTTPParser& httpParser,
-                                         const HttpSession::Ptr& session) {
-                    (void)session;
-                    std::cout << httpParser.getBody() << std::endl;
-                    counter.fetch_add(1);
-                    std::cout << "counter:" << counter.load() << std::endl;
-                });
-            })
-            .asyncConnect();
+                .configureConnectionOptions({AddSocketOption::WithMaxRecvBufferSize(10),
+                                             AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
+                                                 // do something for session
+                                                 (void) session;
+                                             })})
+                .configureEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
+                    (void) session;
+                    std::cout << "connect success" << std::endl;
+                    session->send(requestStr.c_str(), requestStr.size());
+                    handlers.setHttpCallback([requestStr](const HTTPParser& httpParser,
+                                                          const HttpSession::Ptr& session) {
+                        (void) session;
+                        std::cout << httpParser.getBody() << std::endl;
+                        counter.fetch_add(1);
+                        std::cout << "counter:" << counter.load() << std::endl;
+                    });
+                })
+                .asyncConnect();
     }
 
-    while(true)
+    while (true)
     {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if (brynet::base::app_kbhit())
