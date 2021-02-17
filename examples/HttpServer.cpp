@@ -28,23 +28,17 @@ int main(int argc, char** argv)
                                 const HttpSession::Ptr& session) {
         (void) httpParser;
         HttpResponse response;
-        std::cout << "method:" << http_method_str(static_cast<http_method>(httpParser.method())) << std::endl;
-        std::string body = "<html>hello world </html>";
-        for (size_t i = 0; i < 10; i++)
-        {
-            body += body;
-        }
-        response.setBody(body);
-        std::string result = response.getResult();
+        //std::cout << "method:" << http_method_str(static_cast<http_method>(httpParser.method())) << std::endl;
+        response.setBody(std::string("<html>hello world </html>"));
         if (httpParser.isKeepAlive())
         {
             response.addHeadValue("Connection", "Keep-Alive");
-            session->send(result.c_str(), result.size());
+            session->send(response.getResult());
         }
         else
         {
             response.addHeadValue("Connection", "Close");
-            session->send(result.c_str(), result.size(), [session]() {
+            session->send(response.getResult(), [session]() {
                 session->postShutdown();
             });
         }

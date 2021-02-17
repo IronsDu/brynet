@@ -9,6 +9,7 @@
 #include <brynet/net/Channel.hpp>
 #include <brynet/net/EventLoop.hpp>
 #include <brynet/net/SSLHelper.hpp>
+#include <brynet/net/SendableMsg.hpp>
 #include <brynet/net/Socket.hpp>
 #include <brynet/net/SocketLibFunction.hpp>
 #include <cassert>
@@ -34,51 +35,6 @@ extern "C" {
 #endif
 
 namespace brynet { namespace net {
-
-class SendableMsg
-{
-public:
-    using Ptr = std::shared_ptr<SendableMsg>;
-
-    virtual ~SendableMsg() = default;
-
-    virtual const void* data() = 0;
-    virtual size_t size() = 0;
-};
-
-class StringSendMsg : public SendableMsg
-{
-public:
-    explicit StringSendMsg(const char* buffer, size_t len)
-        : mMsg(buffer, len)
-    {}
-
-    explicit StringSendMsg(std::string buffer)
-        : mMsg(std::move(buffer))
-    {}
-
-    const void* data() override
-    {
-        return static_cast<const void*>(mMsg.data());
-    }
-    size_t size() override
-    {
-        return mMsg.size();
-    }
-
-private:
-    std::string mMsg;
-};
-
-static SendableMsg::Ptr MakeStringMsg(const char* buffer, size_t len)
-{
-    return std::make_shared<StringSendMsg>(buffer, len);
-}
-
-static SendableMsg::Ptr MakeStringMsg(std::string buffer)
-{
-    return std::make_shared<StringSendMsg>(std::move(buffer));
-}
 
 class TcpConnection : public Channel,
                       public brynet::base::NonCopyable,
@@ -159,44 +115,37 @@ public:
     }
 
     //TODO::如果所属EventLoop已经没有工作，则可能导致内存无限大，因为所投递的请求都没有得到处理
-    void send(
-            const SendableMsg::Ptr& msg,
-            PacketSendedCallback&& callback = nullptr)
+    void send(const SendableMsg::Ptr& msg,
+              PacketSendedCallback&& callback = nullptr)
     {
-        auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis, msg, callback]() mutable {
-            if (sharedThis->mAlreadyClose)
-            {
-                return;
-            }
-
-            const auto len = msg->size();
-            sharedThis->mSendingMsgSize += len;
-            sharedThis->mSendList.emplace_back(PendingPacket{
-                    std::move(msg),
-                    len,
-                    std::move(callback)});
-            sharedThis->runAfterFlush();
-
-            if (sharedThis->mSendingMsgSize > sharedThis->mHighWaterSize &&
-                sharedThis->mHighWaterCallback != nullptr)
-            {
-                sharedThis->mHighWaterCallback();
-            }
-        });
+        if (mEventLoop->isInLoopThread())
+        {
+            sendInLoop(msg, std::move(callback));
+        }
+        else
+        {
+            auto sharedThis = shared_from_this();
+            mEventLoop->runAsyncFunctor([sharedThis, msg, callback, this]() mutable {
+                sendInLoop(msg, std::move(callback));
+            });
+        }
     }
 
-    void send(
-            const char* buffer,
-            size_t len,
-            PacketSendedCallback&& callback = nullptr)
+    void send(const char* buffer,
+              size_t len,
+              PacketSendedCallback&& callback = nullptr)
     {
         send(MakeStringMsg(buffer, len), std::move(callback));
     }
 
-    void send(
-            std::string buffer,
-            PacketSendedCallback&& callback = nullptr)
+    void send(const std::string& buffer,
+              PacketSendedCallback&& callback = nullptr)
+    {
+        send(MakeStringMsg(buffer), std::move(callback));
+    }
+
+    void send(std::string&& buffer,
+              PacketSendedCallback&& callback = nullptr)
     {
         send(MakeStringMsg(std::move(buffer)), std::move(callback));
     }
@@ -208,17 +157,17 @@ public:
         verifyArgType(cb, &Callback::operator());
 
         auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
-            sharedThis->mDataCallback = cb;
-            sharedThis->processRecvMessage();
+        mEventLoop->runAsyncFunctor([sharedThis, cb, this]() mutable {
+            mDataCallback = cb;
+            processRecvMessage();
         });
     }
 
     void setDisConnectCallback(DisconnectedCallback&& cb)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis, cb]() mutable {
-            sharedThis->mDisConnectCallback = std::move(cb);
+        mEventLoop->runAsyncFunctor([sharedThis, cb, this]() mutable {
+            mDisConnectCallback = std::move(cb);
         });
     }
 
@@ -226,15 +175,15 @@ public:
     void setHeartBeat(std::chrono::nanoseconds checkTime)
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis, checkTime]() {
-            if (sharedThis->mTimer.lock() != nullptr)
+        mEventLoop->runAsyncFunctor([sharedThis, checkTime, this]() {
+            if (mTimer.lock() != nullptr)
             {
-                sharedThis->mTimer.lock()->cancel();
-                sharedThis->mTimer.reset();
+                mTimer.lock()->cancel();
+                mTimer.reset();
             }
 
-            sharedThis->mCheckTime = checkTime;
-            sharedThis->startPingCheckTimer();
+            mCheckTime = checkTime;
+            startPingCheckTimer();
         });
     }
 
@@ -242,17 +191,17 @@ public:
     {
         auto sharedThis = shared_from_this();
         mEventLoop->runAsyncFunctor([=]() mutable {
-            sharedThis->mHighWaterCallback = std::move(cb);
-            sharedThis->mHighWaterSize = size;
+            mHighWaterCallback = std::move(cb);
+            mHighWaterSize = size;
         });
     }
 
     void postShrinkReceiveBuffer()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([=]() {
-            mEventLoop->runFunctorAfterLoop([=]() {
-                sharedThis->shrinkReceiveBuffer();
+        mEventLoop->runAsyncFunctor([sharedThis, this]() {
+            mEventLoop->runFunctorAfterLoop([sharedThis, this]() {
+                shrinkReceiveBuffer();
             });
         });
     }
@@ -260,17 +209,17 @@ public:
     void postDisConnect()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis]() {
-            sharedThis->procCloseInLoop();
+        mEventLoop->runAsyncFunctor([sharedThis, this]() {
+            procCloseInLoop();
         });
     }
 
     void postShutdown()
     {
         auto sharedThis = shared_from_this();
-        mEventLoop->runAsyncFunctor([sharedThis]() {
-            sharedThis->mEventLoop->runFunctorAfterLoop([sharedThis]() {
-                sharedThis->procShutdownInLoop();
+        mEventLoop->runAsyncFunctor([sharedThis, this]() {
+            mEventLoop->runFunctorAfterLoop([sharedThis, this]() {
+                procShutdownInLoop();
             });
         });
     }
@@ -341,6 +290,29 @@ protected:
     }
 
 private:
+    void sendInLoop(const SendableMsg::Ptr& msg,
+                    PacketSendedCallback&& callback = nullptr)
+    {
+        if (mAlreadyClose)
+        {
+            return;
+        }
+
+        const auto len = msg->size();
+        mSendingMsgSize += len;
+        mSendList.emplace_back(PendingPacket{
+                msg,
+                len,
+                std::move(callback)});
+        runAfterFlush();
+
+        if (mSendingMsgSize > mHighWaterSize &&
+            mHighWaterCallback != nullptr)
+        {
+            mHighWaterCallback();
+        }
+    }
+
     void growRecvBuffer()
     {
         if (mRecvBuffer == nullptr)
@@ -489,9 +461,9 @@ private:
         if (!mTimer.lock() &&
             mCheckTime != std::chrono::steady_clock::duration::zero())
         {
-            std::weak_ptr<TcpConnection> weakedThis = shared_from_this();
-            mTimer = mEventLoop->runAfter(mCheckTime, [weakedThis]() {
-                auto sharedThis = weakedThis.lock();
+            std::weak_ptr<TcpConnection> weakThis = shared_from_this();
+            mTimer = mEventLoop->runAfter(mCheckTime, [weakThis]() {
+                auto sharedThis = weakThis.lock();
                 if (sharedThis != nullptr)
                 {
                     sharedThis->pingCheck();
@@ -1057,9 +1029,9 @@ private:
         if (!mIsPostFlush && !mSendList.empty() && mCanWrite)
         {
             auto sharedThis = shared_from_this();
-            mEventLoop->runFunctorAfterLoop([sharedThis]() {
-                sharedThis->mIsPostFlush = false;
-                sharedThis->flush();
+            mEventLoop->runFunctorAfterLoop([sharedThis, this]() {
+                mIsPostFlush = false;
+                flush();
             });
 
             mIsPostFlush = true;

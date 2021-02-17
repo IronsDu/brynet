@@ -361,7 +361,7 @@ public:
     std::chrono::nanoseconds timeout;
     std::vector<AsyncConnectAddr::ProcessTcpSocketCallback> processCallbacks;
     AsyncConnectAddr::CompletedCallback completedCallback;
-    AsyncConnectAddr::FailedCallback faledCallback;
+    AsyncConnectAddr::FailedCallback failedCallback;
 };
 
 }}}// namespace brynet::net::detail
