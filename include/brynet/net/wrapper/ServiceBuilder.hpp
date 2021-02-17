@@ -3,127 +3,91 @@
 #include <brynet/net/Exception.hpp>
 #include <brynet/net/ListenThread.hpp>
 #include <brynet/net/TcpService.hpp>
+#include <brynet/net/detail/AddSocketOptionInfo.hpp>
+#include <utility>
 
 namespace brynet { namespace net { namespace wrapper {
-
-class ListenConfig final
-{
-public:
-    ListenConfig()
-    {
-        mSetting = false;
-        mIsIpV6 = false;
-        mPort = 0;
-        mEnabledReusePort = false;
-    }
-
-    void setAddr(bool ipV6, std::string ip, int port)
-    {
-        mIsIpV6 = ipV6;
-        mListenAddr = ip;
-        mPort = port;
-        mSetting = true;
-    }
-
-    std::string ip() const
-    {
-        return mListenAddr;
-    }
-
-    int port() const
-    {
-        return mPort;
-    }
-
-    bool useIpV6() const
-    {
-        return mIsIpV6;
-    }
-
-    bool hasSetting() const
-    {
-        return mSetting;
-    }
-
-    void enableReusePort()
-    {
-        mEnabledReusePort = true;
-    }
-
-    bool enabledReusePort()
-    {
-        return mEnabledReusePort;
-    }
-
-private:
-    std::string mListenAddr;
-    int mPort;
-    bool mIsIpV6;
-    bool mSetting;
-    bool mEnabledReusePort;
-};
-
-class BuildListenConfig
-{
-public:
-    explicit BuildListenConfig(ListenConfig* config)
-        : mConfig(config)
-    {
-    }
-
-    void setAddr(bool ipV6, std::string ip, int port)
-    {
-        mConfig->setAddr(ipV6, ip, port);
-    }
-
-    void enableReusePort()
-    {
-        mConfig->enableReusePort();
-    }
-
-private:
-    ListenConfig* mConfig;
-};
 
 template<typename Derived>
 class BaseListenerBuilder
 {
-protected:
-    using AddSocketOptionFunc = detail::AddSocketOptionFunc;
-    using ConnectOptionFunc = detail::ConnectOptionFunc;
-
 public:
     virtual ~BaseListenerBuilder() = default;
 
-    Derived& configureService(TcpService::Ptr service)
+    Derived& WithService(TcpService::Ptr service)
     {
         mTcpService = std::move(service);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& configureSocketOptions(std::vector<ListenThread::TcpSocketProcessCallback> options)
+    Derived& AddSocketProcess(const ListenThread::TcpSocketProcessCallback& callback)
     {
-        mSocketOptions = std::move(options);
+        mSocketProcessCallbacks.push_back(callback);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& configureConnectionOptions(std::vector<AddSocketOptionFunc> options)
+    Derived& WithMaxRecvBufferSize(size_t size)
     {
-        mConnectionOptions = std::move(options);
+        mSocketOption.maxRecvBufferSize = size;
+        return static_cast<Derived&>(*this);
+    }
+#ifdef BRYNET_USE_OPENSSL
+    Derived& WithSSL(SSLHelper::Ptr sslHelper)
+    {
+        mSocketOption.sslHelper = std::move(sslHelper);
+        mSocketOption.useSSL = true;
+        return static_cast<Derived&>(*this);
+    }
+#endif
+    Derived& WithForceSameThreadLoop()
+    {
+        mSocketOption.forceSameThreadLoop = true;
         return static_cast<Derived&>(*this);
     }
 
-    template<typename BuilderFunc>
-    Derived& configureListen(const BuilderFunc& builder)
+    Derived& AddEnterCallback(const TcpConnection::EnterCallback& callback)
     {
-        BuildListenConfig buildConfig(&mListenConfig);
-        builder(buildConfig);
+        mSocketOption.enterCallback.push_back(callback);
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithAddr(bool ipV6, std::string ip, size_t port)
+    {
+        mIsIpV6 = ipV6;
+        mListenAddr = std::move(ip);
+        mPort = port;
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithReusePort()
+    {
+        mEnabledReusePort = true;
         return static_cast<Derived&>(*this);
     }
 
     void asyncRun()
     {
-        asyncRun(getConnectionOptions());
+        if (mTcpService == nullptr)
+        {
+            throw BrynetCommonException("tcp service is nullptr");
+        }
+        if (mListenAddr.empty())
+        {
+            throw BrynetCommonException("not config listen addr");
+        }
+
+        auto service = mTcpService;
+        auto option = mSocketOption;
+        mListenThread = ListenThread::Create(
+                mIsIpV6,
+                mListenAddr,
+                mPort,
+                [service, option](brynet::net::TcpSocket::Ptr socket) {
+                    service->addTcpConnection(std::move(socket), option);
+                },
+                mSocketProcessCallbacks,
+                mEnabledReusePort);
+        mListenThread->startListen();
     }
 
     void stop()
@@ -134,48 +98,15 @@ public:
         }
     }
 
-    std::vector<AddSocketOptionFunc> getConnectionOptions() const
-    {
-        return mConnectionOptions;
-    }
-
-protected:
-    void asyncRun(std::vector<AddSocketOptionFunc> connectionOptions)
-    {
-        if (mTcpService == nullptr)
-        {
-            throw BrynetCommonException("tcp service is nullptr");
-        }
-        if (connectionOptions.empty())
-        {
-            throw BrynetCommonException("options is empty");
-        }
-        if (!mListenConfig.hasSetting())
-        {
-            throw BrynetCommonException("not config listen addr");
-        }
-
-        auto service = mTcpService;
-        mListenThread = ListenThread::Create(
-                mListenConfig.useIpV6(),
-                mListenConfig.ip(),
-                mListenConfig.port(),
-                [service, connectionOptions](brynet::net::TcpSocket::Ptr socket) {
-                    service->addTcpConnection(std::move(socket), connectionOptions);
-                },
-                mSocketOptions,
-                mListenConfig.enabledReusePort());
-        mListenThread->startListen();
-    }
-
 private:
     TcpService::Ptr mTcpService;
-    std::vector<ListenThread::TcpSocketProcessCallback> mSocketOptions;
-    ListenConfig mListenConfig;
+    std::vector<ListenThread::TcpSocketProcessCallback> mSocketProcessCallbacks;
+    detail::AddSocketOptionInfo mSocketOption;
+    std::string mListenAddr;
+    int mPort = 0;
+    bool mIsIpV6 = false;
+    bool mEnabledReusePort = false;
     ListenThread::Ptr mListenThread;
-
-private:
-    std::vector<AddSocketOptionFunc> mConnectionOptions;
 };
 
 class ListenerBuilder : public BaseListenerBuilder<ListenerBuilder>

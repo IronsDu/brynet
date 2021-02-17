@@ -61,19 +61,13 @@ int main(int argc, char** argv)
     };
 
     wrapper::HttpListenerBuilder listenBuilder;
-    listenBuilder.configureService(service)
-            .configureSocketOptions({
-                    [](TcpSocket& socket) {
-                        socket.setNodelay();
-                    },
+    listenBuilder.WithService(service)
+            .AddSocketProcess([](TcpSocket& socket) {
+              socket.setNodelay();
             })
-            .configureConnectionOptions({
-                    AddSocketOption::WithMaxRecvBufferSize(1024),
-            })
-            .configureListen([port](wrapper::BuildListenConfig builder) {
-                builder.setAddr(false, "0.0.0.0", port);
-                builder.enableReusePort();
-            })
+            .WithMaxRecvBufferSize(1024)
+            .WithAddr(false, "0.0.0.0", port)
+            .WithReusePort()
             .configureEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
                 handlers.setHttpCallback(httpEnterCallback);
                 handlers.setWSCallback(wsEnterCallback);

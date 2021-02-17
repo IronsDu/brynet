@@ -10,7 +10,6 @@ class ListenThread : public detail::ListenThreadDetail,
 public:
     using Ptr = std::shared_ptr<ListenThread>;
     using AccepCallback = std::function<void(TcpSocket::Ptr)>;
-    ;
     using TcpSocketProcessCallback = std::function<void(TcpSocket&)>;
 
     void startListen()

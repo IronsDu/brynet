@@ -79,6 +79,11 @@ protected:
         mIOLoopDatas.clear();
     }
 
+    bool addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo options)
+    {
+        return _addTcpConnection(std::move(socket), std::move(options));
+    }
+
     template<typename... Options>
     bool addTcpConnection(TcpSocket::Ptr socket,
                           const Options&... options)
@@ -117,18 +122,8 @@ protected:
         stopWorkerThread();
     }
 
-    bool _addTcpConnection(TcpSocket::Ptr socket,
-                           const std::vector<AddSocketOptionFunc>& optionFuncs)
+    bool _addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo options)
     {
-        AddSocketOptionInfo options;
-        for (const auto& v : optionFuncs)
-        {
-            if (v != nullptr)
-            {
-                v(options);
-            }
-        }
-
         if (options.maxRecvBufferSize <= 0)
         {
             throw BrynetCommonException("buffer size is zero");
@@ -149,10 +144,10 @@ protected:
         }
 
         auto wrapperEnterCallback = [options](const TcpConnection::Ptr& tcpConnection) {
-            for (const auto& callback : options.enterCallback)
-            {
-                callback(tcpConnection);
-            }
+          for (const auto& callback : options.enterCallback)
+          {
+              callback(tcpConnection);
+          }
         };
 
         if (options.useSSL && options.sslHelper == nullptr)
@@ -167,6 +162,21 @@ protected:
                               options.sslHelper);
 
         return true;
+    }
+
+    bool _addTcpConnection(TcpSocket::Ptr socket,
+                           const std::vector<AddSocketOptionFunc>& optionFuncs)
+    {
+        AddSocketOptionInfo options;
+        for (const auto& v : optionFuncs)
+        {
+            if (v != nullptr)
+            {
+                v(options);
+            }
+        }
+
+        return _addTcpConnection(std::move(socket), options);
     }
 
     EventLoop::Ptr getSameThreadEventLoop()

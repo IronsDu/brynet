@@ -122,9 +122,10 @@ int main(int argc, char** argv)
                 }
             });
         };
-        service->addTcpConnection(std::move(socket),
-                                  brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
-                                  brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024));
+        detail::AddSocketOptionInfo option;
+        option.enterCallback.emplace_back(enterCallback);
+        option.maxRecvBufferSize = 1024 * 1024;
+        service->addTcpConnection(std::move(socket), option);
     });
 
     listenThread->startListen();

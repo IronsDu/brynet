@@ -4,74 +4,86 @@
 #include <brynet/net/Exception.hpp>
 #include <brynet/net/TcpService.hpp>
 #include <future>
+#include <utility>
 
 namespace brynet { namespace net { namespace wrapper {
 
 template<typename Derived>
 class BaseSocketConnectBuilder
 {
-protected:
-    using AddSocketOptionFunc = detail::AddSocketOptionFunc;
-    using ConnectOptionFunc = detail::ConnectOptionFunc;
-
 public:
     virtual ~BaseSocketConnectBuilder() = default;
 
-    Derived& configureConnector(AsyncConnector::Ptr connector)
+    Derived& WithConnector(AsyncConnector::Ptr connector)
     {
         mConnector = std::move(connector);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& configureConnectOptions(
-            std::vector<ConnectOptionFunc> options)
+    Derived& WithAddr(std::string ip, size_t port)
     {
-        mConnectOptions = std::move(options);
+        mInfo.ip = std::move(ip);
+        mInfo.port = port;
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithTimeout(std::chrono::nanoseconds timeout)
+    {
+        mInfo.timeout = timeout;
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& AddSocketProcessCallback(const detail::AsyncConnectAddr::ProcessTcpSocketCallback& callback)
+    {
+        mInfo.processCallbacks.push_back(callback);
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithCompletedCallback(detail::AsyncConnectAddr::CompletedCallback callback)
+    {
+        mInfo.completedCallback = std::move(callback);
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithFailedCallback(detail::AsyncConnectAddr::FailedCallback callback)
+    {
+        mInfo.failedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
     }
 
     void asyncConnect() const
     {
-        asyncConnect(mConnectOptions);
-    }
-
-    TcpSocket::Ptr syncConnect() const
-    {
-        return syncConnect(mConnectOptions);
-    }
-
-protected:
-    void asyncConnect(std::vector<ConnectOptionFunc> connectOptions) const
-    {
         if (mConnector == nullptr)
         {
             throw BrynetCommonException("connector is nullptr");
         }
-        if (connectOptions.empty())
+        if (mInfo.ip.empty())
         {
-            throw BrynetCommonException("options is empty");
+            throw BrynetCommonException("address is empty");
         }
 
-        mConnector->asyncConnect(connectOptions);
+        mConnector->asyncConnect(mInfo);
     }
 
-    TcpSocket::Ptr syncConnect(std::vector<ConnectOptionFunc> connectOptions) const
+    TcpSocket::Ptr syncConnect()
     {
-        auto timeout = ConnectOption::ExtractTimeout(connectOptions);
+        if (mInfo.completedCallback != nullptr || mInfo.failedCallback != nullptr)
+        {
+            throw std::runtime_error("already setting completed callback or failed callback");
+        }
 
         auto socketPromise = std::make_shared<std::promise<TcpSocket::Ptr>>();
-        connectOptions.push_back(ConnectOption::WithCompletedCallback(
-                [socketPromise](TcpSocket::Ptr socket) {
-                    socketPromise->set_value(std::move(socket));
-                }));
-        connectOptions.push_back(ConnectOption::WithFailedCallback([socketPromise]() {
+        mInfo.completedCallback = [socketPromise](TcpSocket::Ptr socket) {
+            socketPromise->set_value(std::move(socket));
+        };
+        mInfo.failedCallback = [socketPromise]() {
             socketPromise->set_value(nullptr);
-        }));
+        };
 
-        asyncConnect(connectOptions);
+        asyncConnect();
 
         auto future = socketPromise->get_future();
-        if (future.wait_for(timeout) != std::future_status::ready)
+        if (future.wait_for(mInfo.timeout) != std::future_status::ready)
         {
             return nullptr;
         }
@@ -79,14 +91,9 @@ protected:
         return future.get();
     }
 
-    std::vector<ConnectOptionFunc> getConnectOptions() const
-    {
-        return mConnectOptions;
-    }
-
 private:
     AsyncConnector::Ptr mConnector;
-    std::vector<ConnectOptionFunc> mConnectOptions;
+    detail::ConnectOptionsInfo mInfo;
 };
 
 class SocketConnectBuilder : public BaseSocketConnectBuilder<SocketConnectBuilder>
@@ -94,94 +101,102 @@ class SocketConnectBuilder : public BaseSocketConnectBuilder<SocketConnectBuilde
 };
 
 template<typename Derived>
-class BaseConnectionBuilder : public BaseSocketConnectBuilder<Derived>
+class BaseConnectionBuilder
 {
-protected:
-    using AddSocketOptionFunc = detail::AddSocketOptionFunc;
-    using ConnectOptionFunc = detail::ConnectOptionFunc;
-
 public:
-    Derived& configureService(TcpService::Ptr service)
+    Derived& WithService(TcpService::Ptr service)
     {
         mTcpService = std::move(service);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& configureConnectionOptions(std::vector<AddSocketOptionFunc> options)
+    Derived& WithConnector(AsyncConnector::Ptr connector)
     {
-        mConnectionOptions = std::move(options);
+        mConnectBuilder.WithConnector(std::move(connector));
         return static_cast<Derived&>(*this);
     }
 
-    void asyncConnect() const
+    Derived& WithAddr(std::string ip, size_t port)
     {
-        asyncConnect(BaseSocketConnectBuilder<Derived>::getConnectOptions(),
-                     mConnectionOptions);
+        mConnectBuilder.WithAddr(std::move(ip), port);
+        return static_cast<Derived&>(*this);
     }
 
-    TcpConnection::Ptr syncConnect() const
+    Derived& WithTimeout(std::chrono::nanoseconds timeout)
     {
-        return syncConnect(BaseSocketConnectBuilder<Derived>::getConnectOptions(),
-                           mConnectionOptions);
+        mConnectBuilder.WithTimeout(timeout);
+        return static_cast<Derived&>(*this);
     }
 
-protected:
-    void asyncConnect(std::vector<ConnectOptionFunc> connectOptions,
-                      std::vector<AddSocketOptionFunc> connectionOptions) const
+    Derived& AddSocketProcessCallback(const detail::AsyncConnectAddr::ProcessTcpSocketCallback& callback)
     {
-        if (mTcpService == nullptr)
-        {
-            throw BrynetCommonException("tcp serviceis nullptr");
-        }
-        if (connectionOptions.empty())
-        {
-            throw BrynetCommonException("options is empty");
-        }
+        mConnectBuilder.AddSocketProcessCallback(callback);
+        return static_cast<Derived&>(*this);
+    }
 
+    Derived& WithFailedCallback(detail::AsyncConnectAddr::FailedCallback callback)
+    {
+        mConnectBuilder.WithFailedCallback(std::move(callback));
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithMaxRecvBufferSize(size_t size)
+    {
+        mOption.maxRecvBufferSize = size;
+        return static_cast<Derived&>(*this);
+    }
+
+#ifdef BRYNET_USE_OPENSSL
+    Derived& WithSSL()
+    {
+        mOption.useSSL = true;
+        return static_cast<Derived&>(*this);
+    }
+#endif
+    Derived& WithForceSameThreadLoop()
+    {
+        mOption.forceSameThreadLoop = true;
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& AddEnterCallback(const TcpConnection::EnterCallback& callback)
+    {
+        mOption.enterCallback.push_back(callback);
+        return static_cast<Derived&>(*this);
+    }
+
+    void asyncConnect()
+    {
         auto service = mTcpService;
-        auto enterCallback = [service, connectionOptions](TcpSocket::Ptr socket) mutable {
-            service->addTcpConnection(std::move(socket), connectionOptions);
-        };
-        connectOptions.push_back(ConnectOption::WithCompletedCallback(enterCallback));
+        auto option = mOption;
+        mConnectBuilder.WithCompletedCallback([service, option](TcpSocket::Ptr socket) mutable {
+            service->addTcpConnection(std::move(socket), option);
+        });
 
-        BaseSocketConnectBuilder<Derived>::asyncConnect(connectOptions);
+        mConnectBuilder.asyncConnect();
     }
 
-    TcpConnection::Ptr syncConnect(std::vector<ConnectOptionFunc> connectOptions,
-                                   std::vector<AddSocketOptionFunc> connectionOptions) const
+    TcpConnection::Ptr syncConnect()
     {
-        auto timeout = ConnectOption::ExtractTimeout(connectOptions);
         auto sessionPromise = std::make_shared<std::promise<TcpConnection::Ptr>>();
 
-        connectOptions.push_back(ConnectOption::WithFailedCallback(
-                [sessionPromise]() {
-                    sessionPromise->set_value(nullptr);
-                }));
+        auto option = mOption;
+        option.enterCallback.push_back([sessionPromise](const TcpConnection::Ptr& session) {
+            sessionPromise->set_value(session);
+        });
 
-        connectionOptions.push_back(AddSocketOption::AddEnterCallback(
-                [sessionPromise](const TcpConnection::Ptr& session) {
-                    sessionPromise->set_value(session);
-                }));
-
-        asyncConnect(connectOptions, connectionOptions);
-
-        auto future = sessionPromise->get_future();
-        if (future.wait_for(timeout) != std::future_status::ready)
+        auto socket = mConnectBuilder.syncConnect();
+        if (socket == nullptr || !mTcpService->addTcpConnection(std::move(socket), option))
         {
             return nullptr;
         }
-
-        return future.get();
-    }
-
-    std::vector<AddSocketOptionFunc> getConnectionOptions() const
-    {
-        return mConnectionOptions;
+        return sessionPromise->get_future().get();
     }
 
 private:
     TcpService::Ptr mTcpService;
-    std::vector<AddSocketOptionFunc> mConnectionOptions;
+    detail::AddSocketOptionInfo mOption;
+    SocketConnectBuilder mConnectBuilder;
 };
 
 class ConnectionBuilder : public BaseConnectionBuilder<ConnectionBuilder>

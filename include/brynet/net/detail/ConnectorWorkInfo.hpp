@@ -350,15 +350,9 @@ static void RunOnceCheckConnect(
 class ConnectOptionsInfo final
 {
 public:
-    ConnectOptionsInfo()
-        : port(0),
-          timeout(std::chrono::seconds(10))
-    {
-    }
-
     std::string ip;
-    int port;
-    std::chrono::nanoseconds timeout;
+    int port = 0;
+    std::chrono::nanoseconds timeout = std::chrono::seconds(10);
     std::vector<AsyncConnectAddr::ProcessTcpSocketCallback> processCallbacks;
     AsyncConnectAddr::CompletedCallback completedCallback;
     AsyncConnectAddr::FailedCallback failedCallback;

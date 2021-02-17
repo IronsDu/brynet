@@ -88,17 +88,17 @@ int main(int argc, char** argv)
     connector->startWorkerThread();
 
     wrapper::HttpConnectionBuilder connectionBuilder;
-    connectionBuilder.configureService(service)
-            .configureConnector(connector)
-            .configureConnectionOptions({brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)});
+    connectionBuilder.WithService(service)
+            .WithConnector(connector)
+            .WithMaxRecvBufferSize(1024 * 1024);
 
     for (int i = 0; i < connections; i++)
     {
-        connectionBuilder.configureConnectOptions({ConnectOption::WithAddr(host, port),
-                                                   ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                                                   ConnectOption::AddProcessTcpSocketCallback([](TcpSocket& socket) {
-                                                       socket.setNodelay();
-                                                   })})
+        connectionBuilder.WithAddr(host, port)
+                .WithTimeout(std::chrono::seconds(10))
+                .AddSocketProcessCallback([](TcpSocket& socket) {
+                    socket.setNodelay();
+                })
                 .configureEnterCallback(enterCallback)
                 .asyncConnect();
     }

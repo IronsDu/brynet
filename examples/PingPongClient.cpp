@@ -37,10 +37,10 @@ int main(int argc, char** argv)
     };
 
     wrapper::ConnectionBuilder connectionBuilder;
-    connectionBuilder.configureService(service)
-            .configureConnector(connector)
-            .configureConnectionOptions({brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
-                                         brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024)});
+    connectionBuilder.WithService(service)
+            .WithConnector(connector)
+            .WithMaxRecvBufferSize(1024 * 1024)
+            .AddEnterCallback(enterCallback);
 
     const auto num = std::atoi(argv[4]);
     const auto ip = argv[1];
@@ -49,12 +49,12 @@ int main(int argc, char** argv)
     {
         try
         {
-            connectionBuilder.configureConnectOptions({ConnectOption::WithAddr(ip, port),
-                                                       ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                                                       ConnectOption::WithFailedCallback(failedCallback),
-                                                       ConnectOption::AddProcessTcpSocketCallback([](TcpSocket& socket) {
-                                                           socket.setNodelay();
-                                                       })})
+            connectionBuilder.WithAddr(ip, port)
+                    .WithTimeout(std::chrono::seconds(10))
+                    .WithFailedCallback(failedCallback)
+                    .AddSocketProcessCallback([](TcpSocket& socket) {
+                        socket.setNodelay();
+                    })
                     .asyncConnect();
         }
         catch (std::runtime_error& e)

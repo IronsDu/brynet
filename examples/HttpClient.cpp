@@ -54,20 +54,14 @@ int main(int argc, char** argv)
     {
         // ConnectOption::WithAddr("23.73.140.64", 80),
         wrapper::HttpConnectionBuilder()
-                .configureConnector(connector)
-                .configureService(service)
-                .configureConnectOptions({
-                        ConnectOption::WithAddr("127.0.0.1", 80),
-                        ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                        ConnectOption::WithFailedCallback([]() {
-                            std::cout << "connect failed" << std::endl;
-                        }),
+                .WithConnector(connector)
+                .WithService(service)
+                .WithAddr("127.0.0.1", 80)
+                .WithTimeout(std::chrono::seconds(10))
+                .WithFailedCallback([]() {
+                  std::cout << "connect failed" << std::endl;
                 })
-                .configureConnectionOptions({AddSocketOption::WithMaxRecvBufferSize(10),
-                                             AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
-                                                 // do something for session
-                                                 (void) session;
-                                             })})
+                .WithMaxRecvBufferSize(10)
                 .configureEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
                     (void) session;
                     std::cout << "connect success" << std::endl;
