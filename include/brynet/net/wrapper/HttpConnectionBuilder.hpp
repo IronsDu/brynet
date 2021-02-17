@@ -9,8 +9,7 @@ namespace brynet { namespace net { namespace wrapper {
 class HttpConnectionBuilder
 {
 public:
-    HttpConnectionBuilder& configureEnterCallback(
-            http::HttpSession::EnterCallback&& callback)
+    HttpConnectionBuilder& WithEnterCallback(http::HttpSession::EnterCallback&& callback)
     {
         mHttpEnterCallback = std::move(callback);
         return *this;
@@ -40,13 +39,13 @@ public:
         return *this;
     }
 
-    HttpConnectionBuilder& AddSocketProcessCallback(const detail::AsyncConnectAddr::ProcessTcpSocketCallback& callback)
+    HttpConnectionBuilder& AddSocketProcessCallback(const ProcessTcpSocketCallback& callback)
     {
         mBuilder.AddSocketProcessCallback(callback);
         return *this;
     }
 
-    HttpConnectionBuilder& WithFailedCallback(detail::AsyncConnectAddr::FailedCallback callback)
+    HttpConnectionBuilder& WithFailedCallback(FailedCallback callback)
     {
         mBuilder.WithFailedCallback(std::move(callback));
         return *this;

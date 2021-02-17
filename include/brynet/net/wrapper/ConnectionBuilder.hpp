@@ -8,6 +8,10 @@
 
 namespace brynet { namespace net { namespace wrapper {
 
+using CompletedCallback = detail::AsyncConnectAddr::CompletedCallback;
+using ProcessTcpSocketCallback = detail::AsyncConnectAddr::ProcessTcpSocketCallback;
+using FailedCallback = detail::AsyncConnectAddr::FailedCallback;
+
 template<typename Derived>
 class BaseSocketConnectBuilder
 {
@@ -33,19 +37,19 @@ public:
         return static_cast<Derived&>(*this);
     }
 
-    Derived& AddSocketProcessCallback(const detail::AsyncConnectAddr::ProcessTcpSocketCallback& callback)
+    Derived& AddSocketProcessCallback(const ProcessTcpSocketCallback& callback)
     {
         mConnectOption.processCallbacks.push_back(callback);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& WithCompletedCallback(detail::AsyncConnectAddr::CompletedCallback callback)
+    Derived& WithCompletedCallback(CompletedCallback callback)
     {
         mConnectOption.completedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& WithFailedCallback(detail::AsyncConnectAddr::FailedCallback callback)
+    Derived& WithFailedCallback(FailedCallback callback)
     {
         mConnectOption.failedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
@@ -128,13 +132,13 @@ public:
         return static_cast<Derived&>(*this);
     }
 
-    Derived& AddSocketProcessCallback(const detail::AsyncConnectAddr::ProcessTcpSocketCallback& callback)
+    Derived& AddSocketProcessCallback(const ProcessTcpSocketCallback& callback)
     {
         mConnectBuilder.AddSocketProcessCallback(callback);
         return static_cast<Derived&>(*this);
     }
 
-    Derived& WithFailedCallback(detail::AsyncConnectAddr::FailedCallback callback)
+    Derived& WithFailedCallback(FailedCallback callback)
     {
         mConnectBuilder.WithFailedCallback(std::move(callback));
         return static_cast<Derived&>(*this);

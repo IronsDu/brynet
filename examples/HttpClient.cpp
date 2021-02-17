@@ -59,10 +59,10 @@ int main(int argc, char** argv)
                 .WithAddr("127.0.0.1", 80)
                 .WithTimeout(std::chrono::seconds(10))
                 .WithFailedCallback([]() {
-                  std::cout << "connect failed" << std::endl;
+                    std::cout << "connect failed" << std::endl;
                 })
                 .WithMaxRecvBufferSize(10)
-                .configureEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
+                .WithEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
                     (void) session;
                     std::cout << "connect success" << std::endl;
                     session->send(requestStr.c_str(), requestStr.size());

@@ -99,7 +99,7 @@ int main(int argc, char** argv)
                 .AddSocketProcessCallback([](TcpSocket& socket) {
                     socket.setNodelay();
                 })
-                .configureEnterCallback(enterCallback)
+                .WithEnterCallback(enterCallback)
                 .asyncConnect();
     }
 
