@@ -79,16 +79,46 @@ protected:
         mIOLoopDatas.clear();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo options)
+    bool addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo option)
     {
-        return _addTcpConnection(std::move(socket), std::move(options));
-    }
+        if (option.maxRecvBufferSize <= 0)
+        {
+            throw BrynetCommonException("buffer size is zero");
+        }
 
-    template<typename... Options>
-    bool addTcpConnection(TcpSocket::Ptr socket,
-                          const Options&... options)
-    {
-        return _addTcpConnection(std::move(socket), {options...});
+        EventLoop::Ptr eventLoop;
+        if (option.forceSameThreadLoop)
+        {
+            eventLoop = getSameThreadEventLoop();
+        }
+        else
+        {
+            eventLoop = getRandomEventLoop();
+        }
+        if (eventLoop == nullptr)
+        {
+            return false;
+        }
+
+        auto wrapperEnterCallback = [option](const TcpConnection::Ptr& tcpConnection) {
+            for (const auto& callback : option.enterCallback)
+            {
+                callback(tcpConnection);
+            }
+        };
+
+        if (option.useSSL && option.sslHelper == nullptr)
+        {
+            option.sslHelper = SSLHelper::Create();
+        }
+
+        TcpConnection::Create(std::move(socket),
+                              option.maxRecvBufferSize,
+                              wrapperEnterCallback,
+                              eventLoop,
+                              option.sslHelper);
+
+        return true;
     }
 
     EventLoop::Ptr getRandomEventLoop()
@@ -120,63 +150,6 @@ protected:
     virtual ~TcpServiceDetail() BRYNET_NOEXCEPT
     {
         stopWorkerThread();
-    }
-
-    bool _addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo options)
-    {
-        if (options.maxRecvBufferSize <= 0)
-        {
-            throw BrynetCommonException("buffer size is zero");
-        }
-
-        EventLoop::Ptr eventLoop;
-        if (options.forceSameThreadLoop)
-        {
-            eventLoop = getSameThreadEventLoop();
-        }
-        else
-        {
-            eventLoop = getRandomEventLoop();
-        }
-        if (eventLoop == nullptr)
-        {
-            return false;
-        }
-
-        auto wrapperEnterCallback = [options](const TcpConnection::Ptr& tcpConnection) {
-          for (const auto& callback : options.enterCallback)
-          {
-              callback(tcpConnection);
-          }
-        };
-
-        if (options.useSSL && options.sslHelper == nullptr)
-        {
-            options.sslHelper = SSLHelper::Create();
-        }
-
-        TcpConnection::Create(std::move(socket),
-                              options.maxRecvBufferSize,
-                              wrapperEnterCallback,
-                              eventLoop,
-                              options.sslHelper);
-
-        return true;
-    }
-
-    bool _addTcpConnection(TcpSocket::Ptr socket,
-                           const std::vector<AddSocketOptionFunc>& optionFuncs)
-    {
-        AddSocketOptionInfo options;
-        for (const auto& v : optionFuncs)
-        {
-            if (v != nullptr)
-            {
-                v(options);
-            }
-        }
-
-        return _addTcpConnection(std::move(socket), options);
     }
 
     EventLoop::Ptr getSameThreadEventLoop()

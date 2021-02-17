@@ -4,6 +4,7 @@
 
 namespace brynet { namespace net {
 
+using ConnectOptionsInfo = detail::ConnectOptionsInfo;
 class AsyncConnector : public detail::AsyncConnectorDetail,
                        public std::enable_shared_from_this<AsyncConnector>
 {
@@ -20,12 +21,7 @@ public:
         detail::AsyncConnectorDetail::stopWorkerThread();
     }
 
-    void asyncConnect(const std::vector<detail::ConnectOptionFunc>& options)
-    {
-        detail::AsyncConnectorDetail::asyncConnect(options);
-    }
-
-    void asyncConnect(const detail::ConnectOptionsInfo& info)
+    void asyncConnect(const ConnectOptionsInfo& info)
     {
         detail::AsyncConnectorDetail::asyncConnect(info);
     }

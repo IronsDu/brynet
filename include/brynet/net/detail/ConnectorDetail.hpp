@@ -120,17 +120,6 @@ protected:
         });
     }
 
-    void asyncConnect(const std::vector<detail::ConnectOptionFunc>& options)
-    {
-        detail::ConnectOptionsInfo option;
-        for (const auto& func : options)
-        {
-            func(option);
-        }
-
-        asyncConnect(option);
-    }
-
 protected:
     AsyncConnectorDetail()
     {

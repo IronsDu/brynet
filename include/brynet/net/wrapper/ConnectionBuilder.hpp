@@ -93,7 +93,7 @@ public:
 
 private:
     AsyncConnector::Ptr mConnector;
-    detail::ConnectOptionsInfo mInfo;
+    ConnectOptionsInfo mInfo;
 };
 
 class SocketConnectBuilder : public BaseSocketConnectBuilder<SocketConnectBuilder>
@@ -195,7 +195,7 @@ public:
 
 private:
     TcpService::Ptr mTcpService;
-    detail::AddSocketOptionInfo mOption;
+    AddSocketOptionInfo mOption;
     SocketConnectBuilder mConnectBuilder;
 };
 

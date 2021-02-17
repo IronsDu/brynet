@@ -18,9 +18,6 @@
 
 namespace brynet { namespace net { namespace detail {
 
-class ConnectOptionsInfo;
-using ConnectOptionFunc = std::function<void(ConnectOptionsInfo& option)>;
-
 class AsyncConnectAddr final
 {
 public:
@@ -94,9 +91,9 @@ public:
         mPollResult.reset(brynet::base::stack_new(1024, sizeof(BrynetSocketFD)));
     }
 
-    void checkConnectStatus(int millsecond)
+    void checkConnectStatus(int millSecond)
     {
-        if (poller_poll(mPoller.get(), millsecond) <= 0)
+        if (poller_poll(mPoller.get(), millSecond) <= 0)
         {
             return;
         }

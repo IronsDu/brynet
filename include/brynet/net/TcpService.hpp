@@ -4,6 +4,7 @@
 
 namespace brynet { namespace net {
 
+using AddSocketOptionInfo = detail::AddSocketOptionInfo;
 class TcpService : public detail::TcpServiceDetail,
                    public std::enable_shared_from_this<TcpService>
 {
@@ -31,16 +32,9 @@ public:
         detail::TcpServiceDetail::stopWorkerThread();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, detail::AddSocketOptionInfo options)
+    bool addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo options)
     {
         return detail::TcpServiceDetail::addTcpConnection(std::move(socket), options);
-    }
-
-    template<typename... Options>
-    bool addTcpConnection(TcpSocket::Ptr socket,
-                          const Options&... options)
-    {
-        return detail::TcpServiceDetail::addTcpConnection(std::move(socket), options...);
     }
 
     EventLoop::Ptr getRandomEventLoop()

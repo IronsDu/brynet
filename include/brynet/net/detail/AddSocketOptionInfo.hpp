@@ -8,20 +8,11 @@ namespace brynet { namespace net { namespace detail {
 class AddSocketOptionInfo final
 {
 public:
-    AddSocketOptionInfo()
-    {
-        useSSL = false;
-        forceSameThreadLoop = false;
-        maxRecvBufferSize = 128;
-    }
-
     std::vector<TcpConnection::EnterCallback> enterCallback;
     SSLHelper::Ptr sslHelper;
-    bool useSSL;
-    bool forceSameThreadLoop;
-    size_t maxRecvBufferSize;
+    bool useSSL = false;
+    bool forceSameThreadLoop = false;
+    size_t maxRecvBufferSize = 128;
 };
-
-using AddSocketOptionFunc = std::function<void(AddSocketOptionInfo& option)>;
 
 }}}// namespace brynet::net::detail

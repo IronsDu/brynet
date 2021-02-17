@@ -101,7 +101,7 @@ public:
 private:
     TcpService::Ptr mTcpService;
     std::vector<ListenThread::TcpSocketProcessCallback> mSocketProcessCallbacks;
-    detail::AddSocketOptionInfo mSocketOption;
+    AddSocketOptionInfo mSocketOption;
     std::string mListenAddr;
     int mPort = 0;
     bool mIsIpV6 = false;
