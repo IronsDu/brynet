@@ -99,7 +99,7 @@ protected:
             func(option);
         }
 
-        if (option.completedCallback == nullptr && option.faledCallback == nullptr)
+        if (option.completedCallback == nullptr && option.failedCallback == nullptr)
         {
             throw ConnectException("all callback is nullptr");
         }
@@ -118,7 +118,7 @@ protected:
                                                 option.port,
                                                 option.timeout,
                                                 std::move(option.completedCallback),
-                                                std::move(option.faledCallback),
+                                                std::move(option.failedCallback),
                                                 std::move(option.processCallbacks));
         mEventLoop->runAsyncFunctor([workInfo, address]() {
             workInfo->processConnect(address);

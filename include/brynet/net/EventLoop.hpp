@@ -71,7 +71,7 @@ public:
         mIsAlreadyPostWakeup = false;
         mIsInBlock = true;
 
-        reallocEventSize(1024);
+        reAllocEventSize(1024);
         mSelfThreadID = -1;
         mTimer = std::make_shared<brynet::base::TimerMgr>();
     }
@@ -223,7 +223,7 @@ public:
 
         if (static_cast<size_t>(numComplete) == mEventEntries.size())
         {
-            reallocEventSize(mEventEntries.size() + 128);
+            reAllocEventSize(mEventEntries.size() + 128);
         }
 
         mTimer->schedule();
@@ -312,7 +312,7 @@ public:
     }
 
 private:
-    void reallocEventSize(size_t size)
+    void reAllocEventSize(size_t size)
     {
         mEventEntries.resize(size);
     }

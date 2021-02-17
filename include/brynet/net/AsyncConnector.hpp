@@ -40,7 +40,7 @@ public:
     static ConnectOptionFunc WithFailedCallback(FailedCallback callback)
     {
         return [callback](detail::ConnectOptionsInfo& option) {
-            option.faledCallback = callback;
+            option.failedCallback = callback;
         };
     }
 
