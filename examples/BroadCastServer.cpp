@@ -122,7 +122,7 @@ int main(int argc, char** argv)
                 }
             });
         };
-        AddSocketOptionInfo option;
+        ConnectionOption option;
         option.enterCallback.emplace_back(enterCallback);
         option.maxRecvBufferSize = 1024 * 1024;
         service->addTcpConnection(std::move(socket), option);

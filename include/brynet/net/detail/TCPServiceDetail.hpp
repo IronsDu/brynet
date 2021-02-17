@@ -5,7 +5,7 @@
 #include <brynet/net/SSLHelper.hpp>
 #include <brynet/net/Socket.hpp>
 #include <brynet/net/TcpConnection.hpp>
-#include <brynet/net/detail/AddSocketOptionInfo.hpp>
+#include <brynet/net/detail/ConnectionOption.hpp>
 #include <brynet/net/detail/IOLoopData.hpp>
 #include <functional>
 #include <memory>
@@ -79,7 +79,7 @@ protected:
         mIOLoopDatas.clear();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo option)
+    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption option)
     {
         if (option.maxRecvBufferSize <= 0)
         {

@@ -22,32 +22,32 @@ public:
 
     Derived& WithAddr(std::string ip, size_t port)
     {
-        mInfo.ip = std::move(ip);
-        mInfo.port = port;
+        mConnectOption.ip = std::move(ip);
+        mConnectOption.port = port;
         return static_cast<Derived&>(*this);
     }
 
     Derived& WithTimeout(std::chrono::nanoseconds timeout)
     {
-        mInfo.timeout = timeout;
+        mConnectOption.timeout = timeout;
         return static_cast<Derived&>(*this);
     }
 
     Derived& AddSocketProcessCallback(const detail::AsyncConnectAddr::ProcessTcpSocketCallback& callback)
     {
-        mInfo.processCallbacks.push_back(callback);
+        mConnectOption.processCallbacks.push_back(callback);
         return static_cast<Derived&>(*this);
     }
 
     Derived& WithCompletedCallback(detail::AsyncConnectAddr::CompletedCallback callback)
     {
-        mInfo.completedCallback = std::move(callback);
+        mConnectOption.completedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
     }
 
     Derived& WithFailedCallback(detail::AsyncConnectAddr::FailedCallback callback)
     {
-        mInfo.failedCallback = std::move(callback);
+        mConnectOption.failedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
     }
 
@@ -57,33 +57,33 @@ public:
         {
             throw BrynetCommonException("connector is nullptr");
         }
-        if (mInfo.ip.empty())
+        if (mConnectOption.ip.empty())
         {
             throw BrynetCommonException("address is empty");
         }
 
-        mConnector->asyncConnect(mInfo);
+        mConnector->asyncConnect(mConnectOption);
     }
 
     TcpSocket::Ptr syncConnect()
     {
-        if (mInfo.completedCallback != nullptr || mInfo.failedCallback != nullptr)
+        if (mConnectOption.completedCallback != nullptr || mConnectOption.failedCallback != nullptr)
         {
             throw std::runtime_error("already setting completed callback or failed callback");
         }
 
         auto socketPromise = std::make_shared<std::promise<TcpSocket::Ptr>>();
-        mInfo.completedCallback = [socketPromise](TcpSocket::Ptr socket) {
+        mConnectOption.completedCallback = [socketPromise](TcpSocket::Ptr socket) {
             socketPromise->set_value(std::move(socket));
         };
-        mInfo.failedCallback = [socketPromise]() {
+        mConnectOption.failedCallback = [socketPromise]() {
             socketPromise->set_value(nullptr);
         };
 
         asyncConnect();
 
         auto future = socketPromise->get_future();
-        if (future.wait_for(mInfo.timeout) != std::future_status::ready)
+        if (future.wait_for(mConnectOption.timeout) != std::future_status::ready)
         {
             return nullptr;
         }
@@ -93,7 +93,7 @@ public:
 
 private:
     AsyncConnector::Ptr mConnector;
-    ConnectOptionsInfo mInfo;
+    ConnectOption mConnectOption;
 };
 
 class SocketConnectBuilder : public BaseSocketConnectBuilder<SocketConnectBuilder>
@@ -195,7 +195,7 @@ public:
 
 private:
     TcpService::Ptr mTcpService;
-    AddSocketOptionInfo mOption;
+    ConnectionOption mOption;
     SocketConnectBuilder mConnectBuilder;
 };
 

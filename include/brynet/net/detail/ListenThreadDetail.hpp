@@ -87,7 +87,7 @@ protected:
 
         //TODO:: if the listen enable reuse_port, one time connect may be can't wakeup listen.
         wrapper::SocketConnectBuilder connectBuilder;
-        (void)connectBuilder
+        (void) connectBuilder
                 .WithConnector(connector)
                 .WithTimeout(std::chrono::seconds(2))
                 .WithAddr(selfIP, mPort)

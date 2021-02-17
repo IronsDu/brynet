@@ -86,7 +86,7 @@ protected:
         mThread = nullptr;
     }
 
-    void asyncConnect(detail::ConnectOptionsInfo option)
+    void asyncConnect(detail::ConnectOption option)
     {
 #ifdef BRYNET_HAVE_LANG_CXX17
         std::shared_lock<std::shared_mutex> lck(mThreadGuard);

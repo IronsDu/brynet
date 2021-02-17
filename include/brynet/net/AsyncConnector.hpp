@@ -4,7 +4,7 @@
 
 namespace brynet { namespace net {
 
-using ConnectOptionsInfo = detail::ConnectOptionsInfo;
+using ConnectOption = detail::ConnectOption;
 class AsyncConnector : public detail::AsyncConnectorDetail,
                        public std::enable_shared_from_this<AsyncConnector>
 {
@@ -21,9 +21,9 @@ public:
         detail::AsyncConnectorDetail::stopWorkerThread();
     }
 
-    void asyncConnect(const ConnectOptionsInfo& info)
+    void asyncConnect(const ConnectOption& option)
     {
-        detail::AsyncConnectorDetail::asyncConnect(info);
+        detail::AsyncConnectorDetail::asyncConnect(option);
     }
 
     static Ptr Create()

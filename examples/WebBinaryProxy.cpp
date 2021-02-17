@@ -70,7 +70,7 @@ int main(int argc, char** argv)
                                                              });
                                                          };
 
-                                                         AddSocketOptionInfo option;
+                                                         ConnectionOption option;
                                                          option.enterCallback.emplace_back(enterCallback);
                                                          option.maxRecvBufferSize = 32 * 1024;
                                                          tcpService->addTcpConnection(std::move(socket), option);
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 
 
                                                      /* new connect to backend server */
-                                                     ConnectOptionsInfo option;
+                                                     ConnectOption option;
                                                      option.ip = backendIP;
                                                      option.port = backendPort;
                                                      option.timeout = std::chrono::seconds(10);
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
                                                      });
                                                  };
 
-                                                 AddSocketOptionInfo option;
+                                                 ConnectionOption option;
                                                  option.enterCallback.emplace_back(enterCallback);
                                                  option.maxRecvBufferSize = 32 * 1024;
                                                  tcpService->addTcpConnection(std::move(socket), option);

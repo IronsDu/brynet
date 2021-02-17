@@ -5,7 +5,7 @@
 
 namespace brynet { namespace net { namespace detail {
 
-class AddSocketOptionInfo final
+class ConnectionOption final
 {
 public:
     std::vector<TcpConnection::EnterCallback> enterCallback;

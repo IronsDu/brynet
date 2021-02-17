@@ -3,7 +3,7 @@
 #include <brynet/net/Exception.hpp>
 #include <brynet/net/ListenThread.hpp>
 #include <brynet/net/TcpService.hpp>
-#include <brynet/net/detail/AddSocketOptionInfo.hpp>
+#include <brynet/net/detail/ConnectionOption.hpp>
 #include <utility>
 
 namespace brynet { namespace net { namespace wrapper {
@@ -101,7 +101,7 @@ public:
 private:
     TcpService::Ptr mTcpService;
     std::vector<ListenThread::TcpSocketProcessCallback> mSocketProcessCallbacks;
-    AddSocketOptionInfo mSocketOption;
+    ConnectionOption mSocketOption;
     std::string mListenAddr;
     int mPort = 0;
     bool mIsIpV6 = false;

@@ -4,7 +4,7 @@
 
 namespace brynet { namespace net {
 
-using AddSocketOptionInfo = detail::AddSocketOptionInfo;
+using ConnectionOption = detail::ConnectionOption;
 class TcpService : public detail::TcpServiceDetail,
                    public std::enable_shared_from_this<TcpService>
 {
@@ -32,7 +32,7 @@ public:
         detail::TcpServiceDetail::stopWorkerThread();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, AddSocketOptionInfo options)
+    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options)
     {
         return detail::TcpServiceDetail::addTcpConnection(std::move(socket), options);
     }

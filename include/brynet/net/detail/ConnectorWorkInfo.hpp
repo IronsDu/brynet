@@ -344,7 +344,7 @@ static void RunOnceCheckConnect(
     workerInfo->checkTimeout();
 }
 
-class ConnectOptionsInfo final
+class ConnectOption final
 {
 public:
     std::string ip;
