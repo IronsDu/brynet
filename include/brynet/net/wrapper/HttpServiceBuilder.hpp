@@ -9,15 +9,15 @@ namespace brynet { namespace net { namespace wrapper {
 class HttpListenerBuilder
 {
 public:
-    HttpListenerBuilder& configureEnterCallback(http::HttpSession::EnterCallback&& callback)
-    {
-        mHttpEnterCallback = std::move(callback);
-        return *this;
-    }
-
     HttpListenerBuilder& WithService(TcpService::Ptr service)
     {
         mBuilder.WithService(std::move(service));
+        return *this;
+    }
+
+    HttpListenerBuilder& WithEnterCallback(http::HttpSession::EnterCallback&& callback)
+    {
+        mHttpEnterCallback = std::move(callback);
         return *this;
     }
 

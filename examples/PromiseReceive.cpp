@@ -56,8 +56,7 @@ int main(int argc, char** argv)
                     response.setContentType("text/html; charset=utf-8");
                     response.setBody("<html>hello world </html>");
 
-                    auto result = response.getResult();
-                    session->send(result.c_str(), result.size());
+                    session->send(response.getResult());
                     session->postShutdown();
 
                     return false;

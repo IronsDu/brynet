@@ -9,12 +9,6 @@ namespace brynet { namespace net { namespace wrapper {
 class HttpConnectionBuilder
 {
 public:
-    HttpConnectionBuilder& WithEnterCallback(http::HttpSession::EnterCallback&& callback)
-    {
-        mHttpEnterCallback = std::move(callback);
-        return *this;
-    }
-
     HttpConnectionBuilder& WithService(TcpService::Ptr service)
     {
         mBuilder.WithService(std::move(service));
@@ -42,6 +36,12 @@ public:
     HttpConnectionBuilder& AddSocketProcessCallback(const ProcessTcpSocketCallback& callback)
     {
         mBuilder.AddSocketProcessCallback(callback);
+        return *this;
+    }
+
+    HttpConnectionBuilder& WithEnterCallback(http::HttpSession::EnterCallback&& callback)
+    {
+        mHttpEnterCallback = std::move(callback);
         return *this;
     }
 

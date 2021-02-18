@@ -29,7 +29,7 @@ int main(int argc, char** argv)
             session->send(reader.begin(), reader.size());
             reader.consumeAll();
         });
-        session->send(tmp.c_str(), tmp.size());
+        session->send(tmp);
     };
 
     auto failedCallback = []() {
@@ -37,7 +37,8 @@ int main(int argc, char** argv)
     };
 
     wrapper::ConnectionBuilder connectionBuilder;
-    connectionBuilder.WithService(service)
+    connectionBuilder
+            .WithService(service)
             .WithConnector(connector)
             .WithMaxRecvBufferSize(1024 * 1024)
             .AddEnterCallback(enterCallback);
@@ -49,7 +50,8 @@ int main(int argc, char** argv)
     {
         try
         {
-            connectionBuilder.WithAddr(ip, port)
+            connectionBuilder
+                    .WithAddr(ip, port)
                     .WithTimeout(std::chrono::seconds(10))
                     .WithFailedCallback(failedCallback)
                     .AddSocketProcessCallback([](TcpSocket& socket) {

@@ -20,6 +20,20 @@ public:
         return static_cast<Derived&>(*this);
     }
 
+    Derived& WithAddr(bool ipV6, std::string ip, size_t port)
+    {
+        mIsIpV6 = ipV6;
+        mListenAddr = std::move(ip);
+        mPort = port;
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& WithReusePort()
+    {
+        mEnabledReusePort = true;
+        return static_cast<Derived&>(*this);
+    }
+
     Derived& AddSocketProcess(const ListenThread::TcpSocketProcessCallback& callback)
     {
         mSocketProcessCallbacks.push_back(callback);
@@ -48,20 +62,6 @@ public:
     Derived& AddEnterCallback(const TcpConnection::EnterCallback& callback)
     {
         mSocketOption.enterCallback.push_back(callback);
-        return static_cast<Derived&>(*this);
-    }
-
-    Derived& WithAddr(bool ipV6, std::string ip, size_t port)
-    {
-        mIsIpV6 = ipV6;
-        mListenAddr = std::move(ip);
-        mPort = port;
-        return static_cast<Derived&>(*this);
-    }
-
-    Derived& WithReusePort()
-    {
-        mEnabledReusePort = true;
         return static_cast<Derived&>(*this);
     }
 

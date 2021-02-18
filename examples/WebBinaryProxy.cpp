@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 
                                                              for (auto& p : *cachePacket)
                                                              {
-                                                                 backendSession->send(p.c_str(), p.size());
+                                                                 backendSession->send(p);
                                                              }
                                                              cachePacket->clear();
 
@@ -75,7 +75,6 @@ int main(int argc, char** argv)
                                                          option.maxRecvBufferSize = 32 * 1024;
                                                          tcpService->addTcpConnection(std::move(socket), option);
                                                      };
-
 
                                                      /* new connect to backend server */
                                                      ConnectOption option;

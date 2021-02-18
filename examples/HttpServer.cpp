@@ -61,14 +61,15 @@ int main(int argc, char** argv)
     };
 
     wrapper::HttpListenerBuilder listenBuilder;
-    listenBuilder.WithService(service)
+    listenBuilder
+            .WithService(service)
             .AddSocketProcess([](TcpSocket& socket) {
-              socket.setNodelay();
+                socket.setNodelay();
             })
             .WithMaxRecvBufferSize(1024)
             .WithAddr(false, "0.0.0.0", port)
             .WithReusePort()
-            .configureEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
+            .WithEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
                 handlers.setHttpCallback(httpEnterCallback);
                 handlers.setWSCallback(wsEnterCallback);
             })

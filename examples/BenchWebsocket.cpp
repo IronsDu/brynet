@@ -94,7 +94,8 @@ int main(int argc, char** argv)
 
     for (int i = 0; i < connections; i++)
     {
-        connectionBuilder.WithAddr(host, port)
+        connectionBuilder
+                .WithAddr(host, port)
                 .WithTimeout(std::chrono::seconds(10))
                 .AddSocketProcessCallback([](TcpSocket& socket) {
                     socket.setNodelay();
