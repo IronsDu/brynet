@@ -54,25 +54,19 @@ int main(int argc, char** argv)
     {
         // ConnectOption::WithAddr("23.73.140.64", 80),
         wrapper::HttpConnectionBuilder()
-                .configureConnector(connector)
-                .configureService(service)
-                .configureConnectOptions({
-                        ConnectOption::WithAddr("127.0.0.1", 80),
-                        ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                        ConnectOption::WithFailedCallback([]() {
-                            std::cout << "connect failed" << std::endl;
-                        }),
+                .WithConnector(connector)
+                .WithService(service)
+                .WithAddr("127.0.0.1", 80)
+                .WithTimeout(std::chrono::seconds(10))
+                .WithFailedCallback([]() {
+                    std::cout << "connect failed" << std::endl;
                 })
-                .configureConnectionOptions({AddSocketOption::WithMaxRecvBufferSize(10),
-                                             AddSocketOption::AddEnterCallback([](const TcpConnection::Ptr& session) {
-                                                 // do something for session
-                                                 (void) session;
-                                             })})
-                .configureEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
+                .WithMaxRecvBufferSize(10)
+                .WithEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
                     (void) session;
                     std::cout << "connect success" << std::endl;
-                    session->send(requestStr.c_str(), requestStr.size());
-                    handlers.setHttpCallback([requestStr](const HTTPParser& httpParser,
+                    session->send(requestStr);
+                    handlers.setHttpCallback([](const HTTPParser& httpParser,
                                                           const HttpSession::Ptr& session) {
                         (void) session;
                         std::cout << httpParser.getBody() << std::endl;

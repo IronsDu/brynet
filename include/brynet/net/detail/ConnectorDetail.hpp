@@ -86,18 +86,13 @@ protected:
         mThread = nullptr;
     }
 
-    void asyncConnect(const std::vector<detail::ConnectOptionFunc>& options)
+    void asyncConnect(detail::ConnectOption option)
     {
 #ifdef BRYNET_HAVE_LANG_CXX17
         std::shared_lock<std::shared_mutex> lck(mThreadGuard);
 #else
         std::lock_guard<std::mutex> lck(mThreadGuard);
 #endif
-        detail::ConnectOptionsInfo option;
-        for (const auto& func : options)
-        {
-            func(option);
-        }
 
         if (option.completedCallback == nullptr && option.failedCallback == nullptr)
         {

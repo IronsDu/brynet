@@ -21,9 +21,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
     connector->startWorkerThread();
     wrapper::SocketConnectBuilder connectBuilder;
     auto socket = connectBuilder
-                          .configureConnector(connector)
-                          .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                    ConnectOption::WithAddr(ip, port)})
+                          .WithConnector(connector)
+                          .WithTimeout(std::chrono::seconds(2))
+                          .WithAddr(ip, port)
                           .syncConnect();
 
     REQUIRE(socket == nullptr);
@@ -37,10 +37,10 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 
     wrapper::ConnectionBuilder connectionBuilder;
     auto session = connectionBuilder
-                           .configureService(service)
-                           .configureConnector(connector)
-                           .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                     ConnectOption::WithAddr(ip, port)})
+                           .WithService(service)
+                           .WithConnector(connector)
+                           .WithTimeout(std::chrono::seconds(2))
+                           .WithAddr(ip, port)
                            .syncConnect();
 
     REQUIRE(session == nullptr);
@@ -52,12 +52,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
     auto service = TcpService::Create();
     service->startWorkerThread(1);
     wrapper::ListenerBuilder listenerBuilder;
-    listenerBuilder.configureService(service)
-            .configureConnectionOptions({AddSocketOption::WithMaxRecvBufferSize(10)})
-            .configureSocketOptions({})
-            .configureListen([=](wrapper::BuildListenConfig config) {
-                config.setAddr(false, ip, port);
-            })
+    listenerBuilder.WithService(service)
+            .WithMaxRecvBufferSize(10)
+            .WithAddr(false, ip, port)
             .asyncRun();
 
     {
@@ -65,9 +62,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
         connector->startWorkerThread();
         wrapper::SocketConnectBuilder connectBuilder;
         auto socket = connectBuilder
-                              .configureConnector(connector)
-                              .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                        ConnectOption::WithAddr(ip, port)})
+                              .WithConnector(connector)
+                              .WithTimeout(std::chrono::seconds(2))
+                              .WithAddr(ip, port)
                               .syncConnect();
 
         REQUIRE(socket != nullptr);
@@ -79,9 +76,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
     connector->startWorkerThread();
     wrapper::SocketConnectBuilder connectBuilder;
     auto socket = connectBuilder
-                          .configureConnector(connector)
-                          .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                    ConnectOption::WithAddr(ip, port)})
+                          .WithConnector(connector)
+                          .WithTimeout(std::chrono::seconds(2))
+                          .WithAddr(ip, port)
                           .syncConnect();
 
     REQUIRE(socket == nullptr);
@@ -101,9 +98,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
         connector->startWorkerThread();
         wrapper::SocketConnectBuilder connectBuilder;
         auto socket = connectBuilder
-                              .configureConnector(connector)
-                              .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                        ConnectOption::WithAddr(ip, port)})
+                              .WithConnector(connector)
+                              .WithTimeout(std::chrono::seconds(2))
+                              .WithAddr(ip, port)
                               .syncConnect();
 
         REQUIRE(socket != nullptr);
@@ -118,10 +115,10 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 
         wrapper::ConnectionBuilder connectionBuilder;
         auto session = connectionBuilder
-                               .configureService(service)
-                               .configureConnector(connector)
-                               .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                         ConnectOption::WithAddr(ip, port)})
+                               .WithService(service)
+                               .WithConnector(connector)
+                               .WithTimeout(std::chrono::seconds(2))
+                               .WithAddr(ip, port)
                                .syncConnect();
 
         REQUIRE(session != nullptr);
@@ -135,10 +132,10 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 
         wrapper::ConnectionBuilder connectionBuilder;
         auto session = connectionBuilder
-                               .configureService(service)
-                               .configureConnector(connector)
-                               .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                         ConnectOption::WithAddr(ip, port)})
+                               .WithService(service)
+                               .WithConnector(connector)
+                               .WithTimeout(std::chrono::seconds(2))
+                               .WithAddr(ip, port)
                                .syncConnect();
 
         REQUIRE(session == nullptr);
@@ -151,9 +148,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
     connector->startWorkerThread();
     wrapper::SocketConnectBuilder connectBuilder;
     auto socket = connectBuilder
-                          .configureConnector(connector)
-                          .configureConnectOptions({ConnectOption::WithTimeout(std::chrono::seconds(2)),
-                                                    ConnectOption::WithAddr(ip, port)})
+                          .WithConnector(connector)
+                          .WithTimeout(std::chrono::seconds(2))
+                          .WithAddr(ip, port)
                           .syncConnect();
 
     REQUIRE(socket == nullptr);

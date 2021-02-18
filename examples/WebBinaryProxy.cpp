@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 
                                                              for (auto& p : *cachePacket)
                                                              {
-                                                                 backendSession->send(p.c_str(), p.size());
+                                                                 backendSession->send(p);
                                                              }
                                                              cachePacket->clear();
 
@@ -70,16 +70,19 @@ int main(int argc, char** argv)
                                                              });
                                                          };
 
-                                                         tcpService->addTcpConnection(std::move(socket),
-                                                                                      brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
-                                                                                      brynet::net::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
+                                                         ConnectionOption option;
+                                                         option.enterCallback.emplace_back(enterCallback);
+                                                         option.maxRecvBufferSize = 32 * 1024;
+                                                         tcpService->addTcpConnection(std::move(socket), option);
                                                      };
 
-
                                                      /* new connect to backend server */
-                                                     asyncConnector->asyncConnect({ConnectOption::WithAddr(backendIP.c_str(), backendPort),
-                                                                                   ConnectOption::WithTimeout(std::chrono::seconds(10)),
-                                                                                   ConnectOption::WithCompletedCallback(enterCallback)});
+                                                     ConnectOption option;
+                                                     option.ip = backendIP;
+                                                     option.port = backendPort;
+                                                     option.timeout = std::chrono::seconds(10);
+                                                     option.completedCallback = enterCallback;
+                                                     asyncConnector->asyncConnect(option);
 
                                                      session->setDataCallback([=](brynet::base::BasePacketReader& reader) {
                                                          TcpConnection::Ptr backendSession = *shareBackendSession;
@@ -108,9 +111,10 @@ int main(int argc, char** argv)
                                                      });
                                                  };
 
-                                                 tcpService->addTcpConnection(std::move(socket),
-                                                                              brynet::net::AddSocketOption::AddEnterCallback(enterCallback),
-                                                                              brynet::net::AddSocketOption::WithMaxRecvBufferSize(32 * 1024));
+                                                 ConnectionOption option;
+                                                 option.enterCallback.emplace_back(enterCallback);
+                                                 option.maxRecvBufferSize = 32 * 1024;
+                                                 tcpService->addTcpConnection(std::move(socket), option);
                                              });
 
     // listen for front http client

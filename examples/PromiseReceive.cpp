@@ -56,8 +56,7 @@ int main(int argc, char** argv)
                     response.setContentType("text/html; charset=utf-8");
                     response.setBody("<html>hello world </html>");
 
-                    auto result = response.getResult();
-                    session->send(result.c_str(), result.size());
+                    session->send(response.getResult());
                     session->postShutdown();
 
                     return false;
@@ -65,15 +64,13 @@ int main(int argc, char** argv)
     };
 
     wrapper::ListenerBuilder listener;
-    listener.configureService(service)
-            .configureSocketOptions({[](TcpSocket& socket) {
+    listener.WithService(service)
+            .AddSocketProcess({[](TcpSocket& socket) {
                 socket.setNodelay();
             }})
-            .configureConnectionOptions({brynet::net::AddSocketOption::WithMaxRecvBufferSize(1024 * 1024),
-                                         brynet::net::AddSocketOption::AddEnterCallback(enterCallback)})
-            .configureListen([=](wrapper::BuildListenConfig config) {
-                config.setAddr(false, "0.0.0.0", atoi(argv[1]));
-            })
+            .WithMaxRecvBufferSize(1024 * 1024)
+            .AddEnterCallback(enterCallback)
+            .WithAddr(false, "0.0.0.0", atoi(argv[1]))
             .asyncRun();
 
     while (true)
