@@ -1,6 +1,6 @@
 language: cpp
 sudo: required
-dist: trusty
+dist: xenial
 
 common_sources: &all_sources
   - ubuntu-toolchain-r-test
