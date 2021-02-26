@@ -64,40 +64,42 @@ Linux/MacOS : [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=m
   ![Broadcast](image/broadcast.png "Broadcast")
 
 * Ab HTTP(1 network thread)
-        Document Path:          /
-        Document Length:        18 bytes
-
-        Concurrency Level:      100
-        Time taken for tests:   5.871 seconds
-        Complete requests:      100000
-        Failed requests:        0
-        Write errors:           0
-        Non-2xx responses:      100000
-        Total transferred:      5200000 bytes
-        HTML transferred:       1800000 bytes
-        Requests per second:    17031.62 [#/sec] (mean)
-        Time per request:       5.871 [ms] (mean)
-        Time per request:       0.059 [ms] (mean, across all concurrent requests)
-        Transfer rate:          864.89 [Kbytes/sec] received
-
-        Connection Times (ms)
-                    min  mean[+/-sd] median   max
-        Connect:        0    2   0.7      2       8
-        Processing:     1    3   0.7      3       9
-        Waiting:        0    3   0.8      3       8
-        Total:          2    6   0.8      6      11
-
-        Percentage of the requests served within a certain time (ms)
-        50%      6
-        66%      6
-        75%      6
-        80%      6
-        90%      7
-        95%      7
-        98%      7
-        99%      8
-        100%     11 (longest request)
-
+```
+    Server Hostname:        127.0.0.1
+    Server Port:            9999
+  
+    Document Path:          /abc/de?a=1
+    Document Length:        25 bytes
+    
+    Concurrency Level:      100
+    Time taken for tests:   17.734 seconds
+    Complete requests:      500000
+    Failed requests:        0
+    Total transferred:      41000000 bytes
+    HTML transferred:       12500000 bytes
+    Requests per second:    28194.36 [#/sec] (mean)
+    Time per request:       3.547 [ms] (mean)
+    Time per request:       0.035 [ms] (mean, across all concurrent requests)
+    Transfer rate:          2257.75 [Kbytes/sec] received
+    
+    Connection Times (ms)
+    min  mean[+/-sd] median   max
+    Connect:        0    2   0.2      2       3
+    Processing:     1    2   0.3      2       7
+    Waiting:        0    1   0.4      1       6
+    Total:          2    4   0.2      4       7
+    
+    Percentage of the requests served within a certain time (ms)
+    50%      4
+    66%      4
+    75%      4
+    80%      4
+    90%      4
+    95%      4
+    98%      4
+    99%      4
+    100%      7 (longest request)
+```
 
 Examples
 ----------------------------
@@ -114,7 +116,6 @@ Examples
 
 Users
 ----------------------------
-* [ARK - distributed plugin framework](https://github.com/ArkNX/ARK)
 * [Redis proxy](https://github.com/IronsDu/DBProxy)
 * [gayrpc](https://github.com/IronsDu/gayrpc)
 * [gaylord - distributed virtual actor framework](https://github.com/IronsDu/gaylord)
