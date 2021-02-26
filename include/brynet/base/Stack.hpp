@@ -11,8 +11,8 @@ struct stack_s
     size_t element_size;
 
     size_t element_num;
-    size_t front; /*  ջ��  */
-    size_t num;   /*  ջ��ЧԪ�ش�С */
+    size_t front;
+    size_t num;
 };
 
 static void stack_delete(struct stack_s* self)
@@ -110,7 +110,6 @@ static bool stack_isfull(struct stack_s* self)
     return (self->num == self->element_num);
 }
 
-/*  stack��stack_push���ڿռ䲻���ʱ���Զ�����(ͨ��stack_increase)  */
 static bool stack_push(struct stack_s* self, const void* data)
 {
     if (stack_isfull(self))
