@@ -67,7 +67,7 @@ int main(int argc, char** argv)
                     std::cout << "connect success" << std::endl;
                     session->send(requestStr);
                     handlers.setHttpCallback([](const HTTPParser& httpParser,
-                                                          const HttpSession::Ptr& session) {
+                                                const HttpSession::Ptr& session) {
                         (void) session;
                         std::cout << httpParser.getBody() << std::endl;
                         counter.fetch_add(1);
