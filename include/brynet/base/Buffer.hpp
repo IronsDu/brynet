@@ -163,7 +163,6 @@ static bool buffer_write(struct buffer_s* self, const char* data, size_t len)
 
     if (buffer_getwritevalidcount(self) >= len)
     {
-        /*  ֱ��д��    */
         memcpy(buffer_getwriteptr(self), data, len);
         buffer_addwritepos(self, len);
     }
