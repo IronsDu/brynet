@@ -22,7 +22,7 @@ public:
     {}
 
     explicit StringSendMsg(const std::string& buffer)
-            : mMsg(buffer)
+        : mMsg(buffer)
     {}
 
     explicit StringSendMsg(std::string&& buffer)

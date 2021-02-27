@@ -11,8 +11,8 @@ struct stack_s
     size_t element_size;
 
     size_t element_num;
-    size_t front; /*  栈底  */
-    size_t num;   /*  栈有效元素大小 */
+    size_t front;
+    size_t num;
 };
 
 static void stack_delete(struct stack_s* self)
@@ -110,7 +110,6 @@ static bool stack_isfull(struct stack_s* self)
     return (self->num == self->element_num);
 }
 
-/*  stack的stack_push会在空间不足的时候自动增长(通过stack_increase)  */
 static bool stack_push(struct stack_s* self, const void* data)
 {
     if (stack_isfull(self))

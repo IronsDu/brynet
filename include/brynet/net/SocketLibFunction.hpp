@@ -1,8 +1,9 @@
 #pragma once
 
+#include <string.h>
+
 #include <brynet/net/SocketLibTypes.hpp>
 #include <string>
-#include <string.h>
 
 namespace brynet { namespace net { namespace base {
 
