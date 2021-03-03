@@ -83,14 +83,14 @@ public:
 
     void setBody(const std::string& body)
     {
-        mBody = body;
         addHeadValue("Content-Length", std::to_string(body.size()));
+        mBody = body;
     }
 
     void setBody(std::string&& body)
     {
-        mBody = std::move(body);
         addHeadValue("Content-Length", std::to_string(body.size()));
+        mBody = std::move(body);
     }
 
     void addHeadValue(const std::string& field,
@@ -180,14 +180,14 @@ public:
 
     void setBody(const std::string& body)
     {
-        mBody = body;
         addHeadValue("Content-Length", std::to_string(body.size()));
+        mBody = body;
     }
 
     void setBody(std::string&& body)
     {
-        mBody = std::move(body);
         addHeadValue("Content-Length", std::to_string(body.size()));
+        mBody = std::move(body);
     }
 
     std::string getResult() const
