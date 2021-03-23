@@ -182,8 +182,15 @@ private:
     {
         /*TODO::keep alive and timeout close */
         auto& session = httpSession->getSession();
+        auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
 
-        session->setDisConnectCallback([httpSession](const TcpConnection::Ptr&) {
+        session->setDisConnectCallback([httpSession, httpParser](const TcpConnection::Ptr&) {
+            if (!httpParser->isCompleted())
+            {
+                // try pass EOF to http parser
+                HttpService::ProcessHttp(nullptr, 0, httpParser, httpSession);
+            }
+
             const auto& tmp = httpSession->getCloseCallback();
             if (tmp != nullptr)
             {
@@ -191,7 +198,6 @@ private:
             }
         });
 
-        auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
         session->setDataCallback([httpSession, httpParser](
                                          brynet::base::BasePacketReader& reader) {
             size_t retLen = 0;
@@ -203,12 +209,22 @@ private:
                                                        httpParser,
                                                        httpSession);
             }
+            else if (httpParser->isUpgrade())
+            {
+                // TODO::not support other upgrade protocol
+            }
             else
             {
                 retLen = HttpService::ProcessHttp(reader.begin(),
                                                   reader.size(),
                                                   httpParser,
                                                   httpSession);
+                // if http_parser_execute not consume all data that indicate cause error in parser.
+                // so we need close connection.
+                if (retLen != reader.size())
+                {
+                    httpSession->postClose();
+                }
             }
 
             reader.addPos(retLen);

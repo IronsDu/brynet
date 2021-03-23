@@ -22,6 +22,7 @@ public:
     {
         mLastWasValue = true;
 
+        mIsUpgrade = false;
         mIsWebSocket = false;
         mIsKeepAlive = false;
         mISCompleted = false;
@@ -44,6 +45,11 @@ public:
 
     virtual ~HTTPParser() = default;
 
+    bool isUpgrade() const
+    {
+        return mIsUpgrade;
+    }
+
     bool isWebSocket() const
     {
         return mIsWebSocket;
@@ -52,6 +58,12 @@ public:
     bool isKeepAlive() const
     {
         return mIsKeepAlive;
+    }
+
+
+    bool isCompleted() const
+    {
+        return mISCompleted;
     }
 
     int method() const
@@ -137,6 +149,8 @@ private:
     void clearParse()
     {
         mMethod = -1;
+        mIsUpgrade = false;
+        mIsWebSocket = false;
         mISCompleted = false;
         mLastWasValue = true;
         mUrl.clear();
@@ -154,18 +168,14 @@ private:
         const size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
         if (mISCompleted)
         {
-            mIsWebSocket = mParser.upgrade;
+            mIsUpgrade = mParser.upgrade;
+            mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
             mIsKeepAlive = hasEntry("Connection", "Keep-Alive");
             mMethod = mParser.method;
             http_parser_init(&mParser, mParserType);
         }
 
         return nparsed;
-    }
-
-    bool isCompleted() const
-    {
-        return mISCompleted;
     }
 
 private:
@@ -288,7 +298,8 @@ private:
     http_parser_settings mSettings;
 
     int mMethod = -1;
-    bool mIsWebSocket;
+    bool mIsUpgrade = false;
+    bool mIsWebSocket = false;
     bool mIsKeepAlive;
     bool mISCompleted;
 
