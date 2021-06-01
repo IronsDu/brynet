@@ -50,6 +50,11 @@ public:
         mSession->postDisConnect();
     }
 
+    const std::string& getIP() const
+    {
+        return mSession->getIP();
+    }
+
 protected:
     explicit HttpSession(TcpConnection::Ptr session)
     {
