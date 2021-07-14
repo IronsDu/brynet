@@ -38,8 +38,8 @@ SET(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include" CACHE PATH "The direct
 install(DIRECTORY include/brynet
   DESTINATION "${INCLUDE_INSTALL_DIR}")
 
-option(brynet_BUILD_EXAMPLES "Build examples" OFF)
-option(brynet_BUILD_TESTS "Build test" OFF)
+option(brynet_BUILD_EXAMPLES "Build examples" ON)
+option(brynet_BUILD_TESTS "Build test" ON)
 
 if (brynet_BUILD_EXAMPLES)
   add_subdirectory(examples)
