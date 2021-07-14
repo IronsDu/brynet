@@ -53,7 +53,7 @@ int main(int argc, char** argv)
             sp->writeINT64((int64_t) dataSocket.get());
             sp->writeBinary(std::string(packetLen, '_'));
 
-            for (int i = 0; i < 1; ++i)
+            for (int i = 0; i < 10; ++i)
             {
                 dataSocket->send(sp->getData(), sp->getPos());
             }
