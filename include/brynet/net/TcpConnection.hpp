@@ -838,11 +838,16 @@ private:
                 tmp_len -= packet.left;
                 if (packet.mCompleteCallback != nullptr)
                 {
-                    (packet.mCompleteCallback)();
+                    pedingCallbacks.push_back(std::move(packet.mCompleteCallback));
                 }
                 mSendingMsgSize -= packet.data->size();
                 it = mSendList.erase(it);
             }
+            for (auto&& callback : pedingCallbacks)
+            {
+                callback();
+            }
+            pedingCallbacks.clear();
 
             if (notInSSL && static_cast<size_t>(send_retlen) != wait_send_size)
             {
@@ -917,11 +922,16 @@ private:
                 tmp_len -= b.left;
                 if (b.mCompleteCallback != nullptr)
                 {
-                    b.mCompleteCallback();
+                    pedingCallbacks.push_back(std::move(b.mCompleteCallback));
                 }
                 mSendingMsgSize -= b.data->size();
                 it = mSendList.erase(it);
             }
+            for (auto&& callback : pedingCallbacks)
+            {
+                callback();
+            }
+            pedingCallbacks.clear();
 
             if (static_cast<size_t>(send_len) != ready_send_len)
             {
@@ -1208,6 +1218,8 @@ private:
         size_t left;
         PacketSendedCallback mCompleteCallback;
     };
+
+    std::vector<PacketSendedCallback> pedingCallbacks;
 
     using PacketListType = std::deque<PendingPacket>;
     PacketListType mSendList;
