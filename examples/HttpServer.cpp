@@ -50,14 +50,7 @@ int main(int argc, char** argv)
         std::cout << "frame enter of type:" << int(opcode) << std::endl;
         std::cout << "payload is:" << payload << std::endl;
         // echo frame
-        std::string frame;
-        WebSocketFormat::wsFrameBuild(payload.c_str(),
-                                      payload.size(),
-                                      frame,
-                                      WebSocketFormat::WebSocketFrameType::TEXT_FRAME,
-                                      true,
-                                      false);
-        httpSession->send(std::move(frame));
+        httpSession->send(WebSocketFormat::wsFrameBuild(payload));
     };
 
     wrapper::HttpListenerBuilder listenBuilder;
