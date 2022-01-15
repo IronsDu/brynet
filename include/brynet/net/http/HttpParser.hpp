@@ -170,7 +170,8 @@ private:
         {
             mIsUpgrade = mParser.upgrade;
             mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
-            mIsKeepAlive = hasEntry("Connection", "Keep-Alive");
+            auto &connHeader = getValue("Connection");
+            mIsKeepAlive = connHeader == "Keep-Alive" || connHeader == "keep-alive";
             mMethod = mParser.method;
             http_parser_init(&mParser, mParserType);
         }
