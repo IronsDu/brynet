@@ -116,6 +116,19 @@ public:
         return true;
     }
 
+    static std::string wsFrameBuild(const std::string& payload,
+                                    bool isFin = true,
+                                    bool masking = false)
+    {
+        std::string frame;
+        wsFrameBuild(payload.c_str(),
+                     payload.size(),
+                     frame,
+                     WebSocketFormat::WebSocketFrameType::TEXT_FRAME,
+                     isFin,
+                     masking);
+        return frame;//auto move
+    }
     static bool wsFrameBuild(const std::string& payload,
                              std::string& frame,
                              WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME,
