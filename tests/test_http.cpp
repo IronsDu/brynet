@@ -139,6 +139,7 @@ TEST_CASE("http server are computed", "[http_server]")
                                     (void)session;
                                     REQUIRE(httpParser.getBody() == "<html>hello world </html>");
                                     counter.fetch_add(1);
+                                    session->postClose();
                                 });
                                 })
                             .asyncConnect();
