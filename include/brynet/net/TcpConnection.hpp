@@ -210,7 +210,10 @@ public:
     {
         auto sharedThis = shared_from_this();
         mEventLoop->runAsyncFunctor([sharedThis, this]() {
-            procCloseInLoop();
+            // call runFunctorAfterLoop, avoid user call postDisConnect in message callback, because after it brynet will use receive buffer.
+            mEventLoop->runFunctorAfterLoop([sharedThis, this]() {
+                procCloseInLoop();
+            });
         });
     }
 
