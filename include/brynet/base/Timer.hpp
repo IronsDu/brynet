@@ -81,6 +81,11 @@ class RepeatTimer
 public:
     using Ptr = std::shared_ptr<RepeatTimer>;
 
+    RepeatTimer()
+    {
+        mCancel.store(false);
+    }
+
     void cancel()
     {
         mCancel.store(true);
@@ -92,7 +97,7 @@ public:
     }
 
 private:
-    std::atomic_bool mCancel = {false};
+    std::atomic_bool mCancel;
 };
 
 class TimerMgr final : public std::enable_shared_from_this<TimerMgr>
