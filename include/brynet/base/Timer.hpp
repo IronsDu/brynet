@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <brynet/base/Noexcept.hpp>
 #include <chrono>
 #include <functional>
@@ -75,7 +76,26 @@ private:
     friend class TimerMgr;
 };
 
-class TimerMgr final
+class RepeatTimer
+{
+public:
+    using Ptr = std::shared_ptr<RepeatTimer>;
+
+    void cancel()
+    {
+        mCancel.store(true);
+    }
+
+    bool isCancel() const
+    {
+        return mCancel.load();
+    }
+
+private:
+    std::atomic_bool mCancel = {false};
+};
+
+class TimerMgr final : public std::enable_shared_from_this<TimerMgr>
 {
 public:
     using Ptr = std::shared_ptr<TimerMgr>;
@@ -93,6 +113,22 @@ public:
         mTimers.push(timer);
 
         return timer;
+    }
+
+    template<typename F, typename... TArgs>
+    RepeatTimer::Ptr addIntervalTimer(
+            std::chrono::nanoseconds interval,
+            F&& callback,
+            TArgs&&... args)
+    {
+        auto sharedThis = shared_from_this();
+        auto repeatTimer = std::make_shared<RepeatTimer>();
+        auto wrapperCallback = std::bind(std::forward<F>(callback), std::forward<TArgs>(args)...);
+        addTimer(interval, [sharedThis, interval, wrapperCallback, repeatTimer]() {
+            stubRepeatTimerCallback(sharedThis, interval, wrapperCallback, repeatTimer);
+        });
+
+        return repeatTimer;
     }
 
     void addTimer(const Timer::Ptr& timer)
@@ -143,6 +179,22 @@ public:
         {
             mTimers.pop();
         }
+    }
+
+private:
+    static void stubRepeatTimerCallback(TimerMgr::Ptr timerMgr,
+                                        std::chrono::nanoseconds interval,
+                                        std::function<void()> callback,
+                                        RepeatTimer::Ptr repeatTimer)
+    {
+        if (repeatTimer->isCancel())
+        {
+            return;
+        }
+        callback();
+        timerMgr->addTimer(interval, [timerMgr, interval, callback, repeatTimer]() {
+            stubRepeatTimerCallback(timerMgr, interval, callback, repeatTimer);
+        });
     }
 
 private:

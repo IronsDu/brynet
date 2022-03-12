@@ -1,7 +1,9 @@
 #define CATCH_CONFIG_MAIN// This tells Catch to provide a main() - only do this in one cpp file
 #include <brynet/base/Timer.hpp>
+#include <brynet/base/WaitGroup.hpp>
 #include <chrono>
 #include <memory>
+#include <thread>
 
 #include "catch.hpp"
 
@@ -49,4 +51,34 @@ TEST_CASE("Timer are computed", "[timer]")
     }
 
     REQUIRE(upvalue == 2);
+}
+
+TEST_CASE("repeat timer are computed", "[repeat timer]")
+{
+    auto timerMgr = std::make_shared<brynet::base::TimerMgr>();
+    auto wg = brynet::base::WaitGroup::Create();
+    wg->add(1);
+
+    std::atomic_int value = 0;
+    auto timer = timerMgr->addIntervalTimer(std::chrono::milliseconds(100), [&]() {
+        if (value.load() < 10)
+        {
+            value.fetch_add(1);
+        }
+        else
+        {
+            wg->done();
+        }
+    });
+
+    std::thread t([&]() {
+        wg->wait();
+        timer->cancel();
+    });
+    while (!timerMgr->isEmpty())
+    {
+        timerMgr->schedule();
+    }
+    t.join();
+    REQUIRE(value.load() == 10);
 }
