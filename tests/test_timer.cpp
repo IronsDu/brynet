@@ -3,6 +3,7 @@
 #include <brynet/base/WaitGroup.hpp>
 #include <chrono>
 #include <memory>
+#include <thread>
 
 #include "catch.hpp"
 
