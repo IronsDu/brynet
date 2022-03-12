@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <brynet/base/Noexcept.hpp>
 #include <chrono>
 #include <functional>
@@ -7,7 +8,6 @@
 #include <mutex>
 #include <queue>
 #include <vector>
-#include <atomic>
 
 namespace brynet { namespace base {
 
@@ -181,11 +181,11 @@ public:
         }
     }
 
-    private:
+private:
     static void stubRepeatTimerCallback(TimerMgr::Ptr timerMgr,
-                                std::chrono::nanoseconds interval,
-                                std::function<void()> callback,
-                                RepeatTimer::Ptr repeatTimer)
+                                        std::chrono::nanoseconds interval,
+                                        std::function<void()> callback,
+                                        RepeatTimer::Ptr repeatTimer)
     {
         if (repeatTimer->isCancel())
         {
