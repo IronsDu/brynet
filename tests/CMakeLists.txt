@@ -3,6 +3,12 @@ enable_testing()
 include_directories("${PROJECT_SOURCE_DIR}/include/")
 
 add_executable(test_timer test_timer.cpp)
+if(WIN32)
+  target_link_libraries(test_timer ws2_32)
+elseif(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(test_timer pthread)
+endif()
 add_test(TestTimer test_timer)
 
 add_executable(test_wait_group test_wait_group.cpp)
