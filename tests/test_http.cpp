@@ -30,7 +30,7 @@ TEST_CASE("http server are computed", "[http_server]")
             auto connector = AsyncConnector::Create();
             connector->startWorkerThread();
 
-            auto service = TcpService::Create();
+            auto service = IOThreadTcpService::Create();
             service->startWorkerThread(1);
 
             auto httpEnterCallback = [](const HTTPParser& httpParser,

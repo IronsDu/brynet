@@ -74,6 +74,7 @@ public:
         reAllocEventSize(1024);
         mSelfThreadID = -1;
         mTimer = std::make_shared<brynet::base::TimerMgr>();
+        mSelfThreadIDIsInitialized.store(false);
     }
 
     virtual ~EventLoop() BRYNET_NOEXCEPT
@@ -88,6 +89,11 @@ public:
         close(mKqueueFd);
         mKqueueFd = -1;
 #endif
+    }
+
+    void bindCurrentThread()
+    {
+        tryInitThreadID();
     }
 
     void loop(int64_t milliseconds)
@@ -264,6 +270,10 @@ public:
 
     void runAsyncFunctor(UserFunctor&& f)
     {
+        if (!mSelfThreadIDIsInitialized.load())
+        {
+            throw std::runtime_error("thread id not initialized, you need call `bindCurrentThread` first");
+        }
         if (isInLoopThread())
         {
             f();
@@ -274,6 +284,7 @@ public:
             wakeup();
         }
     }
+
     void runFunctorAfterLoop(UserFunctor&& f)
     {
         assert(isInLoopThread());
@@ -284,6 +295,7 @@ public:
 
         mAfterLoopFunctors.emplace_back(std::move(f));
     }
+
     brynet::base::Timer::WeakPtr runAfter(std::chrono::nanoseconds timeout, UserFunctor&& callback)
     {
         auto timer = std::make_shared<brynet::base::Timer>(
@@ -304,6 +316,23 @@ public:
         }
 
         return timer;
+    }
+
+    brynet::base::RepeatTimer::Ptr runIntervalTimer(std::chrono::nanoseconds timeout, UserFunctor&& callback)
+    {
+        if (isInLoopThread())
+        {
+            return mTimer->addIntervalTimer(timeout, callback);
+        }
+        else
+        {
+            auto timer = std::make_shared<brynet::base::RepeatTimer>();
+            auto timerMgr = mTimer;
+            runAsyncFunctor([timerMgr, timer, timeout, callback]() {
+                timerMgr->helperAddIntervalTimer(timer, timeout, callback);
+            });
+            return timer;
+        }
     }
 
     inline bool isInLoopThread() const
@@ -403,6 +432,7 @@ private:
     {
         std::call_once(mOnceInitThreadID, [this]() {
             mSelfThreadID = current_thread::tid();
+            mSelfThreadIDIsInitialized.store(true);
         });
     }
 
@@ -433,6 +463,7 @@ private:
     std::vector<UserFunctor> mCopyAfterLoopFunctors;
 
     std::once_flag mOnceInitThreadID;
+    std::atomic_bool mSelfThreadIDIsInitialized;
     current_thread::THREAD_ID_TYPE mSelfThreadID;
 
     brynet::base::TimerMgr::Ptr mTimer;

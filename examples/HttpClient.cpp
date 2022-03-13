@@ -19,7 +19,7 @@ int main(int argc, char** argv)
     (void) argc;
     (void) argv;
 
-    auto service = TcpService::Create();
+    auto service = IOThreadTcpService::Create();
     service->startWorkerThread(2);
 
     auto connector = brynet::net::AsyncConnector::Create();

@@ -186,6 +186,20 @@ public:
         }
     }
 
+    template<typename F, typename... TArgs>
+    void helperAddIntervalTimer(
+            RepeatTimer::Ptr repeatTimer,
+            std::chrono::nanoseconds interval,
+            F&& callback,
+            TArgs&&... args)
+    {
+        auto sharedThis = shared_from_this();
+        auto wrapperCallback = std::bind(std::forward<F>(callback), std::forward<TArgs>(args)...);
+        addTimer(interval, [sharedThis, interval, wrapperCallback, repeatTimer]() {
+            stubRepeatTimerCallback(sharedThis, interval, wrapperCallback, repeatTimer);
+        });
+    }
+
 private:
     static void stubRepeatTimerCallback(TimerMgr::Ptr timerMgr,
                                         std::chrono::nanoseconds interval,

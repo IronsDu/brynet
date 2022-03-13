@@ -2,6 +2,7 @@
 
 #include <brynet/base/CPP_VERSION.hpp>
 #include <brynet/base/NonCopyable.hpp>
+#include <brynet/base/WaitGroup.hpp>
 #include <brynet/net/EventLoop.hpp>
 #include <brynet/net/Exception.hpp>
 #include <brynet/net/detail/ConnectorWorkInfo.hpp>
@@ -41,7 +42,12 @@ protected:
         auto workerInfo = mWorkInfo;
         auto isRun = mIsRun;
 
-        mThread = std::make_shared<std::thread>([eventLoop, workerInfo, isRun]() {
+        auto wg = brynet::base::WaitGroup::Create();
+        wg->add(1);
+        mThread = std::make_shared<std::thread>([wg, eventLoop, workerInfo, isRun]() {
+            eventLoop->bindCurrentThread();
+            wg->done();
+
             while (*isRun)
             {
                 detail::RunOnceCheckConnect(eventLoop, workerInfo);
@@ -49,6 +55,8 @@ protected:
 
             workerInfo->causeAllFailed();
         });
+
+        wg->wait();
     }
 
     void stopWorkerThread()

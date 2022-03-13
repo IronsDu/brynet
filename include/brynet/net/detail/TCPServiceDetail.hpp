@@ -2,6 +2,7 @@
 
 #include <brynet/base/Noexcept.hpp>
 #include <brynet/base/NonCopyable.hpp>
+#include <brynet/base/WaitGroup.hpp>
 #include <brynet/net/SSLHelper.hpp>
 #include <brynet/net/Socket.hpp>
 #include <brynet/net/TcpConnection.hpp>
@@ -15,11 +16,55 @@
 
 namespace brynet { namespace net { namespace detail {
 
+static bool HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
+{
+    if (eventLoop == nullptr)
+    {
+        return false;
+    }
+    if (option.maxRecvBufferSize <= 0)
+    {
+        throw BrynetCommonException("buffer size is zero");
+    }
+
+    auto wrapperEnterCallback = [option](const TcpConnection::Ptr& tcpConnection) {
+        for (const auto& callback : option.enterCallback)
+        {
+            callback(tcpConnection);
+        }
+    };
+
+    if (option.useSSL && option.sslHelper == nullptr)
+    {
+        option.sslHelper = SSLHelper::Create();
+    }
+
+    TcpConnection::Create(std::move(socket),
+                          option.maxRecvBufferSize,
+                          wrapperEnterCallback,
+                          eventLoop,
+                          option.sslHelper);
+
+    return true;
+}
+
 class TcpServiceDetail : public brynet::base::NonCopyable
 {
 protected:
     using FrameCallback = std::function<void(const EventLoop::Ptr&)>;
     const static unsigned int sDefaultLoopTimeOutMS = 100;
+
+    TcpServiceDetail() BRYNET_NOEXCEPT
+        : mRandom(static_cast<unsigned int>(
+                  std::chrono::system_clock::now().time_since_epoch().count()))
+    {
+        mRunIOLoop = std::make_shared<bool>(false);
+    }
+
+    virtual ~TcpServiceDetail() BRYNET_NOEXCEPT
+    {
+        stopWorkerThread();
+    }
 
     void startWorkerThread(size_t threadNum,
                            FrameCallback callback = nullptr)
@@ -35,13 +80,18 @@ protected:
         mRunIOLoop = std::make_shared<bool>(true);
 
         mIOLoopDatas.resize(threadNum);
+        auto wg = brynet::base::WaitGroup::Create();
         for (auto& v : mIOLoopDatas)
         {
             auto eventLoop = std::make_shared<EventLoop>();
             auto runIoLoop = mRunIOLoop;
+            wg->add(1);
             v = IOLoopData::Create(eventLoop,
                                    std::make_shared<std::thread>(
-                                           [callback, runIoLoop, eventLoop]() {
+                                           [wg, callback, runIoLoop, eventLoop]() {
+                                               eventLoop->bindCurrentThread();
+                                               wg->done();
+
                                                while (*runIoLoop)
                                                {
                                                    eventLoop->loopCompareNearTimer(sDefaultLoopTimeOutMS);
@@ -52,6 +102,7 @@ protected:
                                                }
                                            }));
         }
+        wg->wait();
     }
 
     void stopWorkerThread()
@@ -81,11 +132,6 @@ protected:
 
     bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption option)
     {
-        if (option.maxRecvBufferSize <= 0)
-        {
-            throw BrynetCommonException("buffer size is zero");
-        }
-
         EventLoop::Ptr eventLoop;
         if (option.forceSameThreadLoop)
         {
@@ -95,30 +141,7 @@ protected:
         {
             eventLoop = getRandomEventLoop();
         }
-        if (eventLoop == nullptr)
-        {
-            return false;
-        }
-
-        auto wrapperEnterCallback = [option](const TcpConnection::Ptr& tcpConnection) {
-            for (const auto& callback : option.enterCallback)
-            {
-                callback(tcpConnection);
-            }
-        };
-
-        if (option.useSSL && option.sslHelper == nullptr)
-        {
-            option.sslHelper = SSLHelper::Create();
-        }
-
-        TcpConnection::Create(std::move(socket),
-                              option.maxRecvBufferSize,
-                              wrapperEnterCallback,
-                              eventLoop,
-                              option.sslHelper);
-
-        return true;
+        return HelperAddTcpConnection(eventLoop, std::move(socket), option);
     }
 
     EventLoop::Ptr getRandomEventLoop()
@@ -138,18 +161,6 @@ protected:
         {
             return mIOLoopDatas[mRandom() % ioLoopSize]->getEventLoop();
         }
-    }
-
-    TcpServiceDetail() BRYNET_NOEXCEPT
-        : mRandom(static_cast<unsigned int>(
-                  std::chrono::system_clock::now().time_since_epoch().count()))
-    {
-        mRunIOLoop = std::make_shared<bool>(false);
-    }
-
-    virtual ~TcpServiceDetail() BRYNET_NOEXCEPT
-    {
-        stopWorkerThread();
     }
 
     EventLoop::Ptr getSameThreadEventLoop()

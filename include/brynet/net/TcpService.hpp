@@ -5,17 +5,29 @@
 namespace brynet { namespace net {
 
 using ConnectionOption = detail::ConnectionOption;
-class TcpService : public detail::TcpServiceDetail,
-                   public std::enable_shared_from_this<TcpService>
+
+class ITcpService
 {
 public:
-    using Ptr = std::shared_ptr<TcpService>;
+    using Ptr = std::shared_ptr<ITcpService>;
+
+public:
+    virtual bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) = 0;
+};
+
+// use multi IO threads process IO
+class IOThreadTcpService : public ITcpService,
+                           public detail::TcpServiceDetail,
+                           public std::enable_shared_from_this<IOThreadTcpService>
+{
+public:
+    using Ptr = std::shared_ptr<IOThreadTcpService>;
     using FrameCallback = detail::TcpServiceDetail::FrameCallback;
 
 public:
     static Ptr Create()
     {
-        struct make_shared_enabler : public TcpService
+        struct make_shared_enabler : public IOThreadTcpService
         {
         };
         return std::make_shared<make_shared_enabler>();
@@ -32,18 +44,37 @@ public:
         detail::TcpServiceDetail::stopWorkerThread();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options)
+    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
     {
         return detail::TcpServiceDetail::addTcpConnection(std::move(socket), options);
     }
 
-    EventLoop::Ptr getRandomEventLoop()
+private:
+    IOThreadTcpService() = default;
+};
+
+// use specified eventloop for process IO
+class EventLoopTcpService : public ITcpService
+{
+public:
+    using Ptr = std::shared_ptr<EventLoopTcpService>;
+
+    EventLoopTcpService(EventLoop::Ptr eventLoop)
+        : mEventLoop(eventLoop)
+    {}
+
+    static Ptr Create(EventLoop::Ptr eventLoop)
     {
-        return detail::TcpServiceDetail::getRandomEventLoop();
+        return std::make_shared<EventLoopTcpService>(eventLoop);
+    }
+
+    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
+    {
+        return detail::HelperAddTcpConnection(mEventLoop, std::move(socket), options);
     }
 
 private:
-    TcpService() = default;
+    EventLoop::Ptr mEventLoop;
 };
 
 }}// namespace brynet::net

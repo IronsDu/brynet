@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     }
 
     const auto port = std::atoi(argv[1]);
-    auto service = TcpService::Create();
+    auto service = IOThreadTcpService::Create();
     service->startWorkerThread(atoi(argv[2]));
 
     auto httpEnterCallback = [](const HTTPParser& httpParser,

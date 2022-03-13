@@ -23,7 +23,7 @@ std::atomic_llong SendPacketNum = ATOMIC_VAR_INIT(0);
 std::atomic_llong RecvPacketNum = ATOMIC_VAR_INIT(0);
 
 std::vector<TcpConnection::Ptr> clients;
-TcpService::Ptr service;
+IOThreadTcpService::Ptr service;
 
 static void addClientID(const TcpConnection::Ptr& session)
 {
@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     int threadNum = atoi(argv[2]);
     brynet::net::base::InitSocket();
 
-    service = TcpService::Create();
+    service = IOThreadTcpService::Create();
     auto mainLoop = std::make_shared<EventLoop>();
     auto listenThread = ListenThread::Create(false, "0.0.0.0", port, [mainLoop](TcpSocket::Ptr socket) {
         socket->setNodelay();
