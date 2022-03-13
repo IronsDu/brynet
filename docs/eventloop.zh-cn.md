@@ -12,6 +12,10 @@
 	当有事件产生时,做完工作后即可返回,所需时间依负荷而定.</br>
 	通常，我们会开启一个线程，在其中间断性的调用`loop`接口。
 
+- `EventLoop::bindCurrentThread`
+
+	初始化调度EventLoop的thread id，用于使用EventLoop接口时时判断当前线程是否处于EventLoop::loop所在线程。在使用EventLoop的一些函数，比如runAsyncFunctor时，都需要执行bindCurrentThread（当然，你也可以直接调用loop来初始化）
+
 - `EventLoop::wakeup(void)`
 	
 	(线程安全)唤醒可能阻塞在`EventLoop::loop`中的等待。</br>
@@ -20,7 +24,7 @@
 
 - `EventLoop::runAsyncFunctor(std::function<void(void)>)`
 	
-	(线程安全)投递一个异步函数给`EventLoop`，此函数会在`EventLoop::loop`调用中被执行。
+	(线程安全)投递一个异步函数给`EventLoop`，此函数会在`EventLoop::loop`调用中被执行。如果此时EventLoop还没有初始化thread id（通过bindCurrentThread或loop），那么此函数会抛出异常，避免用户忘记调度IO工作线程时就投递了任务而导致逻辑错误。
 
 - `EventLoop::runFunctorAfterLoop(std::function<void(void)>)`
 
@@ -30,6 +34,15 @@
 - `EventLoop::isInLoopThread(void)`
 	
 	(线程安全)检测当前线程是否和 `EventLoop::loop`所在线程(也就是最先调用`loop`接口的线程)一样。
+
+- `brynet::base::Timer::WeakPtr EventLoop::runAfter(std::chrono::nanoseconds timeout, std::function<void(void)>&& callback)
+	
+	开启一个延迟执行的函数，当到期时会在EventLoop工作线程（即loop函数所在线程）里执行callback。可通过返回的brynet::base::Timer::WeakPtr的cancel函数来取消定时器。
+
+- `RepeatTimer::Ptr EventLoop::brynet::base::RepeatTimer::Ptr runIntervalTimer(std::chrono::nanoseconds timeout, std::function<void(void)>&& callback)`
+
+	开启一个重复执行的延迟执行的函数，当每次到期时会在EventLoop工作线程（即loop函数所在线程）里执行callback。可通过返回的RepeatTimer::Ptr的cancel函数来取消定时器。
+
 
 # 注意事项
 - 当我们第一次在某个线程中调用`loop`之后，就不应该在其他线程中调用`loop`(当然如果你调用了,也没有任何效果/影响)

@@ -9,7 +9,7 @@ namespace brynet { namespace net { namespace wrapper {
 class HttpConnectionBuilder
 {
 public:
-    HttpConnectionBuilder& WithService(TcpService::Ptr service)
+    HttpConnectionBuilder& WithService(ITcpService::Ptr service)
     {
         mBuilder.WithService(std::move(service));
         return *this;

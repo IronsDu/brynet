@@ -15,7 +15,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 
     {
             {}}
-    // 监听服务未开启
+    // listen service not open
     {
             {auto connector = AsyncConnector::Create();
     connector->startWorkerThread();
@@ -32,7 +32,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 {
     auto connector = AsyncConnector::Create();
     connector->startWorkerThread();
-    auto service = TcpService::Create();
+    auto service = IOThreadTcpService::Create();
     service->startWorkerThread(1);
 
     wrapper::ConnectionBuilder connectionBuilder;
@@ -47,9 +47,9 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 }
 }
 
-// 使用ListenerBuilder开启监听
+// use ListenerBuilder for open listen
 {
-    auto service = TcpService::Create();
+    auto service = IOThreadTcpService::Create();
     service->startWorkerThread(1);
     wrapper::ListenerBuilder listenerBuilder;
     listenerBuilder.WithService(service)
@@ -84,7 +84,7 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
     REQUIRE(socket == nullptr);
 }
 
-// 开启监听服务
+// open listen thread
 {
     auto listenThread = brynet::net::ListenThread::Create(false,
                                                           ip,
@@ -106,11 +106,11 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
         REQUIRE(socket != nullptr);
     }
 
-    // Tcp Service 开启工作线程
+    // Tcp Service start io work thread
     {
         auto connector = AsyncConnector::Create();
         connector->startWorkerThread();
-        auto service = TcpService::Create();
+        auto service = IOThreadTcpService::Create();
         service->startWorkerThread(1);
 
         wrapper::ConnectionBuilder connectionBuilder;
@@ -124,11 +124,11 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
         REQUIRE(session != nullptr);
     }
 
-    // Tcp Service 没开启工作线程
+    // Tcp Service not open io work thread
     {
         auto connector = AsyncConnector::Create();
         connector->startWorkerThread();
-        auto service = TcpService::Create();
+        auto service = IOThreadTcpService::Create();
 
         wrapper::ConnectionBuilder connectionBuilder;
         auto session = connectionBuilder
@@ -140,9 +140,28 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
 
         REQUIRE(session == nullptr);
     }
+
+    //  use EventLoop for Tcp Service
+    {
+        auto connector = AsyncConnector::Create();
+        connector->startWorkerThread();
+        auto eventLoop = std::make_shared<EventLoop>();
+        eventLoop->bindCurrentThread();
+        auto service = EventLoopTcpService::Create(eventLoop);
+
+        wrapper::ConnectionBuilder connectionBuilder;
+        auto session = connectionBuilder
+                               .WithService(service)
+                               .WithConnector(connector)
+                               .WithTimeout(std::chrono::seconds(2))
+                               .WithAddr(ip, port)
+                               .syncConnect();
+
+        REQUIRE(session != nullptr);
+    }
 }
 
-// 上个语句块的监听线程结束
+// listen thread exit
 {
     auto connector = AsyncConnector::Create();
     connector->startWorkerThread();

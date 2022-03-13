@@ -9,7 +9,7 @@ namespace brynet { namespace net { namespace wrapper {
 class HttpListenerBuilder
 {
 public:
-    HttpListenerBuilder& WithService(TcpService::Ptr service)
+    HttpListenerBuilder& WithService(ITcpService::Ptr service)
     {
         mBuilder.WithService(std::move(service));
         return *this;

@@ -17,12 +17,9 @@ int main(int argc, char** argv)
 {
     if (argc != 3)
     {
-        fprintf(stderr, "Usage: <listen port> <net work thread num>\n");
+        fprintf(stderr, "Usage: <listen port>\n");
         exit(-1);
     }
-
-    auto service = IOThreadTcpService::Create();
-    service->startWorkerThread(atoi(argv[2]));
 
     auto enterCallback = [](const TcpConnection::Ptr& session) {
         total_client_num++;
@@ -40,6 +37,11 @@ int main(int argc, char** argv)
         });
     };
 
+    EventLoop::Ptr mainLoop = std::make_shared<EventLoop>();
+    mainLoop->bindCurrentThread();
+
+    auto service = EventLoopTcpService::Create(mainLoop);
+
     wrapper::ListenerBuilder listener;
     listener.WithService(service)
             .AddSocketProcess({[](TcpSocket& socket) {
@@ -50,10 +52,7 @@ int main(int argc, char** argv)
             .WithAddr(false, "0.0.0.0", atoi(argv[1]))
             .asyncRun();
 
-    EventLoop mainLoop;
-    while (true)
-    {
-        mainLoop.loop(1000);
+    mainLoop->runIntervalTimer(std::chrono::seconds(1), [&]() {
         if (TotalRecvSize / 1024 == 0)
         {
             std::cout << "total recv : " << TotalRecvSize << " bytes/s, of client num:" << total_client_num << std::endl;
@@ -70,6 +69,11 @@ int main(int argc, char** argv)
         std::cout << "packet num:" << total_packet_num << std::endl;
         total_packet_num = 0;
         TotalRecvSize = 0;
+    });
+
+    while (true)
+    {
+        mainLoop->loop(1000);
 
         if (brynet::base::app_kbhit())
         {

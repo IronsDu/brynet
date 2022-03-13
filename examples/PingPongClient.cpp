@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
     std::string tmp(atoi(argv[5]), 'a');
 
-    auto service = TcpService::Create();
+    auto service = IOThreadTcpService::Create();
     service->startWorkerThread(atoi(argv[3]));
 
     auto connector = AsyncConnector::Create();

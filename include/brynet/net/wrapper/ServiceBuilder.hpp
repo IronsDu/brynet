@@ -14,7 +14,7 @@ class BaseListenerBuilder
 public:
     virtual ~BaseListenerBuilder() = default;
 
-    Derived& WithService(TcpService::Ptr service)
+    Derived& WithService(ITcpService::Ptr service)
     {
         mTcpService = std::move(service);
         return static_cast<Derived&>(*this);
@@ -99,7 +99,7 @@ public:
     }
 
 private:
-    TcpService::Ptr mTcpService;
+    ITcpService::Ptr mTcpService;
     std::vector<ListenThread::TcpSocketProcessCallback> mSocketProcessCallbacks;
     ConnectionOption mSocketOption;
     std::string mListenAddr;

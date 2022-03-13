@@ -23,7 +23,7 @@ int main(int argc, char** argv)
     string backendIP = argv[2];
     int backendPort = atoi(argv[3]);
 
-    auto tcpService = TcpService::Create();
+    auto tcpService = IOThreadTcpService::Create();
     tcpService->startWorkerThread(std::thread::hardware_concurrency());
 
     auto asyncConnector = AsyncConnector::Create();

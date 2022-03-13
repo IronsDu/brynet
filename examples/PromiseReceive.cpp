@@ -19,7 +19,7 @@ int main(int argc, char** argv)
         exit(-1);
     }
 
-    auto service = TcpService::Create();
+    auto service = IOThreadTcpService::Create();
     service->startWorkerThread(atoi(argv[2]));
 
     auto enterCallback = [](const TcpConnection::Ptr& session) {
