@@ -66,15 +66,17 @@ protected:
         stopWorkerThread();
     }
 
-    void startWorkerThread(size_t threadNum,
-                           FrameCallback callback = nullptr)
+    std::vector<brynet::net::EventLoop::Ptr> startWorkerThread(size_t threadNum,
+                                                               FrameCallback callback = nullptr)
     {
+        std::vector<brynet::net::EventLoop::Ptr> eventLoops;
+
         std::lock_guard<std::mutex> lck(mServiceGuard);
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
         if (!mIOLoopDatas.empty())
         {
-            return;
+            return eventLoops;
         }
 
         mRunIOLoop = std::make_shared<bool>(true);
@@ -84,6 +86,8 @@ protected:
         for (auto& v : mIOLoopDatas)
         {
             auto eventLoop = std::make_shared<EventLoop>();
+            eventLoops.push_back(eventLoop);
+
             auto runIoLoop = mRunIOLoop;
             wg->add(1);
             v = IOLoopData::Create(eventLoop,
@@ -103,6 +107,8 @@ protected:
                                            }));
         }
         wg->wait();
+
+        return eventLoops;
     }
 
     void stopWorkerThread()

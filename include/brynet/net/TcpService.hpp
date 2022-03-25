@@ -33,10 +33,10 @@ public:
         return std::make_shared<make_shared_enabler>();
     }
 
-    void startWorkerThread(size_t threadNum,
-                           FrameCallback callback = nullptr)
+    std::vector<brynet::net::EventLoop::Ptr> startWorkerThread(size_t threadNum,
+                                                               FrameCallback callback = nullptr)
     {
-        detail::TcpServiceDetail::startWorkerThread(threadNum, callback);
+        return detail::TcpServiceDetail::startWorkerThread(threadNum, callback);
     }
 
     void stopWorkerThread()
