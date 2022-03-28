@@ -1,3 +1,3 @@
 #pragma once
 
-#define BRYNET_VERSION 1011001
+#define BRYNET_VERSION 1011002
