@@ -76,7 +76,7 @@ private:
     friend class TimerMgr;
 };
 
-class RepeatTimer
+class RepeatTimer final
 {
 public:
     using Ptr = std::shared_ptr<RepeatTimer>;
