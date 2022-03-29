@@ -12,7 +12,6 @@ public:
     using Ptr = std::shared_ptr<ITcpService>;
 
 public:
-    virtual ~ITcpService() = default;
     virtual bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) = 0;
 };
 
