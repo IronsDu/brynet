@@ -76,6 +76,7 @@ int main(int argc, char** argv)
 
     service = IOThreadTcpService::Create();
     auto mainLoop = std::make_shared<EventLoop>();
+    mainLoop->bindCurrentThread();
     auto listenThread = ListenThread::Create(false, "0.0.0.0", port, [mainLoop](TcpSocket::Ptr socket) {
         socket->setNodelay();
         socket->setSendSize(32 * 1024);

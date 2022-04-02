@@ -34,6 +34,7 @@ int main(int argc, char** argv)
     brynet::net::base::InitSocket();
 
     auto clientEventLoop = std::make_shared<EventLoop>();
+    clientEventLoop->bindCurrentThread();
 
     for (int i = 0; i < clientNum; i++)
     {
