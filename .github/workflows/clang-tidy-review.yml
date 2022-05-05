@@ -1,0 +1,33 @@
+name: clang-tidy-review
+
+on:
+  pull_request:
+    paths:
+      - '**.cpp'
+      - '**.hpp'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Run clang-tidy
+        uses: ZedThree/clang-tidy-review@v0.8.3
+        id: review
+        with:
+          build_dir: build
+          config_file: ".clang-tidy"
+          # Googletest triggers a _lot_ of clang-tidy warnings, so ignore all
+          # the unit tests until they're fixed or ignored upstream
+          exclude: "tests/unit/*cxx"
+          cmake_command: |
+            cmake . -B build -Dbrynet_BUILD_TESTS=ON \
+                             -Dbrynet_BUILD_EXAMPLES=ON \
+                             -DCMAKE_EXPORT_COMPILE_COMMANDS=On
