@@ -52,7 +52,7 @@ public:
     void setMethod(HTTP_METHOD protocol)
     {
         mMethod = protocol;
-        assert(mMethod > HTTP_METHOD::HTTP_METHOD_HEAD &&
+        assert(mMethod >= HTTP_METHOD::HTTP_METHOD_HEAD &&
                mMethod < HTTP_METHOD::HTTP_METHOD_MAX);
     }
 
