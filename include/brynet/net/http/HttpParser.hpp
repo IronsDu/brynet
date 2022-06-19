@@ -60,10 +60,24 @@ public:
         return mIsKeepAlive;
     }
 
-
     bool isCompleted() const
     {
         return mISCompleted;
+    }
+
+    bool isHeadersCompleted() const
+    {
+        return mHeadersISCompleted;
+    }
+
+    bool isHeaderCompletedHandled() const
+    {
+        return mHasHandleHeadersCompleted;
+    }
+
+    void setHeaderCompletedIsHandled()
+    {
+        mHasHandleHeadersCompleted = true;
     }
 
     int method() const
@@ -210,6 +224,7 @@ private:
     static int sHeadComplete(http_parser* hp)
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
+        httpParser->mHeadersISCompleted = true;
 
         if (httpParser->mUrl.empty())
         {
@@ -303,6 +318,8 @@ private:
     bool mIsWebSocket = false;
     bool mIsKeepAlive;
     bool mISCompleted;
+    bool mHeadersISCompleted = false;
+    bool mHasHandleHeadersCompleted = false;
 
     bool mLastWasValue;
     std::string mCurrentField;

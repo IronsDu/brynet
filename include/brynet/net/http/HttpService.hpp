@@ -322,6 +322,16 @@ private:
         if (!httpParser->isCompleted())
         {
             retlen = httpParser->tryParse(buffer, len);
+            if (httpParser->isHeadersCompleted() && !httpParser->isHeaderCompletedHandled())
+            {
+                httpParser->setHeaderCompletedIsHandled();
+                const auto& httpCallback = httpSession->getHttpCallback();
+                if (httpCallback != nullptr)
+                {
+                    httpCallback(*httpParser, httpSession);
+                }
+            }
+
             if (!httpParser->isCompleted())
             {
                 return retlen;
