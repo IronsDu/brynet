@@ -27,8 +27,8 @@ int main(int argc, char** argv)
 
     HttpRequest request;
     request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-    request.setUrl("/ISteamUserAuth/AuthenticateUserTicket/v1/");
-    request.addHeadValue("Host", "api.steampowered.com");
+    request.setUrl("/");
+    request.addHeadValue("Host", "www.baidu.com");
 
     HttpQueryParameter p;
     p.add("key", "DCD9C36F1F54A96F707DFBE833600167");
@@ -50,28 +50,44 @@ int main(int argc, char** argv)
 
     std::string requestStr = request.getResult();
 
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < 1; i++)
     {
         // ConnectOption::WithAddr("23.73.140.64", 80),
         wrapper::HttpConnectionBuilder()
                 .WithConnector(connector)
                 .WithService(service)
-                .WithAddr("127.0.0.1", 80)
+                .WithAddr("14.215.177.39", 80)
                 .WithTimeout(std::chrono::seconds(10))
                 .WithFailedCallback([]() {
                     std::cout << "connect failed" << std::endl;
                 })
-                .WithMaxRecvBufferSize(10)
+                .WithMaxRecvBufferSize(1000)
                 .WithEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
                     (void) session;
                     std::cout << "connect success" << std::endl;
                     session->send(requestStr);
-                    handlers.setHttpCallback([](const HTTPParser& httpParser,
-                                                const HttpSession::Ptr& session) {
+                    handlers.setHttpBodyCallback([](const HTTPParser& httpParser,
+                                                    const HttpSession::Ptr& session,
+                                                    const char* body,
+                                                    size_t length) {
+                        (void) httpParser;
                         (void) session;
+                        (void) body;
+                        (void) length;
+                    });
+                    handlers.setHeaderCallback([](const HTTPParser& httpParser,
+                                                  const HttpSession::Ptr& session) {
+                        (void) httpParser;
+                        (void) session;
+                    });
+                    handlers.setHttpEndCallback([](const HTTPParser& httpParser,
+                                                   const HttpSession::Ptr& session) {
+                        (void) session;
+                        // because has call setHttpBodyCallback, so the body from http parser is empty.
                         std::cout << httpParser.getBody() << std::endl;
                         counter.fetch_add(1);
                         std::cout << "counter:" << counter.load() << std::endl;
+                        session->postClose();
                     });
                 })
                 .asyncConnect();

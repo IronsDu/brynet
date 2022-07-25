@@ -115,7 +115,7 @@ TEST_CASE("http server are computed", "[http_server]")
                         .WithAddr(false, "0.0.0.0", port)
                         .WithReusePort()
                         .WithEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
-                        handlers.setHttpCallback(httpEnterCallback);
+                        handlers.setHttpEndCallback(httpEnterCallback);
                         handlers.setWSCallback(wsEnterCallback);
                             })
                         .asyncRun();
@@ -134,7 +134,7 @@ TEST_CASE("http server are computed", "[http_server]")
                             handlers.setClosedCallback([wg](const HttpSession::Ptr& session) {
                                 wg->done();
                                 });
-                            handlers.setHttpCallback([wg](const HTTPParser& httpParser,
+                            handlers.setHttpEndCallback([wg](const HTTPParser& httpParser,
                                 const HttpSession::Ptr& session) {
                                     (void)session;
                                     REQUIRE(httpParser.getBody() == "<html>hello world </html>");

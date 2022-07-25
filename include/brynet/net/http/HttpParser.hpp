@@ -2,6 +2,7 @@
 
 #include <brynet/net/http/WebSocketFormat.hpp>
 #include <cassert>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -63,21 +64,6 @@ public:
     bool isCompleted() const
     {
         return mISCompleted;
-    }
-
-    bool isHeadersCompleted() const
-    {
-        return mHeadersISCompleted;
-    }
-
-    bool isHeaderCompletedHandled() const
-    {
-        return mHasHandleHeadersCompleted;
-    }
-
-    void setHeaderCompletedIsHandled()
-    {
-        mHasHandleHeadersCompleted = true;
     }
 
     int method() const
@@ -179,18 +165,40 @@ private:
 
     size_t tryParse(const char* buffer, size_t len)
     {
-        const size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
-        if (mISCompleted)
-        {
-            mIsUpgrade = mParser.upgrade;
-            mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
-            auto& connHeader = getValue("Connection");
-            mIsKeepAlive = connHeader == "Keep-Alive" || connHeader == "keep-alive";
-            mMethod = mParser.method;
-            http_parser_init(&mParser, mParserType);
-        }
+        return http_parser_execute(&mParser, &mSettings, buffer, len);
+    }
 
-        return nparsed;
+    void onEnd()
+    {
+        mISCompleted = true;
+        mIsUpgrade = mParser.upgrade;
+        mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
+        const auto& connHeader = getValue("Connection");
+        mIsKeepAlive = connHeader == "Keep-Alive" || connHeader == "keep-alive";
+        mMethod = static_cast<int>(mParser.method);
+        http_parser_init(&mParser, mParserType);
+
+        if (mMsgEndCallback != nullptr)
+        {
+            mMsgEndCallback();
+            mMsgEndCallback = nullptr;
+        }
+        mBodyCallback = nullptr;
+    }
+
+    void setHeaderCallback(std::function<void()> callback)
+    {
+        mHeaderCallback = std::move(callback);
+    }
+
+    void setBodyCallback(std::function<void(const char*, size_t)> callback)
+    {
+        mBodyCallback = std::move(callback);
+    }
+
+    void setEndCallback(std::function<void()> callback)
+    {
+        mMsgEndCallback = std::move(callback);
     }
 
 private:
@@ -217,55 +225,66 @@ private:
     static int sMessageEnd(http_parser* hp)
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
-        httpParser->mISCompleted = true;
+        httpParser->onEnd();
         return 0;
     }
 
     static int sHeadComplete(http_parser* hp)
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
-        httpParser->mHeadersISCompleted = true;
 
-        if (httpParser->mUrl.empty())
+        int retValue = 0;
+        do
         {
-            return 0;
+            if (httpParser->mUrl.empty())
+            {
+                break;
+            }
+
+            struct http_parser_url u;
+
+            const int result = http_parser_parse_url(httpParser->mUrl.data(),
+                                                     httpParser->mUrl.size(),
+                                                     0,
+                                                     &u);
+            if (result != 0)
+            {
+                retValue = -1;
+                break;
+            }
+
+            if (!(u.field_set & (1 << UF_PATH)))
+            {
+                fprintf(stderr,
+                        "\n\n*** failed to parse PATH in URL %s ***\n\n",
+                        httpParser->mUrl.c_str());
+                retValue = -1;
+                break;
+            }
+
+            httpParser->mPath = std::string(
+                    httpParser->mUrl.data() + u.field_data[UF_PATH].off,
+                    u.field_data[UF_PATH].len);
+            if (u.field_set & (1 << UF_QUERY))
+            {
+                httpParser->mQuery = std::string(
+                        httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
+                        u.field_data[UF_QUERY].len);
+            }
+        } while (false);
+
+        if (httpParser->mHeaderCallback != nullptr)
+        {
+            httpParser->mHeaderCallback();
+            httpParser->mHeaderCallback = nullptr;
         }
 
-        struct http_parser_url u;
-
-        const int result = http_parser_parse_url(httpParser->mUrl.data(),
-                                                 httpParser->mUrl.size(),
-                                                 0,
-                                                 &u);
-        if (result != 0)
-        {
-            return -1;
-        }
-
-        if (!(u.field_set & (1 << UF_PATH)))
-        {
-            fprintf(stderr,
-                    "\n\n*** failed to parse PATH in URL %s ***\n\n",
-                    httpParser->mUrl.c_str());
-            return -1;
-        }
-
-        httpParser->mPath = std::string(
-                httpParser->mUrl.data() + u.field_data[UF_PATH].off,
-                u.field_data[UF_PATH].len);
-        if (u.field_set & (1 << UF_QUERY))
-        {
-            httpParser->mQuery = std::string(
-                    httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
-                    u.field_data[UF_QUERY].len);
-        }
-
-        return 0;
+        return retValue;
     }
 
     static int sUrlHandle(http_parser* hp, const char* url, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         httpParser->mUrl.append(url, length);
 
         return 0;
@@ -273,7 +292,7 @@ private:
 
     static int sHeadValue(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         auto& value = httpParser->mHeadValues[httpParser->mCurrentField];
         value.append(at, length);
         httpParser->mLastWasValue = true;
@@ -282,7 +301,7 @@ private:
 
     static int sHeadField(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         if (httpParser->mLastWasValue)
         {
             httpParser->mCurrentField.clear();
@@ -295,7 +314,7 @@ private:
 
     static int sStatusHandle(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         httpParser->mStatus.append(at, length);
         httpParser->mStatusCode = hp->status_code;
         return 0;
@@ -303,8 +322,15 @@ private:
 
     static int sBodyHandle(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
-        httpParser->mBody.append(at, length);
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
+        if (httpParser->mBodyCallback != nullptr)
+        {
+            httpParser->mBodyCallback(at, length);
+        }
+        else
+        {
+            httpParser->mBody.append(at, length);
+        }
         return 0;
     }
 
@@ -318,8 +344,6 @@ private:
     bool mIsWebSocket = false;
     bool mIsKeepAlive;
     bool mISCompleted;
-    bool mHeadersISCompleted = false;
-    bool mHasHandleHeadersCompleted = false;
 
     bool mLastWasValue;
     std::string mCurrentField;
@@ -337,6 +361,10 @@ private:
     std::string mWSCacheFrame;
     std::string mWSParsePayload;
     WebSocketFormat::WebSocketFrameType mWSFrameType;
+
+    std::function<void()> mHeaderCallback;
+    std::function<void(const char*, size_t)> mBodyCallback;
+    std::function<void()> mMsgEndCallback;
 
 private:
     friend class HttpService;
