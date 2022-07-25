@@ -80,6 +80,11 @@ protected:
         return mSession;
     }
 
+    const HttpParserCallback& getHeaderCallback() const
+    {
+        return mHttpHeaderCallback;
+    }
+
     const HttpParserCallback& getHttpCallback() const
     {
         return mHttpRequestCallback;
@@ -101,6 +106,11 @@ protected:
     }
 
 private:
+    void setHeaderCallback(HttpParserCallback&& callback)
+    {
+        mHttpHeaderCallback = std::move(callback);
+    }
+
     void setHttpCallback(HttpParserCallback&& callback)
     {
         mHttpRequestCallback = std::move(callback);
@@ -123,6 +133,7 @@ private:
 
 private:
     TcpConnection::Ptr mSession;
+    HttpParserCallback mHttpHeaderCallback;
     HttpParserCallback mHttpRequestCallback;
     WsCallback mWSCallback;
     ClosedCallback mCloseCallback;
@@ -134,6 +145,11 @@ private:
 class HttpSessionHandlers
 {
 public:
+    void setHeaderCallback(HttpSession::HttpParserCallback&& callback)
+    {
+        mHttpHeaderCallback = std::move(callback);
+    }
+
     void setHttpCallback(HttpSession::HttpParserCallback&& callback)
     {
         mHttpRequestCallback = std::move(callback);
@@ -155,6 +171,7 @@ public:
     }
 
 private:
+    HttpSession::HttpParserCallback mHttpHeaderCallback;
     HttpSession::HttpParserCallback mHttpRequestCallback;
     HttpSession::WsCallback mWSCallback;
     HttpSession::ClosedCallback mCloseCallback;
@@ -174,6 +191,7 @@ public:
         {
             HttpSessionHandlers handlers;
             enterCallback(httpSession, handlers);
+            httpSession->setHeaderCallback(std::move(handlers.mHttpHeaderCallback));
             httpSession->setHttpCallback(std::move(handlers.mHttpRequestCallback));
             httpSession->setClosedCallback(std::move(handlers.mCloseCallback));
             httpSession->setWSCallback(std::move(handlers.mWSCallback));
@@ -325,10 +343,10 @@ private:
             if (httpParser->isHeadersCompleted() && !httpParser->isHeaderCompletedHandled())
             {
                 httpParser->setHeaderCompletedIsHandled();
-                const auto& httpCallback = httpSession->getHttpCallback();
-                if (httpCallback != nullptr)
+                const auto& headerCallback = httpSession->getHeaderCallback();
+                if (headerCallback != nullptr)
                 {
-                    httpCallback(*httpParser, httpSession);
+                    headerCallback(*httpParser, httpSession);
                 }
             }
 

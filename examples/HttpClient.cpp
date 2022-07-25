@@ -66,6 +66,10 @@ int main(int argc, char** argv)
                     (void) session;
                     std::cout << "connect success" << std::endl;
                     session->send(requestStr);
+                    handlers.setHeaderCallback([](const HTTPParser& httpParser,
+                                                  const HttpSession::Ptr& session) {
+                        (void) session;
+                    });
                     handlers.setHttpCallback([](const HTTPParser& httpParser,
                                                 const HttpSession::Ptr& session) {
                         (void) session;
