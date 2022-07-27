@@ -70,16 +70,6 @@ public:
         return mHeadersISCompleted;
     }
 
-    bool isHeaderCompletedHandled() const
-    {
-        return mHasHandleHeadersCompleted;
-    }
-
-    void setHeaderCompletedIsHandled()
-    {
-        mHasHandleHeadersCompleted = true;
-    }
-
     int method() const
     {
         // mMethod's value defined in http_method, such as  HTTP_GET、HTTP_POST.
@@ -193,6 +183,21 @@ private:
         return nparsed;
     }
 
+    void setHeaderCallback(std::function<void()> callback)
+    {
+        mHeaderCallback = std::move(callback);
+    }
+
+    void setBodyCallback(std::function<void(std::string)> callback)
+    {
+        mBodyCallback = std::move(callback);
+    }
+
+    void setEndCallback(std::function<void()> callback)
+    {
+        mMsgEndCallback = std::move(callback);
+    }
+
 private:
     static int sChunkHeader(http_parser* hp)
     {
@@ -218,6 +223,10 @@ private:
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
         httpParser->mISCompleted = true;
+        if (httpParser->mMsgEndCallback != nullptr)
+        {
+            httpParser->mMsgEndCallback();
+        }
         return 0;
     }
 
@@ -258,6 +267,11 @@ private:
             httpParser->mQuery = std::string(
                     httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
                     u.field_data[UF_QUERY].len);
+        }
+
+        if (httpParser->mHeaderCallback != nullptr)
+        {
+            httpParser->mHeaderCallback();
         }
 
         return 0;
@@ -304,6 +318,10 @@ private:
     static int sBodyHandle(http_parser* hp, const char* at, size_t length)
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
+        if (httpParser->mBodyCallback != nullptr)
+        {
+            httpParser->mBodyCallback(std::string(at, length));
+        }
         httpParser->mBody.append(at, length);
         return 0;
     }
@@ -319,7 +337,6 @@ private:
     bool mIsKeepAlive;
     bool mISCompleted;
     bool mHeadersISCompleted = false;
-    bool mHasHandleHeadersCompleted = false;
 
     bool mLastWasValue;
     std::string mCurrentField;
@@ -337,6 +354,10 @@ private:
     std::string mWSCacheFrame;
     std::string mWSParsePayload;
     WebSocketFormat::WebSocketFrameType mWSFrameType;
+
+    std::function<void()> mHeaderCallback;
+    std::function<void(std::string)> mBodyCallback;
+    std::function<void()> mMsgEndCallback;
 
 private:
     friend class HttpService;

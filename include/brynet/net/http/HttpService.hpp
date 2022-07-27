@@ -5,6 +5,7 @@
 #include <brynet/net/http/HttpParser.hpp>
 #include <brynet/net/http/WebSocketFormat.hpp>
 #include <memory>
+#include <string>
 
 namespace brynet { namespace net { namespace http {
 
@@ -17,7 +18,9 @@ public:
     using Ptr = std::shared_ptr<HttpSession>;
 
     using EnterCallback = std::function<void(const HttpSession::Ptr&, HttpSessionHandlers&)>;
-    using HttpParserCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&)>;
+    using HttpHeaderCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&)>;
+    using HttpBodyCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&, std::string)>;
+    using HttpEndCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&)>;
     using WsCallback = std::function<void(const HttpSession::Ptr&,
                                           WebSocketFormat::WebSocketFrameType opcode,
                                           const std::string& payload)>;
@@ -80,16 +83,6 @@ protected:
         return mSession;
     }
 
-    const HttpParserCallback& getHeaderCallback() const
-    {
-        return mHttpHeaderCallback;
-    }
-
-    const HttpParserCallback& getHttpCallback() const
-    {
-        return mHttpRequestCallback;
-    }
-
     const ClosedCallback& getCloseCallback() const
     {
         return mCloseCallback;
@@ -106,16 +99,6 @@ protected:
     }
 
 private:
-    void setHeaderCallback(HttpParserCallback&& callback)
-    {
-        mHttpHeaderCallback = std::move(callback);
-    }
-
-    void setHttpCallback(HttpParserCallback&& callback)
-    {
-        mHttpRequestCallback = std::move(callback);
-    }
-
     void setClosedCallback(ClosedCallback&& callback)
     {
         mCloseCallback = std::move(callback);
@@ -133,8 +116,6 @@ private:
 
 private:
     TcpConnection::Ptr mSession;
-    HttpParserCallback mHttpHeaderCallback;
-    HttpParserCallback mHttpRequestCallback;
     WsCallback mWSCallback;
     ClosedCallback mCloseCallback;
     WsConnectedCallback mWSConnectedCallback;
@@ -145,14 +126,19 @@ private:
 class HttpSessionHandlers
 {
 public:
-    void setHeaderCallback(HttpSession::HttpParserCallback&& callback)
+    void setHeaderCallback(HttpSession::HttpHeaderCallback&& callback)
     {
         mHttpHeaderCallback = std::move(callback);
     }
 
-    void setHttpCallback(HttpSession::HttpParserCallback&& callback)
+    void setHttpBodyCallback(HttpSession::HttpBodyCallback&& callback)
     {
-        mHttpRequestCallback = std::move(callback);
+        mHttpBodyCallback = std::move(callback);
+    }
+
+    void setHttpEndCallback(HttpSession::HttpEndCallback&& callback)
+    {
+        mHttpEndCallback = std::move(callback);
     }
 
     void setClosedCallback(HttpSession::ClosedCallback&& callback)
@@ -171,8 +157,9 @@ public:
     }
 
 private:
-    HttpSession::HttpParserCallback mHttpHeaderCallback;
-    HttpSession::HttpParserCallback mHttpRequestCallback;
+    HttpSession::HttpHeaderCallback mHttpHeaderCallback;
+    HttpSession::HttpEndCallback mHttpEndCallback;
+    HttpSession::HttpBodyCallback mHttpBodyCallback;
     HttpSession::WsCallback mWSCallback;
     HttpSession::ClosedCallback mCloseCallback;
     HttpSession::WsConnectedCallback mWSConnectedCallback;
@@ -186,16 +173,31 @@ public:
     static void setup(const TcpConnection::Ptr& session,
                       const HttpSession::EnterCallback& enterCallback)
     {
+        auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
+
         auto httpSession = HttpSession::Create(session);
         if (enterCallback != nullptr)
         {
             HttpSessionHandlers handlers;
             enterCallback(httpSession, handlers);
-            httpSession->setHeaderCallback(std::move(handlers.mHttpHeaderCallback));
-            httpSession->setHttpCallback(std::move(handlers.mHttpRequestCallback));
             httpSession->setClosedCallback(std::move(handlers.mCloseCallback));
             httpSession->setWSCallback(std::move(handlers.mWSCallback));
             httpSession->setWSConnected(std::move(handlers.mWSConnectedCallback));
+
+            auto headerCB = handlers.mHttpHeaderCallback;
+            httpParser->setHeaderCallback([=]() {
+                headerCB(*httpParser, httpSession);
+            });
+
+            auto bodyCB = handlers.mHttpBodyCallback;
+            httpParser->setBodyCallback([=](std::string body) {
+                bodyCB(*httpParser, httpSession, std::move(body));
+            });
+
+            auto endCB = handlers.mHttpEndCallback;
+            httpParser->setEndCallback([=]() {
+                endCB(*httpParser, httpSession);
+            });
         }
         HttpService::handle(httpSession);
     }
@@ -340,16 +342,6 @@ private:
         if (!httpParser->isCompleted())
         {
             retlen = httpParser->tryParse(buffer, len);
-            if (httpParser->isHeadersCompleted() && !httpParser->isHeaderCompletedHandled())
-            {
-                httpParser->setHeaderCompletedIsHandled();
-                const auto& headerCallback = httpSession->getHeaderCallback();
-                if (headerCallback != nullptr)
-                {
-                    headerCallback(*httpParser, httpSession);
-                }
-            }
-
             if (!httpParser->isCompleted())
             {
                 return retlen;
@@ -370,14 +362,6 @@ private:
             if (wsConnectedCallback != nullptr)
             {
                 wsConnectedCallback(httpSession, *httpParser);
-            }
-        }
-        else
-        {
-            const auto& httpCallback = httpSession->getHttpCallback();
-            if (httpCallback != nullptr)
-            {
-                httpCallback(*httpParser, httpSession);
             }
         }
 

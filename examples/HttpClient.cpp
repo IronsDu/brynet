@@ -70,7 +70,7 @@ int main(int argc, char** argv)
                                                   const HttpSession::Ptr& session) {
                         (void) session;
                     });
-                    handlers.setHttpCallback([](const HTTPParser& httpParser,
+                    handlers.setHttpEndCallback([](const HTTPParser& httpParser,
                                                 const HttpSession::Ptr& session) {
                         (void) session;
                         std::cout << httpParser.getBody() << std::endl;

@@ -63,7 +63,7 @@ int main(int argc, char** argv)
             .WithAddr(false, "0.0.0.0", port)
             .WithReusePort()
             .WithEnterCallback([httpEnterCallback, wsEnterCallback](const HttpSession::Ptr& httpSession, HttpSessionHandlers& handlers) {
-                handlers.setHttpCallback(httpEnterCallback);
+                handlers.setHttpEndCallback(httpEnterCallback);
                 handlers.setWSCallback(wsEnterCallback);
             })
             .asyncRun();
