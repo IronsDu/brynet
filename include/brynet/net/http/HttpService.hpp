@@ -185,29 +185,37 @@ public:
             httpSession->setWSConnected(std::move(handlers.mWSConnectedCallback));
 
             auto headerCB = handlers.mHttpHeaderCallback;
-            httpParser->setHeaderCallback([=]() {
-                headerCB(*httpParser, httpSession);
-            });
+            if (headerCB != nullptr)
+            {
+                httpParser->setHeaderCallback([=]() {
+                    headerCB(*httpParser, httpSession);
+                });
+            }
 
             auto bodyCB = handlers.mHttpBodyCallback;
-            httpParser->setBodyCallback([=](std::string body) {
-                bodyCB(*httpParser, httpSession, std::move(body));
-            });
+            if (bodyCB != nullptr)
+            {
+                httpParser->setBodyCallback([=](std::string body) {
+                    bodyCB(*httpParser, httpSession, std::move(body));
+                });
+            }
 
             auto endCB = handlers.mHttpEndCallback;
-            httpParser->setEndCallback([=]() {
-                endCB(*httpParser, httpSession);
-            });
+            if (endCB != nullptr)
+            {
+                httpParser->setEndCallback([=]() {
+                    endCB(*httpParser, httpSession);
+                });
+            }
         }
-        HttpService::handle(httpSession);
+        HttpService::handle(httpSession, httpParser);
     }
 
 private:
-    static void handle(const HttpSession::Ptr& httpSession)
+    static void handle(const HttpSession::Ptr& httpSession, HTTPParser::Ptr httpParser)
     {
         /*TODO::keep alive and timeout close */
         auto& session = httpSession->getSession();
-        auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
 
         session->setDisConnectCallback([httpSession, httpParser](const TcpConnection::Ptr&) {
             if (!httpParser->isCompleted())

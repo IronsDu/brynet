@@ -235,46 +235,52 @@ private:
         HTTPParser* httpParser = (HTTPParser*) hp->data;
         httpParser->mHeadersISCompleted = true;
 
-        if (httpParser->mUrl.empty())
+        int retValue = 0;
+        do
         {
-            return 0;
-        }
+            if (httpParser->mUrl.empty())
+            {
+                break;
+            }
 
-        struct http_parser_url u;
+            struct http_parser_url u;
 
-        const int result = http_parser_parse_url(httpParser->mUrl.data(),
-                                                 httpParser->mUrl.size(),
-                                                 0,
-                                                 &u);
-        if (result != 0)
-        {
-            return -1;
-        }
+            const int result = http_parser_parse_url(httpParser->mUrl.data(),
+                                                     httpParser->mUrl.size(),
+                                                     0,
+                                                     &u);
+            if (result != 0)
+            {
+                retValue = - 1;
+                break;
+            }
 
-        if (!(u.field_set & (1 << UF_PATH)))
-        {
-            fprintf(stderr,
-                    "\n\n*** failed to parse PATH in URL %s ***\n\n",
-                    httpParser->mUrl.c_str());
-            return -1;
-        }
+            if (!(u.field_set & (1 << UF_PATH)))
+            {
+                fprintf(stderr,
+                        "\n\n*** failed to parse PATH in URL %s ***\n\n",
+                        httpParser->mUrl.c_str());
+                retValue = -1;
+                break;
+            }
 
-        httpParser->mPath = std::string(
-                httpParser->mUrl.data() + u.field_data[UF_PATH].off,
-                u.field_data[UF_PATH].len);
-        if (u.field_set & (1 << UF_QUERY))
-        {
-            httpParser->mQuery = std::string(
-                    httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
-                    u.field_data[UF_QUERY].len);
-        }
+            httpParser->mPath = std::string(
+                    httpParser->mUrl.data() + u.field_data[UF_PATH].off,
+                    u.field_data[UF_PATH].len);
+            if (u.field_set & (1 << UF_QUERY))
+            {
+                httpParser->mQuery = std::string(
+                        httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
+                        u.field_data[UF_QUERY].len);
+            }
+        } while (0);
 
         if (httpParser->mHeaderCallback != nullptr)
         {
             httpParser->mHeaderCallback();
         }
 
-        return 0;
+        return retValue;
     }
 
     static int sUrlHandle(http_parser* hp, const char* url, size_t length)

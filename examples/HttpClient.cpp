@@ -27,8 +27,8 @@ int main(int argc, char** argv)
 
     HttpRequest request;
     request.setMethod(HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
-    request.setUrl("/ISteamUserAuth/AuthenticateUserTicket/v1/");
-    request.addHeadValue("Host", "api.steampowered.com");
+    request.setUrl("/");
+    request.addHeadValue("Host", "www.baidu.com");
 
     HttpQueryParameter p;
     p.add("key", "DCD9C36F1F54A96F707DFBE833600167");
@@ -50,18 +50,18 @@ int main(int argc, char** argv)
 
     std::string requestStr = request.getResult();
 
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < 1; i++)
     {
         // ConnectOption::WithAddr("23.73.140.64", 80),
         wrapper::HttpConnectionBuilder()
                 .WithConnector(connector)
                 .WithService(service)
-                .WithAddr("127.0.0.1", 80)
+                .WithAddr("14.215.177.39", 80)
                 .WithTimeout(std::chrono::seconds(10))
                 .WithFailedCallback([]() {
                     std::cout << "connect failed" << std::endl;
                 })
-                .WithMaxRecvBufferSize(10)
+                .WithMaxRecvBufferSize(1000)
                 .WithEnterCallback([requestStr](const HttpSession::Ptr& session, HttpSessionHandlers& handlers) {
                     (void) session;
                     std::cout << "connect success" << std::endl;
@@ -69,6 +69,7 @@ int main(int argc, char** argv)
                     handlers.setHeaderCallback([](const HTTPParser& httpParser,
                                                   const HttpSession::Ptr& session) {
                         (void) session;
+                        std::cout << "counter:" << counter.load() << std::endl;
                     });
                     handlers.setHttpEndCallback([](const HTTPParser& httpParser,
                                                 const HttpSession::Ptr& session) {
