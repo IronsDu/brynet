@@ -70,15 +70,20 @@ int main(int argc, char** argv)
                                                     const HttpSession::Ptr& session,
                                                     const char* body,
                                                     size_t length) {
+                        (void) httpParser;
+                        (void) session;
+                        (void) body;
+                        (void) length;
                     });
                     handlers.setHeaderCallback([](const HTTPParser& httpParser,
                                                   const HttpSession::Ptr& session) {
+                        (void) httpParser;
                         (void) session;
-                        std::cout << "counter:" << counter.load() << std::endl;
                     });
                     handlers.setHttpEndCallback([](const HTTPParser& httpParser,
                                                    const HttpSession::Ptr& session) {
                         (void) session;
+                        // because has call setHttpBodyCallback, so the body from http parser is empty.
                         std::cout << httpParser.getBody() << std::endl;
                         counter.fetch_add(1);
                         std::cout << "counter:" << counter.load() << std::endl;

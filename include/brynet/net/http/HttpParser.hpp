@@ -2,6 +2,7 @@
 
 #include <brynet/net/http/WebSocketFormat.hpp>
 #include <cassert>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -173,9 +174,9 @@ private:
         mISCompleted = true;
         mIsUpgrade = mParser.upgrade;
         mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
-        auto& connHeader = getValue("Connection");
+        const auto& connHeader = getValue("Connection");
         mIsKeepAlive = connHeader == "Keep-Alive" || connHeader == "keep-alive";
-        mMethod = mParser.method;
+        mMethod = static_cast<int>(mParser.method);
         http_parser_init(&mParser, mParserType);
 
         if (mMsgEndCallback != nullptr)
