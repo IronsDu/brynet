@@ -65,11 +65,6 @@ public:
         return mISCompleted;
     }
 
-    bool isHeadersCompleted() const
-    {
-        return mHeadersISCompleted;
-    }
-
     int method() const
     {
         // mMethod's value defined in http_method, such as  HTTP_GET、HTTP_POST.
@@ -170,17 +165,25 @@ private:
     size_t tryParse(const char* buffer, size_t len)
     {
         const size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
-        if (mISCompleted)
-        {
-            mIsUpgrade = mParser.upgrade;
-            mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
-            auto& connHeader = getValue("Connection");
-            mIsKeepAlive = connHeader == "Keep-Alive" || connHeader == "keep-alive";
-            mMethod = mParser.method;
-            http_parser_init(&mParser, mParserType);
-        }
-
         return nparsed;
+    }
+
+    void onEnd()
+    {
+        mISCompleted = true;
+        mIsUpgrade = mParser.upgrade;
+        mIsWebSocket = mIsUpgrade && hasEntry("Upgrade", "websocket");
+        auto& connHeader = getValue("Connection");
+        mIsKeepAlive = connHeader == "Keep-Alive" || connHeader == "keep-alive";
+        mMethod = mParser.method;
+        http_parser_init(&mParser, mParserType);
+
+        if (mMsgEndCallback != nullptr)
+        {
+            mMsgEndCallback();
+            mMsgEndCallback = nullptr;
+        }
+        mBodyCallback = nullptr;
     }
 
     void setHeaderCallback(std::function<void()> callback)
@@ -188,7 +191,7 @@ private:
         mHeaderCallback = std::move(callback);
     }
 
-    void setBodyCallback(std::function<void(std::string)> callback)
+    void setBodyCallback(std::function<void(const char*, size_t)> callback)
     {
         mBodyCallback = std::move(callback);
     }
@@ -222,18 +225,13 @@ private:
     static int sMessageEnd(http_parser* hp)
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
-        httpParser->mISCompleted = true;
-        if (httpParser->mMsgEndCallback != nullptr)
-        {
-            httpParser->mMsgEndCallback();
-        }
+        httpParser->onEnd();
         return 0;
     }
 
     static int sHeadComplete(http_parser* hp)
     {
         HTTPParser* httpParser = (HTTPParser*) hp->data;
-        httpParser->mHeadersISCompleted = true;
 
         int retValue = 0;
         do
@@ -251,7 +249,7 @@ private:
                                                      &u);
             if (result != 0)
             {
-                retValue = - 1;
+                retValue = -1;
                 break;
             }
 
@@ -278,6 +276,7 @@ private:
         if (httpParser->mHeaderCallback != nullptr)
         {
             httpParser->mHeaderCallback();
+            httpParser->mHeaderCallback = nullptr;
         }
 
         return retValue;
@@ -326,9 +325,12 @@ private:
         HTTPParser* httpParser = (HTTPParser*) hp->data;
         if (httpParser->mBodyCallback != nullptr)
         {
-            httpParser->mBodyCallback(std::string(at, length));
+            httpParser->mBodyCallback(at, length);
         }
-        httpParser->mBody.append(at, length);
+        else
+        {
+            httpParser->mBody.append(at, length);
+        }
         return 0;
     }
 
@@ -342,7 +344,6 @@ private:
     bool mIsWebSocket = false;
     bool mIsKeepAlive;
     bool mISCompleted;
-    bool mHeadersISCompleted = false;
 
     bool mLastWasValue;
     std::string mCurrentField;
@@ -362,7 +363,7 @@ private:
     WebSocketFormat::WebSocketFrameType mWSFrameType;
 
     std::function<void()> mHeaderCallback;
-    std::function<void(std::string)> mBodyCallback;
+    std::function<void(const char*, size_t)> mBodyCallback;
     std::function<void()> mMsgEndCallback;
 
 private:

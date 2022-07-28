@@ -66,6 +66,11 @@ int main(int argc, char** argv)
                     (void) session;
                     std::cout << "connect success" << std::endl;
                     session->send(requestStr);
+                    handlers.setHttpBodyCallback([](const HTTPParser& httpParser,
+                                                    const HttpSession::Ptr& session,
+                        const char* body, 
+                        size_t length) {
+                    });
                     handlers.setHeaderCallback([](const HTTPParser& httpParser,
                                                   const HttpSession::Ptr& session) {
                         (void) session;
@@ -77,6 +82,7 @@ int main(int argc, char** argv)
                         std::cout << httpParser.getBody() << std::endl;
                         counter.fetch_add(1);
                         std::cout << "counter:" << counter.load() << std::endl;
+                        session->postClose();
                     });
                 })
                 .asyncConnect();

@@ -19,7 +19,7 @@ public:
 
     using EnterCallback = std::function<void(const HttpSession::Ptr&, HttpSessionHandlers&)>;
     using HttpHeaderCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&)>;
-    using HttpBodyCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&, std::string)>;
+    using HttpBodyCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&, const char*, size_t)>;
     using HttpEndCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&)>;
     using WsCallback = std::function<void(const HttpSession::Ptr&,
                                           WebSocketFormat::WebSocketFrameType opcode,
@@ -131,6 +131,8 @@ public:
         mHttpHeaderCallback = std::move(callback);
     }
 
+    // if call setHttpBodyCallback, the http body need user manager.
+    // so, you can't use body from HttpParser object in HttpEndCallback.
     void setHttpBodyCallback(HttpSession::HttpBodyCallback&& callback)
     {
         mHttpBodyCallback = std::move(callback);
@@ -195,8 +197,8 @@ public:
             auto bodyCB = handlers.mHttpBodyCallback;
             if (bodyCB != nullptr)
             {
-                httpParser->setBodyCallback([=](std::string body) {
-                    bodyCB(*httpParser, httpSession, std::move(body));
+                httpParser->setBodyCallback([=](const char* body, size_t length) {
+                    bodyCB(*httpParser, httpSession, body, length);
                 });
             }
 
