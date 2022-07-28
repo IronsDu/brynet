@@ -165,8 +165,7 @@ private:
 
     size_t tryParse(const char* buffer, size_t len)
     {
-        const size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
-        return nparsed;
+        return http_parser_execute(&mParser, &mSettings, buffer, len);
     }
 
     void onEnd()
@@ -272,7 +271,7 @@ private:
                         httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
                         u.field_data[UF_QUERY].len);
             }
-        } while (0);
+        } while (false);
 
         if (httpParser->mHeaderCallback != nullptr)
         {
@@ -285,7 +284,7 @@ private:
 
     static int sUrlHandle(http_parser* hp, const char* url, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         httpParser->mUrl.append(url, length);
 
         return 0;
@@ -293,7 +292,7 @@ private:
 
     static int sHeadValue(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         auto& value = httpParser->mHeadValues[httpParser->mCurrentField];
         value.append(at, length);
         httpParser->mLastWasValue = true;
@@ -302,7 +301,7 @@ private:
 
     static int sHeadField(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         if (httpParser->mLastWasValue)
         {
             httpParser->mCurrentField.clear();
@@ -315,7 +314,7 @@ private:
 
     static int sStatusHandle(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         httpParser->mStatus.append(at, length);
         httpParser->mStatusCode = hp->status_code;
         return 0;
@@ -323,7 +322,7 @@ private:
 
     static int sBodyHandle(http_parser* hp, const char* at, size_t length)
     {
-        HTTPParser* httpParser = (HTTPParser*) hp->data;
+        HTTPParser* httpParser = static_cast<HTTPParser*>(hp->data);
         if (httpParser->mBodyCallback != nullptr)
         {
             httpParser->mBodyCallback(at, length);

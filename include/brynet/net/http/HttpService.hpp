@@ -160,8 +160,8 @@ public:
 
 private:
     HttpSession::HttpHeaderCallback mHttpHeaderCallback;
-    HttpSession::HttpEndCallback mHttpEndCallback;
     HttpSession::HttpBodyCallback mHttpBodyCallback;
+    HttpSession::HttpEndCallback mHttpEndCallback;
     HttpSession::WsCallback mWSCallback;
     HttpSession::ClosedCallback mCloseCallback;
     HttpSession::WsConnectedCallback mWSConnectedCallback;
@@ -226,10 +226,10 @@ private:
                 HttpService::ProcessHttp(nullptr, 0, httpParser, httpSession);
             }
 
-            const auto& tmp = httpSession->getCloseCallback();
-            if (tmp != nullptr)
+            const auto& cb = httpSession->getCloseCallback();
+            if (cb != nullptr)
             {
-                tmp(httpSession);
+                cb(httpSession);
             }
         });
 
