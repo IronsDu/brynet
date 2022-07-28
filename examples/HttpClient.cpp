@@ -68,8 +68,8 @@ int main(int argc, char** argv)
                     session->send(requestStr);
                     handlers.setHttpBodyCallback([](const HTTPParser& httpParser,
                                                     const HttpSession::Ptr& session,
-                        const char* body, 
-                        size_t length) {
+                                                    const char* body,
+                                                    size_t length) {
                     });
                     handlers.setHeaderCallback([](const HTTPParser& httpParser,
                                                   const HttpSession::Ptr& session) {
@@ -77,7 +77,7 @@ int main(int argc, char** argv)
                         std::cout << "counter:" << counter.load() << std::endl;
                     });
                     handlers.setHttpEndCallback([](const HTTPParser& httpParser,
-                                                const HttpSession::Ptr& session) {
+                                                   const HttpSession::Ptr& session) {
                         (void) session;
                         std::cout << httpParser.getBody() << std::endl;
                         counter.fetch_add(1);
