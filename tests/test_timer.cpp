@@ -59,7 +59,7 @@ TEST_CASE("repeat timer are computed", "[repeat timer]")
     auto wg = brynet::base::WaitGroup::Create();
     wg->add(1);
 
-    std::atomic_int value = 0;
+    std::atomic_int value = ATOMIC_VAR_INIT(0);
     auto timer = timerMgr->addIntervalTimer(std::chrono::milliseconds(100), [&]() {
         if (value.load() < 10)
         {
