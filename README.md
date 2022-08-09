@@ -4,14 +4,10 @@ Header Only Cross platform high performance TCP network library using C++ 11.
 
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![LICENSE](https://img.shields.io/badge/license-NPL%20(The%20996%20Prohibited%20License)-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
-[![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=brynet&metric=alert_status)](https://sonarcloud.io/dashboard/index/brynet)
 [![Platform](https://img.shields.io/badge/Platform-Linux,%20Windows,%20MacOS-green.svg?style=flat-square)](https://github.com/IronsDu/brynet)
 
 ## Build status
-| OS | Build Status |
-|---|---|
-| Windows | [![Build status](https://ci.appveyor.com/api/projects/status/a2bxg5umbwwdb01k/branch/master?svg=true)](https://ci.appveyor.com/project/IronsDu/brynet/branch/master) |
-| Linux/MacOS | [![Build Status](https://travis-ci.org/IronsDu/brynet.svg?branch=master)](https://travis-ci.org/IronsDu/brynet) |
+[![build-and-test](https://github.com/IronsDu/brynet/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/IronsDu/brynet/actions/workflows/build-and-test.yml)
 
 ## Features
 * Header only
