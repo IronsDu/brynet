@@ -1,0 +1,237 @@
+name: build-and-test
+
+on: [push]
+
+jobs:
+  job:
+    name: ${{ matrix.os }}.${{ matrix.build_type }}.${{ matrix.lib }}.${{ matrix.compiler }}
+    # The CMake configure and build commands are platform agnostic and should work equally
+    # well on Windows or Mac.  You can convert this to a matrix build if you need
+    # cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04, macos-latest]
+        build_type: ['Release', 'Debug']
+        compiler: [g++, clang++]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Create Build Environment
+      # Some projects don't allow in-source building, so create a separate build directory
+      # We'll use this as our working directory for all subsequent commands
+      shell: bash
+      run: cmake -E make_directory ${{github.workspace}}/build
+
+    - name: Configure CMake
+      env:
+          CXX: ${{ matrix.compiler }}
+      # Use a bash shell so we can use the same syntax for environment variable
+      # access regardless of the host operating system
+      shell: bash
+      working-directory: ${{github.workspace}}/build
+      # Note the current convention is to use the -S and -B options here to specify source 
+      # and build directories, but this is only available with CMake 3.13 and higher.  
+      # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_VISIBILITY_PRESET=hidden -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
+
+    - name: Build
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      # Execute the build.  You can specify a specific target with "--target <NAME>"
+      run: cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      # Execute tests defined by the CMake configuration.  
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: cd tests && ctest -C ${{ matrix.build_type }}
+
+  ubuntu-16_04:
+    name: ubuntu-16.04.${{ matrix.build_type }}.${{ matrix.compiler }}
+    # The CMake configure and build commands are platform agnostic and should work equally
+    # well on Windows or Mac.  You can convert this to a matrix build if you need
+    # cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: [ubuntu-latest]
+    strategy:
+      matrix:
+        build_type: ['Release', 'Debug']
+        compiler: [g++, clang++]
+    container: ubuntu:16.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install required bits
+      run: |
+          apt update
+          apt -y install clang cmake g++ git
+
+    - name: Create Build Environment
+      # Some projects don't allow in-source building, so create a separate build directory
+      # We'll use this as our working directory for all subsequent commands
+      shell: bash
+      run: cmake -E make_directory $GITHUB_WORKSPACE/build
+
+    - name: setup cmake initial cache
+      run: touch compiler-cache.cmake
+
+    - name: Configure CMake
+      env:
+          CXX: ${{ matrix.compiler }}
+      # Use a bash shell so we can use the same syntax for environment variable
+      # access regardless of the host operating system
+      shell: bash
+      working-directory: ${{github.workspace}}/build
+      # Note the current convention is to use the -S and -B options here to specify source 
+      # and build directories, but this is only available with CMake 3.13 and higher.  
+      # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
+      run: cmake -C ../compiler-cache.cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_VISIBILITY_PRESET=hidden -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
+
+    - name: Build
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      # Execute the build.  You can specify a specific target with "--target <NAME>"
+      run: cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      # Execute tests defined by the CMake configuration.  
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: cd tests && ctest -C ${{ matrix.build_type }}
+  
+  ubuntu-14_04:
+    name: ubuntu-14.04.${{ matrix.build_type }}.${{ matrix.compiler }}
+    # The CMake configure and build commands are platform agnostic and should work equally
+    # well on Windows or Mac.  You can convert this to a matrix build if you need
+    # cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: [ubuntu-latest]
+    strategy:
+      matrix:
+        build_type: ['Release', 'Debug']
+        compiler: [g++-4.8, clang++-3.6]
+    container: ubuntu:14.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install required bits
+      run: |
+          sudo apt update
+          sudo apt -y install clang-3.6 cmake3 g++-4.8 git
+
+    - name: Create Build Environment
+      # Some projects don't allow in-source building, so create a separate build directory
+      # We'll use this as our working directory for all subsequent commands
+      shell: bash
+      run: cmake -E make_directory $GITHUB_WORKSPACE/build
+    
+    - name: setup cmake initial cache
+      run: touch compiler-cache.cmake
+
+    - name: Configure CMake
+      env:
+          CXX: ${{ matrix.compiler }}
+      # Use a bash shell so we can use the same syntax for environment variable
+      # access regardless of the host operating system
+      shell: bash
+      working-directory: ${{github.workspace}}/build
+      # Note the current convention is to use the -S and -B options here to specify source 
+      # and build directories, but this is only available with CMake 3.13 and higher.  
+      # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
+      run: cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_VISIBILITY_PRESET=hidden -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON
+
+    - name: Build
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      # Execute the build.  You can specify a specific target with "--target <NAME>"
+      run: cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      # Execute tests defined by the CMake configuration.  
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: cd tests && ctest -C ${{ matrix.build_type }}
+
+  msvc:
+    name: ${{ matrix.os }}.${{ matrix.build_type }}.${{ matrix.lib }}.${{ matrix.msvc }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+        run:
+            shell: powershell
+    strategy:
+      fail-fast: false
+      matrix:
+        msvc:
+          - VS-16-2019
+          - VS-17-2022
+        arch:
+          - Win32
+          - x64
+        build_type:
+          - Debug
+          - Release
+        include:
+          - msvc: VS-16-2019
+            os: windows-2019
+            generator: 'Visual Studio 16 2019'
+          - msvc: VS-17-2022
+            os: windows-2022
+            generator: 'Visual Studio 17 2022'
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B _build/
+          -A ${{ matrix.arch }}
+          -G "${{ matrix.generator }}"
+          -Dbrynet_BUILD_EXAMPLES=ON
+          -Dbrynet_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build _build/ --config ${{ matrix.build_type }}
+      - name: Test
+        run: ctest --test-dir _build/tests -C ${{ matrix.build_type }} -VV
+
+  build-windows-2015:
+    name: ${{ matrix.os }}.${{ matrix.build_type }}.${{ matrix.lib }}.${{ matrix.msvc }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+        run:
+            shell: powershell
+    strategy:
+      fail-fast: false
+      matrix:
+        msvc:
+          - VS-14-2015
+        arch:
+          - Win32
+          - x64
+        build_type:
+          - Debug
+          - Release
+        include:
+          - msvc: VS-14-2015
+            os: windows-2019
+            generator: 'Visual Studio 14 2015'
+            version: 14.0
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+    - name: cmake
+      run: cmake -A ${{ matrix.arch }} -G "${{ matrix.generator }}" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -Dbrynet_BUILD_EXAMPLES=ON -Dbrynet_BUILD_TESTS=ON .
+    - name: build
+      run: msbuild.exe brynet.sln /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} /p:VisualStudioVersion=${{ matrix.version }}
+    - name: test
+      run: ctest --test-dir ./tests -VV

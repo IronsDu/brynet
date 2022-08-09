@@ -36,7 +36,7 @@ elseif(UNIX)
   find_package(Threads REQUIRED)
   target_link_libraries(test_http pthread)
 endif()
-add_test(TestSyncConnect test_sync_connect)
+add_test(TestHTTP test_http)
 
 add_executable(test_array test_array.cpp)
 add_test(TestArray test_array)
