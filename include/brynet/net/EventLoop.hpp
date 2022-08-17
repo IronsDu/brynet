@@ -17,6 +17,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+#include <sstream>
 
 namespace brynet { namespace net {
 
@@ -99,14 +100,7 @@ public:
     void loop(int64_t milliseconds)
     {
         tryInitThreadID();
-
-#ifndef NDEBUG
-        assert(isInLoopThread());
-#endif
-        if (!isInLoopThread())
-        {
-            throw BrynetCommonException("only loop in io thread");
-        }
+        exceptInLoopThread();
 
         if (!mAfterLoopFunctors.empty())
         {
@@ -239,14 +233,7 @@ public:
     void loopCompareNearTimer(int64_t milliseconds)
     {
         tryInitThreadID();
-
-#ifndef NDEBUG
-        assert(isInLoopThread());
-#endif
-        if (!isInLoopThread())
-        {
-            throw BrynetCommonException("only loop in IO thread");
-        }
+        exceptInLoopThread();
 
         if (!mTimer->isEmpty())
         {
@@ -287,12 +274,7 @@ public:
 
     void runFunctorAfterLoop(UserFunctor&& f)
     {
-        assert(isInLoopThread());
-        if (!isInLoopThread())
-        {
-            throw BrynetCommonException("only push after functor in io thread");
-        }
-
+        exceptInLoopThread();
         mAfterLoopFunctors.emplace_back(std::move(f));
     }
 
@@ -341,6 +323,21 @@ public:
     }
 
 private:
+    void exceptInLoopThread() const
+    {
+#ifndef NDEBUG
+        assert(isInLoopThread());
+#endif
+        if (!isInLoopThread())
+        {
+            std::stringstream ss;
+            ss << "this call stack not in io thread"
+               << ", current thread id:" << current_thread::tid()
+               << ", but event loop self thread id:" << mSelfThreadID;
+            throw BrynetCommonException(ss.str());
+        }
+    }
+
     void reAllocEventSize(size_t size)
     {
         mEventEntries.resize(size);

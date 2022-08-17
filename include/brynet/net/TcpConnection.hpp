@@ -373,7 +373,7 @@ private:
         assert(mEventLoop->isInLoopThread());
         if (!mEventLoop->isInLoopThread())
         {
-            return false;
+            throw std::runtime_error("not in io thread call onEnterEventLoop");
         }
 
         if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
@@ -1156,7 +1156,11 @@ private:
     void causeEnterCallback()
     {
         assert(mEventLoop->isInLoopThread());
-        if (mEventLoop->isInLoopThread() && mEnterCallback != nullptr)
+        if (!mEventLoop->isInLoopThread())
+        {
+            throw std::runtime_error("not in io thread call causeEnterCallback");
+        }
+        if (mEnterCallback != nullptr)
         {
             auto tmp = mEnterCallback;
             mEnterCallback = nullptr;
