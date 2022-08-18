@@ -80,7 +80,7 @@ int main(int argc, char** argv)
                     reader.readUINT16();
                     int64_t addr = reader.readINT64();
 
-                    if (addr == (int64_t) (dataSocket.get()))
+                    if (addr == reinterpret_cast<int64_t>(dataSocket.get()))
                     {
                         dataSocket->send(buffer, packetLen);
                     }

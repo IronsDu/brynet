@@ -16,7 +16,7 @@
 
 namespace brynet { namespace net { namespace detail {
 
-static void HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
+static void HelperAddTcpConnection(const EventLoop::Ptr& eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
 {
     if (eventLoop == nullptr)
     {
@@ -146,7 +146,7 @@ protected:
         {
             eventLoop = getRandomEventLoop();
         }
-        return HelperAddTcpConnection(eventLoop, std::move(socket), option);
+        return HelperAddTcpConnection(eventLoop, std::move(socket), std::move(option));
     }
 
     EventLoop::Ptr getRandomEventLoop()

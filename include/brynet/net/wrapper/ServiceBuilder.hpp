@@ -67,7 +67,7 @@ public:
 
     Derived& WithEnterFailedCallback(std::function<void()> callback)
     {
-        mSocketOption.enterFailedCallback = callback;
+        mSocketOption.enterFailedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
     }
 
@@ -88,8 +88,8 @@ public:
                 mIsIpV6,
                 mListenAddr,
                 mPort,
-                [service, option](brynet::net::TcpSocket::Ptr socket) {
-                    service->addTcpConnection(std::move(socket), option);
+                [service, option](brynet::net::TcpSocket::Ptr socket) mutable {
+                    service->addTcpConnection(std::move(socket), std::move(option));
                 },
                 mSocketProcessCallbacks,
                 mEnabledReusePort);

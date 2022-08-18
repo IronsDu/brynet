@@ -47,7 +47,7 @@ public:
 
     void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
     {
-        return detail::TcpServiceDetail::addTcpConnection(std::move(socket), options);
+        return detail::TcpServiceDetail::addTcpConnection(std::move(socket), std::move(options));
     }
 
 private:
@@ -71,7 +71,7 @@ public:
 
     void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
     {
-        detail::HelperAddTcpConnection(mEventLoop, std::move(socket), options);
+        detail::HelperAddTcpConnection(mEventLoop, std::move(socket), std::move(options));
     }
 
 private:

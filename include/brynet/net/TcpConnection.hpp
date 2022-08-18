@@ -55,7 +55,7 @@ public:
                       EnterCallback&& enterCallback,
                       const EventLoop::Ptr& eventLoop,
                       const SSLHelper::Ptr& sslHelper = nullptr,
-                      std::function<void()> enterFailedCallback = nullptr)
+                      const std::function<void()>& enterFailedCallback = nullptr)
     {
         class make_shared_enabler : public TcpConnection
         {

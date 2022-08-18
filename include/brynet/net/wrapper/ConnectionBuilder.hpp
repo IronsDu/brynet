@@ -152,7 +152,7 @@ public:
 
     Derived& WithEnterFailedCallback(std::function<void()> callback)
     {
-        mOption.enterFailedCallback = callback;
+        mOption.enterFailedCallback = std::move(callback);
         return static_cast<Derived&>(*this);
     }
 
@@ -180,7 +180,7 @@ public:
         auto service = mTcpService;
         auto option = mOption;
         mConnectBuilder.WithCompletedCallback([service, option](TcpSocket::Ptr socket) mutable {
-            service->addTcpConnection(std::move(socket), option);
+            service->addTcpConnection(std::move(socket), std::move(option));
         });
 
         mConnectBuilder.asyncConnect();
@@ -200,7 +200,7 @@ public:
         {
             return nullptr;
         }
-        mTcpService->addTcpConnection(std::move(socket), option);
+        mTcpService->addTcpConnection(std::move(socket), std::move(option));
 
         return sessionPromise->get_future().get();
     }
