@@ -28,7 +28,7 @@ protected:
 
         if (mListenThread != nullptr)
         {
-            return;
+            throw std::runtime_error("listen thread already started");
         }
 
         const auto fd = brynet::net::base::Listen(mIsIPV6, mIP.c_str(), mPort, 512, mEnabledReusePort);
@@ -142,7 +142,7 @@ private:
         }
         catch (const EintrError& e)
         {
-            std::cerr << "accept eintr execption:" << e.what() << std::endl;
+            std::cerr << "accept EINTR execption:" << e.what() << std::endl;
         }
         catch (const AcceptError& e)
         {

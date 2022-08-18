@@ -68,6 +68,11 @@ protected:
     std::vector<brynet::net::EventLoop::Ptr> startWorkerThread(size_t threadNum,
                                                                FrameCallback callback = nullptr)
     {
+        if (threadNum == 0)
+        {
+            throw std::runtime_error("thread num is zero");
+        }
+
         std::vector<brynet::net::EventLoop::Ptr> eventLoops;
 
         std::lock_guard<std::mutex> lck(mServiceGuard);
@@ -75,7 +80,7 @@ protected:
 
         if (!mIOLoopDatas.empty())
         {
-            return eventLoops;
+            throw std::runtime_error("worker thread already started");
         }
 
         mRunIOLoop = std::make_shared<bool>(true);

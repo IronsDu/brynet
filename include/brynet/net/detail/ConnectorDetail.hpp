@@ -31,7 +31,7 @@ protected:
 
         if (mThread != nullptr)
         {
-            return;
+            throw std::runtime_error("connect thread already started");
         }
 
         mIsRun = std::make_shared<bool>(true);

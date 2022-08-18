@@ -188,7 +188,7 @@ public:
 
     template<typename F, typename... TArgs>
     void helperAddIntervalTimer(
-            RepeatTimer::Ptr repeatTimer,
+            const RepeatTimer::Ptr& repeatTimer,
             std::chrono::nanoseconds interval,
             F&& callback,
             TArgs&&... args)
@@ -201,10 +201,10 @@ public:
     }
 
 private:
-    static void stubRepeatTimerCallback(TimerMgr::Ptr timerMgr,
+    static void stubRepeatTimerCallback(const TimerMgr::Ptr& timerMgr,
                                         std::chrono::nanoseconds interval,
-                                        std::function<void()> callback,
-                                        RepeatTimer::Ptr repeatTimer)
+                                        const std::function<void()>& callback,
+                                        const RepeatTimer::Ptr& repeatTimer)
     {
         if (repeatTimer->isCancel())
         {
