@@ -16,11 +16,11 @@
 
 namespace brynet { namespace net { namespace detail {
 
-static bool HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
+static void HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
 {
     if (eventLoop == nullptr)
     {
-        return false;
+        throw BrynetCommonException("event loop is null");
     }
     if (option.maxRecvBufferSize <= 0)
     {
@@ -43,9 +43,8 @@ static bool HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr sock
                           option.maxRecvBufferSize,
                           wrapperEnterCallback,
                           eventLoop,
-                          option.sslHelper);
-
-    return true;
+                          option.sslHelper,
+                          option.enterFailedCallback);
 }
 
 class TcpServiceDetail : public brynet::base::NonCopyable
@@ -136,7 +135,7 @@ protected:
         mIOLoopDatas.clear();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption option)
+    void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption option)
     {
         EventLoop::Ptr eventLoop;
         if (option.forceSameThreadLoop)

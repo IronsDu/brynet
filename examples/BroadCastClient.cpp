@@ -80,7 +80,7 @@ int main(int argc, char** argv)
                     reader.readUINT16();
                     int64_t addr = reader.readINT64();
 
-                    if (addr == (int64_t)(dataSocket.get()))
+                    if (addr == (int64_t) (dataSocket.get()))
                     {
                         dataSocket->send(buffer, packetLen);
                     }
@@ -97,7 +97,9 @@ int main(int argc, char** argv)
         auto tcpConnection = TcpConnection::Create(TcpSocket::Create(fd, false),
                                                    1024 * 1024,
                                                    enterCallback,
-                                                   clientEventLoop);
+                                                   clientEventLoop,
+                                                   nullptr,
+                                                   nullptr);
     }
 
     auto now = std::chrono::steady_clock::now();

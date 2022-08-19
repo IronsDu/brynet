@@ -65,6 +65,12 @@ public:
         return static_cast<Derived&>(*this);
     }
 
+    Derived& WithEnterFailedCallback(std::function<void()> callback)
+    {
+        mSocketOption.enterFailedCallback = callback;
+        return static_cast<Derived&>(*this);
+    }
+
     void asyncRun()
     {
         if (mTcpService == nullptr)

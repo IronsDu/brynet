@@ -54,7 +54,8 @@ public:
                       size_t maxRecvBufferSize,
                       EnterCallback&& enterCallback,
                       const EventLoop::Ptr& eventLoop,
-                      const SSLHelper::Ptr& sslHelper = nullptr)
+                      const SSLHelper::Ptr& sslHelper = nullptr,
+                      std::function<void()> enterFailedCallback = nullptr)
     {
         class make_shared_enabler : public TcpConnection
         {
@@ -85,14 +86,14 @@ public:
                 if (sslHelper->getOpenSSLCTX() == nullptr ||
                     !session->initAcceptSSL(sslHelper->getOpenSSLCTX()))
                 {
-                    throw std::runtime_error("init ssl failed");
+                    return nullptr;
                 }
             }
             else
             {
                 if (!session->initConnectSSL())
                 {
-                    throw std::runtime_error("init ssl failed");
+                    return nullptr;
                 }
             }
         }
@@ -103,8 +104,11 @@ public:
         }
 #endif
 
-        eventLoop->runAsyncFunctor([session]() {
-            session->onEnterEventLoop();
+        eventLoop->runAsyncFunctor([session, enterFailedCallback]() {
+            if (!session->onEnterEventLoop() && enterFailedCallback != nullptr)
+            {
+                enterFailedCallback();
+            }
         });
         return session;
     }

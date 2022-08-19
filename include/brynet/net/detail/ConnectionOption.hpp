@@ -9,6 +9,7 @@ class ConnectionOption final
 {
 public:
     std::vector<TcpConnection::EnterCallback> enterCallback;
+    std::function<void()> enterFailedCallback;
     SSLHelper::Ptr sslHelper;
     bool useSSL = false;
     bool forceSameThreadLoop = false;

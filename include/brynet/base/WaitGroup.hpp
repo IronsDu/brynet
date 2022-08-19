@@ -30,7 +30,7 @@ public:
 
     void done()
     {
-        mCounter--;
+        --mCounter;
         mCond.notify_all();
     }
 
