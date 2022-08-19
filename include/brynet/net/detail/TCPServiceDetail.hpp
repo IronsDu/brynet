@@ -158,18 +158,13 @@ protected:
     {
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
-        const auto ioLoopSize = mIOLoopDatas.size();
-        if (ioLoopSize == 0)
+        if (mIOLoopDatas.empty())
         {
             return nullptr;
         }
-        else if (ioLoopSize == 1)
-        {
-            return mIOLoopDatas.front()->getEventLoop();
-        }
         else
         {
-            return mIOLoopDatas[mRandom() % ioLoopSize]->getEventLoop();
+            return mIOLoopDatas[mRandom() % mIOLoopDatas.size()]->getEventLoop();
         }
     }
 
