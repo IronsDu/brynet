@@ -16,11 +16,11 @@
 
 namespace brynet { namespace net { namespace detail {
 
-static bool HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
+static void HelperAddTcpConnection(const EventLoop::Ptr& eventLoop, TcpSocket::Ptr socket, ConnectionOption option)
 {
     if (eventLoop == nullptr)
     {
-        return false;
+        throw BrynetCommonException("event loop is null");
     }
     if (option.maxRecvBufferSize <= 0)
     {
@@ -43,9 +43,8 @@ static bool HelperAddTcpConnection(EventLoop::Ptr eventLoop, TcpSocket::Ptr sock
                           option.maxRecvBufferSize,
                           wrapperEnterCallback,
                           eventLoop,
-                          option.sslHelper);
-
-    return true;
+                          option.sslHelper,
+                          option.enterFailedCallback);
 }
 
 class TcpServiceDetail : public brynet::base::NonCopyable
@@ -69,6 +68,11 @@ protected:
     std::vector<brynet::net::EventLoop::Ptr> startWorkerThread(size_t threadNum,
                                                                FrameCallback callback = nullptr)
     {
+        if (threadNum == 0)
+        {
+            throw std::runtime_error("thread num is zero");
+        }
+
         std::vector<brynet::net::EventLoop::Ptr> eventLoops;
 
         std::lock_guard<std::mutex> lck(mServiceGuard);
@@ -76,7 +80,7 @@ protected:
 
         if (!mIOLoopDatas.empty())
         {
-            return eventLoops;
+            throw std::runtime_error("worker thread already started");
         }
 
         mRunIOLoop = std::make_shared<bool>(true);
@@ -136,7 +140,7 @@ protected:
         mIOLoopDatas.clear();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption option)
+    void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption option)
     {
         EventLoop::Ptr eventLoop;
         if (option.forceSameThreadLoop)
@@ -147,25 +151,20 @@ protected:
         {
             eventLoop = getRandomEventLoop();
         }
-        return HelperAddTcpConnection(eventLoop, std::move(socket), option);
+        return HelperAddTcpConnection(eventLoop, std::move(socket), std::move(option));
     }
 
     EventLoop::Ptr getRandomEventLoop()
     {
         std::lock_guard<std::mutex> lock(mIOLoopGuard);
 
-        const auto ioLoopSize = mIOLoopDatas.size();
-        if (ioLoopSize == 0)
+        if (mIOLoopDatas.empty())
         {
             return nullptr;
         }
-        else if (ioLoopSize == 1)
-        {
-            return mIOLoopDatas.front()->getEventLoop();
-        }
         else
         {
-            return mIOLoopDatas[mRandom() % ioLoopSize]->getEventLoop();
+            return mIOLoopDatas[mRandom() % mIOLoopDatas.size()]->getEventLoop();
         }
     }
 

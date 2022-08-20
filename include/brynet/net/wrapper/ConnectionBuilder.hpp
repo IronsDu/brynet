@@ -150,6 +150,12 @@ public:
         return static_cast<Derived&>(*this);
     }
 
+    Derived& WithEnterFailedCallback(std::function<void()> callback)
+    {
+        mOption.enterFailedCallback = std::move(callback);
+        return static_cast<Derived&>(*this);
+    }
+
 #ifdef BRYNET_USE_OPENSSL
     Derived& WithSSL()
     {
@@ -174,7 +180,7 @@ public:
         auto service = mTcpService;
         auto option = mOption;
         mConnectBuilder.WithCompletedCallback([service, option](TcpSocket::Ptr socket) mutable {
-            service->addTcpConnection(std::move(socket), option);
+            service->addTcpConnection(std::move(socket), std::move(option));
         });
 
         mConnectBuilder.asyncConnect();
@@ -190,10 +196,12 @@ public:
         });
 
         auto socket = mConnectBuilder.syncConnect();
-        if (socket == nullptr || !mTcpService->addTcpConnection(std::move(socket), option))
+        if (socket == nullptr)
         {
             return nullptr;
         }
+        mTcpService->addTcpConnection(std::move(socket), std::move(option));
+
         return sessionPromise->get_future().get();
     }
 

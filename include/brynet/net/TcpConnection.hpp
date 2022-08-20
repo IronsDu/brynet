@@ -54,7 +54,8 @@ public:
                       size_t maxRecvBufferSize,
                       EnterCallback&& enterCallback,
                       const EventLoop::Ptr& eventLoop,
-                      const SSLHelper::Ptr& sslHelper = nullptr)
+                      const SSLHelper::Ptr& sslHelper = nullptr,
+                      const std::function<void()>& enterFailedCallback = nullptr)
     {
         class make_shared_enabler : public TcpConnection
         {
@@ -85,14 +86,14 @@ public:
                 if (sslHelper->getOpenSSLCTX() == nullptr ||
                     !session->initAcceptSSL(sslHelper->getOpenSSLCTX()))
                 {
-                    throw std::runtime_error("init ssl failed");
+                    return nullptr;
                 }
             }
             else
             {
                 if (!session->initConnectSSL())
                 {
-                    throw std::runtime_error("init ssl failed");
+                    return nullptr;
                 }
             }
         }
@@ -103,8 +104,11 @@ public:
         }
 #endif
 
-        eventLoop->runAsyncFunctor([session]() {
-            session->onEnterEventLoop();
+        eventLoop->runAsyncFunctor([session, enterFailedCallback]() {
+            if (!session->onEnterEventLoop() && enterFailedCallback != nullptr)
+            {
+                enterFailedCallback();
+            }
         });
         return session;
     }
@@ -373,7 +377,7 @@ private:
         assert(mEventLoop->isInLoopThread());
         if (!mEventLoop->isInLoopThread())
         {
-            return false;
+            throw std::runtime_error("not in io thread call onEnterEventLoop");
         }
 
         if (!brynet::net::base::SocketNonblock(mSocket->getFD()) ||
@@ -1156,7 +1160,11 @@ private:
     void causeEnterCallback()
     {
         assert(mEventLoop->isInLoopThread());
-        if (mEventLoop->isInLoopThread() && mEnterCallback != nullptr)
+        if (!mEventLoop->isInLoopThread())
+        {
+            throw std::runtime_error("not in io thread call causeEnterCallback");
+        }
+        if (mEnterCallback != nullptr)
         {
             auto tmp = mEnterCallback;
             mEnterCallback = nullptr;

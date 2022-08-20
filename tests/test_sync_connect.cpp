@@ -131,12 +131,19 @@ TEST_CASE("SyncConnector are computed", "[sync_connect]")
         auto service = IOThreadTcpService::Create();
 
         wrapper::ConnectionBuilder connectionBuilder;
-        auto session = connectionBuilder
-                               .WithService(service)
-                               .WithConnector(connector)
-                               .WithTimeout(std::chrono::seconds(2))
-                               .WithAddr(ip, port)
-                               .syncConnect();
+        TcpConnection::Ptr session;
+        try
+        {
+            session = connectionBuilder
+                              .WithService(service)
+                              .WithConnector(connector)
+                              .WithTimeout(std::chrono::seconds(2))
+                              .WithAddr(ip, port)
+                              .syncConnect();
+        }
+        catch (...)
+        {
+        }
 
         REQUIRE(session == nullptr);
     }

@@ -175,40 +175,42 @@ public:
     static void setup(const TcpConnection::Ptr& session,
                       const HttpSession::EnterCallback& enterCallback)
     {
-        auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
-
-        auto httpSession = HttpSession::Create(session);
-        if (enterCallback != nullptr)
+        if (enterCallback == nullptr)
         {
-            HttpSessionHandlers handlers;
-            enterCallback(httpSession, handlers);
-            httpSession->setClosedCallback(std::move(handlers.mCloseCallback));
-            httpSession->setWSCallback(std::move(handlers.mWSCallback));
-            httpSession->setWSConnected(std::move(handlers.mWSConnectedCallback));
+            throw BrynetCommonException("not setting http enter callback");
+        }
 
-            auto headerCB = handlers.mHttpHeaderCallback;
-            if (headerCB != nullptr)
-            {
-                httpParser->setHeaderCallback([=]() {
-                    headerCB(*httpParser, httpSession);
-                });
-            }
+        auto httpParser = std::make_shared<HTTPParser>(HTTP_BOTH);
+        auto httpSession = HttpSession::Create(session);
 
-            auto bodyCB = handlers.mHttpBodyCallback;
-            if (bodyCB != nullptr)
-            {
-                httpParser->setBodyCallback([=](const char* body, size_t length) {
-                    bodyCB(*httpParser, httpSession, body, length);
-                });
-            }
+        HttpSessionHandlers handlers;
+        enterCallback(httpSession, handlers);
+        httpSession->setClosedCallback(std::move(handlers.mCloseCallback));
+        httpSession->setWSCallback(std::move(handlers.mWSCallback));
+        httpSession->setWSConnected(std::move(handlers.mWSConnectedCallback));
 
-            auto endCB = handlers.mHttpEndCallback;
-            if (endCB != nullptr)
-            {
-                httpParser->setEndCallback([=]() {
-                    endCB(*httpParser, httpSession);
-                });
-            }
+        auto headerCB = handlers.mHttpHeaderCallback;
+        if (headerCB != nullptr)
+        {
+            httpParser->setHeaderCallback([=]() {
+                headerCB(*httpParser, httpSession);
+            });
+        }
+
+        auto bodyCB = handlers.mHttpBodyCallback;
+        if (bodyCB != nullptr)
+        {
+            httpParser->setBodyCallback([=](const char* body, size_t length) {
+                bodyCB(*httpParser, httpSession, body, length);
+            });
+        }
+
+        auto endCB = handlers.mHttpEndCallback;
+        if (endCB != nullptr)
+        {
+            httpParser->setEndCallback([=]() {
+                endCB(*httpParser, httpSession);
+            });
         }
         HttpService::handle(httpSession, httpParser);
     }

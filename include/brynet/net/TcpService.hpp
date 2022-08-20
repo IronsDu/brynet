@@ -13,7 +13,7 @@ public:
 
 public:
     virtual ~ITcpService() = default;
-    virtual bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) = 0;
+    virtual void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) = 0;
 };
 
 // use multi IO threads process IO
@@ -45,9 +45,9 @@ public:
         detail::TcpServiceDetail::stopWorkerThread();
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
+    void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
     {
-        return detail::TcpServiceDetail::addTcpConnection(std::move(socket), options);
+        return detail::TcpServiceDetail::addTcpConnection(std::move(socket), std::move(options));
     }
 
 private:
@@ -69,9 +69,9 @@ public:
         return std::make_shared<EventLoopTcpService>(eventLoop);
     }
 
-    bool addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
+    void addTcpConnection(TcpSocket::Ptr socket, ConnectionOption options) override
     {
-        return detail::HelperAddTcpConnection(mEventLoop, std::move(socket), options);
+        detail::HelperAddTcpConnection(mEventLoop, std::move(socket), std::move(options));
     }
 
 private:
