@@ -491,7 +491,7 @@ private:
             }
             return;
         }
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         if (mAlreadyClose)
         {
             return;
@@ -524,7 +524,7 @@ private:
             }
             return;
         }
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         if (mAlreadyClose)
         {
             return;
@@ -646,7 +646,7 @@ private:
             {
 #ifdef BRYNET_PLATFORM_WINDOWS
                 checkRead();
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
                 //force recheck IN-OUT Event
                 recheckEvent();
 #endif
@@ -725,7 +725,7 @@ private:
     {
 #ifdef BRYNET_PLATFORM_WINDOWS
         normalFlush();
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 #ifdef BRYNET_USE_OPENSSL
         if (mSSL != nullptr)
         {
@@ -744,7 +744,7 @@ private:
     {
 #ifdef BRYNET_PLATFORM_WINDOWS
         static __declspec(thread) char* threadLocalSendBuf = nullptr;
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         static __thread char* threadLocalSendBuf = nullptr;
 #endif
         static const int SENDBUF_SIZE = 1024 * 32;
@@ -869,7 +869,7 @@ private:
             procCloseInLoop();
         }
     }
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     void quickFlush()
     {
 #ifndef MAX_IOVEC
@@ -963,7 +963,7 @@ private:
         }
         mAlreadyClose = true;
 
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         unregisterPollerEvent();
 #endif
 
@@ -1023,7 +1023,7 @@ private:
         }
 #elif defined BRYNET_PLATFORM_LINUX
         onClose();
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         onClose();
 #endif
     }
@@ -1035,7 +1035,7 @@ private:
         {
 #ifdef BRYNET_PLATFORM_WINDOWS
             shutdown(mSocket->getFD(), SD_SEND);
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
             shutdown(mSocket->getFD(), SHUT_WR);
 #endif
         }
@@ -1054,7 +1054,7 @@ private:
             mIsPostFlush = true;
         }
     }
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     void recheckEvent()
     {
 #ifdef BRYNET_PLATFORM_LINUX
@@ -1065,7 +1065,7 @@ private:
         ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         ev.data.ptr = (Channel*) (this);
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_MOD, mSocket->getFD(), &ev);
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         struct kevent ev[2];
         memset(&ev, 0, sizeof(ev));
         int n = 0;
@@ -1084,7 +1084,7 @@ private:
                                      nullptr
                                  }};
         epoll_ctl(mEventLoop->getEpollHandle(), EPOLL_CTL_DEL, mSocket->getFD(), &ev);
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         struct kevent ev[2];
         memset(&ev, 0, sizeof(ev));
         int n = 0;

@@ -25,7 +25,7 @@ static bool InitSocket()
     {
         ret = false;
     }
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     signal(SIGPIPE, SIG_IGN);
 #endif
 
@@ -51,7 +51,7 @@ static bool SocketBlock(BrynetSocketFD fd)
     unsigned long ul = false;
 #ifdef BRYNET_PLATFORM_WINDOWS
     err = ioctlsocket(fd, FIONBIO, &ul);
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     err = ioctl(fd, FIONBIO, &ul);
 #endif
 
@@ -64,7 +64,7 @@ static bool SocketNonblock(BrynetSocketFD fd)
     unsigned long ul = true;
 #ifdef BRYNET_PLATFORM_WINDOWS
     err = ioctlsocket(fd, FIONBIO, &ul);
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     err = ioctl(fd, FIONBIO, &ul);
 #endif
 
@@ -100,7 +100,7 @@ static void SocketClose(BrynetSocketFD fd)
 {
 #ifdef BRYNET_PLATFORM_WINDOWS
     ::closesocket(fd);
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     ::close(fd);
 #endif
 }
@@ -226,7 +226,7 @@ static std::string getIPString(const struct sockaddr* sa)
 {
 #ifdef BRYNET_PLATFORM_WINDOWS
     using PAddrType = PVOID;
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     using PAddrType = const void*;
 #endif
     char tmp[INET6_ADDRSTRLEN] = {0};
@@ -256,7 +256,7 @@ static std::string GetIPOfSocket(BrynetSocketFD fd)
     {
         return getIPString(&name);
     }
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     struct sockaddr_in name = sockaddr_in();
     socklen_t namelen = sizeof(name);
     if (::getpeername(fd, (struct sockaddr*) &name, &namelen) == 0)
@@ -324,7 +324,7 @@ static bool IsSelfConnect(BrynetSocketFD fd)
         return localaddr.sin6_port == peeraddr.sin6_port && memcmp(&localaddr.sin6_addr.u.Byte,
                                                                    &peeraddr.sin6_addr.u.Byte,
                                                                    sizeof localaddr.sin6_addr.u.Byte) == 0;
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         return localaddr.sin6_port == peeraddr.sin6_port && memcmp(&localaddr.sin6_addr.s6_addr,
                                                                    &peeraddr.sin6_addr.s6_addr,
                                                                    sizeof localaddr.sin6_addr.s6_addr) == 0;

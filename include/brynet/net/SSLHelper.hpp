@@ -32,7 +32,7 @@ static void cryptoSetThreadIDCallback(CRYPTO_THREADID* id)
 #ifdef BRYNET_PLATFORM_WINDOWS
     CRYPTO_THREADID_set_numeric(id,
                                 static_cast<unsigned long>(GetCurrentThreadId()));
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     CRYPTO_THREADID_set_numeric(id,
                                 static_cast<unsigned long>(pthread_self()));
 #endif
