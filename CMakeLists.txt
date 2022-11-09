@@ -25,6 +25,7 @@ option(brynet_BUILD_EXAMPLES "Build examples" ON)
 option(brynet_BUILD_TESTS "Build test" ON)
 
 if (brynet_BUILD_EXAMPLES)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
   if(UNIX)
     if(NOT CMAKE_BUILD_TYPE)
       set(CMAKE_BUILD_TYPE "Release")
