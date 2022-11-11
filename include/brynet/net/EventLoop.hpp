@@ -40,7 +40,7 @@ public:
         mWakeupChannel(std::make_unique<detail::WakeupChannel>(mIOCP))
 #elif defined BRYNET_PLATFORM_LINUX
         mEpollFd(epoll_create(1))
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         mKqueueFd(kqueue())
 #endif
     {
@@ -58,7 +58,7 @@ public:
         auto eventfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
         mWakeupChannel.reset(new detail::WakeupChannel(eventfd));
         linkChannel(eventfd, mWakeupChannel.get());
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         const int NOTIFY_IDENT = 42;// Magic number we use for our filter ID.
         mWakeupChannel.reset(new detail::WakeupChannel(mKqueueFd, NOTIFY_IDENT));
         //Add user event
@@ -73,7 +73,11 @@ public:
         mIsInBlock = true;
 
         reAllocEventSize(1024);
+#if defined BRYNET_PLATFORM_FREEBSD
+        mSelfThreadID = nullptr;
+#else
         mSelfThreadID = -1;
+#endif
         mTimer = std::make_shared<brynet::base::TimerMgr>();
         mSelfThreadIDIsInitialized.store(false);
     }
@@ -86,7 +90,7 @@ public:
 #elif defined BRYNET_PLATFORM_LINUX
         close(mEpollFd);
         mEpollFd = -1;
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         close(mKqueueFd);
         mKqueueFd = -1;
 #endif
@@ -187,7 +191,7 @@ public:
                 channel->canSend();
             }
         }
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         struct timespec timeout = {milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000};
         int numComplete = kevent(mKqueueFd, NULL, 0, mEventEntries.data(), mEventEntries.size(), &timeout);
 
@@ -379,7 +383,7 @@ private:
     {
         return mEpollFd;
     }
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     int getKqueueHandle() const
     {
         return mKqueueFd;
@@ -397,7 +401,7 @@ private:
         ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         ev.data.ptr = (void*) ptr;
         return epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &ev) == 0;
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         struct kevent ev[2];
         memset(&ev, 0, sizeof(ev));
         int n = 0;
@@ -443,7 +447,7 @@ private:
 #elif defined BRYNET_PLATFORM_LINUX
     std::vector<epoll_event> mEventEntries;
     int mEpollFd;
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     std::vector<struct kevent> mEventEntries;
     int mKqueueFd;
 #endif

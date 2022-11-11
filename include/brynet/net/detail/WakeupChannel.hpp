@@ -88,7 +88,7 @@ private:
     UniqueFd mUniqueFd;
 };
 
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 class WakeupChannel final : public Channel, public brynet::base::NonCopyable
 {
 public:

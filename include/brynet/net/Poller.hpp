@@ -5,7 +5,7 @@
 #include <cassert>
 #include <cstdlib>
 
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 #include <poll.h>
 #endif
 
@@ -15,7 +15,7 @@ namespace brynet { namespace base {
 const static int CHECK_READ_FLAG = (POLLIN | POLLRDNORM | POLLRDBAND);
 const static int CHECK_WRITE_FLAG = (POLLOUT | POLLWRNORM);
 const static int CHECK_ERROR_FLAG = (POLLERR | POLLHUP);
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 const static int CHECK_READ_FLAG = (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI);
 const static int CHECK_WRITE_FLAG = (POLLOUT | POLLWRNORM | POLLWRBAND);
 const static int CHECK_ERROR_FLAG = (POLLERR | POLLHUP);
@@ -237,7 +237,7 @@ static int poller_poll(struct poller_s* self, long overtime)
 {
 #ifdef BRYNET_PLATFORM_WINDOWS
     int ret = WSAPoll(&self->pollFds[0], self->nfds, overtime);
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     int ret = poll(self->pollFds, self->nfds, overtime);
 #endif
 

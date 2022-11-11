@@ -161,7 +161,7 @@ public:
         const auto clientFD = brynet::net::base::Accept(mFD, nullptr, nullptr);
         if (clientFD == BRYNET_INVALID_SOCKET)
         {
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
             if (BRYNET_ERRNO == EMFILE)
             {
                 // Thanks libev and muduo.
@@ -204,7 +204,7 @@ protected:
     explicit ListenSocket(BrynetSocketFD fd)
         : mFD(fd)
     {
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
         mIdle = brynet::net::TcpSocket::Create(::open("/dev/null", O_RDONLY | O_CLOEXEC), true);
 #endif
     }
@@ -216,7 +216,7 @@ protected:
 
 private:
     const BrynetSocketFD mFD;
-#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#if defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
     brynet::net::TcpSocket::Ptr mIdle;
 #endif
 

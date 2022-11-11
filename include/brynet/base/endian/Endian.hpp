@@ -8,7 +8,7 @@
 
 #ifdef BRYNET_PLATFORM_LINUX
 #include <endian.h>
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 #include <sys/_endian.h>
 #endif
 
@@ -104,7 +104,7 @@ inline uint16_t networkToHost16(uint16_t net16, bool convert = true)
 {
     return convert ? be16toh(net16) : net16;
 }
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 inline uint64_t hostToNetwork64(uint64_t host64, bool convert = true)
 {
     return convert ? hl64ton(host64) : host64;

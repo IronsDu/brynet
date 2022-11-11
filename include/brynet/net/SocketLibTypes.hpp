@@ -27,7 +27,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-#elif defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -60,7 +60,7 @@ typedef SOCKET BrynetSocketFD;
 #define BRYNET_SOCKET_ERROR SOCKET_ERROR
 #define BRYNET_INVALID_SOCKET INVALID_SOCKET
 
-#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN
+#elif defined BRYNET_PLATFORM_LINUX || defined BRYNET_PLATFORM_DARWIN || defined BRYNET_PLATFORM_FREEBSD
 #define BRYNET_ERRNO errno
 #define BRYNET_ENOTSOCK EBADF
 #define BRYNET_EWOULDBLOCK EAGAIN
