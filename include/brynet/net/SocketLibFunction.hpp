@@ -81,11 +81,33 @@ static int SocketSetRecvSize(BrynetSocketFD fd, int rd_size)
     return ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*) &rd_size, sizeof(rd_size));
 }
 
+static int SocketSetReuseAddr(BrynetSocketFD fd)
+{
+#ifdef BRYNET_PLATFORM_WINDOWS
+    BOOL enable = true;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &enable, sizeof(enable));
+#else
+    int enable = 1;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+#endif
+}
+
+static int SocketDisableReuseAddr(BrynetSocketFD fd)
+{
+#ifdef BRYNET_PLATFORM_WINDOWS
+    BOOL enable = false;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &enable, sizeof(enable));
+#else
+    int enable = 0;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+#endif
+}
+
 static int SocketSetReusePort(BrynetSocketFD fd)
 {
 #ifdef BRYNET_PLATFORM_WINDOWS
     BOOL enable = true;
-    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&enable, sizeof(enable));
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &enable, sizeof(enable));
 #else
     int enable = 1;
     return ::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
@@ -205,13 +227,8 @@ static BrynetSocketFD Listen(bool isIPV6, const char* ip, int port, int back_num
         ptonResult = inet_pton(AF_INET, ip, &ip4Addr.sin_addr) > 0;
     }
 
-    const int reuseaddr_value = 1;
-    if (!ptonResult ||
-        ::setsockopt(socketfd,
-                     SOL_SOCKET,
-                     SO_REUSEADDR,
-                     (const char*) &reuseaddr_value,
-                     sizeof(int)) < 0)
+    // default aneble SO_REUSEADDR
+    if (!ptonResult || SocketSetReuseAddr(socketfd) < 0)
     {
         SocketClose(socketfd);
         return BRYNET_INVALID_SOCKET;
