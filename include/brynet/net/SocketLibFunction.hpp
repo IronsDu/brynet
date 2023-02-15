@@ -84,9 +84,21 @@ static int SocketSetRecvSize(BrynetSocketFD fd, int rd_size)
 static int SocketSetReusePort(BrynetSocketFD fd)
 {
 #ifdef BRYNET_PLATFORM_WINDOWS
-    return 0;
+    BOOL enable = true;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&enable, sizeof(enable));
 #else
     int enable = 1;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
+#endif
+}
+
+static int SocketDisableReusePort(BrynetSocketFD fd)
+{
+#ifdef BRYNET_PLATFORM_WINDOWS
+    BOOL enable = false;
+    return ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &enable, sizeof(enable));
+#else
+    int enable = 0;
     return ::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
 #endif
 }
@@ -205,7 +217,8 @@ static BrynetSocketFD Listen(bool isIPV6, const char* ip, int port, int back_num
         return BRYNET_INVALID_SOCKET;
     }
 
-    if (enabledReusePort && SocketSetReusePort(socketfd) < 0)
+    if ((enabledReusePort && SocketSetReusePort(socketfd) < 0) ||
+        (!enabledReusePort && SocketDisableReusePort(socketfd) < 0))
     {
         SocketClose(socketfd);
         return BRYNET_INVALID_SOCKET;
