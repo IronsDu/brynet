@@ -82,11 +82,16 @@ public:
     using Ptr = std::shared_ptr<SSLHelper>;
 
 #ifdef BRYNET_USE_OPENSSL
-    bool initSSL(const std::string& certificate,
-                 const std::string& privatekey)
+    static void InitThreadSafeSupport()
     {
         std::call_once(initCryptoThreadSafeSupportOnceFlag,
                        InitCryptoThreadSafeSupport);
+    }    
+
+    bool initSSL(const std::string& certificate,
+                 const std::string& privatekey)
+    {
+        SSLHelper::InitThreadSafeSupport();
 
         if (mOpenSSLCTX != nullptr)
         {
