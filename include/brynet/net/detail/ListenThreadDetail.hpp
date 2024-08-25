@@ -1,6 +1,5 @@
 #pragma once
 
-#include <brynet/base/Noexcept.hpp>
 #include <brynet/base/NonCopyable.hpp>
 #include <brynet/net/AsyncConnector.hpp>
 #include <brynet/net/Socket.hpp>
@@ -128,7 +127,7 @@ protected:
         mRunListen = std::make_shared<bool>(false);
     }
 
-    virtual ~ListenThreadDetail() BRYNET_NOEXCEPT
+    virtual ~ListenThreadDetail()
     {
         stopListen();
     }

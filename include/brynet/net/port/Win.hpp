@@ -20,7 +20,8 @@ public:
         OVERLAPPED base;
         const OverlappedType OP;
 
-        OverlappedExt(OverlappedType op) BRYNET_NOEXCEPT : OP(op)
+        OverlappedExt(OverlappedType op)
+            : OP(op)
         {
             memset(&base, 0, sizeof(base));
         }

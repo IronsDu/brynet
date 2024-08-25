@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <brynet/base/Noexcept.hpp>
 #include <brynet/base/NonCopyable.hpp>
 #include <brynet/base/WaitGroup.hpp>
 #include <brynet/net/SSLHelper.hpp>
@@ -53,14 +52,14 @@ protected:
     using FrameCallback = std::function<void(const EventLoop::Ptr&)>;
     const static unsigned int sDefaultLoopTimeOutMS = 100;
 
-    TcpServiceDetail() BRYNET_NOEXCEPT
+    TcpServiceDetail()
         : mRandom(static_cast<unsigned int>(
                   std::chrono::system_clock::now().time_since_epoch().count()))
     {
         mRunIOLoop = std::make_shared<bool>(false);
     }
 
-    virtual ~TcpServiceDetail() BRYNET_NOEXCEPT
+    virtual ~TcpServiceDetail()
     {
         stopWorkerThread();
     }

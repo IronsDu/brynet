@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <brynet/base/Noexcept.hpp>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -22,7 +21,7 @@ public:
 
     Timer(std::chrono::steady_clock::time_point startTime,
           std::chrono::nanoseconds lastTime,
-          Callback&& callback) BRYNET_NOEXCEPT
+          Callback&& callback)
         : mCallback(std::move(callback)),
           mStartTime(startTime),
           mLastTime(lastTime)

@@ -1,8 +1,6 @@
 ﻿#pragma once
 
-#include <brynet/base/Any.hpp>
 #include <brynet/base/Buffer.hpp>
-#include <brynet/base/Noexcept.hpp>
 #include <brynet/base/NonCopyable.hpp>
 #include <brynet/base/Packet.hpp>
 #include <brynet/base/Timer.hpp>
@@ -240,21 +238,21 @@ protected:
     TcpConnection(TcpSocket::Ptr socket,
                   size_t maxRecvBufferSize,
                   EnterCallback&& enterCallback,
-                  EventLoop::Ptr eventLoop) BRYNET_NOEXCEPT
+                  EventLoop::Ptr eventLoop)
         :
 #ifdef BRYNET_PLATFORM_WINDOWS
-        mOvlRecv(port::Win::OverlappedType::OverlappedRecv),
-        mOvlSend(port::Win::OverlappedType::OverlappedSend),
-        mPostClose(false),
+          mOvlRecv(port::Win::OverlappedType::OverlappedRecv),
+          mOvlSend(port::Win::OverlappedType::OverlappedSend),
+          mPostClose(false),
 #endif
-        mIP(socket->getRemoteIP()),
-        mSocket(std::move(socket)),
-        mEventLoop(std::move(eventLoop)),
-        mAlreadyClose(false),
-        mMaxRecvBufferSize(maxRecvBufferSize),
-        mSendingMsgSize(0),
-        mEnterCallback(std::move(enterCallback)),
-        mHighWaterSize(0)
+          mIP(socket->getRemoteIP()),
+          mSocket(std::move(socket)),
+          mEventLoop(std::move(eventLoop)),
+          mAlreadyClose(false),
+          mMaxRecvBufferSize(maxRecvBufferSize),
+          mSendingMsgSize(0),
+          mEnterCallback(std::move(enterCallback)),
+          mHighWaterSize(0)
     {
         mRecvData = false;
         mCheckTime = std::chrono::steady_clock::duration::zero();
@@ -275,7 +273,7 @@ protected:
 #endif
     }
 
-    ~TcpConnection() BRYNET_NOEXCEPT override
+    ~TcpConnection() override
     {
 #ifdef BRYNET_USE_OPENSSL
         if (mSSL != nullptr)
