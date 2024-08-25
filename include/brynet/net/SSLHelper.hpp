@@ -1,6 +1,5 @@
 #pragma once
 
-#include <brynet/base/Noexcept.hpp>
 #include <brynet/base/NonCopyable.hpp>
 #include <brynet/base/Platform.hpp>
 #include <memory>
@@ -86,7 +85,7 @@ public:
     {
         std::call_once(initCryptoThreadSafeSupportOnceFlag,
                        InitCryptoThreadSafeSupport);
-    }    
+    }
 
     bool initSSL(const std::string& certificate,
                  const std::string& privatekey)
@@ -157,14 +156,14 @@ public:
     }
 
 protected:
-    SSLHelper() BRYNET_NOEXCEPT
+    SSLHelper()
     {
 #ifdef BRYNET_USE_OPENSSL
         mOpenSSLCTX = nullptr;
 #endif
     }
 
-    virtual ~SSLHelper() BRYNET_NOEXCEPT
+    virtual ~SSLHelper()
     {
 #ifdef BRYNET_USE_OPENSSL
         destroySSL();

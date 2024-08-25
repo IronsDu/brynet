@@ -20,7 +20,7 @@ public:
     {
     }
 
-    bool wakeup() BRYNET_NOEXCEPT
+    bool wakeup()
     {
         return PostQueuedCompletionStatus(mIOCP,
                                           0,
@@ -29,17 +29,17 @@ public:
     }
 
 private:
-    void canRecv(bool) BRYNET_NOEXCEPT override
+    void canRecv(bool) override
     {
         ;
     }
 
-    void canSend() BRYNET_NOEXCEPT override
+    void canSend() override
     {
         ;
     }
 
-    void onClose() BRYNET_NOEXCEPT override
+    void onClose() override
     {
         ;
     }
