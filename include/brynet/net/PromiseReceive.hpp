@@ -5,7 +5,7 @@
 namespace brynet { namespace net {
 
 /* binary search in memory */
-void memsearch(const char* hay, size_t haysize, const char* needle, size_t needlesize, size_t& result, bool& isOK)
+static void memsearch(const char* hay, size_t haysize, const char* needle, size_t needlesize, size_t& result, bool& isOK)
 {
     size_t haypos, needlepos;
     haysize -= needlesize;

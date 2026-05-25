@@ -25,13 +25,18 @@ public:
 public:
     void add(int i = 1)
     {
+        std::unique_lock<std::mutex> l(mMutex);
         mCounter += i;
     }
 
     void done()
     {
+        std::unique_lock<std::mutex> l(mMutex);
         --mCounter;
-        mCond.notify_all();
+        if (mCounter <= 0)
+        {
+            mCond.notify_all();
+        }
     }
 
     void wait()
@@ -43,10 +48,10 @@ public:
     }
 
     template<class Rep, class Period>
-    void wait(const std::chrono::duration<Rep, Period>& timeout)
+    bool wait(const std::chrono::duration<Rep, Period>& timeout)
     {
         std::unique_lock<std::mutex> l(mMutex);
-        mCond.wait_for(l, timeout, [&] {
+        return mCond.wait_for(l, timeout, [&] {
             return mCounter <= 0;
         });
     }
@@ -61,7 +66,7 @@ private:
 
 private:
     std::mutex mMutex;
-    std::atomic<int> mCounter;
+    int mCounter;
     std::condition_variable mCond;
 };
 }}// namespace brynet::base
